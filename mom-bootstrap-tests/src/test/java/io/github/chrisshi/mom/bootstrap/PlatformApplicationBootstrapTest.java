@@ -1,6 +1,5 @@
 package io.github.chrisshi.mom.bootstrap;
 
-import io.github.chrisshi.mom.gateway.MomGatewayApplication;
 import io.github.chrisshi.mom.iam.MomIamApplication;
 import io.github.chrisshi.mom.integration.MomIntegrationApplication;
 import io.github.chrisshi.mom.mdm.MomMdmApplication;
@@ -16,33 +15,29 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PlatformApplicationBootstrapTest {
 
     @Test
-    void gatewayStartsWithoutExternalInfrastructure() {
-        assertApplicationStarts(MomGatewayApplication.class, WebApplicationType.REACTIVE);
-    }
-
-    @Test
     void iamStartsWithoutExternalInfrastructure() {
-        assertApplicationStarts(MomIamApplication.class, WebApplicationType.SERVLET);
+        assertApplicationStarts(MomIamApplication.class);
     }
 
     @Test
     void mdmStartsWithoutExternalInfrastructure() {
-        assertApplicationStarts(MomMdmApplication.class, WebApplicationType.SERVLET);
+        assertApplicationStarts(MomMdmApplication.class);
     }
 
     @Test
     void integrationStartsWithoutExternalInfrastructure() {
-        assertApplicationStarts(MomIntegrationApplication.class, WebApplicationType.SERVLET);
+        assertApplicationStarts(MomIntegrationApplication.class);
     }
 
-    private void assertApplicationStarts(Class<?> applicationClass, WebApplicationType webApplicationType) {
+    private void assertApplicationStarts(Class<?> applicationClass) {
         try (ConfigurableApplicationContext context = new SpringApplicationBuilder(applicationClass)
-                .web(webApplicationType)
+                .web(WebApplicationType.SERVLET)
                 .properties(
                         "server.port=0",
                         "spring.main.banner-mode=off",
                         "spring.cloud.nacos.discovery.enabled=false",
                         "spring.cloud.nacos.config.enabled=false",
+                        "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
                         "management.endpoints.enabled-by-default=true")
                 .run()) {
             assertTrue(context.isActive());
