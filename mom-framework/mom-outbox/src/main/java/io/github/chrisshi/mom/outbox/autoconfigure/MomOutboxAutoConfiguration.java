@@ -6,6 +6,8 @@ import io.github.chrisshi.mom.outbox.application.OutboxAppender;
 import io.github.chrisshi.mom.outbox.application.OutboxPublisher;
 import io.github.chrisshi.mom.outbox.config.OutboxPublisherProperties;
 import io.github.chrisshi.mom.outbox.persistence.JdbcOutboxRepository;
+import io.micrometer.observation.ObservationRegistry;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -33,6 +35,10 @@ import java.util.UUID;
  * <p>自动配置显式排在 Spring Boot DataSource、JdbcTemplate、事务自动配置以及 MOM 数据模块之后，确保条件
  * 判断时所需 Bean 已经可见。Outbox 追加器和 Inbox 幂等器在 JDBC 可用时创建；定时发布器默认关闭，只有
  * 显式设置 {@code mom.outbox.publisher.enabled=true} 且存在 {@link EventTransport} 时才启用调度。</p>
+ *
+ * <p>发布器优先使用应用已有 {@link ObservationRegistry} 创建消息发布 Span；没有可观测性基础设施时使用
+ * NOOP Registry，不因为诊断能力缺失阻断可靠消息。该降级只关闭 Span，不改变 Outbox 状态机或 Broker
+ * 失败语义。</p>
  */
 @AutoConfiguration(afterName = {
         "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
@@ -99,6 +105,7 @@ public class MomOutboxAutoConfiguration {
      * @param properties 发布参数
      * @param clock 平台 UTC 时钟
      * @param environment 应用环境，用于构造稳定可诊断的租约前缀
+     * @param observationRegistryProvider 可选 Micrometer Observation 注册表
      * @return Outbox 定时发布器
      */
     @Bean
@@ -112,12 +119,21 @@ public class MomOutboxAutoConfiguration {
             EventTransport transport,
             OutboxPublisherProperties properties,
             Clock clock,
-            Environment environment) {
+            Environment environment,
+            ObjectProvider<ObservationRegistry> observationRegistryProvider) {
         String applicationName = environment.getProperty(
                 "spring.application.name",
                 "unknown-application");
         String leaseOwner = applicationName + ":" + UUID.randomUUID();
-        return new OutboxPublisher(repository, transport, properties, clock, leaseOwner);
+        ObservationRegistry observationRegistry = observationRegistryProvider
+                .getIfAvailable(() -> ObservationRegistry.NOOP);
+        return new OutboxPublisher(
+                repository,
+                transport,
+                properties,
+                clock,
+                leaseOwner,
+                observationRegistry);
     }
 
     /**
