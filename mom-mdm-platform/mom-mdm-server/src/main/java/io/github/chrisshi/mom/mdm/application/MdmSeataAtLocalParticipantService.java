@@ -1,6 +1,7 @@
 package io.github.chrisshi.mom.mdm.application;
 
 import org.apache.seata.core.context.RootContext;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,10 +17,18 @@ import java.util.Objects;
  * 明确分离。它只写当前 MDM 数据库，不调用远端服务，不创建第二 DataSource，也不承担 Seata 全局事务的
  * 开始或结束。</p>
  *
+ * <p>Bean 仅在 {@code mom.mdm.seata-at-probe.enabled=true} 时注册。普通无数据库 Bootstrap 因此不会要求
+ * {@link JdbcTemplate}，启用技术接口时如果数据源基础设施缺失则应用启动直接失败，而不是形成缺少事务能力的
+ * 半成品服务。</p>
+ *
  * <p>调用时必须已经由外层 {@code @GlobalTransactional} 建立 XID。若没有 XID，则拒绝写入，避免技术 PoC
  * 退化成普通本地事务并给出虚假的兼容性结论。</p>
  */
 @Service
+@ConditionalOnProperty(
+        prefix = "mom.mdm.seata-at-probe",
+        name = "enabled",
+        havingValue = "true")
 public class MdmSeataAtLocalParticipantService {
 
     private final JdbcTemplate jdbcTemplate;
