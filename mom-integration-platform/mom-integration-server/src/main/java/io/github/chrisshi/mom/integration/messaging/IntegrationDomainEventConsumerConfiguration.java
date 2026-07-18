@@ -2,6 +2,8 @@ package io.github.chrisshi.mom.integration.messaging;
 
 import io.github.chrisshi.mom.messaging.event.EventEnvelope;
 import io.github.chrisshi.mom.outbox.application.InboxDeduplicator;
+import io.github.chrisshi.mom.tracing.CurrentTraceContext;
+import io.github.chrisshi.mom.tracing.TraceContextSnapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -22,9 +24,13 @@ import java.util.function.Consumer;
  * {@code spring.cloud.function.definition=momDomainEventConsumer} 时才参与消息消费，从而保证普通本地启动和
  * 既有 Nacos/Redis Smoke Test 不依赖 RocketMQ。</p>
  *
+ * <p>Spring Cloud Stream 的 Imperative Function Observation 会从消息 Header 恢复发布方 Trace Context，并
+ * 为当前消费尝试创建 Span。技术消费结果同时记录 Trace ID 与 Span ID，供真实 Broker CI 证明发布和消费属于
+ * 同一短 Trace；重复投递可以产生新的消费尝试 Span，但 Inbox 仍只允许一次业务成功。</p>
+ *
  * <p>配置不使用类级 {@code ConditionalOnBean} 判断 Inbox 基础设施，因为组件扫描发生在自动配置 Bean 注册
- * 之前，早期判断会把合法消费者错误跳过。启用消费者后，{@link InboxDeduplicator} 或 {@link JdbcTemplate}
- * 缺失将导致应用启动失败；可靠消费者不能以“静默不绑定”的方式降级。</p>
+ * 之前，早期判断会把合法消费者错误跳过。启用消费者后，{@link InboxDeduplicator}、{@link JdbcTemplate} 或
+ * {@link CurrentTraceContext} 缺失将导致应用启动失败；可靠消费者不能以“静默不绑定”的方式降级。</p>
  *
  * <p>正常事件由 {@link InboxDeduplicator} 在同一 PostgreSQL 本地事务中写入 Inbox 与技术消费结果。重复投递
  * 不会重复执行 INSERT。故障验证事件会在事务内主动抛出异常，使 Inbox 与业务结果一起回滚，并把异常交给
@@ -53,17 +59,22 @@ public class IntegrationDomainEventConsumerConfiguration {
      *
      * @param inboxDeduplicator 当前服务 Inbox 幂等执行器
      * @param jdbcTemplate 当前服务唯一权威 DataSource 对应的 JDBC 模板
+     * @param currentTraceContext 当前消费函数 Observation 的 Trace 上下文访问器
      * @return 接收完整事件信封的函数式 Consumer
      */
     @Bean
     Consumer<Message<EventEnvelope>> momDomainEventConsumer(
             InboxDeduplicator inboxDeduplicator,
-            JdbcTemplate jdbcTemplate) {
+            JdbcTemplate jdbcTemplate,
+            CurrentTraceContext currentTraceContext) {
         return message -> {
             EventEnvelope event = message.getPayload();
             if (CREATED_EVENT_TYPE.equals(event.eventType())) {
                 inboxDeduplicator.executeOnce(event, CONSUMER_NAME, () ->
-                        insertTechnicalReceipt(jdbcTemplate, event));
+                        insertTechnicalReceipt(
+                                jdbcTemplate,
+                                event,
+                                currentTraceContext.snapshot()));
                 return;
             }
             if (POISON_EVENT_TYPE.equals(event.eventType())) {
@@ -78,15 +89,20 @@ public class IntegrationDomainEventConsumerConfiguration {
     }
 
     /**
-     * 在 Inbox 事务中记录一次正常技术事件的消费结果。
+     * 在 Inbox 事务中记录一次正常技术事件的消费结果及当前消费 Span。
      *
      * @param jdbcTemplate 当前事务绑定的 JDBC 模板
      * @param event 正在处理的事件信封
-     * @throws IllegalStateException INSERT 未影响预期一行时抛出并回滚 Inbox
+     * @param trace 当前消费函数 Observation 的 Trace 标识快照
+     * @throws IllegalStateException 当前没有活动消费 Span，或 INSERT 未影响预期一行时抛出并回滚 Inbox
      */
     private static void insertTechnicalReceipt(
             JdbcTemplate jdbcTemplate,
-            EventEnvelope event) {
+            EventEnvelope event,
+            TraceContextSnapshot trace) {
+        if (!trace.isPresent()) {
+            throw new IllegalStateException("消息消费者执行时没有活动 Trace Context");
+        }
         int inserted = jdbcTemplate.update("""
                         INSERT INTO technical_message_receipt (
                             event_id,
@@ -94,15 +110,19 @@ public class IntegrationDomainEventConsumerConfiguration {
                             aggregate_id,
                             correlation_id,
                             payload_json,
-                            received_at
-                        ) VALUES (?, ?, ?, ?, ?, ?)
+                            received_at,
+                            trace_id,
+                            span_id
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                 event.eventId(),
                 event.eventType(),
                 event.aggregateId(),
                 event.correlationId(),
                 event.payloadJson(),
-                Timestamp.from(event.occurredAt()));
+                Timestamp.from(event.occurredAt()),
+                trace.traceId(),
+                trace.spanId());
         if (inserted != 1) {
             throw new IllegalStateException("技术消息消费结果未插入预期的一行记录");
         }
