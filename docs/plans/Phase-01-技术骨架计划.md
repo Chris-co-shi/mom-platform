@@ -114,13 +114,20 @@ mvn -B -ntp clean verify
 任务：
 
 - PostgreSQL 每服务独立 Schema。
+- 普通领域服务采用单权威 DataSource 和单 HikariCP 连接池。
+- 固化连接池默认容量、连接获取超时、TCP Keepalive、ApplicationName 与 UTC 会话。
+- 按服务最大副本数建立 PostgreSQL 连接预算，保留滚动升级和运维容量。
 - Flyway 初始化脚本。
 - Outbox/Inbox 最小表结构和接口。
+- 业务表、Outbox 和 Inbox 共用所属服务 DataSource 与本地事务。
 - RocketMQ 最小生产、消费、重试和死信验证。
 - Seata AT 兼容性 PoC，不扩展到长流程。
 
 验收：
 
+- 应用上下文默认只创建一个 HikariDataSource。
+- PostgreSQL 可通过 `application_name` 识别服务连接。
+- Prometheus 能看到 JDBC 和 Hikari 连接池指标。
 - 一个本地事务同时写业务测试表和 Outbox。
 - Outbox 消息发布并由消费者 Inbox 去重。
 - 同一消息重复投递三次只处理一次。
@@ -131,7 +138,7 @@ mvn -B -ntp clean verify
 - 集成测试：PostgreSQL、Redis、RocketMQ、Nacos。
 - 契约测试：错误响应、事件信封和上下文字段。
 - 架构测试：模块依赖和禁止类型。
-- 故障测试：Redis 中断、MQ 重复投递、应用重启。
+- 故障测试：Redis 中断、数据库中断、MQ 重复投递、应用重启。
 
 ## 5. 完成定义
 
@@ -154,3 +161,4 @@ Phase 01 完成必须同时满足：
 | Framework 过早膨胀 | 只实现首个垂直切片需要的公共能力 |
 | 链路追踪标签失控 | 只允许低基数指标标签，业务 ID 放日志和 Span 属性 |
 | Redis 故障导致生产操作全部失败 | 按接口等级定义 fail-open、fail-closed 或本地应急桶 |
+| Pod 扩容和滚动升级耗尽 PostgreSQL 连接 | 按副本数计算连接预算，默认每实例最大 5，并保留运维和发布余量 |
