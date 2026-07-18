@@ -19,6 +19,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -54,6 +56,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MdmPostgresqlDataIntegrationTest {
 
     private static final String SCHEMA = "mom_mdm";
+    private static final Duration POSTGRESQL_TIMESTAMP_TOLERANCE = Duration.ofMicros(1);
 
     @Container
     private static final PostgreSQLContainer POSTGRESQL = new PostgreSQLContainer(
@@ -101,7 +104,8 @@ class MdmPostgresqlDataIntegrationTest {
                 String.class));
         assertTrue(flyway.info().applied().length >= 1);
         assertEquals(1L, jdbcTemplate.queryForObject(
-                "select count(*) from flyway_schema_history where success = true",
+                "select count(*) from flyway_schema_history "
+                        + "where success = true and version = '1'",
                 Long.class));
         assertEquals(1L, jdbcTemplate.queryForObject(
                 "select count(*) from information_schema.tables "
@@ -128,7 +132,12 @@ class MdmPostgresqlDataIntegrationTest {
 
         MdmDataProbeEntity persisted = mapper.selectById(entity.getId());
         assertEquals(entity.getProbeKey(), persisted.getProbeKey());
-        assertEquals(entity.getCreatedAt(), persisted.getCreatedAt());
+        assertWithinPostgresqlTimestampPrecision(
+                entity.getCreatedAt(),
+                persisted.getCreatedAt());
+        assertWithinPostgresqlTimestampPrecision(
+                entity.getUpdatedAt(),
+                persisted.getUpdatedAt());
         assertEquals("p01-s04-test-actor", persisted.getCreatedBy());
     }
 
@@ -169,6 +178,21 @@ class MdmPostgresqlDataIntegrationTest {
                 service.createThenRollback(probeKey, "must-not-persist"));
 
         assertTrue(service.findByKey(probeKey).isEmpty());
+    }
+
+    /**
+     * 按 PostgreSQL {@code timestamptz} 的微秒精度比较 Java Instant。
+     *
+     * <p>Java Instant 支持纳秒，而 PostgreSQL 会把时间舍入到微秒。测试允许不超过一微秒的差异，
+     * 但仍能发现时区错误或明显的审计时间偏移。</p>
+     */
+    private static void assertWithinPostgresqlTimestampPrecision(
+            Instant expected,
+            Instant actual) {
+        Duration difference = Duration.between(expected, actual).abs();
+        assertTrue(
+                difference.compareTo(POSTGRESQL_TIMESTAMP_TOLERANCE) <= 0,
+                () -> "PostgreSQL 时间精度差异超过一微秒：" + difference);
     }
 
     /**
