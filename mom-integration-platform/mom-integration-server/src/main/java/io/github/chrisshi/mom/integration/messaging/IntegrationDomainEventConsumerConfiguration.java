@@ -4,7 +4,6 @@ import io.github.chrisshi.mom.messaging.event.EventEnvelope;
 import io.github.chrisshi.mom.outbox.application.InboxDeduplicator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,12 +22,15 @@ import java.util.function.Consumer;
  * {@code spring.cloud.function.definition=momDomainEventConsumer} 时才参与消息消费，从而保证普通本地启动和
  * 既有 Nacos/Redis Smoke Test 不依赖 RocketMQ。</p>
  *
+ * <p>配置不使用类级 {@code ConditionalOnBean} 判断 Inbox 基础设施，因为组件扫描发生在自动配置 Bean 注册
+ * 之前，早期判断会把合法消费者错误跳过。启用消费者后，{@link InboxDeduplicator} 或 {@link JdbcTemplate}
+ * 缺失将导致应用启动失败；可靠消费者不能以“静默不绑定”的方式降级。</p>
+ *
  * <p>正常事件由 {@link InboxDeduplicator} 在同一 PostgreSQL 本地事务中写入 Inbox 与技术消费结果。重复投递
  * 不会重复执行 INSERT。故障验证事件会在事务内主动抛出异常，使 Inbox 与业务结果一起回滚，并把异常交给
  * RocketMQ 执行重新消费和 DLQ 策略。</p>
  */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnBean({InboxDeduplicator.class, JdbcTemplate.class})
 @ConditionalOnProperty(
         prefix = "mom.integration.message-consumer",
         name = "enabled",
