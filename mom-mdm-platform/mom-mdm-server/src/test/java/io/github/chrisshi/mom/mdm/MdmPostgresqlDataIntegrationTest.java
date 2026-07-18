@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm;
 
+import com.zaxxer.hikari.HikariDataSource;
 import io.github.chrisshi.mom.core.security.CurrentActorProvider;
 import io.github.chrisshi.mom.mdm.application.MdmDataProbeService;
 import io.github.chrisshi.mom.mdm.infrastructure.persistence.MdmDataProbeEntity;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -19,6 +21,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import javax.sql.DataSource;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -26,6 +29,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -34,8 +38,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * MDM 数据访问真实 PostgreSQL 集成测试。
  *
  * <p>测试使用 PostgreSQL 17.7 官方镜像，并把数据库服务端默认时区设置为 Asia/Tokyo，以确认 MOM
- * 连接池的 UTC 初始化语句真实生效。测试同时验证 Flyway 增量迁移、String 主键、Lombok 访问器、
- * MyBatis-Plus 审计填充、逻辑删除、乐观锁和 Spring 事务回滚，不使用 H2 模拟 PostgreSQL 行为。</p>
+ * 连接池的 UTC 初始化语句真实生效。测试同时验证单服务单数据源约束、HikariCP 参数、PgJDBC 连接属性、
+ * Flyway 增量迁移、String 主键、Lombok 访问器、MyBatis-Plus 审计填充、逻辑删除、乐观锁和 Spring
+ * 事务回滚，不使用 H2 模拟 PostgreSQL 行为。</p>
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
@@ -56,6 +61,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MdmPostgresqlDataIntegrationTest {
 
     private static final String SCHEMA = "mom_mdm";
+    private static final String APPLICATION_NAME = "mom-mdm-server";
     private static final Duration POSTGRESQL_TIMESTAMP_TOLERANCE = Duration.ofNanos(1_000);
 
     @Container
@@ -65,6 +71,12 @@ class MdmPostgresqlDataIntegrationTest {
             .withUsername("mom")
             .withPassword("mom")
             .withCommand("postgres", "-c", "fsync=off", "-c", "timezone=Asia/Tokyo");
+
+    @Autowired
+    private ApplicationContext applicationContext;
+
+    @Autowired
+    private DataSource dataSource;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -80,15 +92,49 @@ class MdmPostgresqlDataIntegrationTest {
 
     /**
      * 将 Testcontainers 动态端口和凭证注入 Spring Boot 数据源。
+     *
+     * <p>测试 URL 显式保留生产默认使用的 {@code tcpKeepAlive} 和 {@code ApplicationName}，避免动态属性
+     * 覆盖应用配置后漏测 PgJDBC 连接治理参数。</p>
+     *
+     * @param registry Spring 测试动态属性注册器
      */
     @DynamicPropertySource
     static void registerDatabaseProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", () -> POSTGRESQL.getJdbcUrl()
-                + "&currentSchema=" + SCHEMA);
+                + "&currentSchema=" + SCHEMA
+                + "&tcpKeepAlive=true"
+                + "&ApplicationName=" + APPLICATION_NAME);
         registry.add("spring.datasource.username", POSTGRESQL::getUsername);
         registry.add("spring.datasource.password", POSTGRESQL::getPassword);
         registry.add("spring.flyway.default-schema", () -> SCHEMA);
         registry.add("spring.flyway.schemas", () -> SCHEMA);
+    }
+
+    /**
+     * 验证默认应用上下文只存在一个权威 DataSource，并锁定 P01-S04.5 的 HikariCP 资源预算。
+     *
+     * <p>该测试不是限制未来永远不能接入第二数据源，而是防止普通领域服务在没有 ADR、独立事务边界和
+     * 故障策略的情况下被动态数据源框架隐式改造成多数据源应用。外部遗留库或报表库需要独立设计后才能
+     * 调整此契约。</p>
+     */
+    @Test
+    void dataSourceTopologyAndHikariDefaultsShouldMatchGovernanceBaseline() {
+        assertEquals(1, applicationContext.getBeansOfType(DataSource.class).size());
+
+        HikariDataSource hikariDataSource = assertInstanceOf(HikariDataSource.class, dataSource);
+        assertEquals("mom-mdm-hikari", hikariDataSource.getPoolName());
+        assertEquals(1, hikariDataSource.getMinimumIdle());
+        assertEquals(5, hikariDataSource.getMaximumPoolSize());
+        assertEquals(3_000L, hikariDataSource.getConnectionTimeout());
+        assertEquals(2_000L, hikariDataSource.getValidationTimeout());
+        assertEquals(0L, hikariDataSource.getLeakDetectionThreshold());
+        assertEquals("SET TIME ZONE 'UTC'", hikariDataSource.getConnectionInitSql());
+        assertTrue(hikariDataSource.getJdbcUrl().contains("tcpKeepAlive=true"));
+        assertTrue(hikariDataSource.getJdbcUrl().contains("ApplicationName=" + APPLICATION_NAME));
+
+        assertEquals(APPLICATION_NAME, jdbcTemplate.queryForObject(
+                "select application_name from pg_stat_activity where pid = pg_backend_pid()",
+                String.class));
     }
 
     /**
@@ -221,6 +267,9 @@ class MdmPostgresqlDataIntegrationTest {
      *
      * <p>Java Instant 支持纳秒，而 PostgreSQL 会把时间舍入到微秒。测试允许不超过一微秒的差异，
      * 但仍能发现时区错误或明显的审计时间偏移。</p>
+     *
+     * @param expected 写入前的 Java 时间
+     * @param actual PostgreSQL 读取后的时间
      */
     private static void assertWithinPostgresqlTimestampPrecision(
             Instant expected,
@@ -233,6 +282,9 @@ class MdmPostgresqlDataIntegrationTest {
 
     /**
      * 为并行或重复执行的测试生成互不冲突的唯一验证键。
+     *
+     * @param prefix 用于辨识测试场景的前缀
+     * @return 带随机后缀的验证键
      */
     private static String uniqueKey(String prefix) {
         return prefix + "-" + UUID.randomUUID();
