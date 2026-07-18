@@ -1,5 +1,5 @@
 server:
-  port: ${SERVER_PORT:8400}
+  port: ${SERVER_PORT:20500}
 spring:
   application:
     name: mom-qms-server

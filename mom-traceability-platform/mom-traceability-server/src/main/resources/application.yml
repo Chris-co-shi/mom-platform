@@ -1,5 +1,5 @@
 server:
-  port: ${SERVER_PORT:8600}
+  port: ${SERVER_PORT:20900}
 spring:
   application:
     name: mom-traceability-server

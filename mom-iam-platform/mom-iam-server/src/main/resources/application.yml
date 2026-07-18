@@ -1,5 +1,5 @@
 server:
-  port: ${SERVER_PORT:8100}
+  port: ${SERVER_PORT:20100}
 spring:
   application:
     name: mom-iam-server
