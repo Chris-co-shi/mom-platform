@@ -68,7 +68,24 @@
 - Lombok 仅用于消除 getter、setter、构造器等机械代码，不得使用 `@Data` 自动生成实体 `equals/hashCode/toString`，避免触发懒加载、递归引用或错误身份语义；
 - 新增 Flyway 迁移后不得修改已经合并执行过的历史迁移文件，结构变更必须增加新版本迁移。
 
-## 5. Redis 约束
+## 5. 消息与最终一致性约束
+
+- Spring Cloud Stream 只作为 Binding、消息转换和 Broker 适配层；不得把 Binder 抽象当作本地事务、可靠状态或业务幂等实现；
+- 跨服务事件必须使用版本化、Broker 无关的事件信封，至少包含 `eventId`、事件类型、版本、聚合标识、发生时间、生产服务和关联标识；
+- 事件正文使用明确 JSON，禁止 Java 原生序列化；Payload、日志、Trace 和 `last_error` 不得包含 Token、密钥或未脱敏敏感数据；
+- 事件 ID 在首次写入 Outbox 时生成，所有发布重试必须复用同一个 ID 和负载；
+- 业务写入与 Outbox INSERT 必须同一 PostgreSQL 本地事务提交或回滚，禁止在业务事务中直接调用 RocketMQ；
+- Outbox 领取必须使用数据库原子语义、短事务、租约与 CAS；RocketMQ 网络调用必须在提交领取事务、释放数据库连接和行锁后执行；
+- StreamBridge 返回成功只表示传输被 Binding/Broker 接受，不表示消费者业务完成；发送后状态更新失败时必须允许重复发布，并依靠消费幂等承受；
+- Producer 的 Binder 内部发送重试默认关闭，由 Outbox 持久化 RETRY/DEAD 状态统一控制，避免多层重试乘法；
+- Consumer 使用稳定消费者组；Spring Cloud Stream 通用 `maxAttempts` 默认设为 1，Broker 重新消费和 DLQ 由 RocketMQ 配置控制；
+- 消费者业务写入与 Inbox 记录必须同一本地事务；业务异常必须回滚 Inbox，使重新投递仍可处理；
+- Inbox 唯一约束只解决事件级重复，库存、工单、质量和设备命令仍必须使用领域状态机、条件更新和业务唯一约束；
+- Outbox DEAD 与 RocketMQ 消费 DLQ 是不同故障面，必须分别监控、告警和处理；
+- 不允许根据 HTTP 参数、事件内容或用户输入无限创建动态 Binding、Topic 或消费者组；正式名称必须来自受控配置；
+- 新增消息能力必须真实验证正常发布、重复投递、Broker 中断恢复、消费者失败重试和 DLQ，不得只使用内存 Test Binder 得出兼容性结论。
+
+## 6. Redis 约束
 
 - Key 必须具有统一命名空间，禁止直接拼接含个人信息或敏感业务数据的原始值；
 - 默认使用字符串或明确的 JSON 格式，禁止依赖 Java 原生序列化；
@@ -77,7 +94,7 @@
 - 必须明确 Redis 不可用时采用 fail-open 还是 fail-closed；
 - 分布式锁必须使用唯一持有者标识并安全释放，幂等占位不得伪装成分布式锁。
 
-## 6. 测试与提交
+## 7. 测试与提交
 
 - 新增基础设施能力必须包含单元测试或真实中间件 Smoke Test；
 - GitHub Actions 必须执行 JDK 25 下的 `mvn -B -ntp clean verify`；

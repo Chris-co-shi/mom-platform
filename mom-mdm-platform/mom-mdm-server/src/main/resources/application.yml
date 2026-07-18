@@ -35,6 +35,22 @@ spring:
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
+    stream:
+      bindings:
+        momDomainEvents-out-0:
+          destination: ${MOM_DOMAIN_EVENT_TOPIC:mom-domain-events-v1}
+          content-type: application/json
+      rocketmq:
+        binder:
+          name-server: ${ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
+          enable-msg-trace: ${ROCKETMQ_ENABLE_MSG_TRACE:false}
+        bindings:
+          momDomainEvents-out-0:
+            producer:
+              group: ${ROCKETMQ_PRODUCER_GROUP:mom-mdm-outbox-v1}
+              send-type: Sync
+              send-msg-timeout: ${ROCKETMQ_SEND_TIMEOUT:3000}
+              retry-times-when-send-failed: 0
 
 mybatis-plus:
   configuration:
@@ -46,12 +62,24 @@ mom:
   mdm:
     data-probe:
       enabled: ${MDM_DATA_PROBE_ENABLED:false}
+    outbox-probe:
+      enabled: ${MDM_OUTBOX_PROBE_ENABLED:false}
+  outbox:
+    publisher:
+      enabled: ${OUTBOX_PUBLISHER_ENABLED:false}
+      binding-name: momDomainEvents-out-0
+      fixed-delay-millis: ${OUTBOX_FIXED_DELAY_MILLIS:1000}
+      batch-size: ${OUTBOX_BATCH_SIZE:20}
+      lease-duration: ${OUTBOX_LEASE_DURATION:30s}
+      max-attempts: ${OUTBOX_MAX_ATTEMPTS:8}
+      initial-backoff: ${OUTBOX_INITIAL_BACKOFF:1s}
+      max-backoff: ${OUTBOX_MAX_BACKOFF:5m}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,nacos-discovery
+        include: health,info,prometheus,nacos-discovery,bindings
   endpoint:
     health:
       probes:

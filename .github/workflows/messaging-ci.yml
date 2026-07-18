@@ -1,0 +1,67 @@
+name: Messaging CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: messaging-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rocketmq-outbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Package MDM and Integration applications
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -ntp -DskipTests \
+            -pl :mom-mdm-server,:mom-integration-server \
+            -am package 2>&1 | tee messaging-build.log
+
+      - name: Run RocketMQ Stream Outbox smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          bash .github/scripts/p01-s05-rocketmq-outbox-smoke.sh \
+            2>&1 | tee p01-s05-smoke.log
+
+      - name: Upload messaging diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: messaging-verification-diagnostics
+          path: |
+            messaging-build.log
+            p01-s05-smoke.log
+            p01-s05-postgresql.log
+            p01-s05-rocketmq-namesrv.log
+            p01-s05-rocketmq-broker.log
+            p01-s05-mdm-server.log
+            p01-s05-integration-server.log
+            p01-s05-mdm-health.json
+            p01-s05-integration-health.json
+            p01-s05-normal-create.json
+            p01-s05-outage-create.json
+            p01-s05-poison-create.json
+            p01-s05-dlq-status.txt
+            p01-s05-outbox-status.txt
+            p01-s05-inbox-status.txt
+            **/target/surefire-reports/**
+          if-no-files-found: ignore

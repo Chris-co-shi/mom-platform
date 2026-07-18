@@ -4,6 +4,27 @@ server:
 spring:
   application:
     name: mom-integration-server
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_integration}&tcpKeepAlive=${POSTGRES_TCP_KEEP_ALIVE:true}&ApplicationName=${POSTGRES_APPLICATION_NAME:mom-integration-server}}
+    username: ${POSTGRES_USERNAME:mom}
+    password: ${POSTGRES_PASSWORD:mom}
+    hikari:
+      pool-name: ${POSTGRES_POOL_NAME:mom-integration-hikari}
+      minimum-idle: ${POSTGRES_MINIMUM_IDLE:1}
+      maximum-pool-size: ${POSTGRES_MAXIMUM_POOL_SIZE:5}
+      connection-timeout: ${POSTGRES_CONNECTION_TIMEOUT:3000}
+      validation-timeout: ${POSTGRES_VALIDATION_TIMEOUT:2000}
+      leak-detection-threshold: ${POSTGRES_LEAK_DETECTION_THRESHOLD:0}
+      connection-init-sql: SET TIME ZONE 'UTC'
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    create-schemas: true
+    default-schema: ${POSTGRES_SCHEMA:mom_integration}
+    schemas: ${POSTGRES_SCHEMA:mom_integration}
+    locations: classpath:db/migration/integration
+    validate-migration-naming: true
+    clean-disabled: true
+    baseline-on-migrate: false
   data:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
@@ -14,6 +35,8 @@ spring:
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
       timeout: ${REDIS_TIMEOUT:2s}
   cloud:
+    function:
+      definition: ${MOM_MESSAGE_FUNCTION_DEFINITION:}
     nacos:
       discovery:
         enabled: ${NACOS_DISCOVERY_ENABLED:false}
@@ -30,8 +53,30 @@ spring:
             connect-timeout: ${MDM_CLIENT_CONNECT_TIMEOUT:2000}
             read-timeout: ${MDM_CLIENT_READ_TIMEOUT:3000}
             logger-level: basic
+    stream:
+      bindings:
+        momDomainEventConsumer-in-0:
+          destination: ${MOM_DOMAIN_EVENT_TOPIC:mom-domain-events-v1}
+          group: ${ROCKETMQ_CONSUMER_GROUP:mom-integration-v1}
+          content-type: application/json
+          consumer:
+            max-attempts: 1
+      rocketmq:
+        binder:
+          name-server: ${ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
+          enable-msg-trace: ${ROCKETMQ_ENABLE_MSG_TRACE:false}
+        bindings:
+          momDomainEventConsumer-in-0:
+            consumer:
+              push:
+                orderly: false
+                max-reconsume-times: ${ROCKETMQ_MAX_RECONSUME_TIMES:2}
+                consume-message-batch-max-size: 1
 
 mom:
+  integration:
+    message-consumer:
+      enabled: ${MOM_MESSAGE_CONSUMER_ENABLED:false}
   idempotency:
     redis:
       environment: ${MOM_ENVIRONMENT:local}
@@ -42,7 +87,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,nacos-discovery
+        include: health,info,prometheus,nacos-discovery,bindings
   endpoint:
     health:
       probes:
