@@ -49,7 +49,7 @@ spring:
             producer:
               group: ${ROCKETMQ_PRODUCER_GROUP:mom-mdm-outbox-v1}
               send-type: Sync
-              send-message-timeout: ${ROCKETMQ_SEND_TIMEOUT:3000}
+              send-msg-timeout: ${ROCKETMQ_SEND_TIMEOUT:3000}
               retry-times-when-send-failed: 0
 
 mybatis-plus:
