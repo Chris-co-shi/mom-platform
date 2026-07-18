@@ -16,11 +16,12 @@ import java.nio.charset.StandardCharsets;
 /**
  * Gateway Redis 限流故障处理器。
  *
- * <p>当前阶段采用 fail-closed：当 Redis 连接或命令执行失败时，不允许请求绕过共享令牌桶继续访问下游，
- * 而是返回 HTTP 503。这样可以避免 Redis 故障期间所有 Gateway 实例同时失去流量保护，冲击 IAM、
- * Integration 或后续 MES/WMS 核心服务。</p>
+ * <p>当前阶段采用 fail-closed：当 MOM 包装器识别到官方 RedisRateLimiter 的异常放行结果，或者
+ * 其他自定义限流实现直接抛出 Redis 异常时，不允许请求继续访问下游，而是返回 HTTP 503。这样可以
+ * 避免 Redis 故障期间所有 Gateway 实例同时失去流量保护，冲击 IAM、Integration 或后续 MES/WMS
+ * 核心服务。</p>
  *
- * <p>该处理器只接管 Redis 基础设施异常，其他异常继续交给 Gateway 默认错误处理链。</p>
+ * <p>该处理器只接管限流基础设施异常，其他异常继续交给 Gateway 默认错误处理链。</p>
  */
 public final class RedisRateLimitFailureWebExceptionHandler implements WebExceptionHandler, Ordered {
 
@@ -33,11 +34,11 @@ public final class RedisRateLimitFailureWebExceptionHandler implements WebExcept
      *
      * @param exchange 当前请求与响应上下文
      * @param exception 过滤链异常
-     * @return Redis 故障时写入 503 响应；非 Redis 异常继续向后传播
+     * @return 限流基础设施故障时写入 503 响应；其他异常继续向后传播
      */
     @Override
     public Mono<Void> handle(ServerWebExchange exchange, Throwable exception) {
-        if (!isRedisFailure(exception) || exchange.getResponse().isCommitted()) {
+        if (!isRateLimitInfrastructureFailure(exception) || exchange.getResponse().isCommitted()) {
             return Mono.error(exception);
         }
 
@@ -55,12 +56,13 @@ public final class RedisRateLimitFailureWebExceptionHandler implements WebExcept
     }
 
     /**
-     * 递归检查异常因果链，兼容 Reactor 或 Gateway 对 Redis 异常的包装。
+     * 递归检查异常因果链，兼容 MOM fail-closed 包装器以及 Reactor 对原始 Redis 异常的包装。
      */
-    private static boolean isRedisFailure(Throwable exception) {
+    private static boolean isRateLimitInfrastructureFailure(Throwable exception) {
         Throwable current = exception;
         while (current != null) {
-            if (current instanceof RedisConnectionFailureException
+            if (current instanceof RedisRateLimitUnavailableException
+                    || current instanceof RedisConnectionFailureException
                     || current instanceof RedisSystemException) {
                 return true;
             }
@@ -70,7 +72,7 @@ public final class RedisRateLimitFailureWebExceptionHandler implements WebExcept
     }
 
     /**
-     * 必须早于 Gateway 默认错误处理器执行，才能把 Redis 故障稳定映射为 503。
+     * 必须早于 Gateway 默认错误处理器执行，才能把限流基础设施故障稳定映射为 503。
      *
      * @return WebExceptionHandler 顺序
      */
