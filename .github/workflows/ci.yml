@@ -32,6 +32,9 @@ jobs:
       - name: Compile reactor
         run: mvn -B -ntp -DskipTests compile
 
+      - name: Compile architecture and bootstrap tests
+        run: mvn -B -ntp -DskipTests test-compile
+
       - name: Run architecture and bootstrap tests
         run: mvn -B -ntp test
 
