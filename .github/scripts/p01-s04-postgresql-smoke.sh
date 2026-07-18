@@ -52,6 +52,7 @@ NACOS_DISCOVERY_ENABLED=false \
 java -jar mom-mdm-platform/mom-mdm-server/target/mom-mdm-server-0.1.0-SNAPSHOT-exec.jar \
   --server.port="$MDM_PORT" \
   --spring.application.name=mom-mdm-server \
+  --mom.mdm.data-probe.enabled=true \
   --spring.autoconfigure.exclude="$SECURITY_EXCLUSIONS" \
   > mdm-postgresql-server.log 2>&1 &
 MDM_PID=$!
