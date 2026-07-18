@@ -4,6 +4,26 @@ server:
 spring:
   application:
     name: mom-mdm-server
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_mdm}}
+    username: ${POSTGRES_USERNAME:mom}
+    password: ${POSTGRES_PASSWORD:mom}
+    hikari:
+      pool-name: mom-mdm-hikari
+      minimum-idle: ${POSTGRES_MINIMUM_IDLE:1}
+      maximum-pool-size: ${POSTGRES_MAXIMUM_POOL_SIZE:10}
+      connection-timeout: ${POSTGRES_CONNECTION_TIMEOUT:3000}
+      validation-timeout: ${POSTGRES_VALIDATION_TIMEOUT:2000}
+      connection-init-sql: SET TIME ZONE 'UTC'
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    create-schemas: true
+    default-schema: ${POSTGRES_SCHEMA:mom_mdm}
+    schemas: ${POSTGRES_SCHEMA:mom_mdm}
+    locations: classpath:db/migration/mdm
+    validate-migration-naming: true
+    clean-disabled: true
+    baseline-on-migrate: false
   cloud:
     nacos:
       discovery:
@@ -14,6 +34,17 @@ spring:
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+
+mom:
+  mdm:
+    data-probe:
+      enabled: ${MDM_DATA_PROBE_ENABLED:false}
 
 management:
   endpoints:

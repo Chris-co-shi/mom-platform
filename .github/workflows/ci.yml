@@ -15,7 +15,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -236,6 +236,10 @@ jobs:
           [[ "$redis_failure_status" == "503" ]]
           jq --exit-status '.code == "REDIS_RATE_LIMIT_UNAVAILABLE"' redis-failure-response.json
 
+      - name: Run PostgreSQL packaged application smoke test
+        shell: bash
+        run: bash .github/scripts/p01-s04-postgresql-smoke.sh
+
       - name: Upload verification diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -245,7 +249,9 @@ jobs:
             maven-build.log
             nacos-server.log
             redis-server.log
+            postgresql-server.log
             mdm-server.log
+            mdm-postgresql-server.log
             integration-server.log
             gateway-one.log
             gateway-one-rate-limit.log
@@ -257,6 +263,10 @@ jobs:
             rate-limit-first.json
             rate-limit-second.json
             redis-failure-response.json
+            mdm-postgresql-health.json
+            mdm-data-probe-create.json
+            mdm-data-probe-read.json
+            mdm-postgresql-failure.json
             **/target/surefire-reports/**
             **/target/failsafe-reports/**
           if-no-files-found: ignore
