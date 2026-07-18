@@ -1,5 +1,5 @@
 server:
-  port: ${SERVER_PORT:8500}
+  port: ${SERVER_PORT:20800}
 spring:
   application:
     name: mom-integration-server
