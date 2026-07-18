@@ -73,10 +73,33 @@ spring:
                 max-reconsume-times: ${ROCKETMQ_MAX_RECONSUME_TIMES:2}
                 consume-message-batch-max-size: 1
 
+seata:
+  enabled: ${SEATA_ENABLED:false}
+  application-id: ${spring.application.name}
+  tx-service-group: mom-p01-s06-tx-group
+  enable-auto-data-source-proxy: true
+  data-source-proxy-mode: AT
+  use-jdk-proxy: false
+  registry:
+    type: file
+  config:
+    type: file
+  service:
+    vgroup-mapping:
+      mom-p01-s06-tx-group: default
+    grouplist:
+      default: ${SEATA_SERVER_ADDR:127.0.0.1:8091}
+  client:
+    rm:
+      report-success-enable: true
+      table-meta-check-enable: true
+
 mom:
   integration:
     message-consumer:
       enabled: ${MOM_MESSAGE_CONSUMER_ENABLED:false}
+    seata-at-probe:
+      enabled: ${INTEGRATION_SEATA_AT_PROBE_ENABLED:false}
   idempotency:
     redis:
       environment: ${MOM_ENVIRONMENT:local}
