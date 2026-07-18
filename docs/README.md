@@ -2,7 +2,7 @@
 
 本目录是 `mom-platform` 的需求、计划、架构和架构决策权威入口。
 
-> 文档分支约定：所有文档新增、修改、重命名、整理和相关 PR 更新统一在 `agent/complete-chinese-docs` 分支进行，详见 [文档分支策略](.branch-policy.md)。
+> 文档分支约定：所有文档新增、修改、重命名、整理和相关 PR 更新统一在 `agent/complete-chinese-docs` 分支进行，详见 [文档维护约定](文档维护约定.md)。
 
 ## 文档使用原则
 
