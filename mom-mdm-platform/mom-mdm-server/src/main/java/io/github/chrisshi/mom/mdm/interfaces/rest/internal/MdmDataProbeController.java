@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.net.URI;
 
@@ -15,9 +15,13 @@ import java.net.URI;
  * MDM PostgreSQL 数据访问技术探针。
  *
  * <p>该接口用于 P01-S04 验证可执行 Jar 中的 Flyway、MyBatis-Plus、事务和 PostgreSQL 连接，不是
- * 主数据业务 API。路径位于 {@code /internal}，后续安全基线完成后必须限制为内部运维或测试访问。</p>
+ * 主数据业务 API。该类型不使用 {@code @RestController} 参与普通组件扫描，而是由
+ * {@code MdmDataProbeAutoConfiguration} 在 SqlSessionFactory 已就绪时条件注册。这样可以保证
+ * 无数据库 Bootstrap 测试不会创建一个缺失事务服务的半成品 Controller。</p>
+ *
+ * <p>路径位于 {@code /internal}，后续安全基线完成后必须限制为内部运维或测试访问。</p>
  */
-@RestController
+@ResponseBody
 @RequestMapping("/internal/mdm/data-probes")
 public class MdmDataProbeController {
 
