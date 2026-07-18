@@ -8,10 +8,13 @@
 | Spring Cloud Stream | 由 Spring Cloud 2025.1.2 BOM 管理 | `mom-messaging` 的 Binding、函数式消息模型和 `StreamBridge` 传输适配 | https://spring.io/projects/spring-cloud-stream / https://github.com/spring-cloud/spring-cloud-stream | Apache License 2.0 | 仅负责消息应用抽象，不负责 MOM 本地事务、Outbox 状态机和消费幂等。升级时必须与 Spring Boot、Spring Cloud Alibaba 和 Binder 联合验证。 |
 | Spring Cloud Alibaba RocketMQ Binder | 2025.1.0.0 | MDM Producer 与 Integration Consumer 的 RocketMQ Binder | https://sca.aliyun.com/ / https://github.com/alibaba/spring-cloud-alibaba | Apache License 2.0 | 依赖 `spring-cloud-starter-stream-rocketmq`；Topic、Group、重试和 DLQ 必须显式配置，兼容性以真实 Broker CI 为准。 |
 | Apache RocketMQ Client | 5.3.1（由 Spring Cloud Alibaba BOM 管理） | RocketMQ Binder 底层生产、消费和协议实现 | https://rocketmq.apache.org/ / https://github.com/apache/rocketmq | Apache License 2.0 | 业务代码不得直接依赖 Client 类型；确需使用 Binder 未覆盖能力时必须新增 ADR。 |
+| Spring Cloud Alibaba Seata Starter | 2025.1.0.0 | `mom-seata` 的 Boot 4 自动配置、Feign XID 传播和 Seata 集成 | https://sca.aliyun.com/ / https://github.com/alibaba/spring-cloud-alibaba | Apache License 2.0 | 只允许受控短同步事务；默认关闭。升级必须与 Boot、Cloud、Seata Client 和 Seata Server 联合验证。 |
+| Apache Seata Spring Boot Starter / Client | 2.5.0（由 Spring Cloud Alibaba BOM 管理） | AT 数据源代理、TM/RM、XID、Undo Log 和全局事务协议 | https://seata.apache.org/ / https://github.com/apache/incubator-seata | Apache License 2.0 | 不允许业务代码直接操作 TC/RM 内部 API；正式场景必须遵守 ADR-009 与 ADR-016，TC 不可用时 fail-closed。 |
 
 ## 维护规则
 
-- 升级版本前必须确认目标 JDK、Spring Boot、Spring Cloud、Binder 与 Broker 兼容性。
+- 升级版本前必须确认目标 JDK、Spring Boot、Spring Cloud、Binder、Broker、Seata Client 与 Seata Server 兼容性。
 - 新增依赖必须记录官方来源、许可证、运行时影响和替代方案。
 - 编译期依赖不得因为使用方便而被打入业务应用运行时包。
 - 消息中间件升级不能只验证编译，必须执行真实生产、消费、重复投递、故障恢复和 DLQ 测试。
+- Seata 升级不能只验证应用启动，必须使用两个独立数据库验证全局提交、参与者失败、远端成功后回滚、Undo Log 清理和 TC 中断。
