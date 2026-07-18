@@ -77,10 +77,13 @@ class IntegrationMdmServiceCallTest {
                 "spring.autoconfigure.exclude=" + BOOTSTRAP_EXCLUSIONS));
         properties.addAll(Arrays.asList(additionalProperties));
 
+        String[] commandLineArguments = properties.stream()
+                .map(property -> "--" + property)
+                .toArray(String[]::new);
+
         return new SpringApplicationBuilder(applicationClass)
                 .web(WebApplicationType.SERVLET)
-                .properties(properties.toArray(String[]::new))
-                .run();
+                .run(commandLineArguments);
     }
 
     private static Integer localPort(ConfigurableApplicationContext context) {
