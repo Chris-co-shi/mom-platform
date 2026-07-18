@@ -28,7 +28,8 @@ class IntegrationMdmServiceCallTest {
             "org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration",
             "org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration",
             "org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration",
-            "org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration");
+            "org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration",
+            "org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration");
 
     @Test
     void integrationCallsRealMdmApplicationAndPropagatesCorrelationId() throws Exception {
