@@ -7,7 +7,7 @@ import java.time.Instant;
 /**
  * MDM PostgreSQL 技术探针响应。
  *
- * @param id 数据库内部主键
+ * @param id 字符串技术主键；前端不得转换为 JavaScript Number
  * @param probeKey 技术验证键
  * @param probeValue 技术验证值
  * @param createdAt UTC 创建时间
@@ -15,16 +15,18 @@ import java.time.Instant;
  * @param createdBy 创建主体；未接入可靠主体时为空
  * @param updatedBy 最近修改主体；未接入可靠主体时为空
  * @param version 乐观锁版本号
+ * @param deleted 逻辑删除标识
  */
 public record MdmDataProbeResponse(
-        Long id,
+        String id,
         String probeKey,
         String probeValue,
         Instant createdAt,
         Instant updatedAt,
         String createdBy,
         String updatedBy,
-        Long version) {
+        Long version,
+        Boolean deleted) {
 
     /**
      * 将持久化实体转换为内部技术接口响应，避免 Controller 直接暴露数据库实体。
@@ -41,6 +43,7 @@ public record MdmDataProbeResponse(
                 entity.getUpdatedAt(),
                 entity.getCreatedBy(),
                 entity.getUpdatedBy(),
-                entity.getVersion());
+                entity.getVersion(),
+                entity.getDeleted());
     }
 }
