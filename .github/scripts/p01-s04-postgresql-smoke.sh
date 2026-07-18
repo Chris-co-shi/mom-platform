@@ -6,7 +6,7 @@ POSTGRES_DATABASE="mom_platform"
 POSTGRES_USERNAME="mom"
 POSTGRES_PASSWORD="mom"
 POSTGRES_SCHEMA="mom_mdm"
-MDM_PORT="20200"
+MDM_PORT="20201"
 PROBE_KEY="p01-s04-packaged-application"
 MDM_PID=""
 
