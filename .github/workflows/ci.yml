@@ -27,12 +27,18 @@ jobs:
           cache: maven
 
       - name: Clean verify reactor and architecture boundaries
-        run: mvn -B -ntp clean verify
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -ntp clean verify 2>&1 | tee maven-build.log
 
-      - name: Upload test reports on failure
+      - name: Upload verification diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: surefire-reports
-          path: "**/target/surefire-reports/**"
+          name: verification-diagnostics
+          path: |
+            maven-build.log
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
           if-no-files-found: ignore
