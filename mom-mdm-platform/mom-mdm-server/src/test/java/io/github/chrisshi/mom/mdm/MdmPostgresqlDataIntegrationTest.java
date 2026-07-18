@@ -34,8 +34,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * MDM 数据访问真实 PostgreSQL 集成测试。
  *
  * <p>测试使用 PostgreSQL 17.7 官方镜像，并把数据库服务端默认时区设置为 Asia/Tokyo，以确认 MOM
- * 连接池的 UTC 初始化语句真实生效。测试同时验证 Flyway Schema、MyBatis-Plus 审计填充、乐观锁和
- * Spring 事务回滚，不使用 H2 模拟 PostgreSQL 行为。</p>
+ * 连接池的 UTC 初始化语句真实生效。测试同时验证 Flyway 增量迁移、String 主键、Lombok 访问器、
+ * MyBatis-Plus 审计填充、逻辑删除、乐观锁和 Spring 事务回滚，不使用 H2 模拟 PostgreSQL 行为。</p>
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
@@ -92,45 +92,58 @@ class MdmPostgresqlDataIntegrationTest {
     }
 
     /**
-     * 验证 Flyway 创建独立 Schema、执行迁移并把应用数据库会话统一为 UTC。
+     * 验证 Flyway 顺序执行 V1、V2，最终形成 varchar(19) 主键、逻辑删除列和 UTC 应用会话。
      */
     @Test
-    void flywayShouldCreateSchemaAndApplicationSessionShouldUseUtc() {
+    void flywayShouldMigrateStringIdLogicDeleteAndUseUtcSession() {
         assertEquals(SCHEMA, jdbcTemplate.queryForObject(
                 "select current_schema()",
                 String.class));
         assertEquals("UTC", jdbcTemplate.queryForObject(
                 "show timezone",
                 String.class));
-        assertTrue(flyway.info().applied().length >= 1);
-        assertEquals(1L, jdbcTemplate.queryForObject(
+        assertTrue(flyway.info().applied().length >= 2);
+        assertEquals(2L, jdbcTemplate.queryForObject(
                 "select count(*) from flyway_schema_history "
-                        + "where success = true and version = '1'",
+                        + "where success = true and version in ('1', '2')",
                 Long.class));
-        assertEquals(1L, jdbcTemplate.queryForObject(
-                "select count(*) from information_schema.tables "
-                        + "where table_schema = ? and table_name = 'technical_data_probe'",
-                Long.class,
+        assertEquals("character varying", jdbcTemplate.queryForObject(
+                "select data_type from information_schema.columns "
+                        + "where table_schema = ? and table_name = 'technical_data_probe' and column_name = 'id'",
+                String.class,
+                SCHEMA));
+        assertEquals(19, jdbcTemplate.queryForObject(
+                "select character_maximum_length from information_schema.columns "
+                        + "where table_schema = ? and table_name = 'technical_data_probe' and column_name = 'id'",
+                Integer.class,
+                SCHEMA));
+        assertEquals("boolean", jdbcTemplate.queryForObject(
+                "select data_type from information_schema.columns "
+                        + "where table_schema = ? and table_name = 'technical_data_probe' and column_name = 'deleted'",
+                String.class,
                 SCHEMA));
     }
 
     /**
-     * 验证 MyBatis-Plus 插入后回填主键、UTC 审计字段、操作主体和初始版本号。
+     * 验证 MyBatis-Plus 为 String 字段生成数字字符串主键，并填充审计、版本及未删除状态。
      */
     @Test
-    void mybatisPlusShouldFillAuditFieldsAndGeneratedId() {
+    void mybatisPlusShouldGenerateStringIdAndFillBaseFields() {
         MdmDataProbeEntity entity = service.create(
                 uniqueKey("audit"),
                 "created-value");
 
         assertNotNull(entity.getId());
+        assertTrue(entity.getId().matches("[0-9]{1,19}"));
         assertNotNull(entity.getCreatedAt());
         assertNotNull(entity.getUpdatedAt());
         assertEquals("p01-s04-test-actor", entity.getCreatedBy());
         assertEquals("p01-s04-test-actor", entity.getUpdatedBy());
         assertEquals(0L, entity.getVersion());
+        assertFalse(entity.getDeleted());
 
         MdmDataProbeEntity persisted = mapper.selectById(entity.getId());
+        assertEquals(entity.getId(), persisted.getId());
         assertEquals(entity.getProbeKey(), persisted.getProbeKey());
         assertWithinPostgresqlTimestampPrecision(
                 entity.getCreatedAt(),
@@ -139,6 +152,7 @@ class MdmPostgresqlDataIntegrationTest {
                 entity.getUpdatedAt(),
                 persisted.getUpdatedAt());
         assertEquals("p01-s04-test-actor", persisted.getCreatedBy());
+        assertFalse(persisted.getDeleted());
     }
 
     /**
@@ -165,6 +179,28 @@ class MdmPostgresqlDataIntegrationTest {
         assertEquals("first-update", persisted.getProbeValue());
         assertEquals(1L, persisted.getVersion());
         assertEquals("p01-s04-test-actor", persisted.getUpdatedBy());
+    }
+
+    /**
+     * 验证 deleteById 只更新删除标记，并让普通查询自动排除已删除记录。
+     */
+    @Test
+    void logicDeleteShouldHideRowWithoutPhysicalDeletion() {
+        String probeKey = uniqueKey("logic-delete");
+        MdmDataProbeEntity created = service.create(probeKey, "delete-me");
+
+        assertTrue(service.deleteById(created.getId()));
+        assertTrue(service.findByKey(probeKey).isEmpty());
+        assertFalse(service.deleteById(created.getId()));
+
+        assertEquals(1L, jdbcTemplate.queryForObject(
+                "select count(*) from technical_data_probe where id = ?",
+                Long.class,
+                created.getId()));
+        assertTrue(jdbcTemplate.queryForObject(
+                "select deleted from technical_data_probe where id = ?",
+                Boolean.class,
+                created.getId()));
     }
 
     /**
