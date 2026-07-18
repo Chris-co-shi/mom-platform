@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -15,10 +16,11 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 /**
  * Redis 幂等保护自动配置。
  *
- * <p>只有应用已经具备 {@link StringRedisTemplate} 时才创建幂等保护 Bean。
- * 模块不自建 Redis 连接，也不覆盖应用自定义实现，从而保持连接配置、集群模式和凭证管理由应用负责。</p>
+ * <p>该配置必须在 Spring Boot 4 的 {@link DataRedisAutoConfiguration} 之后执行，确保
+ * {@link StringRedisTemplate} 已经创建，再判断是否启用 MOM 幂等能力。模块不自建 Redis 连接，
+ * 也不覆盖应用自定义实现，从而保持连接配置、集群模式和凭证管理由应用负责。</p>
  */
-@AutoConfiguration
+@AutoConfiguration(after = DataRedisAutoConfiguration.class)
 @ConditionalOnBean(StringRedisTemplate.class)
 @EnableConfigurationProperties(RedisIdempotencyProperties.class)
 public class RedisIdempotencyAutoConfiguration {
