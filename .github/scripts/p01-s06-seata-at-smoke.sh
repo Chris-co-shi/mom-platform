@@ -6,6 +6,8 @@ INTEGRATION_DB_CONTAINER=mom-p01-s06-integration-postgres
 SEATA_CONTAINER=mom-p01-s06-seata-server
 MDM_DB_PORT=55432
 INTEGRATION_DB_PORT=55433
+MDM_MIGRATION_PORT=20211
+INTEGRATION_MIGRATION_PORT=20811
 MDM_PORT=20210
 INTEGRATION_PORT=20810
 MDM_PID=""
@@ -17,8 +19,8 @@ cleanup() {
   set +e
   [[ -n "$MDM_PID" ]] && kill "$MDM_PID" 2>/dev/null
   [[ -n "$INTEGRATION_PID" ]] && kill "$INTEGRATION_PID" 2>/dev/null
-  wait "$MDM_PID" 2>/dev/null
-  wait "$INTEGRATION_PID" 2>/dev/null
+  [[ -n "$MDM_PID" ]] && wait "$MDM_PID" 2>/dev/null
+  [[ -n "$INTEGRATION_PID" ]] && wait "$INTEGRATION_PID" 2>/dev/null
   docker logs "$MDM_DB_CONTAINER" > p01-s06-mdm-postgresql.log 2>&1
   docker logs "$INTEGRATION_DB_CONTAINER" > p01-s06-integration-postgresql.log 2>&1
   docker logs "$SEATA_CONTAINER" > p01-s06-seata-server.log 2>&1
@@ -77,6 +79,67 @@ for attempt in {1..90}; do
   sleep 2
 done
 
+# Seata DataSourceProxy 在构造阶段会先检查 undo_log，因此全新数据库必须先完成迁移。
+# 该阶段运行同一打包应用和同一 Flyway 脚本，但显式关闭 Seata 和技术接口；
+# 完成后停止迁移实例，再启动启用数据源代理的正式验证实例。
+POSTGRES_PORT=$INTEGRATION_DB_PORT \
+POSTGRES_SCHEMA=mom_integration \
+POSTGRES_APPLICATION_NAME=mom-integration-seata-migration-ci \
+SEATA_ENABLED=false \
+INTEGRATION_SEATA_AT_PROBE_ENABLED=false \
+java -jar mom-integration-platform/mom-integration-server/target/mom-integration-server-0.1.0-SNAPSHOT-exec.jar \
+  --server.port=$INTEGRATION_MIGRATION_PORT \
+  --spring.application.name=mom-integration-server \
+  --spring.cloud.nacos.discovery.enabled=false \
+  --seata.enabled=false \
+  --spring.autoconfigure.exclude="$SECURITY_EXCLUSIONS" \
+  > p01-s06-integration-migration.log 2>&1 &
+INTEGRATION_PID=$!
+
+POSTGRES_PORT=$MDM_DB_PORT \
+POSTGRES_SCHEMA=mom_mdm \
+POSTGRES_APPLICATION_NAME=mom-mdm-seata-migration-ci \
+SEATA_ENABLED=false \
+MDM_SEATA_AT_PROBE_ENABLED=false \
+java -jar mom-mdm-platform/mom-mdm-server/target/mom-mdm-server-0.1.0-SNAPSHOT-exec.jar \
+  --server.port=$MDM_MIGRATION_PORT \
+  --spring.application.name=mom-mdm-server \
+  --spring.cloud.nacos.discovery.enabled=false \
+  --seata.enabled=false \
+  --spring.autoconfigure.exclude="$SECURITY_EXCLUSIONS" \
+  > p01-s06-mdm-migration.log 2>&1 &
+MDM_PID=$!
+
+for attempt in {1..90}; do
+  mdm_migration_status=$(curl --silent --output p01-s06-mdm-migration-health.json --write-out '%{http_code}' \
+    http://127.0.0.1:$MDM_MIGRATION_PORT/actuator/health || true)
+  integration_migration_status=$(curl --silent --output p01-s06-integration-migration-health.json --write-out '%{http_code}' \
+    http://127.0.0.1:$INTEGRATION_MIGRATION_PORT/actuator/health || true)
+  if [[ "$mdm_migration_status" == "200" && "$integration_migration_status" == "200" ]]; then
+    break
+  fi
+  if [[ "$attempt" == "90" ]]; then
+    echo "MDM or Integration migration instance did not become ready"
+    cat p01-s06-mdm-migration-health.json || true
+    cat p01-s06-integration-migration-health.json || true
+    exit 1
+  fi
+  sleep 2
+done
+
+mdm_undo_exists=$(docker exec "$MDM_DB_CONTAINER" psql -U mom -d mom_platform -Atc \
+  "select count(*) from information_schema.tables where table_schema='mom_mdm' and table_name='undo_log'")
+integration_undo_exists=$(docker exec "$INTEGRATION_DB_CONTAINER" psql -U mom -d mom_platform -Atc \
+  "select count(*) from information_schema.tables where table_schema='mom_integration' and table_name='undo_log'")
+[[ "$mdm_undo_exists" == "1" ]]
+[[ "$integration_undo_exists" == "1" ]]
+
+kill "$MDM_PID" "$INTEGRATION_PID"
+wait "$MDM_PID" 2>/dev/null || true
+wait "$INTEGRATION_PID" 2>/dev/null || true
+MDM_PID=""
+INTEGRATION_PID=""
+
 POSTGRES_PORT=$INTEGRATION_DB_PORT \
 POSTGRES_SCHEMA=mom_integration \
 POSTGRES_APPLICATION_NAME=mom-integration-seata-ci \
@@ -87,6 +150,7 @@ java -jar mom-integration-platform/mom-integration-server/target/mom-integration
   --server.port=$INTEGRATION_PORT \
   --spring.application.name=mom-integration-server \
   --spring.cloud.nacos.discovery.enabled=false \
+  --seata.enabled=true \
   --spring.autoconfigure.exclude="$SECURITY_EXCLUSIONS" \
   > p01-s06-integration-server.log 2>&1 &
 INTEGRATION_PID=$!
@@ -101,6 +165,7 @@ java -jar mom-mdm-platform/mom-mdm-server/target/mom-mdm-server-0.1.0-SNAPSHOT-e
   --server.port=$MDM_PORT \
   --spring.application.name=mom-mdm-server \
   --spring.cloud.nacos.discovery.enabled=false \
+  --seata.enabled=true \
   --spring.cloud.openfeign.client.config.integrationSeataAtParticipantClient.url=http://127.0.0.1:$INTEGRATION_PORT \
   --spring.cloud.openfeign.client.config.mom-integration-server.url=http://127.0.0.1:$INTEGRATION_PORT \
   --spring.autoconfigure.exclude="$SECURITY_EXCLUSIONS" \
@@ -116,7 +181,7 @@ for attempt in {1..90}; do
     break
   fi
   if [[ "$attempt" == "90" ]]; then
-    echo "MDM or Integration did not become ready"
+    echo "MDM or Integration did not become ready with Seata enabled"
     cat p01-s06-mdm-health.json || true
     cat p01-s06-integration-health.json || true
     exit 1
