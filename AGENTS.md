@@ -100,7 +100,20 @@
 - 不允许在 Seata 全局事务中直接发送 RocketMQ，也不允许用 Seata 替代 Outbox、Inbox、幂等、DEAD/DLQ 和对账；
 - 新增或升级 Seata 必须使用真实 TC 和两个独立 PostgreSQL 数据库验证迁移先行、提交、参与者失败、远端成功后回滚、Undo Log 清理和 TC 中断，不得仅验证应用启动。
 
-## 7. Redis 约束
+## 7. 可观测性与追踪约束
+
+- 业务与 Framework 优先依赖 Micrometer Observation/Tracing，不直接依赖 OpenTelemetry SDK；Exporter、Propagator 和 SDK 生命周期由 Spring Boot 管理；
+- 服务间统一使用 W3C Trace Context；禁止业务代码手工拼接 `traceparent` 或把客户端 Trace ID 当作可信身份；
+- 同步请求保持短 Trace；完整制造流程不得维持小时级 Trace，必须通过 `correlation_id`、`workflow_id`、`event_id`、`command_id` 和业务单号关联多个 Trace；
+- Trace ID、Span ID 不得作为业务主键、幂等键、审计主体或数据库唯一约束；
+- Outbox 每次发布尝试创建短 Observation，Consumer 从消息上下文恢复关联；可观测性不得改变 Outbox/Inbox、Broker 重试或消息确认语义；
+- Prometheus Label 只能使用低基数字段；用户 ID、业务单号、事件 ID、命令 ID、Trace ID 和完整 URL 参数禁止作为指标标签；
+- Payload、Token、Cookie、密码、密钥和未脱敏敏感数据禁止进入 Span 属性、日志或 Collector；
+- OTLP 导出默认关闭，由部署环境显式开启；Collector、Tempo 或 Exporter 不可用时业务必须继续，遥测失败通过指标和告警暴露；
+- 日志 MDC 使用 `traceId`、`spanId`，输出字段统一为 `trace_id`、`span_id`；没有活动 Span 时保持空值，不伪造标识；
+- 新增或升级追踪能力必须使用真实 Collector、Tempo、Gateway、OpenFeign 和 RocketMQ 验证，不得只断言 Bean 存在。
+
+## 8. Redis 约束
 
 - Key 必须具有统一命名空间，禁止直接拼接含个人信息或敏感业务数据的原始值；
 - 默认使用字符串或明确的 JSON 格式，禁止依赖 Java 原生序列化；
@@ -109,7 +122,7 @@
 - 必须明确 Redis 不可用时采用 fail-open 还是 fail-closed；
 - 分布式锁必须使用唯一持有者标识并安全释放，幂等占位不得伪装成分布式锁。
 
-## 8. 测试与提交
+## 9. 测试与提交
 
 - 新增基础设施能力必须包含单元测试或真实中间件 Smoke Test；
 - GitHub Actions 必须执行 JDK 25 下的 `mvn -B -ntp clean verify`；
