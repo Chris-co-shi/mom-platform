@@ -1,0 +1,62 @@
+name: Observability CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: observability-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tracing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Package traced applications
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -ntp -DskipTests \
+            -pl :mom-gateway,:mom-mdm-server,:mom-integration-server \
+            -am package 2>&1 | tee observability-build.log
+
+      - name: Run OpenTelemetry and Tempo smoke test
+        shell: bash
+        run: bash .github/scripts/p01-s07-observability-smoke.sh
+
+      - name: Upload observability diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: observability-verification-diagnostics
+          path: |
+            observability-build.log
+            p01-s07-nacos.log
+            p01-s07-redis.log
+            p01-s07-tempo.log
+            p01-s07-collector.log
+            p01-s07-gateway.log
+            p01-s07-integration.log
+            p01-s07-mdm.log
+            p01-s07-http-response.json
+            p01-s07-http-response-headers.txt
+            p01-s07-tempo-trace.json
+            p01-s07-collector-outage-response.json
+            p01-s07-status.txt
+            **/target/surefire-reports/**
+          if-no-files-found: ignore

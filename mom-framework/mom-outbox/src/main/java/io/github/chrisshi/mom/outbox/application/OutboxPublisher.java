@@ -5,6 +5,8 @@ import io.github.chrisshi.mom.outbox.config.OutboxPublisherProperties;
 import io.github.chrisshi.mom.outbox.model.OutboxRecord;
 import io.github.chrisshi.mom.outbox.model.OutboxStatus;
 import io.github.chrisshi.mom.outbox.persistence.JdbcOutboxRepository;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -22,8 +24,13 @@ import java.util.Objects;
  * 发送结果再通过独立短事务执行 CAS 更新。多个应用实例可以同时运行；{@code SKIP LOCKED} 分散领取，租约防止
  * 实例崩溃后记录永久卡住，租约所有者条件防止旧实例覆盖新实例结果。</p>
  *
+ * <p>每条领取记录创建一个短 {@code mom.outbox.publish} Observation。消息传输层可以把当前 Trace Context
+ * 写入 Broker Header，使消费者形成子 Span。该 Trace 只覆盖一次发布尝试，不延长原始 HTTP 请求；事件之间
+ * 继续使用 {@code eventId} 与 {@code correlationId} 关联。业务 ID 仅作为高基数 Span 属性，不作为指标标签。</p>
+ *
  * <p>发布失败使用有上限的指数退避，达到最大次数后进入 DEAD。发布器只记录异常类型和摘要，禁止把事件负载
- * 写入错误日志或 {@code last_error}。数据库或 Broker 不可用时均 fail-closed，不会把未确认发送标记为 SENT。</p>
+ * 写入错误日志或 {@code last_error}。数据库、Broker 或 Trace Exporter 不可用时都不会把未确认发送标记为
+ * SENT；可观测性自身使用 NOOP Registry 时不得阻断发布。</p>
  */
 public final class OutboxPublisher {
 
@@ -34,9 +41,13 @@ public final class OutboxPublisher {
     private final OutboxPublisherProperties properties;
     private final Clock clock;
     private final String leaseOwner;
+    private final ObservationRegistry observationRegistry;
 
     /**
-     * 创建 Outbox 发布器。
+     * 创建不启用 Trace 的 Outbox 发布器。
+     *
+     * <p>该重载保留给纯单元测试和不启用 Observability 的嵌入场景；正式应用自动配置会注入真实
+     * {@link ObservationRegistry}。</p>
      *
      * @param repository Outbox JDBC 仓储
      * @param transport 消息传输端口
@@ -50,10 +61,33 @@ public final class OutboxPublisher {
             OutboxPublisherProperties properties,
             Clock clock,
             String leaseOwner) {
+        this(repository, transport, properties, clock, leaseOwner, ObservationRegistry.NOOP);
+    }
+
+    /**
+     * 创建带 Micrometer Observation 的 Outbox 发布器。
+     *
+     * @param repository Outbox JDBC 仓储
+     * @param transport 消息传输端口
+     * @param properties 发布和重试参数
+     * @param clock UTC 时钟
+     * @param leaseOwner 当前应用实例唯一租约标识
+     * @param observationRegistry Micrometer Observation 注册表；不得为空
+     */
+    public OutboxPublisher(
+            JdbcOutboxRepository repository,
+            EventTransport transport,
+            OutboxPublisherProperties properties,
+            Clock clock,
+            String leaseOwner,
+            ObservationRegistry observationRegistry) {
         this.repository = Objects.requireNonNull(repository, "repository 不能为空");
         this.transport = Objects.requireNonNull(transport, "transport 不能为空");
         this.properties = Objects.requireNonNull(properties, "properties 不能为空");
         this.clock = Objects.requireNonNull(clock, "clock 不能为空");
+        this.observationRegistry = Objects.requireNonNull(
+                observationRegistry,
+                "observationRegistry 不能为空");
         if (leaseOwner == null || leaseOwner.isBlank()) {
             throw new IllegalArgumentException("leaseOwner 不能为空");
         }
@@ -98,12 +132,23 @@ public final class OutboxPublisher {
     }
 
     private boolean publishOne(OutboxRecord record) {
-        try {
+        Observation observation = Observation.createNotStarted(
+                        "mom.outbox.publish",
+                        observationRegistry)
+                .lowCardinalityKeyValue("messaging.system", "rocketmq")
+                .lowCardinalityKeyValue("event.type", record.eventType())
+                .lowCardinalityKeyValue("outbox.attempt", Integer.toString(record.retryCount() + 1))
+                .highCardinalityKeyValue("event.id", record.eventId())
+                .highCardinalityKeyValue("correlation.id", record.correlationId())
+                .start();
+        try (Observation.Scope ignored = observation.openScope()) {
             boolean accepted = transport.send(
                     properties.getBindingName(),
                     record.toEnvelope());
             if (!accepted) {
-                return markFailure(record, new IllegalStateException("消息 Binding 未接受事件"));
+                IllegalStateException exception = new IllegalStateException("消息 Binding 未接受事件");
+                observation.error(exception);
+                return markFailure(record, exception);
             }
             boolean updated = repository.markSent(record.eventId(), leaseOwner);
             if (!updated) {
@@ -113,7 +158,11 @@ public final class OutboxPublisher {
             return updated;
         }
         catch (RuntimeException exception) {
+            observation.error(exception);
             return markFailure(record, exception);
+        }
+        finally {
+            observation.stop();
         }
     }
 
@@ -151,6 +200,9 @@ public final class OutboxPublisher {
 
     /**
      * 计算有上限的指数退避，第一次失败使用 initialBackoff，之后按二倍增长。
+     *
+     * @param retryCount 下一次持久化的重试次数
+     * @return 不超过最大退避时间的等待时长
      */
     private Duration calculateBackoff(int retryCount) {
         int exponent = Math.min(Math.max(retryCount - 1, 0), 30);

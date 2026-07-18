@@ -10,11 +10,16 @@
 | Apache RocketMQ Client | 5.3.1（由 Spring Cloud Alibaba BOM 管理） | RocketMQ Binder 底层生产、消费和协议实现 | https://rocketmq.apache.org/ / https://github.com/apache/rocketmq | Apache License 2.0 | 业务代码不得直接依赖 Client 类型；确需使用 Binder 未覆盖能力时必须新增 ADR。 |
 | Spring Cloud Alibaba Seata Starter | 2025.1.0.0 | `mom-seata` 的 Boot 4 自动配置、Feign XID 传播和 Seata 集成 | https://sca.aliyun.com/ / https://github.com/alibaba/spring-cloud-alibaba | Apache License 2.0 | 只允许受控短同步事务；默认关闭。升级必须与 Boot、Cloud、Seata Client 和 Seata Server 联合验证。 |
 | Apache Seata Spring Boot Starter / Client | 2.5.0（由 Spring Cloud Alibaba BOM 管理） | AT 数据源代理、TM/RM、XID、Undo Log 和全局事务协议 | https://seata.apache.org/ / https://github.com/apache/incubator-seata | Apache License 2.0 | 不允许业务代码直接操作 TC/RM 内部 API；正式场景必须遵守 ADR-009 与 ADR-016，TC 不可用时 fail-closed。 |
+| Spring Boot OpenTelemetry Starter | 由 Spring Boot 4.1.0 BOM 管理 | `mom-tracing` 的 OpenTelemetry SDK、OTLP Exporter 与 Micrometer Tracing 自动配置 | https://spring.io/projects/spring-boot / https://github.com/spring-projects/spring-boot | Apache License 2.0 | 业务与 Framework 使用 Micrometer 门面，不直接依赖 SDK。OTLP 默认关闭，Collector 故障不得改变业务结果。 |
+| OpenFeign Micrometer | 由 Spring Cloud / OpenFeign BOM 管理 | OpenFeign Client Observation、Trace Context 注入和客户端指标 | https://github.com/OpenFeign/feign | Apache License 2.0 | 只有在 `ObservationRegistry` 存在时启用；不得手工复制 W3C Trace Header。 |
+| OpenTelemetry Collector Contrib | 0.156.0（CI 镜像） | OTLP 接收、批处理、调试导出与 Tempo 转发 | https://opentelemetry.io/docs/collector/ / https://github.com/open-telemetry/opentelemetry-collector-contrib | Apache License 2.0 | 当前版本仅用于真实兼容性 CI；生产部署、容量和升级由 `mom-infra` 管理。 |
+| Grafana Tempo | 2.10.5（CI 镜像） | Trace 存储与查询 | https://grafana.com/oss/tempo/ / https://github.com/grafana/tempo | AGPL-3.0 | CI 使用单机本地存储验证，不代表生产高可用、保留或对象存储方案。 |
 
 ## 维护规则
 
-- 升级版本前必须确认目标 JDK、Spring Boot、Spring Cloud、Binder、Broker、Seata Client 与 Seata Server 兼容性。
+- 升级版本前必须确认目标 JDK、Spring Boot、Spring Cloud、Binder、Broker、Seata Client、OpenTelemetry 与后端兼容性。
 - 新增依赖必须记录官方来源、许可证、运行时影响和替代方案。
 - 编译期依赖不得因为使用方便而被打入业务应用运行时包。
 - 消息中间件升级不能只验证编译，必须执行真实生产、消费、重复投递、故障恢复和 DLQ 测试。
 - Seata 升级不能只验证应用启动，必须使用两个独立数据库验证全局提交、参与者失败、远端成功后回滚、Undo Log 清理和 TC 中断。
+- Tracing 升级不能只验证 Bean 或依赖树，必须使用真实 Collector、Tempo、Gateway、Feign 和消息链路验证传播、导出与故障策略。
