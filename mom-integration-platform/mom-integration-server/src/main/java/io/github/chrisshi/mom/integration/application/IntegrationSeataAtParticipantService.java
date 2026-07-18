@@ -3,12 +3,13 @@ package io.github.chrisshi.mom.integration.application;
 import io.github.chrisshi.mom.integration.api.seata.IntegrationSeataAtParticipantRequest;
 import io.github.chrisshi.mom.integration.api.seata.IntegrationSeataAtParticipantResponse;
 import org.apache.seata.core.context.RootContext;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Clock;
 import java.sql.Timestamp;
+import java.time.Clock;
 import java.util.Objects;
 
 /**
@@ -17,11 +18,18 @@ import java.util.Objects;
  * <p>该服务只用于验证同步短事务中的 AT 分支注册、XID 传播、PostgreSQL Undo Log 和全局回滚。它不承载
  * Integration Hub 的正式外部系统编排，也不允许在事务内等待消息、人工、设备或第三方回调。</p>
  *
+ * <p>Bean 仅在 {@code mom.integration.seata-at-probe.enabled=true} 时注册。普通无数据库 Bootstrap 不会
+ * 因为引入 Seata 依赖而强制创建 {@link JdbcTemplate}；启用技术接口后若数据源缺失，应用启动必须失败。</p>
+ *
  * <p>方法使用 Spring 本地事务，使业务 INSERT 与 Seata {@code undo_log} 生成位于同一个数据库事务中。
  * 当故障注入触发异常时，本地事务直接回滚；当上游稍后决定全局回滚时，TC 会要求该 RM 使用 Undo Log
  * 补偿已经提交的分支。服务要求线程中存在 XID，缺失时 fail-fast，防止技术接口在未加入全局事务时静默写入。</p>
  */
 @Service
+@ConditionalOnProperty(
+        prefix = "mom.integration.seata-at-probe",
+        name = "enabled",
+        havingValue = "true")
 public class IntegrationSeataAtParticipantService {
 
     private final JdbcTemplate jdbcTemplate;
