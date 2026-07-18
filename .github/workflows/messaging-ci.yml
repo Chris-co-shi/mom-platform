@@ -37,7 +37,10 @@ jobs:
 
       - name: Run RocketMQ Stream Outbox smoke test
         shell: bash
-        run: bash .github/scripts/p01-s05-rocketmq-outbox-smoke.sh
+        run: |
+          set -o pipefail
+          bash .github/scripts/p01-s05-rocketmq-outbox-smoke.sh \
+            2>&1 | tee p01-s05-smoke.log
 
       - name: Upload messaging diagnostics on failure
         if: failure()
@@ -46,6 +49,7 @@ jobs:
           name: messaging-verification-diagnostics
           path: |
             messaging-build.log
+            p01-s05-smoke.log
             p01-s05-postgresql.log
             p01-s05-rocketmq-namesrv.log
             p01-s05-rocketmq-broker.log
