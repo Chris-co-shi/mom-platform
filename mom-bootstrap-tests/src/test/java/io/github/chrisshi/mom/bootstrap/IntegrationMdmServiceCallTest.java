@@ -21,6 +21,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Integration 通过 OpenFeign 调用真实 MDM 应用的回归测试。
+ *
+ * <p>该测试验证 P01-S02 的同步调用和关联标识传播，不验证分布式事务。由于 Bootstrap 测试类路径同时包含
+ * MDM 与 Integration 的全部依赖，必须显式关闭 Seata，防止 GlobalTransactionScanner 在没有 TC 的既有
+ * HTTP 回归中启动。Seata Feign XID 传播由独立 P01-S06 双数据库 CI 覆盖。</p>
+ */
 class IntegrationMdmServiceCallTest {
 
     private static final String BOOTSTRAP_EXCLUSIONS = String.join(",",
@@ -70,6 +77,13 @@ class IntegrationMdmServiceCallTest {
         }
     }
 
+    /**
+     * 以指定附加属性启动一个无外部基础设施的真实 Servlet 应用。
+     *
+     * @param applicationClass 应用入口类型
+     * @param additionalProperties 场景特定属性
+     * @return 活动应用上下文；调用方负责关闭
+     */
     private static ConfigurableApplicationContext startApplication(
             Class<?> applicationClass,
             String... additionalProperties) {
@@ -78,6 +92,9 @@ class IntegrationMdmServiceCallTest {
                 "spring.main.banner-mode=off",
                 "spring.cloud.nacos.discovery.enabled=false",
                 "spring.cloud.nacos.config.enabled=false",
+                "seata.enabled=false",
+                "mom.mdm.seata-at-probe.enabled=false",
+                "mom.integration.seata-at-probe.enabled=false",
                 "spring.autoconfigure.exclude=" + BOOTSTRAP_EXCLUSIONS));
         properties.addAll(Arrays.asList(additionalProperties));
 
@@ -90,6 +107,12 @@ class IntegrationMdmServiceCallTest {
                 .run(commandLineArguments);
     }
 
+    /**
+     * 读取随机端口启动后的本地服务端口。
+     *
+     * @param context 已启动的应用上下文
+     * @return 分配的本地 HTTP 端口
+     */
     private static Integer localPort(ConfigurableApplicationContext context) {
         Integer port = context.getEnvironment().getProperty("local.server.port", Integer.class);
         assertNotNull(port);
