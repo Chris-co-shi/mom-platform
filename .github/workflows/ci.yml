@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -22,5 +26,13 @@ jobs:
           java-version: "25"
           cache: maven
 
-      - name: Verify reactor
-        run: mvn -B -ntp verify
+      - name: Verify reactor and architecture boundaries
+        run: mvn -B -ntp clean verify
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: "**/target/surefire-reports/**"
+          if-no-files-found: ignore
