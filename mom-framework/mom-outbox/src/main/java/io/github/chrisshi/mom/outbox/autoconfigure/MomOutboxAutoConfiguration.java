@@ -30,10 +30,16 @@ import java.util.UUID;
  * {@code mom_outbox_event} 或 {@code mom_inbox_event}。所有 Bean 使用应用唯一 DataSource 对应的事务管理器，
  * 不声明第二数据源或第二连接池。</p>
  *
- * <p>Outbox 追加器和 Inbox 幂等器在 JDBC 可用时创建。定时发布器默认关闭，只有显式设置
- * {@code mom.outbox.publisher.enabled=true} 且存在 {@link EventTransport} 时才启用调度。</p>
+ * <p>自动配置显式排在 Spring Boot DataSource、JdbcTemplate、事务自动配置以及 MOM 数据模块之后，确保条件
+ * 判断时所需 Bean 已经可见。Outbox 追加器和 Inbox 幂等器在 JDBC 可用时创建；定时发布器默认关闭，只有
+ * 显式设置 {@code mom.outbox.publisher.enabled=true} 且存在 {@link EventTransport} 时才启用调度。</p>
  */
-@AutoConfiguration
+@AutoConfiguration(afterName = {
+        "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
+        "org.springframework.boot.jdbc.autoconfigure.JdbcTemplateAutoConfiguration",
+        "org.springframework.boot.transaction.autoconfigure.TransactionAutoConfiguration",
+        "io.github.chrisshi.mom.data.autoconfigure.MomDataAutoConfiguration"
+})
 @ConditionalOnClass(JdbcTemplate.class)
 @ConditionalOnBean({JdbcTemplate.class, PlatformTransactionManager.class})
 @EnableConfigurationProperties(OutboxPublisherProperties.class)
