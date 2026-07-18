@@ -35,6 +35,13 @@ spring:
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
+    openfeign:
+      client:
+        config:
+          integrationSeataAtParticipantClient:
+            connect-timeout: ${INTEGRATION_SEATA_CLIENT_CONNECT_TIMEOUT:2000}
+            read-timeout: ${INTEGRATION_SEATA_CLIENT_READ_TIMEOUT:5000}
+            logger-level: basic
     stream:
       bindings:
         momDomainEvents-out-0:
@@ -52,6 +59,27 @@ spring:
               send-msg-timeout: ${ROCKETMQ_SEND_TIMEOUT:3000}
               retry-times-when-send-failed: 0
 
+seata:
+  enabled: ${SEATA_ENABLED:false}
+  application-id: ${spring.application.name}
+  tx-service-group: mom-p01-s06-tx-group
+  enable-auto-data-source-proxy: true
+  data-source-proxy-mode: AT
+  use-jdk-proxy: false
+  registry:
+    type: file
+  config:
+    type: file
+  service:
+    vgroup-mapping:
+      mom-p01-s06-tx-group: default
+    grouplist:
+      default: ${SEATA_SERVER_ADDR:127.0.0.1:8091}
+  client:
+    rm:
+      report-success-enable: true
+      table-meta-check-enable: true
+
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
@@ -64,6 +92,8 @@ mom:
       enabled: ${MDM_DATA_PROBE_ENABLED:false}
     outbox-probe:
       enabled: ${MDM_OUTBOX_PROBE_ENABLED:false}
+    seata-at-probe:
+      enabled: ${MDM_SEATA_AT_PROBE_ENABLED:false}
   outbox:
     publisher:
       enabled: ${OUTBOX_PUBLISHER_ENABLED:false}
