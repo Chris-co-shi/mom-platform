@@ -15,8 +15,11 @@ import java.util.UUID;
  * <p>该服务不是正式主数据业务能力，只用于 P01-S05 验证“业务表 INSERT + Outbox INSERT”共享同一个
  * PostgreSQL 本地事务。方法不会直接调用 RocketMQ；事务提交后由独立发布器读取 Outbox 并通过 Spring Cloud
  * Stream 发送，从而消除数据库与 Broker 同步双写窗口。</p>
+ *
+ * <p>类型不能声明为 {@code final}，因为当前使用类代理实现 {@link Transactional}；禁止为了代码风格重新加回
+ * final 而破坏事务代理。</p>
  */
-public final class MdmOutboxProbeService {
+public class MdmOutboxProbeService {
 
     /** 正常消费技术事件类型。 */
     public static final String CREATED_EVENT_TYPE = "mdm.technical-probe.created";
