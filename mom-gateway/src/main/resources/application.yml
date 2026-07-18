@@ -4,6 +4,15 @@ server:
 spring:
   application:
     name: mom-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
+      username: ${REDIS_USERNAME:}
+      password: ${REDIS_PASSWORD:}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${REDIS_TIMEOUT:2s}
   cloud:
     nacos:
       discovery:
@@ -24,6 +33,13 @@ spring:
                 - Path=/api/integration/**
               filters:
                 - StripPrefix=1
+                - name: RequestRateLimiter
+                  args:
+                    rate-limiter: "#{@momFailClosedRedisRateLimiter}"
+                    key-resolver: "#{@requestIdentityKeyResolver}"
+                    redis-rate-limiter.replenishRate: ${GATEWAY_RATE_LIMIT_REPLENISH_RATE:10}
+                    redis-rate-limiter.burstCapacity: ${GATEWAY_RATE_LIMIT_BURST_CAPACITY:20}
+                    redis-rate-limiter.requestedTokens: ${GATEWAY_RATE_LIMIT_REQUESTED_TOKENS:1}
 
 management:
   endpoints:
