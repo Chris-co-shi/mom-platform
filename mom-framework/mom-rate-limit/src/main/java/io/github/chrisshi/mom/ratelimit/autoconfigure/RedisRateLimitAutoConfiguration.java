@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.cloud.gateway.filter.ratelimit.KeyResolver;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.web.server.WebExceptionHandler;
 
 /**
@@ -22,11 +23,15 @@ import org.springframework.web.server.WebExceptionHandler;
 public class RedisRateLimitAutoConfiguration {
 
     /**
-     * 创建默认请求身份解析器。
+     * 创建 MOM 默认请求身份解析器。
+     *
+     * <p>Spring Cloud Gateway 5 同时提供 {@code principalNameKeyResolver}。将 MOM Resolver 标记为
+     * {@link Primary}，保证框架按类型注入默认 Resolver 时没有歧义；路由仍通过 Bean 名显式引用本实现。</p>
      *
      * @return 供 Gateway 路由通过 SpEL 引用的 KeyResolver
      */
     @Bean(name = "requestIdentityKeyResolver")
+    @Primary
     @ConditionalOnMissingBean(name = "requestIdentityKeyResolver")
     KeyResolver requestIdentityKeyResolver() {
         return new RequestIdentityKeyResolver();
