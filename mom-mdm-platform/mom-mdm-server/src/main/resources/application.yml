@@ -41,6 +41,11 @@ mybatis-plus:
   global-config:
     banner: false
 
+mom:
+  mdm:
+    data-probe:
+      enabled: ${MDM_DATA_PROBE_ENABLED:false}
+
 management:
   endpoints:
     web:
