@@ -49,6 +49,10 @@ jobs:
             p01-s06-mdm-postgresql.log
             p01-s06-integration-postgresql.log
             p01-s06-seata-server.log
+            p01-s06-mdm-migration.log
+            p01-s06-integration-migration.log
+            p01-s06-mdm-migration-health.json
+            p01-s06-integration-migration-health.json
             p01-s06-mdm-server.log
             p01-s06-integration-server.log
             p01-s06-mdm-health.json
