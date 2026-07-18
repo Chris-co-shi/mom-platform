@@ -26,8 +26,14 @@ jobs:
           java-version: "25"
           cache: maven
 
-      - name: Verify reactor and architecture boundaries
-        run: mvn -B -ntp clean verify
+      - name: Validate Maven and dependency baseline
+        run: mvn -B -ntp validate
+
+      - name: Compile reactor
+        run: mvn -B -ntp -DskipTests compile
+
+      - name: Run architecture and bootstrap tests
+        run: mvn -B -ntp test
 
       - name: Upload test reports on failure
         if: failure()
