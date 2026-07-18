@@ -1,5 +1,5 @@
 server:
-  port: ${SERVER_PORT:8200}
+  port: ${SERVER_PORT:20300}
 spring:
   application:
     name: mom-mes-server
