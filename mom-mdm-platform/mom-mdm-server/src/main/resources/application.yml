@@ -1,5 +1,6 @@
 server:
   port: ${SERVER_PORT:20200}
+
 spring:
   application:
     name: mom-mdm-server
@@ -8,11 +9,17 @@ spring:
       discovery:
         enabled: ${NACOS_DISCOVERY_ENABLED:false}
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
+
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: health,info,prometheus,nacos-discovery
   endpoint:
     health:
       probes:
