@@ -71,7 +71,27 @@ MDM @GlobalTransactional（TM）
 - 不把 Outbox、Inbox、RocketMQ、人工检验、设备命令、外部回调或完整制造流程放入 AT 全局事务；
 - 回滚必须符合业务语义。对已经产生外部现实副作用的操作不得使用数据库回滚伪装补偿完成。
 
-### 3.4 注册与存储
+### 3.4 数据库迁移先于 Seata 数据源代理
+
+Apache Seata 2.5 的 AT `DataSourceProxy` 在构造阶段会立即检查 `undo_log` 是否存在，并在缺失时 fail-fast。该检查发生在 Spring Boot Flyway 使用代理 DataSource 迁移之前，因此全新数据库不能直接以 Seata 启用状态首次启动。
+
+MOM 固定采用以下顺序：
+
+```text
+迁移阶段：Seata disabled → Flyway migrate/validate → 停止迁移实例
+运行阶段：Seata enabled → DataSourceProxy 校验 undo_log → 注册 RM → 接收流量
+```
+
+约束：
+
+- `undo_log` 必须由服务自己的 Flyway 迁移管理，不在启动脚本中复制 DDL；
+- 迁移阶段使用同一版本应用制品、同一数据库凭证和同一 Schema，但显式设置 `seata.enabled=false`；
+- 迁移成功后才允许滚动启动 Seata-enabled 业务实例；
+- Seata-enabled 实例保留 Flyway 校验，发现迁移漂移仍应启动失败；
+- 不允许通过关闭 Undo Log 存在性检查、自动临时建表或授予业务应用跨 Schema DDL 权限来绕过该顺序；
+- `mom-infra` 后续应把该顺序实现为部署前 Migration Job/Hook，并保证失败时不发布新业务 Pod。
+
+### 3.5 注册与存储
 
 - CI 使用 file registry 和直接 TC 地址，只用于隔离验证；
 - CI 的 Seata Server 使用 file store，不代表生产高可用方案；
@@ -82,6 +102,7 @@ MDM @GlobalTransactional（TM）
 
 | 失败点 | 预期结果 |
 |---|---|
+| Flyway 迁移失败或 `undo_log` 缺失 | Seata-enabled 实例不得启动，不接收流量 |
 | MDM 本地分支失败 | 不调用远端；MDM 本地事务回滚；全局事务回滚 |
 | Integration 本地分支失败 | Integration 本地事务回滚；Feign 抛错；MDM 分支全局回滚 |
 | Integration 成功后 MDM 抛错 | 两个已注册分支都由 TC 全局回滚 |
@@ -95,25 +116,29 @@ MDM @GlobalTransactional（TM）
 - 真实证明当前 Boot 4、Seata 2.5、PostgreSQL 和 Feign 组合可运行；
 - 展示 TM、RM、XID、Undo Log 和二阶段回滚机制；
 - 通过默认关闭和 CI 故障演练限制误用范围；
+- 全新数据库迁移与 Seata 代理启动顺序明确、可自动化；
 - 不影响 Outbox/Inbox 作为长流程最终一致方案。
 
 ### 负向
 
 - 服务启动和 SQL 执行链增加数据源代理、TC 连接和 Undo Log 成本；
 - TC 成为启用场景的强依赖；
+- Seata-enabled 发布前增加独立数据库迁移阶段；
 - AT 的数据库回滚不能替代领域补偿；
 - PostgreSQL SQL 兼容范围需要随正式业务 SQL 单独验证。
 
 ## 6. 验证方式
 
-独立 Seata CI 必须使用两套 PostgreSQL 17.7 和真实 Seata Server 2.5.0，验证：
+独立 Seata CI 必须使用两套全新 PostgreSQL 17.7 和真实 Seata Server 2.5.0，验证：
 
-1. 两个分支成功提交且 XID 一致；
-2. 远端成功后发起方异常，两个数据库最终均无记录；
-3. 参与者本地异常，两个数据库最终均无记录；
-4. 完成事务后两端 `undo_log` 被清理；
-5. TC 停止后新事务 fail-closed，两个数据库均无记录；
-6. 既有 Nacos、Redis、RocketMQ、PostgreSQL 和 JDK 25 CI 无回归。
+1. Seata-disabled 迁移实例通过 Flyway 创建各自 Schema、技术表和 `undo_log`；
+2. Seata-enabled 实例随后通过 Undo Log 检查并成功注册 TM/RM；
+3. 两个分支成功提交且 XID 一致；
+4. 远端成功后发起方异常，两个数据库最终均无记录；
+5. 参与者本地异常，两个数据库最终均无记录；
+6. 完成事务后两端 `undo_log` 被清理；
+7. TC 停止后新事务 fail-closed，两个数据库均无记录；
+8. 既有 Nacos、Redis、RocketMQ、PostgreSQL 和 JDK 25 CI 无回归。
 
 ## 7. 替代和退出条件
 
