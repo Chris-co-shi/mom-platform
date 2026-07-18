@@ -92,12 +92,13 @@
 - 全局事务内禁止等待人工、设备、消息、外部回调、长轮询、休眠和无界重试；完整制造流程必须使用事件、状态机、对账和人工补偿；
 - 当前 AT 基线的单次全局事务超时不得超过 10 秒，参与数据库分支默认不得超过两个；放宽任一限制必须新增 ADR 和故障测试；
 - 每个 RM 仍必须使用显式 Spring 本地事务，业务写入与本服务 `undo_log` 共用唯一 DataSource、事务管理器和连接池；
+- 全新数据库或新增 Seata Flyway 迁移必须先运行 `seata.enabled=false` 的独立 Migration Job，再启动 Seata-enabled 业务实例；不得关闭 Undo Log 检查、在启动脚本复制 DDL 或让业务 Pod 边代理边初始化；
 - Seata 默认关闭，技术接口默认关闭；服务不得自行启动嵌入式 TC，也不得在 TC 不可用时降级为普通本地写入；
 - 参与者没有收到 XID、上下游 XID 不一致或全局事务无法开始时必须 fail-closed；禁止伪造成功或吞掉全局事务异常；
 - Feign XID 传播由 Spring Cloud Alibaba Seata 负责，业务代码不得手工复制协议 Header，除非官方集成失效且已有新的 ADR；
 - AT 回滚只处理数据库状态，不能撤销已经发生的设备动作、人工决策、文件发送或外部系统副作用；此类场景必须使用补偿而不是 AT；
 - 不允许在 Seata 全局事务中直接发送 RocketMQ，也不允许用 Seata 替代 Outbox、Inbox、幂等、DEAD/DLQ 和对账；
-- 新增或升级 Seata 必须使用真实 TC 和两个独立 PostgreSQL 数据库验证提交、参与者失败、远端成功后回滚、Undo Log 清理和 TC 中断，不得仅验证应用启动。
+- 新增或升级 Seata 必须使用真实 TC 和两个独立 PostgreSQL 数据库验证迁移先行、提交、参与者失败、远端成功后回滚、Undo Log 清理和 TC 中断，不得仅验证应用启动。
 
 ## 7. Redis 约束
 
