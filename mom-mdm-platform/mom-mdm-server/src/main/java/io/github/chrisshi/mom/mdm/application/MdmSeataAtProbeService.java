@@ -6,6 +6,7 @@ import io.github.chrisshi.mom.integration.client.IntegrationSeataAtParticipantCl
 import io.github.chrisshi.mom.mdm.interfaces.rest.internal.MdmSeataAtProbeRequest;
 import io.github.chrisshi.mom.mdm.interfaces.rest.internal.MdmSeataAtProbeResponse;
 import org.apache.seata.spring.annotation.GlobalTransactional;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
@@ -17,10 +18,17 @@ import java.util.Objects;
  * Integration 分支。全局事务超时固定为 10 秒，且方法内不得引入消息等待、重试循环、人工交互、设备执行
  * 或第三方回调。</p>
  *
+ * <p>Bean 与技术接口使用同一显式开关注册。Seata 或数据库未启用时，普通 MDM 上下文不会创建全局事务
+ * 发起服务；一旦开关打开，缺少本地分支、Feign Client 或 Seata 基础设施会让应用 fail-fast。</p>
+ *
  * <p>Spring Cloud Alibaba Seata 负责在 Feign 调用中传播 XID。服务会比较两端观察到的 XID，若不一致则
  * 主动失败并全局回滚。类不能声明为 {@code final}，因为 Seata 和 Spring 需要为注解方法创建代理。</p>
  */
 @Service
+@ConditionalOnProperty(
+        prefix = "mom.mdm.seata-at-probe",
+        name = "enabled",
+        havingValue = "true")
 public class MdmSeataAtProbeService {
 
     private final MdmSeataAtLocalParticipantService localParticipantService;
