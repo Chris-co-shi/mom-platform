@@ -45,13 +45,15 @@ public class RedisRateLimitAutoConfiguration {
     /**
      * 创建 MOM fail-closed Redis 令牌桶。
      *
-     * <p>路由必须通过 Bean 名显式引用该包装器，不能继续隐式使用官方默认 RedisRateLimiter，
-     * 否则 Redis 故障时会沿用官方 fail-open 行为。</p>
+     * <p>路由通过 Bean 名显式引用该包装器。同时将其标记为 {@link Primary}，满足 Gateway 默认
+     * RequestRateLimiter 工厂按类型注入单个 {@code RateLimiter<?>} 的要求；官方 RedisRateLimiter
+     * 仍作为内部委托存在，不会被直接用于请求放行判断。</p>
      *
      * @param redisRateLimiter Gateway 官方自动配置创建的 RedisRateLimiter
      * @return 保留官方算法并把异常放行转换为错误信号的 RateLimiter
      */
     @Bean(name = "momFailClosedRedisRateLimiter")
+    @Primary
     @ConditionalOnBean(RedisRateLimiter.class)
     @ConditionalOnMissingBean(name = "momFailClosedRedisRateLimiter")
     RateLimiter<RedisRateLimiter.Config> momFailClosedRedisRateLimiter(
