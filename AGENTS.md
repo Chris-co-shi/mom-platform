@@ -45,7 +45,7 @@
 
 - `*-api` 只定义跨模块契约，不依赖 WebMVC、数据访问或具体 Server；
 - `*-client` 只封装调用契约，不依赖提供方 Server；
-- 领域 `*-server` 不直接依赖其他领域 `*-server`；
+- 领域 `*-server` 不直接依赖其他领域的 `*-server`；
 - Gateway 必须保持 WebFlux，禁止引入 Servlet/WebMVC；
 - PCS、WCS 保持独立仓库和部署边界；
 - MES、WMS、QMS、库存事实、批次谱系、Integration Hub 等 MOM 核心能力必须自主建模。
@@ -58,6 +58,12 @@
 - 中间表、日志表、流水表、Outbox/Inbox、快照表不得为了统一形式强制继承完整 `BaseEntity`；复合主键表可以完全不继承；
 - `BaseEntity.deleted` 使用布尔逻辑删除语义：`false` 有效、`true` 已删除；物理清理、归档和唯一键复用必须由领域迁移单独设计；
 - 时间字段使用 `Instant`，PostgreSQL 使用 `timestamptz`，数据库连接会话统一为 UTC；
+- 普通领域服务默认只能有一个权威 `DataSource` 和一个 HikariCP 连接池；禁止无 ADR 引入动态数据源 Starter、`AbstractRoutingDataSource` 或基于 ThreadLocal 的隐式路由；
+- 业务表、Outbox 表和 Inbox 表必须使用同一 `DataSource`、同一事务管理器和同一本地事务；Outbox Publisher 不得创建第二个连接池；
+- 默认 HikariCP 基线为 `minimumIdle=1`、`maximumPoolSize=5`、`connectionTimeout=3000ms`、`validationTimeout=2000ms`，调整时必须结合服务最大副本数重新计算 PostgreSQL 连接预算；
+- PgJDBC 连接必须启用 TCP Keepalive，并使用稳定的 `ApplicationName` 便于在 `pg_stat_activity` 中识别服务连接；
+- `maxLifetime`、`keepaliveTime` 只有在数据库代理、网络设备或基础设施连接寿命明确后才能覆盖默认值；泄漏检测默认关闭，仅限诊断环境临时开启；
+- 外部遗留数据库、报表库或读副本属于多数据源例外，必须新增 ADR，并显式定义 Bean、Mapper、事务、只读、一致性、健康检查和故障策略；
 - Mapper 不得通过 `IService/ServiceImpl` 直接升级为领域服务契约，事务边界应由显式 Application Service 定义；
 - Lombok 仅用于消除 getter、setter、构造器等机械代码，不得使用 `@Data` 自动生成实体 `equals/hashCode/toString`，避免触发懒加载、递归引用或错误身份语义；
 - 新增 Flyway 迁移后不得修改已经合并执行过的历史迁移文件，结构变更必须增加新版本迁移。

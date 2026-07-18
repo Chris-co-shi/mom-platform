@@ -264,6 +264,7 @@ jobs:
             rate-limit-second.json
             redis-failure-response.json
             mdm-postgresql-health.json
+            mdm-postgresql-prometheus.txt
             mdm-data-probe-create.json
             mdm-data-probe-read.json
             mdm-postgresql-failure.json
