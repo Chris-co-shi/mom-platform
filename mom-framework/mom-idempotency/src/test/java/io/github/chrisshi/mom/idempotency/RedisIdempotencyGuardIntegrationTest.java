@@ -36,10 +36,11 @@ class RedisIdempotencyGuardIntegrationTest {
      */
     @Test
     void shouldAcquireOnlyOnceAndProtectRawBusinessKey() {
-        try (LettuceConnectionFactory connectionFactory = createConnectionFactory(
+        LettuceConnectionFactory connectionFactory = createConnectionFactory(
                 REDIS.getHost(),
                 REDIS.getMappedPort(6379),
-                Duration.ofSeconds(1))) {
+                Duration.ofSeconds(1));
+        try {
             RedisIdempotencyGuard guard = createGuard(
                     connectionFactory,
                     RedisFailureMode.FAIL_CLOSED);
@@ -63,6 +64,8 @@ class RedisIdempotencyGuardIntegrationTest {
             assertFalse(first.protectedKey().contains("supplier-order-20260718-0001"));
             assertTrue(first.protectedKey().startsWith(
                     "mom:test:mom-idempotency-test:idempotency:integration.delivery.receive:"));
+        } finally {
+            connectionFactory.destroy();
         }
     }
 
@@ -71,10 +74,11 @@ class RedisIdempotencyGuardIntegrationTest {
      */
     @Test
     void shouldFailClosedWhenRedisIsUnavailable() {
-        try (LettuceConnectionFactory connectionFactory = createConnectionFactory(
+        LettuceConnectionFactory connectionFactory = createConnectionFactory(
                 "127.0.0.1",
                 1,
-                Duration.ofMillis(200))) {
+                Duration.ofMillis(200));
+        try {
             RedisIdempotencyGuard guard = createGuard(
                     connectionFactory,
                     RedisFailureMode.FAIL_CLOSED);
@@ -84,6 +88,8 @@ class RedisIdempotencyGuardIntegrationTest {
                     "request-closed",
                     "correlation-closed",
                     Duration.ofSeconds(30)));
+        } finally {
+            connectionFactory.destroy();
         }
     }
 
@@ -92,10 +98,11 @@ class RedisIdempotencyGuardIntegrationTest {
      */
     @Test
     void shouldMarkBypassedWhenFailOpenIsConfigured() {
-        try (LettuceConnectionFactory connectionFactory = createConnectionFactory(
+        LettuceConnectionFactory connectionFactory = createConnectionFactory(
                 "127.0.0.1",
                 1,
-                Duration.ofMillis(200))) {
+                Duration.ofMillis(200));
+        try {
             RedisIdempotencyGuard guard = createGuard(
                     connectionFactory,
                     RedisFailureMode.FAIL_OPEN);
@@ -109,6 +116,8 @@ class RedisIdempotencyGuardIntegrationTest {
             assertEquals(IdempotencyAcquireStatus.BYPASSED, result.status());
             assertTrue(result.mayProceed());
             assertEquals("RedisConnectionFailureException", result.failureReason());
+        } finally {
+            connectionFactory.destroy();
         }
     }
 
