@@ -168,6 +168,9 @@ class MdmOutboxPostgresqlIntegrationTest {
 
     /**
      * 验证租约领取互斥、重复领取隔离以及持有者条件更新。
+     *
+     * <p>同一测试上下文中的其他测试可能已经留下待发布记录，因此首个发布器批量领取所有可用记录，再只断言
+     * 本测试事件包含在其租约中，避免测试方法执行顺序影响结论。</p>
      */
     @Test
     void leasedClaimShouldPreventConcurrentDuplicateOwnership() {
@@ -179,15 +182,15 @@ class MdmOutboxPostgresqlIntegrationTest {
 
         List<OutboxRecord> firstClaim = repository.claimAvailable(
                 "publisher-one",
-                1,
+                100,
                 Duration.ofSeconds(30));
         List<OutboxRecord> secondClaim = repository.claimAvailable(
                 "publisher-two",
-                10,
+                100,
                 Duration.ofSeconds(30));
 
-        assertEquals(1, firstClaim.size());
-        assertEquals(result.eventId(), firstClaim.getFirst().eventId());
+        assertTrue(firstClaim.stream().anyMatch(record ->
+                result.eventId().equals(record.eventId())));
         assertTrue(secondClaim.stream().noneMatch(record ->
                 result.eventId().equals(record.eventId())));
         assertTrue(repository.markSent(result.eventId(), "publisher-one"));
