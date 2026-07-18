@@ -6,8 +6,8 @@ import io.github.chrisshi.mom.integration.MomIntegrationApplication;
 import io.github.chrisshi.mom.mdm.MomMdmApplication;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.WebApplicationType;
-import org.springframework.boot.actuate.health.HealthEndpoint;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
 import org.springframework.context.ConfigurableApplicationContext;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
