@@ -104,9 +104,22 @@ jq --exit-status --arg probeKey "$PROBE_KEY" '
   and .deleted == false
 ' mdm-data-probe-read.json
 
+metrics_status=$(curl --silent --output mdm-postgresql-prometheus.txt \
+  --write-out '%{http_code}' \
+  "http://127.0.0.1:${MDM_PORT}/actuator/prometheus")
+[[ "$metrics_status" == "200" ]]
+grep --extended-regexp --quiet '^jdbc_connections_max(\{| )' mdm-postgresql-prometheus.txt
+grep --extended-regexp --quiet '^hikaricp_connections_max(\{| )' mdm-postgresql-prometheus.txt
+
 server_timezone=$(docker exec "$POSTGRES_CONTAINER" \
   psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -tAc 'show timezone')
 [[ "$server_timezone" == "Asia/Tokyo" ]]
+
+application_connection_count=$(docker exec "$POSTGRES_CONTAINER" \
+  psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -tAc \
+  "select count(*) from pg_stat_activity where application_name = 'mom-mdm-server'")
+[[ "$application_connection_count" -ge 1 ]]
+[[ "$application_connection_count" -le 5 ]]
 
 migration_count=$(docker exec "$POSTGRES_CONTAINER" \
   psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -tAc \
