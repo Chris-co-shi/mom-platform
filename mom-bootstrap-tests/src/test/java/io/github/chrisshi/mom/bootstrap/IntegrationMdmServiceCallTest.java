@@ -33,12 +33,16 @@ class IntegrationMdmServiceCallTest {
 
     @Test
     void integrationCallsRealMdmApplicationAndPropagatesCorrelationId() throws Exception {
-        try (ConfigurableApplicationContext mdmContext = startApplication(MomMdmApplication.class)) {
+        try (ConfigurableApplicationContext mdmContext = startApplication(
+                MomMdmApplication.class,
+                "spring.application.name=mom-mdm-server")) {
             Integer mdmPort = localPort(mdmContext);
             String mdmUrl = "http://127.0.0.1:" + mdmPort;
 
             try (ConfigurableApplicationContext integrationContext = startApplication(
                     MomIntegrationApplication.class,
+                    "spring.application.name=mom-integration-server",
+                    "spring.cloud.openfeign.client.config.mdmServiceProbeClient.url=" + mdmUrl,
                     "spring.cloud.openfeign.client.config.mom-mdm-server.url=" + mdmUrl)) {
                 Integer integrationPort = localPort(integrationContext);
                 String correlationId = "p01-s02-correlation-001";
