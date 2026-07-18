@@ -91,6 +91,7 @@ java -jar mom-integration-platform/mom-integration-server/target/mom-integration
   --server.port=$INTEGRATION_MIGRATION_PORT \
   --spring.application.name=mom-integration-server \
   --spring.cloud.nacos.discovery.enabled=false \
+  --management.health.redis.enabled=false \
   --seata.enabled=false \
   --spring.autoconfigure.exclude="$SECURITY_EXCLUSIONS" \
   > p01-s06-integration-migration.log 2>&1 &
@@ -150,6 +151,7 @@ java -jar mom-integration-platform/mom-integration-server/target/mom-integration
   --server.port=$INTEGRATION_PORT \
   --spring.application.name=mom-integration-server \
   --spring.cloud.nacos.discovery.enabled=false \
+  --management.health.redis.enabled=false \
   --seata.enabled=true \
   --spring.autoconfigure.exclude="$SECURITY_EXCLUSIONS" \
   > p01-s06-integration-server.log 2>&1 &
