@@ -6,11 +6,12 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.core.Ordered;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-public final class CorrelationIdFilter extends OncePerRequestFilter {
+public final class CorrelationIdFilter extends OncePerRequestFilter implements Ordered {
 
     @Override
     protected void doFilterInternal(
@@ -27,5 +28,10 @@ public final class CorrelationIdFilter extends OncePerRequestFilter {
         } finally {
             CorrelationContext.clear();
         }
+    }
+
+    @Override
+    public int getOrder() {
+        return Ordered.HIGHEST_PRECEDENCE + 20;
     }
 }
