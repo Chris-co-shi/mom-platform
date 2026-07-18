@@ -37,6 +37,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
+MDM_JAR=mom-mdm-platform/mom-mdm-server/target/mom-mdm-server-0.1.0-SNAPSHOT-exec.jar
+INTEGRATION_JAR=mom-integration-platform/mom-integration-server/target/mom-integration-server-0.1.0-SNAPSHOT-exec.jar
+GATEWAY_JAR=mom-gateway/target/mom-gateway-0.1.0-SNAPSHOT-exec.jar
+
+# Boot 4.1 OpenTelemetry 的 OkHttp 5.3.2 要求 Okio 3.16.4。业务服务同时引入 Seata/RocketMQ，
+# 因此直接检查最终可执行 Jar，防止 Maven 依赖图再次解析出二进制不兼容的旧 Okio。
+for application_jar in "$MDM_JAR" "$INTEGRATION_JAR"; do
+  jar tf "$application_jar" | grep --quiet 'BOOT-INF/lib/okhttp-jvm-5.3.2.jar'
+  jar tf "$application_jar" | grep --quiet 'BOOT-INF/lib/okio-jvm-3.16.4.jar'
+  okio_count=$(jar tf "$application_jar" | grep -c 'BOOT-INF/lib/okio-jvm-.*\.jar')
+  [[ "$okio_count" == "1" ]]
+done
+
 docker rm -f "$NACOS_CONTAINER" "$REDIS_CONTAINER" "$TEMPO_CONTAINER" "$COLLECTOR_CONTAINER" >/dev/null 2>&1 || true
 docker network rm "$NETWORK" >/dev/null 2>&1 || true
 docker network create "$NETWORK" >/dev/null
@@ -107,11 +120,11 @@ COMMON_TRACE_ENV=(
   TRACING_SAMPLING_PROBABILITY=1.0
   OTEL_TRACING_EXPORT_ENABLED=true
   OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318/v1/traces
-  OTEL_EXPORTER_OTLP_TRACES_TIMEOUT=2s
+  OTEL_EXPORTER_OTLP_TRACES_TIMEOUT=2000
 )
 
 env "${COMMON_TRACE_ENV[@]}" \
-  java -jar mom-mdm-platform/mom-mdm-server/target/mom-mdm-server-0.1.0-SNAPSHOT-exec.jar \
+  java -jar "$MDM_JAR" \
   --server.port=$MDM_PORT \
   --spring.application.name=mom-mdm-server \
   --spring.cloud.nacos.discovery.enabled=true \
@@ -123,7 +136,7 @@ env "${COMMON_TRACE_ENV[@]}" \
 MDM_PID=$!
 
 env "${COMMON_TRACE_ENV[@]}" REDIS_HOST=127.0.0.1 REDIS_PORT=6379 \
-  java -jar mom-integration-platform/mom-integration-server/target/mom-integration-server-0.1.0-SNAPSHOT-exec.jar \
+  java -jar "$INTEGRATION_JAR" \
   --server.port=$INTEGRATION_PORT \
   --spring.application.name=mom-integration-server \
   --spring.cloud.nacos.discovery.enabled=true \
@@ -138,7 +151,7 @@ env "${COMMON_TRACE_ENV[@]}" REDIS_HOST=127.0.0.1 REDIS_PORT=6379 \
   GATEWAY_RATE_LIMIT_REPLENISH_RATE=100 \
   GATEWAY_RATE_LIMIT_BURST_CAPACITY=100 \
   GATEWAY_RATE_LIMIT_REQUESTED_TOKENS=1 \
-  java -jar mom-gateway/target/mom-gateway-0.1.0-SNAPSHOT-exec.jar \
+  java -jar "$GATEWAY_JAR" \
   --server.port=$GATEWAY_PORT \
   --spring.application.name=mom-gateway \
   --spring.cloud.nacos.discovery.enabled=true \
@@ -183,10 +196,16 @@ for attempt in {1..60}; do
     --write-out '%{http_code}' \
     --header 'Accept: application/json' \
     http://127.0.0.1:3200/api/traces/$TRACE_ID || true)
-  if [[ "$tempo_status" == "200" ]] \
-    && grep --quiet 'mom-gateway' p01-s07-tempo-trace.json \
-    && grep --quiet 'mom-integration-server' p01-s07-tempo-trace.json \
-    && grep --quiet 'mom-mdm-server' p01-s07-tempo-trace.json; then
+  if [[ "$tempo_status" == "200" ]] && jq --exit-status '
+    [
+      .batches[].resource.attributes[]?
+      | select(.key == "service.name")
+      | .value.stringValue
+    ] as $services
+    | ($services | index("mom-gateway")) != null
+      and ($services | index("mom-integration-server")) != null
+      and ($services | index("mom-mdm-server")) != null
+  ' p01-s07-tempo-trace.json >/dev/null; then
     break
   fi
   if [[ "$attempt" == "60" ]]; then
