@@ -58,6 +58,9 @@ jobs:
           docker run --name "$NACOS_CONTAINER" \
             -e MODE=standalone \
             -e NACOS_AUTH_ENABLE=false \
+            -e NACOS_AUTH_TOKEN=TU9NLVBsYXRmb3JtLUNJLU5hY29zLVRva2VuLTIwMjYtMDctMTgtU3Ryb25nLUtleQ== \
+            -e NACOS_AUTH_IDENTITY_KEY=mom-platform-ci-key \
+            -e NACOS_AUTH_IDENTITY_VALUE=mom-platform-ci-value \
             -e JVM_XMS=256m \
             -e JVM_XMX=256m \
             -e JVM_XMN=128m \
