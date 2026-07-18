@@ -53,6 +53,11 @@
       <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>io.github.chrisshi.mom</groupId>
       <artifactId>mom-test</artifactId>
       <version>${project.version}</version>

@@ -50,7 +50,19 @@
 - PCS、WCS 保持独立仓库和部署边界；
 - MES、WMS、QMS、库存事实、批次谱系、Integration Hub 等 MOM 核心能力必须自主建模。
 
-## 4. Redis 约束
+## 4. 数据访问约束
+
+- Java 技术主键统一使用 `String`，数据库使用 `varchar(19)`；禁止把 Snowflake 或 64 位整数 ID 作为 JSON Number 暴露给前端；
+- MyBatis-Plus 默认主键策略使用 `ASSIGN_ID`，业务编码、工单号、批次号等领域标识必须独立建模；
+- 实体继承必须按能力选择：仅主键使用 `BaseIdEntity`，需要审计使用 `BaseAuditEntity`，同时需要乐观锁和逻辑删除的普通业务表才使用 `BaseEntity`；
+- 中间表、日志表、流水表、Outbox/Inbox、快照表不得为了统一形式强制继承完整 `BaseEntity`；复合主键表可以完全不继承；
+- `BaseEntity.deleted` 使用布尔逻辑删除语义：`false` 有效、`true` 已删除；物理清理、归档和唯一键复用必须由领域迁移单独设计；
+- 时间字段使用 `Instant`，PostgreSQL 使用 `timestamptz`，数据库连接会话统一为 UTC；
+- Mapper 不得通过 `IService/ServiceImpl` 直接升级为领域服务契约，事务边界应由显式 Application Service 定义；
+- Lombok 仅用于消除 getter、setter、构造器等机械代码，不得使用 `@Data` 自动生成实体 `equals/hashCode/toString`，避免触发懒加载、递归引用或错误身份语义；
+- 新增 Flyway 迁移后不得修改已经合并执行过的历史迁移文件，结构变更必须增加新版本迁移。
+
+## 5. Redis 约束
 
 - Key 必须具有统一命名空间，禁止直接拼接含个人信息或敏感业务数据的原始值；
 - 默认使用字符串或明确的 JSON 格式，禁止依赖 Java 原生序列化；
@@ -59,7 +71,7 @@
 - 必须明确 Redis 不可用时采用 fail-open 还是 fail-closed；
 - 分布式锁必须使用唯一持有者标识并安全释放，幂等占位不得伪装成分布式锁。
 
-## 5. 测试与提交
+## 6. 测试与提交
 
 - 新增基础设施能力必须包含单元测试或真实中间件 Smoke Test；
 - GitHub Actions 必须执行 JDK 25 下的 `mvn -B -ntp clean verify`；

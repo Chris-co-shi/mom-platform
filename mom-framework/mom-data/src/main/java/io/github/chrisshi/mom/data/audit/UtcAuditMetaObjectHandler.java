@@ -10,14 +10,17 @@ import java.time.Instant;
 import java.util.Optional;
 
 /**
- * MyBatis-Plus 数据审计字段自动填充器。
+ * MyBatis-Plus 数据审计与基础状态字段自动填充器。
  *
- * <p>插入时填充 {@code createdAt}、{@code updatedAt} 和初始 {@code version}；更新时只刷新
- * {@code updatedAt}。所有时间均来自 UTC {@link Clock}，因此不受应用服务器本地时区影响。</p>
+ * <p>插入时按实体实际声明的字段填充 {@code createdAt}、{@code updatedAt}、初始 {@code version}
+ * 和未删除状态 {@code deleted=false}；更新时只刷新 {@code updatedAt}。MyBatis-Plus 严格填充只会处理
+ * 同时存在且声明了对应 {@code FieldFill} 的字段，因此仅继承 ID 或审计基类的轻量实体不会被强制写入
+ * 版本号或逻辑删除标识。</p>
  *
- * <p>操作主体由可选的 {@link CurrentActorProvider} 提供。IAM 或安全模块尚未接入时保持空值，
- * 不会伪造为“admin”或“system”。如果存在多个实现，只使用 Spring 排序后的第一个实现，应用应通过
- * {@code @Primary} 或 {@code @Order} 明确选择。</p>
+ * <p>所有时间均来自 UTC {@link Clock}，因此不受应用服务器本地时区影响。操作主体由可选的
+ * {@link CurrentActorProvider} 提供；IAM 或安全模块尚未接入时保持空值，不伪造为“admin”或“system”。
+ * 如果存在多个实现，只使用 Spring 排序后的第一个实现，应用应通过 {@code @Primary} 或
+ * {@code @Order} 明确选择。</p>
  */
 public final class UtcAuditMetaObjectHandler implements MetaObjectHandler {
 
@@ -38,7 +41,7 @@ public final class UtcAuditMetaObjectHandler implements MetaObjectHandler {
     }
 
     /**
-     * 为首次持久化实体填充审计字段。
+     * 为首次持久化实体填充其实际具备的审计、版本和逻辑删除初始状态。
      *
      * @param metaObject MyBatis 当前实体元对象
      */
@@ -48,6 +51,7 @@ public final class UtcAuditMetaObjectHandler implements MetaObjectHandler {
         strictInsertFill(metaObject, "createdAt", Instant.class, now);
         strictInsertFill(metaObject, "updatedAt", Instant.class, now);
         strictInsertFill(metaObject, "version", Long.class, 0L);
+        strictInsertFill(metaObject, "deleted", Boolean.class, Boolean.FALSE);
         currentActorId().ifPresent(actorId -> {
             strictInsertFill(metaObject, "createdBy", String.class, actorId);
             strictInsertFill(metaObject, "updatedBy", String.class, actorId);
@@ -68,6 +72,8 @@ public final class UtcAuditMetaObjectHandler implements MetaObjectHandler {
 
     /**
      * 获取排序最高且返回非空值的操作主体。
+     *
+     * @return 经过空白清理后的主体标识；无可靠主体时返回空
      */
     private Optional<String> currentActorId() {
         return actorProviders.orderedStream()

@@ -81,10 +81,12 @@ create_status=$(curl --silent --output mdm-data-probe-create.json \
 [[ "$create_status" == "201" ]]
 
 jq --exit-status --arg probeKey "$PROBE_KEY" '
-  (.id | type == "number")
+  (.id | type == "string")
+  and (.id | test("^[0-9]{1,19}$"))
   and .probeKey == $probeKey
   and .probeValue == "postgresql-17.7-ok"
   and .version == 0
+  and .deleted == false
   and (.createdAt | endswith("Z"))
   and (.updatedAt | endswith("Z"))
 ' mdm-data-probe-create.json
@@ -95,9 +97,11 @@ read_status=$(curl --silent --output mdm-data-probe-read.json \
 [[ "$read_status" == "200" ]]
 
 jq --exit-status --arg probeKey "$PROBE_KEY" '
-  .probeKey == $probeKey
+  (.id | type == "string")
+  and .probeKey == $probeKey
   and .probeValue == "postgresql-17.7-ok"
   and .version == 0
+  and .deleted == false
 ' mdm-data-probe-read.json
 
 server_timezone=$(docker exec "$POSTGRES_CONTAINER" \
@@ -106,12 +110,17 @@ server_timezone=$(docker exec "$POSTGRES_CONTAINER" \
 
 migration_count=$(docker exec "$POSTGRES_CONTAINER" \
   psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -tAc \
-  "select count(*) from ${POSTGRES_SCHEMA}.flyway_schema_history where success = true and version = '1'")
-[[ "$migration_count" == "1" ]]
+  "select count(*) from ${POSTGRES_SCHEMA}.flyway_schema_history where success = true and version in ('1', '2')")
+[[ "$migration_count" == "2" ]]
+
+id_column_definition=$(docker exec "$POSTGRES_CONTAINER" \
+  psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -tAc \
+  "select data_type || ':' || character_maximum_length from information_schema.columns where table_schema = '${POSTGRES_SCHEMA}' and table_name = 'technical_data_probe' and column_name = 'id'")
+[[ "$id_column_definition" == "character varying:19" ]]
 
 probe_count=$(docker exec "$POSTGRES_CONTAINER" \
   psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -tAc \
-  "select count(*) from ${POSTGRES_SCHEMA}.technical_data_probe where probe_key = '${PROBE_KEY}'")
+  "select count(*) from ${POSTGRES_SCHEMA}.technical_data_probe where probe_key = '${PROBE_KEY}' and deleted = false")
 [[ "$probe_count" == "1" ]]
 
 # 数据库不可用时读取请求不得返回 2xx，验证数据访问默认 fail-closed。
