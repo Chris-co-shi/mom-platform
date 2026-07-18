@@ -9,12 +9,27 @@ spring:
       discovery:
         enabled: ${NACOS_DISCOVERY_ENABLED:false}
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: integration-service
+              uri: lb://mom-integration-server
+              predicates:
+                - Path=/api/integration/**
+              filters:
+                - StripPrefix=1
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: health,info,prometheus,nacos-discovery
   endpoint:
     health:
       probes:

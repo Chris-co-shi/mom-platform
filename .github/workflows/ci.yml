@@ -15,6 +15,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +33,110 @@ jobs:
           set -o pipefail
           mvn -B -ntp clean verify 2>&1 | tee maven-build.log
 
+      - name: Run Nacos discovery smoke test
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          NACOS_CONTAINER=mom-nacos-ci
+          CORRELATION_ID=p01-s02-nacos-correlation-001
+          BOOTSTRAP_EXCLUSIONS="org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration,org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration,org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration,org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration,org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration"
+          MDM_PID=""
+          INTEGRATION_PID=""
+          GATEWAY_PID=""
+
+          cleanup() {
+            set +e
+            [[ -n "$GATEWAY_PID" ]] && kill "$GATEWAY_PID" 2>/dev/null
+            [[ -n "$INTEGRATION_PID" ]] && kill "$INTEGRATION_PID" 2>/dev/null
+            [[ -n "$MDM_PID" ]] && kill "$MDM_PID" 2>/dev/null
+            docker logs "$NACOS_CONTAINER" > nacos-server.log 2>&1
+            docker rm -f "$NACOS_CONTAINER" >/dev/null 2>&1
+          }
+          trap cleanup EXIT
+
+          docker run --name "$NACOS_CONTAINER" \
+            -e MODE=standalone \
+            -e NACOS_AUTH_ENABLE=false \
+            -e NACOS_AUTH_TOKEN=TU9NLVBsYXRmb3JtLUNJLU5hY29zLVRva2VuLTIwMjYtMDctMTgtU3Ryb25nLUtleQ== \
+            -e NACOS_AUTH_IDENTITY_KEY=mom-platform-ci-key \
+            -e NACOS_AUTH_IDENTITY_VALUE=mom-platform-ci-value \
+            -e JVM_XMS=256m \
+            -e JVM_XMX=256m \
+            -e JVM_XMN=128m \
+            -p 8848:8848 \
+            -p 9848:9848 \
+            -d nacos/nacos-server:v3.1.0
+
+          for attempt in {1..60}; do
+            if curl --fail --silent --show-error \
+              http://127.0.0.1:8848/nacos/v3/admin/core/state/readiness >/dev/null; then
+              break
+            fi
+            if [[ "$attempt" == "60" ]]; then
+              echo "Nacos did not become ready"
+              exit 1
+            fi
+            sleep 2
+          done
+
+          java -jar mom-mdm-platform/mom-mdm-server/target/mom-mdm-server-0.1.0-SNAPSHOT-exec.jar \
+            --server.port=20200 \
+            --spring.application.name=mom-mdm-server \
+            --spring.cloud.nacos.discovery.enabled=true \
+            --spring.cloud.nacos.discovery.server-addr=127.0.0.1:8848 \
+            --spring.cloud.nacos.discovery.ip=127.0.0.1 \
+            --spring.autoconfigure.exclude="$BOOTSTRAP_EXCLUSIONS" \
+            > mdm-server.log 2>&1 &
+          MDM_PID=$!
+
+          java -jar mom-integration-platform/mom-integration-server/target/mom-integration-server-0.1.0-SNAPSHOT-exec.jar \
+            --server.port=20800 \
+            --spring.application.name=mom-integration-server \
+            --spring.cloud.nacos.discovery.enabled=true \
+            --spring.cloud.nacos.discovery.server-addr=127.0.0.1:8848 \
+            --spring.cloud.nacos.discovery.ip=127.0.0.1 \
+            --spring.autoconfigure.exclude="$BOOTSTRAP_EXCLUSIONS" \
+            > integration-server.log 2>&1 &
+          INTEGRATION_PID=$!
+
+          java -jar mom-gateway/target/mom-gateway-0.1.0-SNAPSHOT-exec.jar \
+            --server.port=20000 \
+            --spring.application.name=mom-gateway \
+            --spring.cloud.nacos.discovery.enabled=true \
+            --spring.cloud.nacos.discovery.server-addr=127.0.0.1:8848 \
+            --spring.cloud.nacos.discovery.ip=127.0.0.1 \
+            > gateway.log 2>&1 &
+          GATEWAY_PID=$!
+
+          for attempt in {1..60}; do
+            status=$(curl --silent --output nacos-smoke-response.json \
+              --dump-header nacos-smoke-headers.txt \
+              --write-out '%{http_code}' \
+              --header "X-Correlation-Id: ${CORRELATION_ID}" \
+              http://127.0.0.1:20000/api/integration/mdm-probe || true)
+            if [[ "$status" == "200" ]]; then
+              break
+            fi
+            if [[ "$attempt" == "60" ]]; then
+              echo "Gateway service-discovery request failed with HTTP ${status}"
+              cat nacos-smoke-response.json || true
+              exit 1
+            fi
+            sleep 2
+          done
+
+          grep --ignore-case --quiet \
+            "^X-Correlation-Id: ${CORRELATION_ID}" nacos-smoke-headers.txt
+          jq --exit-status --arg correlationId "$CORRELATION_ID" '
+            .service == "mom-integration-server"
+            and .status == "UP"
+            and .correlationId == $correlationId
+            and .mdmService == "mom-mdm-server"
+            and .mdmStatus == "UP"
+            and .mdmCorrelationId == $correlationId
+          ' nacos-smoke-response.json
+
       - name: Upload verification diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -39,6 +144,12 @@ jobs:
           name: verification-diagnostics
           path: |
             maven-build.log
+            nacos-server.log
+            mdm-server.log
+            integration-server.log
+            gateway.log
+            nacos-smoke-response.json
+            nacos-smoke-headers.txt
             **/target/surefire-reports/**
             **/target/failsafe-reports/**
           if-no-files-found: ignore
