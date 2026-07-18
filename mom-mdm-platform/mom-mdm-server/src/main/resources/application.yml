@@ -1,5 +1,5 @@
 server:
-  port: ${SERVER_PORT:8110}
+  port: ${SERVER_PORT:20200}
 spring:
   application:
     name: mom-mdm-server
