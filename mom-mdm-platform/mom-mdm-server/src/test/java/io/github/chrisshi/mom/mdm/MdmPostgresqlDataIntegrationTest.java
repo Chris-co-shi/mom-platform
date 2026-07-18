@@ -56,7 +56,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MdmPostgresqlDataIntegrationTest {
 
     private static final String SCHEMA = "mom_mdm";
-    private static final Duration POSTGRESQL_TIMESTAMP_TOLERANCE = Duration.ofMicros(1);
+    private static final Duration POSTGRESQL_TIMESTAMP_TOLERANCE = Duration.ofNanos(1_000);
 
     @Container
     private static final PostgreSQLContainer POSTGRESQL = new PostgreSQLContainer(
