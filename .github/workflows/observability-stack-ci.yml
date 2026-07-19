@@ -1,0 +1,54 @@
+name: Observability Stack CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: observability-stack-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  observability-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Package observed applications
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -ntp -DskipTests package \
+            -pl mom-gateway,mom-mdm-platform/mom-mdm-server,mom-integration-platform/mom-integration-server \
+            -am 2>&1 | tee p01-s08-maven-package.log
+
+      - name: Run Prometheus Loki Grafana smoke test
+        shell: bash
+        run: bash .github/scripts/run-p01-s08-observability-stack-smoke.sh
+
+      - name: Upload observability stack diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: observability-stack-diagnostics
+          path: |
+            p01-s08-*.log
+            p01-s08-*.json
+            p01-s08-*.txt
+            mom-p01-s08-*.log
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+          if-no-files-found: ignore
