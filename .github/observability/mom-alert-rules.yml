@@ -1,0 +1,79 @@
+groups:
+  - name: mom-platform-foundation
+    interval: 5s
+    rules:
+      - alert: MOMServiceDown
+        expr: up{job=~"mom-.*"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "MOM 服务指标端点不可达"
+          description: "{{ $labels.job }} 已连续 30 秒无法被 Prometheus 抓取。"
+
+      - alert: MOMHttp5xxRateHigh
+        expr: |
+          (
+            sum by (application) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            /
+            clamp_min(sum by (application) (rate(http_server_requests_seconds_count[5m])), 0.001)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MOM 服务 5xx 比例持续升高"
+          description: "{{ $labels.application }} 的 5xx 比例连续 5 分钟超过 5%。"
+
+      - alert: MOMHttpP95LatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, application) (rate(http_server_requests_seconds_bucket[5m]))
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MOM 服务 P95 延迟过高"
+          description: "{{ $labels.application }} 的 HTTP P95 延迟连续 5 分钟超过 1 秒。"
+
+      - alert: MOMHikariPoolSaturation
+        expr: |
+          max by (application) (hikaricp_connections_active)
+          /
+          clamp_min(max by (application) (hikaricp_connections_max), 1)
+          > 0.9
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MOM 数据库连接池接近耗尽"
+          description: "{{ $labels.application }} 的 Hikari 活跃连接连续 2 分钟超过容量的 90%。"
+
+      - alert: MOMGatewayRateLimitUnavailable
+        expr: increase(mom_gateway_rate_limit_requests_total{outcome="unavailable"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Gateway Redis 限流基础设施不可用"
+          description: "{{ $labels.application }} 在最近 5 分钟出现 fail-closed 限流故障。"
+
+      - alert: MOMOutboxDeadEvents
+        expr: increase(mom_outbox_publish_results_total{outcome="dead"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Outbox 消息进入 DEAD"
+          description: "{{ $labels.application }} 在最近 10 分钟出现无法自动恢复的 Outbox 事件。"
+
+      - alert: MOMInboxProcessingFailures
+        expr: increase(mom_inbox_process_results_total{outcome="failed"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Inbox 消费处理持续失败"
+          description: "{{ $labels.application }} 的 {{ $labels.consumer }} 消费者出现事务回滚。"
