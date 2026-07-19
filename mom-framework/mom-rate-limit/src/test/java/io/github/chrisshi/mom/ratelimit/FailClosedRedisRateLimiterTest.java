@@ -1,5 +1,7 @@
 package io.github.chrisshi.mom.ratelimit;
 
+import io.github.chrisshi.mom.metrics.MomMetricNames;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.gateway.filter.ratelimit.RateLimiter;
 import org.springframework.cloud.gateway.filter.ratelimit.RedisRateLimiter;
@@ -14,19 +16,21 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * {@link FailClosedRedisRateLimiter} 的契约测试。
+ * {@link FailClosedRedisRateLimiter} 的契约与指标测试。
  *
  * <p>测试不复制官方 Redis Lua 实现，只模拟官方 {@link RedisRateLimiter} 的公开响应，验证正常限流结果
- * 原样透传，以及 Redis 异常时官方返回的“允许且剩余令牌为 -1”会被转换为 MOM fail-closed 异常。</p>
+ * 原样透传、Redis 异常时官方返回的“允许且剩余令牌为 -1”会被转换为 MOM fail-closed 异常，并且指标只
+ * 使用路由和结果标签。</p>
  */
 class FailClosedRedisRateLimiterTest {
 
     /**
-     * 验证正常官方响应不会被包装器修改。
+     * 验证正常官方响应不会被包装器修改，并记录 allowed 指标。
      */
     @Test
-    void shouldKeepNormalOfficialResponse() {
+    void shouldKeepNormalOfficialResponseAndRecordAllowedMetric() {
         RedisRateLimiter delegate = mock(RedisRateLimiter.class);
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
         RateLimiter.Response officialResponse = new RateLimiter.Response(
                 true,
                 Map.of(RedisRateLimiter.REMAINING_HEADER, "8"));
@@ -34,7 +38,7 @@ class FailClosedRedisRateLimiterTest {
         when(delegate.isAllowed("integration-service", "ip:127.0.0.1"))
                 .thenReturn(Mono.just(officialResponse));
 
-        FailClosedRedisRateLimiter limiter = new FailClosedRedisRateLimiter(delegate);
+        FailClosedRedisRateLimiter limiter = new FailClosedRedisRateLimiter(delegate, registry);
         RateLimiter.Response actual = limiter.isAllowed(
                         "integration-service",
                         "ip:127.0.0.1")
@@ -42,14 +46,19 @@ class FailClosedRedisRateLimiterTest {
 
         assertSame(officialResponse, actual);
         assertEquals("8", actual.getHeaders().get(RedisRateLimiter.REMAINING_HEADER));
+        assertEquals(1.0, registry.get(MomMetricNames.GATEWAY_RATE_LIMIT_REQUESTS)
+                .tags("route", "integration-service", "outcome", "allowed")
+                .counter()
+                .count());
     }
 
     /**
-     * 验证官方异常放行标记被转换为 fail-closed 异常，不能继续访问下游。
+     * 验证官方异常放行标记被转换为 fail-closed 异常，并记录 unavailable 指标。
      */
     @Test
-    void shouldRejectOfficialRedisFailureResponse() {
+    void shouldRejectOfficialRedisFailureResponseAndRecordUnavailableMetric() {
         RedisRateLimiter delegate = mock(RedisRateLimiter.class);
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
         RateLimiter.Response officialFailureResponse = new RateLimiter.Response(
                 true,
                 Map.of(RedisRateLimiter.REMAINING_HEADER, "-1"));
@@ -57,11 +66,15 @@ class FailClosedRedisRateLimiterTest {
         when(delegate.isAllowed("integration-service", "ip:127.0.0.1"))
                 .thenReturn(Mono.just(officialFailureResponse));
 
-        FailClosedRedisRateLimiter limiter = new FailClosedRedisRateLimiter(delegate);
+        FailClosedRedisRateLimiter limiter = new FailClosedRedisRateLimiter(delegate, registry);
 
         assertThrows(RedisRateLimitUnavailableException.class, () -> limiter.isAllowed(
                         "integration-service",
                         "ip:127.0.0.1")
                 .block());
+        assertEquals(1.0, registry.get(MomMetricNames.GATEWAY_RATE_LIMIT_REQUESTS)
+                .tags("route", "integration-service", "outcome", "unavailable")
+                .counter()
+                .count());
     }
 }
