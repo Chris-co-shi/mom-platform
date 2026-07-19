@@ -4,5 +4,49 @@
   "schemaVersion": 41,
   "version": 1,
   "refresh": "5s",
-  "panels": []
+  "time": {"from": "now-15m", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Available Services",
+      "datasource": {"type": "prometheus", "uid": "mom-prometheus"},
+      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0},
+      "targets": [{"refId": "A", "expr": "sum(up{job=~\"mom-.*\"})"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "HTTP Request Rate and P95",
+      "datasource": {"type": "prometheus", "uid": "mom-prometheus"},
+      "gridPos": {"h": 8, "w": 16, "x": 8, "y": 0},
+      "targets": [
+        {"refId": "A", "expr": "sum by (application) (rate(http_server_requests_seconds_count[1m]))", "legendFormat": "{{application}} requests/s"},
+        {"refId": "B", "expr": "histogram_quantile(0.95, sum by (le, application) (rate(http_server_requests_seconds_bucket[5m])))", "legendFormat": "{{application}} p95"}
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Database and Messaging Outcomes",
+      "datasource": {"type": "prometheus", "uid": "mom-prometheus"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+      "targets": [
+        {"refId": "A", "expr": "max by (application) (hikaricp_connections_active)", "legendFormat": "{{application}} hikari active"},
+        {"refId": "B", "expr": "sum by (application, outcome) (increase(mom_outbox_publish_results_total[10m]))", "legendFormat": "{{application}} outbox {{outcome}}"},
+        {"refId": "C", "expr": "sum by (application, outcome) (increase(mom_inbox_process_results_total[10m]))", "legendFormat": "{{application}} inbox {{outcome}}"},
+        {"refId": "D", "expr": "sum by (route, outcome) (increase(mom_gateway_rate_limit_requests_total[5m]))", "legendFormat": "{{route}} rate-limit {{outcome}}"}
+      ]
+    },
+    {
+      "id": 4,
+      "type": "logs",
+      "title": "Structured Application Logs",
+      "datasource": {"type": "loki", "uid": "mom-loki"},
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 16},
+      "targets": [{"refId": "A", "expr": "{environment=\"ci\"} | json", "queryType": "range"}],
+      "options": {"showTime": true, "sortOrder": "Descending", "wrapLogMessage": true, "enableLogDetails": true}
+    }
+  ]
 }
