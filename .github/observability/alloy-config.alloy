@@ -1,0 +1,59 @@
+local.file_match "mom_logs" {
+  path_targets = [
+    {
+      "__path__" = "/var/log/mom/gateway.log",
+      "service_name" = "mom-gateway",
+      "environment" = "ci",
+    },
+    {
+      "__path__" = "/var/log/mom/mdm.log",
+      "service_name" = "mom-mdm-server",
+      "environment" = "ci",
+    },
+    {
+      "__path__" = "/var/log/mom/integration.log",
+      "service_name" = "mom-integration-server",
+      "environment" = "ci",
+    },
+  ]
+}
+
+loki.source.file "mom_logs" {
+  targets    = local.file_match.mom_logs.targets
+  forward_to = [loki.process.mom_logs.receiver]
+}
+
+loki.process "mom_logs" {
+  stage.json {
+    expressions = {
+      level          = "level",
+      trace_id       = "trace_id",
+      span_id        = "span_id",
+      correlation_id = "correlation_id",
+      event_id       = "event_id",
+    }
+  }
+
+  stage.labels {
+    values = {
+      level = "",
+    }
+  }
+
+  stage.structured_metadata {
+    values = {
+      trace_id       = "",
+      span_id        = "",
+      correlation_id = "",
+      event_id       = "",
+    }
+  }
+
+  forward_to = [loki.write.mom.receiver]
+}
+
+loki.write "mom" {
+  endpoint {
+    url = "http://mom-p01-s08-loki:3100/loki/api/v1/push"
+  }
+}
