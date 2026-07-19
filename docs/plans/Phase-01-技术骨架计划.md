@@ -17,7 +17,7 @@
 - MDM 和 Integration 最小健康检查服务。
 - PostgreSQL、Redis、Nacos、RocketMQ、Seata 兼容性验证。
 - Micrometer、OpenTelemetry、OTLP Collector 和 Tempo。
-- Prometheus、Loki、Grafana 基础接入。
+- Prometheus、Grafana Alloy、Loki、Grafana 基础接入。
 - Testcontainers 和 ArchUnit 基础测试。
 
 ### 2.2 明确不做
@@ -105,9 +105,10 @@ mvn -B -ntp clean verify
 
 验收：
 
-- Grafana 能查看 Gateway 到后端服务的 Trace。
+- Tempo 能查看 Gateway 到后端服务的 Trace。
 - 日志可以关联 Trace。
 - RocketMQ 消费形成新的 Span 并保留关联关系。
+- Collector 不可用时业务继续运行。
 
 ### Slice 06：数据和消息基础设施
 
@@ -132,13 +133,51 @@ mvn -B -ntp clean verify
 - Outbox 消息发布并由消费者 Inbox 去重。
 - 同一消息重复投递三次只处理一次。
 
+### Slice 07：OpenTelemetry 追踪闭环
+
+任务：
+
+- 使用 Spring Boot OpenTelemetry Starter 和 Micrometer Tracing。
+- W3C Trace Context 贯通 Gateway、Integration、OpenFeign 和 MDM。
+- Outbox 发布与 RocketMQ Consumer 创建短 Span。
+- Collector 通过 OTLP 写入 Tempo。
+- 固化采样、MDC、关联标识和后端故障边界。
+
+验收：
+
+- 固定 Trace ID 在三个服务中一致且 Span 不同。
+- Tempo 能查询完整同步 Trace。
+- 日志 MDC 能关联 Trace。
+- Consumer 执行时存在消费 Span。
+- Collector 停止后业务请求仍成功。
+
+### Slice 08：Prometheus、Loki 与 Grafana 展示闭环
+
+任务：
+
+- Prometheus 抓取 Gateway、MDM 和 Integration 的 Actuator 指标。
+- 所有 Meter 增加 `application`、`environment` 低基数公共标签。
+- 增加 Gateway 限流、Outbox 发布和 Inbox 处理结果指标。
+- Spring Boot 输出结构化 JSON 日志，Grafana Alloy 写入 Loki。
+- Grafana 通过仓库内 provisioning 接入 Prometheus、Loki 与 Tempo。
+- 版本化平台总览 Dashboard 和 Phase 01 最小告警规则。
+
+验收：
+
+- Prometheus 可查询 HTTP、JVM、Hikari 和平台自定义指标。
+- Alert API 成功加载服务、错误率、延迟、连接池、限流和消息规则。
+- Loki 可按固定 Trace ID 查询结构化日志。
+- Loki 标签不包含 Trace、Correlation、Event 或业务单号。
+- Grafana 三个数据源和 Dashboard 均由 provisioning 创建且只读。
+- Prometheus 与 Loki 停止后业务调用仍成功。
+
 ## 4. 测试计划
 
-- 单元测试：核心值对象、上下文、限流策略和事件信封。
+- 单元测试：核心值对象、上下文、限流策略、事件信封和指标结果映射。
 - 集成测试：PostgreSQL、Redis、RocketMQ、Nacos。
-- 契约测试：错误响应、事件信封和上下文字段。
+- 契约测试：错误响应、事件信封、上下文字段和指标标签。
 - 架构测试：模块依赖和禁止类型。
-- 故障测试：Redis 中断、数据库中断、MQ 重复投递、应用重启。
+- 故障测试：Redis 中断、数据库中断、MQ 重复投递、应用重启、Collector/Prometheus/Loki 中断。
 
 ## 5. 完成定义
 
@@ -149,7 +188,8 @@ Phase 01 完成必须同时满足：
 - 核心服务可启动并注册到 Nacos。
 - Gateway 能认证、路由和限流。
 - PostgreSQL、Redis、RocketMQ 集成测试通过。
-- Grafana 能看到 Trace、日志和指标。
+- Grafana 能通过版本化配置查看 Trace、结构化日志和指标。
+- Phase 01 最小告警规则成功加载。
 - 文档和 ADR 与实现一致。
 
 ## 6. 风险
@@ -159,6 +199,7 @@ Phase 01 完成必须同时满足：
 | Boot 4 与某个 Starter 不兼容 | 优先替换或自行配置 Starter，不回退到 Boot 3 |
 | 中间件同时接入导致排障困难 | 按 Slice 单独完成兼容性验证 |
 | Framework 过早膨胀 | 只实现首个垂直切片需要的公共能力 |
-| 链路追踪标签失控 | 只允许低基数指标标签，业务 ID 放日志和 Span 属性 |
+| Trace、指标或日志标签失控 | 只允许低基数标签，高基数业务 ID 进入日志内容、Structured Metadata 或 Span 属性 |
 | Redis 故障导致生产操作全部失败 | 按接口等级定义 fail-open、fail-closed 或本地应急桶 |
 | Pod 扩容和滚动升级耗尽 PostgreSQL 连接 | 按副本数计算连接预算，默认每实例最大 5，并保留运维和发布余量 |
+| 可观测性后端故障影响业务 | Prometheus Pull、Alloy 采集和 OTLP 导出均与业务事务隔离，禁止无界缓冲 |
