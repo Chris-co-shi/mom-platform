@@ -1,0 +1,47 @@
+apiVersion: 1
+
+prune: true
+
+datasources:
+  - name: MOM Prometheus
+    uid: mom-prometheus
+    type: prometheus
+    access: proxy
+    url: http://mom-p01-s08-prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 2s
+
+  - name: MOM Loki
+    uid: mom-loki
+    type: loki
+    access: proxy
+    url: http://mom-p01-s08-loki:3100
+    editable: false
+    jsonData:
+      derivedFields:
+        - name: TraceID
+          matcherRegex: '"trace_id":"([a-f0-9]{32})"'
+          datasourceUid: mom-tempo
+          url: '$${__value.raw}'
+
+  - name: MOM Tempo
+    uid: mom-tempo
+    type: tempo
+    access: proxy
+    url: http://mom-p01-s08-tempo:3200
+    editable: false
+    jsonData:
+      nodeGraph:
+        enabled: true
+      serviceMap:
+        datasourceUid: mom-prometheus
+      tracesToLogsV2:
+        datasourceUid: mom-loki
+        spanStartTimeShift: -5m
+        spanEndTimeShift: 5m
+        filterByTraceID: true
+        filterBySpanID: false
+        customQuery: true
+        query: '{service_name="$${__span.tags["service.name"]}"} | json | trace_id="$${__trace.traceId}"'
