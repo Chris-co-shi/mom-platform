@@ -1,10 +1,12 @@
 package io.github.chrisshi.mom.outbox.application;
 
 import io.github.chrisshi.mom.messaging.event.EventTransport;
+import io.github.chrisshi.mom.metrics.MomMetricNames;
 import io.github.chrisshi.mom.outbox.config.OutboxPublisherProperties;
 import io.github.chrisshi.mom.outbox.model.OutboxRecord;
 import io.github.chrisshi.mom.outbox.model.OutboxStatus;
 import io.github.chrisshi.mom.outbox.persistence.JdbcOutboxRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import org.slf4j.Logger;
@@ -28,6 +30,9 @@ import java.util.Objects;
  * 写入 Broker Header，使消费者形成子 Span。该 Trace 只覆盖一次发布尝试，不延长原始 HTTP 请求；事件之间
  * 继续使用 {@code eventId} 与 {@code correlationId} 关联。业务 ID 仅作为高基数 Span 属性，不作为指标标签。</p>
  *
+ * <p>发布结果额外记录 {@code sent/retry/dead/cas_conflict} 四种低基数指标，不使用事件 ID、关联 ID 或负载作为
+ * 标签。指标注册或写入失败只记录警告，不得改变 Outbox 的持久化状态、重试和至少一次传输语义。</p>
+ *
  * <p>发布失败使用有上限的指数退避，达到最大次数后进入 DEAD。发布器只记录异常类型和摘要，禁止把事件负载
  * 写入错误日志或 {@code last_error}。数据库、Broker 或 Trace Exporter 不可用时都不会把未确认发送标记为
  * SENT；可观测性自身使用 NOOP Registry 时不得阻断发布。</p>
@@ -42,12 +47,12 @@ public final class OutboxPublisher {
     private final Clock clock;
     private final String leaseOwner;
     private final ObservationRegistry observationRegistry;
+    private final MeterRegistry meterRegistry;
 
     /**
-     * 创建不启用 Trace 的 Outbox 发布器。
+     * 创建不启用 Trace 和运行指标的 Outbox 发布器。
      *
-     * <p>该重载保留给纯单元测试和不启用 Observability 的嵌入场景；正式应用自动配置会注入真实
-     * {@link ObservationRegistry}。</p>
+     * <p>该重载保留给纯单元测试和不启用 Observability 的嵌入场景；正式应用自动配置会注入真实注册表。</p>
      *
      * @param repository Outbox JDBC 仓储
      * @param transport 消息传输端口
@@ -61,11 +66,11 @@ public final class OutboxPublisher {
             OutboxPublisherProperties properties,
             Clock clock,
             String leaseOwner) {
-        this(repository, transport, properties, clock, leaseOwner, ObservationRegistry.NOOP);
+        this(repository, transport, properties, clock, leaseOwner, ObservationRegistry.NOOP, null);
     }
 
     /**
-     * 创建带 Micrometer Observation 的 Outbox 发布器。
+     * 创建带 Micrometer Observation、但不启用运行指标的 Outbox 发布器。
      *
      * @param repository Outbox JDBC 仓储
      * @param transport 消息传输端口
@@ -81,6 +86,28 @@ public final class OutboxPublisher {
             Clock clock,
             String leaseOwner,
             ObservationRegistry observationRegistry) {
+        this(repository, transport, properties, clock, leaseOwner, observationRegistry, null);
+    }
+
+    /**
+     * 创建带 Trace 和 Prometheus 运行指标的 Outbox 发布器。
+     *
+     * @param repository Outbox JDBC 仓储
+     * @param transport 消息传输端口
+     * @param properties 发布和重试参数
+     * @param clock UTC 时钟
+     * @param leaseOwner 当前应用实例唯一租约标识
+     * @param observationRegistry Micrometer Observation 注册表；不得为空
+     * @param meterRegistry 可选 Micrometer 指标注册表；为空时关闭结果指标
+     */
+    public OutboxPublisher(
+            JdbcOutboxRepository repository,
+            EventTransport transport,
+            OutboxPublisherProperties properties,
+            Clock clock,
+            String leaseOwner,
+            ObservationRegistry observationRegistry,
+            MeterRegistry meterRegistry) {
         this.repository = Objects.requireNonNull(repository, "repository 不能为空");
         this.transport = Objects.requireNonNull(transport, "transport 不能为空");
         this.properties = Objects.requireNonNull(properties, "properties 不能为空");
@@ -88,6 +115,7 @@ public final class OutboxPublisher {
         this.observationRegistry = Objects.requireNonNull(
                 observationRegistry,
                 "observationRegistry 不能为空");
+        this.meterRegistry = meterRegistry;
         if (leaseOwner == null || leaseOwner.isBlank()) {
             throw new IllegalArgumentException("leaseOwner 不能为空");
         }
@@ -148,25 +176,30 @@ public final class OutboxPublisher {
             if (!accepted) {
                 IllegalStateException exception = new IllegalStateException("消息 Binding 未接受事件");
                 observation.error(exception);
-                return markFailure(record, exception);
+                recordPublishResult(markFailure(record, exception));
+                return false;
             }
             boolean updated = repository.markSent(record.eventId(), leaseOwner);
             if (!updated) {
                 LOGGER.warn("Outbox 已发送但 SENT 状态 CAS 失败，将依靠消费者幂等承受潜在重复。eventId={}",
                         record.eventId());
+                recordPublishResult("cas_conflict");
+                return false;
             }
-            return updated;
+            recordPublishResult("sent");
+            return true;
         }
         catch (RuntimeException exception) {
             observation.error(exception);
-            return markFailure(record, exception);
+            recordPublishResult(markFailure(record, exception));
+            return false;
         }
         finally {
             observation.stop();
         }
     }
 
-    private boolean markFailure(OutboxRecord record, RuntimeException exception) {
+    private String markFailure(OutboxRecord record, RuntimeException exception) {
         int nextRetryCount = record.retryCount() + 1;
         OutboxStatus nextStatus = nextRetryCount >= properties.getMaxAttempts()
                 ? OutboxStatus.DEAD
@@ -186,16 +219,35 @@ public final class OutboxPublisher {
         if (!updated) {
             LOGGER.warn("Outbox 发布失败但状态 CAS 未更新，可能已经由新租约接管。eventId={}, failureType={}",
                     record.eventId(), exception.getClass().getSimpleName());
+            return "cas_conflict";
         }
-        else if (nextStatus == OutboxStatus.DEAD) {
+        if (nextStatus == OutboxStatus.DEAD) {
             LOGGER.error("Outbox 事件达到最大尝试次数并进入 DEAD。eventId={}, retryCount={}, failureType={}",
                     record.eventId(), nextRetryCount, exception.getClass().getSimpleName());
+            return "dead";
         }
-        else {
-            LOGGER.warn("Outbox 事件发布失败并进入退避重试。eventId={}, retryCount={}, failureType={}",
-                    record.eventId(), nextRetryCount, exception.getClass().getSimpleName());
+        LOGGER.warn("Outbox 事件发布失败并进入退避重试。eventId={}, retryCount={}, failureType={}",
+                record.eventId(), nextRetryCount, exception.getClass().getSimpleName());
+        return "retry";
+    }
+
+    /**
+     * 记录单条发布最终结果，禁止指标异常反向影响消息状态机。
+     */
+    private void recordPublishResult(String outcome) {
+        if (meterRegistry == null) {
+            return;
         }
-        return false;
+        try {
+            meterRegistry.counter(
+                            MomMetricNames.OUTBOX_PUBLISH_RESULTS,
+                            "outcome", outcome)
+                    .increment();
+        }
+        catch (RuntimeException exception) {
+            LOGGER.warn("Outbox 结果指标记录失败，消息状态保持不变。failureType={}",
+                    exception.getClass().getSimpleName());
+        }
     }
 
     /**
