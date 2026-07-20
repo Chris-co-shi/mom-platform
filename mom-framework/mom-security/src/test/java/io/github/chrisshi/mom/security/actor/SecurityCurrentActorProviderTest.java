@@ -45,10 +45,12 @@ class SecurityCurrentActorProviderTest {
                 .claim("client_id", "mom-admin-web")
                 .claim("sid", "session-1")
                 .build();
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(
+                jwt,
+                AuthorityUtils.createAuthorityList("ROLE_USER"),
+                jwt.getSubject()));
 
         AuditActor actor = provider.requireCurrentActor();
-
         assertEquals("user-100", actor.actorId());
         assertEquals(ActorType.USER, actor.actorType());
         assertEquals("INTERNAL", actor.userType());
@@ -63,10 +65,12 @@ class SecurityCurrentActorProviderTest {
                 .header("alg", "none")
                 .subject("user-101")
                 .build();
-        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(
+                jwt,
+                AuthorityUtils.createAuthorityList("ROLE_USER"),
+                jwt.getSubject()));
 
         AuditActor actor = provider.requireCurrentActor();
-
         assertEquals("user-101", actor.actorId());
         assertNull(actor.userType());
         assertNull(actor.clientId());
@@ -77,9 +81,7 @@ class SecurityCurrentActorProviderTest {
     void genericAuthenticatedUserShouldUseStableAuthenticationName() {
         SecurityContextHolder.getContext().setAuthentication(
                 new TestingAuthenticationToken("user-102", "n/a", "ROLE_USER"));
-
         AuditActor actor = provider.requireCurrentActor();
-
         assertEquals("user-102", actor.actorId());
         assertEquals(ActorType.USER, actor.actorType());
     }
@@ -92,9 +94,7 @@ class SecurityCurrentActorProviderTest {
         assertTrue(provider.findCurrentActor().isEmpty());
 
         SecurityContextHolder.getContext().setAuthentication(new AnonymousAuthenticationToken(
-                "key",
-                "anonymousUser",
-                AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS")));
+                "key", "anonymousUser", AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS")));
         assertTrue(provider.findCurrentActor().isEmpty());
         assertThrows(AuditActorMissingException.class, provider::requireCurrentActor);
     }
@@ -103,11 +103,7 @@ class SecurityCurrentActorProviderTest {
     void explicitSystemActorShouldOverrideSecurityUser() {
         SecurityContextHolder.getContext().setAuthentication(
                 new TestingAuthenticationToken("user-103", "n/a", "ROLE_USER"));
-
-        AuditActor actor = executor.runAsSystem(
-                "mom-qms-message-consumer",
-                provider::requireCurrentActor);
-
+        AuditActor actor = executor.runAsSystem("mom-qms-message-consumer", provider::requireCurrentActor);
         assertEquals("mom-qms-message-consumer", actor.actorId());
         assertEquals(ActorType.SYSTEM, actor.actorType());
         assertEquals("user-103", provider.requireCurrentActor().actorId());
