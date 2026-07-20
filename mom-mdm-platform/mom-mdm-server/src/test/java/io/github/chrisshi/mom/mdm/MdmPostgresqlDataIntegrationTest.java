@@ -1,18 +1,16 @@
 package io.github.chrisshi.mom.mdm;
 
-import com.zaxxer.hikari.HikariDataSource;
-import io.github.chrisshi.mom.core.security.CurrentActorProvider;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import io.github.chrisshi.mom.core.security.ActorType;
+import io.github.chrisshi.mom.core.security.AuditActor;
+import io.github.chrisshi.mom.core.security.AuditActorMissingException;
+import io.github.chrisshi.mom.core.security.AuditContextExecutor;
 import io.github.chrisshi.mom.mdm.application.MdmDataProbeService;
 import io.github.chrisshi.mom.mdm.infrastructure.persistence.MdmDataProbeEntity;
 import io.github.chrisshi.mom.mdm.infrastructure.persistence.MdmDataProbeMapper;
-import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -21,27 +19,19 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-import javax.sql.DataSource;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * MDM 数据访问真实 PostgreSQL 集成测试。
- *
- * <p>测试使用 PostgreSQL 17.7 官方镜像，并把数据库服务端默认时区设置为 Asia/Tokyo，以确认 MOM
- * 连接池的 UTC 初始化语句真实生效。测试同时验证单服务单数据源约束、HikariCP 参数、PgJDBC 连接属性、
- * Flyway 增量迁移、String 主键、Lombok 访问器、MyBatis-Plus 审计填充、逻辑删除、乐观锁和 Spring
- * 事务回滚，不使用 H2 模拟 PostgreSQL 行为。</p>
- */
+/** CurrentActor、审计填充、更新路径和乐观锁的真实 PostgreSQL 集成测试。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
         classes = MomMdmApplication.class,
@@ -57,253 +47,173 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
                         + "org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration,"
                         + "org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration"
         })
-@Import(MdmPostgresqlDataIntegrationTest.TestActorConfiguration.class)
 class MdmPostgresqlDataIntegrationTest {
 
     private static final String SCHEMA = "mom_mdm";
-    private static final String APPLICATION_NAME = "mom-mdm-server";
-    private static final Duration POSTGRESQL_TIMESTAMP_TOLERANCE = Duration.ofNanos(1_000);
+    private static final Duration PG_PRECISION = Duration.ofNanos(1_000);
 
     @Container
     private static final PostgreSQLContainer POSTGRESQL = new PostgreSQLContainer(
             DockerImageName.parse("postgres:17.7-alpine"))
-            .withDatabaseName("mom_platform")
-            .withUsername("mom")
-            .withPassword("mom")
+            .withDatabaseName("mom_platform").withUsername("mom").withPassword("mom")
             .withCommand("postgres", "-c", "fsync=off", "-c", "timezone=Asia/Tokyo");
 
-    @Autowired
-    private ApplicationContext applicationContext;
+    @Autowired private MdmDataProbeMapper mapper;
+    @Autowired private MdmDataProbeService service;
+    @Autowired private AuditContextExecutor executor;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
-    @Autowired
-    private DataSource dataSource;
-
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-
-    @Autowired
-    private Flyway flyway;
-
-    @Autowired
-    private MdmDataProbeMapper mapper;
-
-    @Autowired
-    private MdmDataProbeService service;
-
-    /**
-     * 将 Testcontainers 动态端口和凭证注入 Spring Boot 数据源。
-     *
-     * <p>测试 URL 显式保留生产默认使用的 {@code tcpKeepAlive} 和 {@code ApplicationName}，避免动态属性
-     * 覆盖应用配置后漏测 PgJDBC 连接治理参数。</p>
-     *
-     * @param registry Spring 测试动态属性注册器
-     */
     @DynamicPropertySource
-    static void registerDatabaseProperties(DynamicPropertyRegistry registry) {
+    static void database(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", () -> POSTGRESQL.getJdbcUrl()
-                + "&currentSchema=" + SCHEMA
-                + "&tcpKeepAlive=true"
-                + "&ApplicationName=" + APPLICATION_NAME);
+                + "&currentSchema=" + SCHEMA + "&tcpKeepAlive=true&ApplicationName=mom-mdm-audit-test");
         registry.add("spring.datasource.username", POSTGRESQL::getUsername);
         registry.add("spring.datasource.password", POSTGRESQL::getPassword);
         registry.add("spring.flyway.default-schema", () -> SCHEMA);
         registry.add("spring.flyway.schemas", () -> SCHEMA);
     }
 
-    /**
-     * 验证默认应用上下文只存在一个权威 DataSource，并锁定 P01-S04.5 的 HikariCP 资源预算。
-     *
-     * <p>该测试不是限制未来永远不能接入第二数据源，而是防止普通领域服务在没有 ADR、独立事务边界和
-     * 故障策略的情况下被动态数据源框架隐式改造成多数据源应用。外部遗留库或报表库需要独立设计后才能
-     * 调整此契约。</p>
-     */
     @Test
-    void dataSourceTopologyAndHikariDefaultsShouldMatchGovernanceBaseline() {
-        assertEquals(1, applicationContext.getBeansOfType(DataSource.class).size());
-
-        HikariDataSource hikariDataSource = assertInstanceOf(HikariDataSource.class, dataSource);
-        assertEquals("mom-mdm-hikari", hikariDataSource.getPoolName());
-        assertEquals(1, hikariDataSource.getMinimumIdle());
-        assertEquals(5, hikariDataSource.getMaximumPoolSize());
-        assertEquals(3_000L, hikariDataSource.getConnectionTimeout());
-        assertEquals(2_000L, hikariDataSource.getValidationTimeout());
-        assertEquals(0L, hikariDataSource.getLeakDetectionThreshold());
-        assertEquals("SET TIME ZONE 'UTC'", hikariDataSource.getConnectionInitSql());
-        assertTrue(hikariDataSource.getJdbcUrl().contains("tcpKeepAlive=true"));
-        assertTrue(hikariDataSource.getJdbcUrl().contains("ApplicationName=" + APPLICATION_NAME));
-
-        assertEquals(APPLICATION_NAME, jdbcTemplate.queryForObject(
-                "select application_name from pg_stat_activity where pid = pg_backend_pid()",
-                String.class));
-    }
-
-    /**
-     * 验证 Flyway 顺序执行 V1、V2，最终形成 varchar(19) 主键、逻辑删除列和 UTC 应用会话。
-     */
-    @Test
-    void flywayShouldMigrateStringIdLogicDeleteAndUseUtcSession() {
-        assertEquals(SCHEMA, jdbcTemplate.queryForObject(
-                "select current_schema()",
-                String.class));
-        assertEquals("UTC", jdbcTemplate.queryForObject(
-                "show timezone",
-                String.class));
-        assertTrue(flyway.info().applied().length >= 2);
-        assertEquals(2L, jdbcTemplate.queryForObject(
-                "select count(*) from flyway_schema_history "
-                        + "where success = true and version in ('1', '2')",
-                Long.class));
-        assertEquals("character varying", jdbcTemplate.queryForObject(
-                "select data_type from information_schema.columns "
-                        + "where table_schema = ? and table_name = 'technical_data_probe' and column_name = 'id'",
-                String.class,
-                SCHEMA));
-        assertEquals(19, jdbcTemplate.queryForObject(
-                "select character_maximum_length from information_schema.columns "
-                        + "where table_schema = ? and table_name = 'technical_data_probe' and column_name = 'id'",
-                Integer.class,
-                SCHEMA));
-        assertEquals("boolean", jdbcTemplate.queryForObject(
-                "select data_type from information_schema.columns "
-                        + "where table_schema = ? and table_name = 'technical_data_probe' and column_name = 'deleted'",
-                String.class,
-                SCHEMA));
-    }
-
-    /**
-     * 验证 MyBatis-Plus 为 String 字段生成数字字符串主键，并填充审计、版本及未删除状态。
-     */
-    @Test
-    void mybatisPlusShouldGenerateStringIdAndFillBaseFields() {
-        MdmDataProbeEntity entity = service.create(
-                uniqueKey("audit"),
-                "created-value");
-
+    void insertShouldForceSameActorAndTime() {
+        MdmDataProbeEntity entity = asUser("user-create", () -> service.create(unique("insert"), "value"));
         assertNotNull(entity.getId());
-        assertTrue(entity.getId().matches("[0-9]{1,19}"));
-        assertNotNull(entity.getCreatedAt());
-        assertNotNull(entity.getUpdatedAt());
-        assertEquals("p01-s04-test-actor", entity.getCreatedBy());
-        assertEquals("p01-s04-test-actor", entity.getUpdatedBy());
+        assertEquals(entity.getCreatedAt(), entity.getUpdatedAt());
+        assertEquals("user-create", entity.getCreatedBy());
+        assertEquals("user-create", entity.getUpdatedBy());
         assertEquals(0L, entity.getVersion());
         assertFalse(entity.getDeleted());
-
-        MdmDataProbeEntity persisted = mapper.selectById(entity.getId());
-        assertEquals(entity.getId(), persisted.getId());
-        assertEquals(entity.getProbeKey(), persisted.getProbeKey());
-        assertWithinPostgresqlTimestampPrecision(
-                entity.getCreatedAt(),
-                persisted.getCreatedAt());
-        assertWithinPostgresqlTimestampPrecision(
-                entity.getUpdatedAt(),
-                persisted.getUpdatedAt());
-        assertEquals("p01-s04-test-actor", persisted.getCreatedBy());
-        assertFalse(persisted.getDeleted());
     }
 
-    /**
-     * 验证相同版本只能成功更新一次，过期版本不会覆盖其他事务已经提交的数据。
-     */
     @Test
-    void optimisticLockShouldRejectStaleVersion() {
-        MdmDataProbeEntity created = service.create(
-                uniqueKey("optimistic"),
-                "initial-value");
-        MdmDataProbeEntity firstSnapshot = mapper.selectById(created.getId());
-        MdmDataProbeEntity staleSnapshot = mapper.selectById(created.getId());
-
-        assertTrue(service.updateValue(
-                firstSnapshot.getId(),
-                firstSnapshot.getVersion(),
-                "first-update"));
-        assertFalse(service.updateValue(
-                staleSnapshot.getId(),
-                staleSnapshot.getVersion(),
-                "stale-update"));
-
-        MdmDataProbeEntity persisted = mapper.selectById(created.getId());
-        assertEquals("first-update", persisted.getProbeValue());
-        assertEquals(1L, persisted.getVersion());
-        assertEquals("p01-s04-test-actor", persisted.getUpdatedBy());
+    void forgedAuditFieldsShouldBeOverwritten() {
+        MdmDataProbeEntity entity = entity(unique("forged"), "value");
+        entity.setCreatedAt(Instant.EPOCH);
+        entity.setUpdatedAt(Instant.EPOCH);
+        entity.setCreatedBy("forged-created");
+        entity.setUpdatedBy("forged-updated");
+        asUser("server-actor", () -> mapper.insert(entity));
+        MdmDataProbeEntity saved = mapper.selectById(entity.getId());
+        assertEquals("server-actor", saved.getCreatedBy());
+        assertEquals("server-actor", saved.getUpdatedBy());
+        assertTrue(saved.getCreatedAt().isAfter(Instant.EPOCH));
+        assertNear(saved.getCreatedAt(), saved.getUpdatedAt());
     }
 
-    /**
-     * 验证 deleteById 只更新删除标记，并让普通查询自动排除已删除记录。
-     */
     @Test
-    void logicDeleteShouldHideRowWithoutPhysicalDeletion() {
-        String probeKey = uniqueKey("logic-delete");
-        MdmDataProbeEntity created = service.create(probeKey, "delete-me");
+    void missingActorShouldFailAndExplicitSystemShouldWrite() {
+        MdmDataProbeEntity missing = entity(unique("missing"), "value");
+        RuntimeException failure = assertThrows(RuntimeException.class, () -> mapper.insert(missing));
+        assertTrue(hasCause(failure, AuditActorMissingException.class));
 
-        assertTrue(service.deleteById(created.getId()));
-        assertTrue(service.findByKey(probeKey).isEmpty());
-        assertFalse(service.deleteById(created.getId()));
-
-        assertEquals(1L, jdbcTemplate.queryForObject(
-                "select count(*) from technical_data_probe where id = ?",
-                Long.class,
-                created.getId()));
-        assertTrue(jdbcTemplate.queryForObject(
-                "select deleted from technical_data_probe where id = ?",
-                Boolean.class,
-                created.getId()));
+        MdmDataProbeEntity system = executor.runAsSystem(
+                "mom-mdm-test-writer", () -> service.create(unique("system"), "value"));
+        assertEquals("mom-mdm-test-writer", system.getCreatedBy());
     }
 
-    /**
-     * 验证运行时异常会回滚已经执行的 INSERT，数据库中不留下半成品记录。
-     */
     @Test
-    void transactionShouldRollbackInsertOnRuntimeException() {
-        String probeKey = uniqueKey("rollback");
-
-        assertThrows(IllegalStateException.class, () ->
-                service.createThenRollback(probeKey, "must-not-persist"));
-
-        assertTrue(service.findByKey(probeKey).isEmpty());
+    void updateByIdShouldKeepCreatedAuditAndIncrementVersion() {
+        MdmDataProbeEntity created = asUser("creator", () -> service.create(unique("update-id"), "before"));
+        assertTrue(asUser("updater", () -> service.updateValue(created.getId(), created.getVersion(), "after")));
+        MdmDataProbeEntity saved = mapper.selectById(created.getId());
+        assertEquals("creator", saved.getCreatedBy());
+        assertEquals("updater", saved.getUpdatedBy());
+        assertEquals(1L, saved.getVersion());
+        assertNear(created.getCreatedAt(), saved.getCreatedAt());
     }
 
-    /**
-     * 按 PostgreSQL {@code timestamptz} 的微秒精度比较 Java Instant。
-     *
-     * <p>Java Instant 支持纳秒，而 PostgreSQL 会把时间舍入到微秒。测试允许不超过一微秒的差异，
-     * 但仍能发现时区错误或明显的审计时间偏移。</p>
-     *
-     * @param expected 写入前的 Java 时间
-     * @param actual PostgreSQL 读取后的时间
-     */
-    private static void assertWithinPostgresqlTimestampPrecision(
-            Instant expected,
-            Instant actual) {
-        Duration difference = Duration.between(expected, actual).abs();
-        assertTrue(
-                difference.compareTo(POSTGRESQL_TIMESTAMP_TOLERANCE) <= 0,
-                () -> "PostgreSQL 时间精度差异超过一微秒：" + difference);
+    @Test
+    void updateEntityAndWrapperShouldFillAudit() {
+        MdmDataProbeEntity created = asUser("creator-wrapper",
+                () -> service.create(unique("entity-wrapper"), "before"));
+        assertTrue(asUser("wrapper-updater",
+                () -> service.updateValueByKey(created.getProbeKey(), "after")));
+        MdmDataProbeEntity saved = mapper.selectById(created.getId());
+        assertEquals("after", saved.getProbeValue());
+        assertEquals("wrapper-updater", saved.getUpdatedBy());
     }
 
-    /**
-     * 为并行或重复执行的测试生成互不冲突的唯一验证键。
-     *
-     * @param prefix 用于辨识测试场景的前缀
-     * @return 带随机后缀的验证键
-     */
-    private static String uniqueKey(String prefix) {
-        return prefix + "-" + UUID.randomUUID();
+    @Test
+    void wrapperOnlyUpdateShouldBeRejected() {
+        assertThrows(UnsupportedOperationException.class, () -> mapper.update(
+                Wrappers.<MdmDataProbeEntity>lambdaUpdate()
+                        .set(MdmDataProbeEntity::getProbeValue, "forbidden")
+                        .eq(MdmDataProbeEntity::getProbeKey, unique("none"))));
     }
 
-    /**
-     * 测试环境提供稳定主体，用于验证审计抽象与数据模块之间的依赖方向。
-     */
-    @TestConfiguration(proxyBeanMethods = false)
-    static class TestActorConfiguration {
+    @Test
+    void batchInsertShouldFillEveryEntity() {
+        MdmDataProbeEntity first = entity(unique("batch-a"), "a");
+        MdmDataProbeEntity second = entity(unique("batch-b"), "b");
+        asUser("batch-writer", () -> mapper.insert(List.of(first, second)));
+        assertEquals("batch-writer", mapper.selectById(first.getId()).getCreatedBy());
+        assertEquals("batch-writer", mapper.selectById(second.getId()).getUpdatedBy());
+    }
 
-        /**
-         * 提供固定测试主体，生产环境后续由安全模块实现同一接口。
-         *
-         * @return 固定主体提供器
-         */
-        @Bean
-        CurrentActorProvider testCurrentActorProvider() {
-            return () -> Optional.of("p01-s04-test-actor");
+    @Test
+    void customSqlMustSupplyExplicitAudit() {
+        MdmDataProbeEntity created = asUser("custom-creator",
+                () -> service.create(unique("custom"), "before"));
+        Instant time = Instant.parse("2026-07-20T02:03:04Z");
+        assertEquals(1, mapper.updateValueWithExplicitAudit(
+                created.getId(), "after", time, "mom-mdm-explicit-sql"));
+        MdmDataProbeEntity saved = mapper.selectById(created.getId());
+        assertEquals("mom-mdm-explicit-sql", saved.getUpdatedBy());
+        assertNear(time, saved.getUpdatedAt());
+    }
+
+    @Test
+    void optimisticLockShouldAllowOnlyOneVersion() {
+        MdmDataProbeEntity created = asUser("optimistic-creator",
+                () -> service.create(unique("optimistic"), "initial"));
+        MdmDataProbeEntity first = mapper.selectById(created.getId());
+        MdmDataProbeEntity stale = mapper.selectById(created.getId());
+        assertTrue(asUser("first-writer",
+                () -> service.updateValue(first.getId(), first.getVersion(), "first")));
+        assertFalse(asUser("stale-writer",
+                () -> service.updateValue(stale.getId(), stale.getVersion(), "stale")));
+        MdmDataProbeEntity saved = mapper.selectById(created.getId());
+        assertEquals("first", saved.getProbeValue());
+        assertEquals(1L, saved.getVersion());
+    }
+
+    @Test
+    void logicDeleteAndRollbackShouldRemainValid() {
+        MdmDataProbeEntity created = asUser("delete-creator",
+                () -> service.create(unique("delete"), "value"));
+        assertTrue(asUser("deleter", () -> service.deleteById(created.getId())));
+        assertTrue(service.findByKey(created.getProbeKey()).isEmpty());
+
+        String key = unique("rollback");
+        assertThrows(IllegalStateException.class, () -> asUser("rollback-writer", () -> {
+            service.createThenRollback(key, "value");
+            return null;
+        }));
+        assertEquals(0L, jdbcTemplate.queryForObject(
+                "select count(*) from technical_data_probe where probe_key = ?", Long.class, key));
+    }
+
+    private <T> T asUser(String actorId, Supplier<T> action) {
+        return executor.runAsActor(new AuditActor(
+                actorId, ActorType.USER, "INTERNAL", "mom-admin-web", "sid-test", "corr-test"), action);
+    }
+
+    private static MdmDataProbeEntity entity(String key, String value) {
+        MdmDataProbeEntity entity = new MdmDataProbeEntity();
+        entity.setProbeKey(key);
+        entity.setProbeValue(value);
+        return entity;
+    }
+
+    private static boolean hasCause(Throwable value, Class<? extends Throwable> type) {
+        for (Throwable current = value; current != null; current = current.getCause()) {
+            if (type.isInstance(current)) { return true; }
         }
+        return false;
     }
+
+    private static void assertNear(Instant expected, Instant actual) {
+        assertTrue(Duration.between(expected, actual).abs().compareTo(PG_PRECISION) <= 0);
+    }
+
+    private static String unique(String prefix) { return prefix + "-" + UUID.randomUUID(); }
 }

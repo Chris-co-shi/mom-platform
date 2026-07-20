@@ -1,15 +1,33 @@
 package io.github.chrisshi.mom.mdm.infrastructure.persistence;
 
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import io.github.chrisshi.mom.data.mapper.MomBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
+
+import java.time.Instant;
 
 /**
  * MDM PostgreSQL 技术验证 Mapper。
  *
- * <p>接口只继承 MyBatis-Plus {@link BaseMapper}，不引入通用 Service 层，也不跨越 MDM Server 边界。
- * 正式领域 Mapper 后续应根据聚合边界决定使用通用方法还是显式 SQL，不能把 BaseMapper 暴露给
- * Controller 或其他领域模块。</p>
+ * <p>继承 MomBaseMapper，Wrapper-only Update 被拒绝。自定义 SQL 示例显式接收更新时间和 Actor，证明
+ * 无法经过实体填充的路径必须由 Repository/Mapper 承担审计责任。</p>
  */
 @Mapper
-public interface MdmDataProbeMapper extends BaseMapper<MdmDataProbeEntity> {
+public interface MdmDataProbeMapper extends MomBaseMapper<MdmDataProbeEntity> {
+
+    /** 使用显式审计字段执行技术验证更新。 */
+    @Update("""
+            UPDATE technical_data_probe
+               SET probe_value = #{probeValue},
+                   updated_at = #{updatedAt},
+                   updated_by = #{updatedBy}
+             WHERE id = #{id}
+               AND deleted = false
+            """)
+    int updateValueWithExplicitAudit(
+            @Param("id") String id,
+            @Param("probeValue") String probeValue,
+            @Param("updatedAt") Instant updatedAt,
+            @Param("updatedBy") String updatedBy);
 }

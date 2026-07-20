@@ -8,40 +8,20 @@ import lombok.Setter;
 import java.time.Instant;
 
 /**
- * MOM 需要创建与修改审计信息的实体基类。
+ * 同时需要创建与修改审计的实体基类。
  *
- * <p>该类型在 {@link BaseIdEntity} 之上增加 UTC 时间和操作主体，但不包含乐观锁与逻辑删除字段。
- * 只追加、不允许修改的日志表通常应自行建模创建时间；需要常规审计但不适合逻辑删除或版本控制的表，
- * 可以继承本类。这样可避免所有中间表、日志表被迫携带完整业务实体字段。</p>
- *
- * <p>时间统一使用 {@link Instant}，数据库列应使用 PostgreSQL {@code timestamptz}。操作主体允许为空，
- * 因为系统启动任务、历史迁移或尚未接入 IAM 的调用不应伪造管理员身份。</p>
+ * <p>在 BaseCreatedEntity 上增加最近更新时间和修改 Actor，不包含乐观锁或逻辑删除。普通写入缺少 Actor
+ * 时默认 fail-closed。</p>
  */
 @Getter
 @Setter
-public abstract class BaseAuditEntity extends BaseIdEntity {
+public abstract class BaseAuditEntity extends BaseCreatedEntity {
 
-    /**
-     * 首次持久化时间，由数据模块按 UTC 自动填充。
-     */
-    @TableField(value = "created_at", fill = FieldFill.INSERT)
-    private Instant createdAt;
-
-    /**
-     * 最近一次持久化更新时间，由数据模块按 UTC 自动填充。
-     */
+    /** 最近一次持久化修改的 UTC 时间，由服务端在 INSERT/UPDATE 强制覆盖。 */
     @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private Instant updatedAt;
 
-    /**
-     * 创建记录的主体标识；无法可靠确认主体时允许为空。
-     */
-    @TableField(value = "created_by", fill = FieldFill.INSERT)
-    private String createdBy;
-
-    /**
-     * 最近一次修改记录的主体标识；无法可靠确认主体时允许为空。
-     */
+    /** 最近修改 Actor ID，可保存用户 ID 或稳定 SYSTEM Actor Code。 */
     @TableField(value = "updated_by", fill = FieldFill.INSERT_UPDATE)
     private String updatedBy;
 }
