@@ -24,6 +24,7 @@
 
 - [P1.5 认证与授权设计基线](security/P1.5-认证与授权设计基线.md)
 - [P1.5 认证与授权闭环实施计划](plans/P1.5-认证与授权闭环计划.md)
+- [P1.5 实施进度](plans/P1.5-实施进度.md)
 - [CurrentActor 与数据审计基础](architecture/CurrentActor与数据审计.md)
 - [安全架构](architecture/安全架构.md)
 - [ADR-019：P1.5 认证与授权闭环](adr/ADR-019-P1.5认证与授权闭环.md)
@@ -42,6 +43,7 @@
 - [Phase 01：技术骨架计划](plans/Phase-01-技术骨架计划.md)
 - [Phase 01：完成报告](plans/Phase-01-完成报告.md)
 - [P1.5：认证与授权闭环实施计划](plans/P1.5-认证与授权闭环计划.md)
+- [P1.5：实施进度](plans/P1.5-实施进度.md)
 - [V1 垂直切片计划](plans/V1垂直切片计划.md)
 
 ## 技术架构
