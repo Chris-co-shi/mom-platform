@@ -35,3 +35,36 @@ groups:
         annotations:
           summary: "MOM Hikari pool is exhausted"
           description: "{{ $labels.pool }} has no spare database connections."
+
+  - name: mom-platform-application-metrics
+    interval: 15s
+    rules:
+      - alert: MOMGatewayRateLimitUnavailable
+        expr: increase(mom_gateway_rate_limit_requests_total{outcome="unavailable"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          category: gateway
+        annotations:
+          summary: "Gateway Redis rate limiting is unavailable"
+          description: "{{ $labels.application }} route {{ $labels.route }} reported a fail-closed Redis rate-limit failure."
+
+      - alert: MOMOutboxDeadEvents
+        expr: increase(mom_outbox_publish_results_total{outcome="dead"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          category: messaging
+        annotations:
+          summary: "Outbox event entered DEAD state"
+          description: "{{ $labels.application }} recorded an Outbox event that exhausted automatic retries."
+
+      - alert: MOMInboxProcessingFailures
+        expr: increase(mom_inbox_process_results_total{outcome="failed"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          category: messaging
+        annotations:
+          summary: "Inbox consumer processing is failing"
+          description: "{{ $labels.application }} consumer {{ $labels.consumer }} recorded a transactional processing failure."
