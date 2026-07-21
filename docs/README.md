@@ -2,7 +2,7 @@
 
 本目录是 `mom-platform` 的需求、计划、架构、安全协议和架构决策权威入口。
 
-> 文档变更使用与具体 Work/Slice 对应的任务分支。P1.5 S01 使用 `feat/p15-s01-actor-audit-foundation`；历史 `agent/complete-chinese-docs` 仅作为既有文档整理分支，不再是后续变更的唯一分支。
+> 文档变更使用与具体 Work/Slice 对应的任务分支。P1.5 S02 使用 `feat/p15-s02-iam-schema-domain`；历史分支不再是后续变更的唯一分支。
 
 ## 文档使用原则
 
@@ -17,7 +17,7 @@
 ## 当前权威阶段
 
 - Phase 01：基础技术骨架已完成。
-- P1.5：S00 设计基线已完成；S01 CurrentActor 与数据审计基础已实现并进入 Review。
+- P1.5：S00、S01 已合并；S02 IAM Schema 与领域模型已完成并进入 PR Review。
 - Phase 02：业务垂直切片仍为计划阶段；安全闭环完成前不得标记为可安全上线。
 
 ## P1.5 认证与授权
@@ -26,6 +26,7 @@
 - [P1.5 认证与授权闭环实施计划](plans/P1.5-认证与授权闭环计划.md)
 - [P1.5 实施进度](plans/P1.5-实施进度.md)
 - [CurrentActor 与数据审计基础](architecture/CurrentActor与数据审计.md)
+- [IAM 数据库与领域模型](architecture/IAM数据库与领域模型.md)
 - [安全架构](architecture/安全架构.md)
 - [ADR-019：P1.5 认证与授权闭环](adr/ADR-019-P1.5认证与授权闭环.md)
 
@@ -54,6 +55,7 @@
 - [领域边界](architecture/领域边界.md)
 - [数据架构](architecture/数据架构.md)
 - [CurrentActor 与数据审计基础](architecture/CurrentActor与数据审计.md)
+- [IAM 数据库与领域模型](architecture/IAM数据库与领域模型.md)
 - [集成架构](architecture/集成架构.md)
 - [安全架构](architecture/安全架构.md)
 - [可观测性架构](architecture/可观测性架构.md)
