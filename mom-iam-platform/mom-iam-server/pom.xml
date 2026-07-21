@@ -52,10 +52,10 @@
       <artifactId>lombok</artifactId>
       <scope>provided</scope>
     </dependency>
-    <!-- Spring TestContext 直接使用 Commons Logging API；精简 IAM 依赖图需显式提供 Spring 官方桥接。 -->
+    <!-- Spring Framework 7 TestContext 直接使用 Commons Logging API；版本由 Spring Boot 4.1 BOM 统一管理。 -->
     <dependency>
-      <groupId>org.springframework</groupId>
-      <artifactId>spring-jcl</artifactId>
+      <groupId>commons-logging</groupId>
+      <artifactId>commons-logging</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
