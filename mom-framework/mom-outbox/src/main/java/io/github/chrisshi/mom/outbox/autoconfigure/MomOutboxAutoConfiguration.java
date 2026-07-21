@@ -6,6 +6,7 @@ import io.github.chrisshi.mom.outbox.application.OutboxAppender;
 import io.github.chrisshi.mom.outbox.application.OutboxPublisher;
 import io.github.chrisshi.mom.outbox.config.OutboxPublisherProperties;
 import io.github.chrisshi.mom.outbox.persistence.JdbcOutboxRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -36,9 +37,9 @@ import java.util.UUID;
  * 判断时所需 Bean 已经可见。Outbox 追加器和 Inbox 幂等器在 JDBC 可用时创建；定时发布器默认关闭，只有
  * 显式设置 {@code mom.outbox.publisher.enabled=true} 且存在 {@link EventTransport} 时才启用调度。</p>
  *
- * <p>发布器优先使用应用已有 {@link ObservationRegistry} 创建消息发布 Span；没有可观测性基础设施时使用
- * NOOP Registry，不因为诊断能力缺失阻断可靠消息。该降级只关闭 Span，不改变 Outbox 状态机或 Broker
- * 失败语义。</p>
+ * <p>发布器优先使用应用已有 {@link ObservationRegistry} 创建消息发布 Span，并把可选 {@link MeterRegistry}
+ * 用于低基数结果指标。没有可观测性基础设施时使用 NOOP Trace 且关闭结果计数，不因为诊断能力缺失阻断可靠
+ * 消息。该降级不改变 Outbox 状态机、Inbox 事务或 Broker 失败语义。</p>
  */
 @AutoConfiguration(afterName = {
         "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
@@ -85,16 +86,19 @@ public class MomOutboxAutoConfiguration {
      *
      * @param jdbcTemplate 当前服务 JDBC 模板
      * @param transactionManager 当前服务本地事务管理器
+     * @param meterRegistryProvider 可选 Micrometer 指标注册表
      * @return Inbox 幂等执行器
      */
     @Bean
     @ConditionalOnMissingBean
     InboxDeduplicator momInboxDeduplicator(
             JdbcTemplate jdbcTemplate,
-            PlatformTransactionManager transactionManager) {
+            PlatformTransactionManager transactionManager,
+            ObjectProvider<MeterRegistry> meterRegistryProvider) {
         return new InboxDeduplicator(
                 jdbcTemplate,
-                new TransactionTemplate(transactionManager));
+                new TransactionTemplate(transactionManager),
+                meterRegistryProvider.getIfAvailable());
     }
 
     /**
@@ -106,6 +110,7 @@ public class MomOutboxAutoConfiguration {
      * @param clock 平台 UTC 时钟
      * @param environment 应用环境，用于构造稳定可诊断的租约前缀
      * @param observationRegistryProvider 可选 Micrometer Observation 注册表
+     * @param meterRegistryProvider 可选 Micrometer 指标注册表
      * @return Outbox 定时发布器
      */
     @Bean
@@ -120,7 +125,8 @@ public class MomOutboxAutoConfiguration {
             OutboxPublisherProperties properties,
             Clock clock,
             Environment environment,
-            ObjectProvider<ObservationRegistry> observationRegistryProvider) {
+            ObjectProvider<ObservationRegistry> observationRegistryProvider,
+            ObjectProvider<MeterRegistry> meterRegistryProvider) {
         String applicationName = environment.getProperty(
                 "spring.application.name",
                 "unknown-application");
@@ -133,7 +139,8 @@ public class MomOutboxAutoConfiguration {
                 properties,
                 clock,
                 leaseOwner,
-                observationRegistry);
+                observationRegistry,
+                meterRegistryProvider.getIfAvailable());
     }
 
     /**
