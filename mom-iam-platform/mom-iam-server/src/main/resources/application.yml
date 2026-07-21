@@ -1,13 +1,47 @@
 server:
   port: ${SERVER_PORT:20100}
+
 spring:
   application:
     name: mom-iam-server
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_iam}&tcpKeepAlive=${POSTGRES_TCP_KEEP_ALIVE:true}&ApplicationName=${POSTGRES_APPLICATION_NAME:mom-iam-server}}
+    username: ${POSTGRES_USERNAME:mom}
+    password: ${POSTGRES_PASSWORD:mom}
+    hikari:
+      pool-name: ${POSTGRES_POOL_NAME:mom-iam-hikari}
+      minimum-idle: ${POSTGRES_MINIMUM_IDLE:1}
+      maximum-pool-size: ${POSTGRES_MAXIMUM_POOL_SIZE:5}
+      connection-timeout: ${POSTGRES_CONNECTION_TIMEOUT:3000}
+      validation-timeout: ${POSTGRES_VALIDATION_TIMEOUT:2000}
+      leak-detection-threshold: ${POSTGRES_LEAK_DETECTION_THRESHOLD:0}
+      connection-init-sql: SET TIME ZONE 'UTC'
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    create-schemas: true
+    default-schema: ${POSTGRES_SCHEMA:mom_iam}
+    schemas: ${POSTGRES_SCHEMA:mom_iam}
+    locations: classpath:db/migration/iam
+    validate-migration-naming: true
+    clean-disabled: true
+    baseline-on-migrate: false
   cloud:
     nacos:
       discovery:
         enabled: ${NACOS_DISCOVERY_ENABLED:false}
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+
 management:
   endpoints:
     web:
@@ -17,3 +51,10 @@ management:
     health:
       probes:
         enabled: true
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+
+logging:
+  pattern:
+    correlation: "[trace_id=%X{traceId:-} span_id=%X{spanId:-}] "
