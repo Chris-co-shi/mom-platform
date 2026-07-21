@@ -3,12 +3,10 @@ package io.github.chrisshi.mom.iam.infrastructure.persistence.repository;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserEntity;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserMapper;
-import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
 /** IAM 用户明确用途仓储，不暴露万能 CRUD Service。 */
-@Repository
 public class IamUserRepository {
     private final IamUserMapper mapper;
 

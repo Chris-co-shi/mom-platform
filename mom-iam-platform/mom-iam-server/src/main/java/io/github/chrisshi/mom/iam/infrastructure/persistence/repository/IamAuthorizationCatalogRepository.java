@@ -9,13 +9,11 @@ import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamOauthClie
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamPermissionMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamRoleMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamRolePermissionMapper;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
 /** 角色、Permission 与 Client Policy 目录只读仓储；不计算权限并集。 */
-@Repository
 public class IamAuthorizationCatalogRepository {
     private final IamRoleMapper roleMapper;
     private final IamPermissionMapper permissionMapper;

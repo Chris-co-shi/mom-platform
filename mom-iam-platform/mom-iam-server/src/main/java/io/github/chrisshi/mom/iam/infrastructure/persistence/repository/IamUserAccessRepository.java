@@ -5,12 +5,10 @@ import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserAppli
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserFactoryScopeEntity;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserApplicationMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserFactoryScopeMapper;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
 /** Mobile Access 与 Factory Scope 仓储；Factory 只保存 MDM 引用 ID。 */
-@Repository
 public class IamUserAccessRepository {
     private final IamUserApplicationMapper userApplicationMapper;
     private final IamUserFactoryScopeMapper userFactoryScopeMapper;

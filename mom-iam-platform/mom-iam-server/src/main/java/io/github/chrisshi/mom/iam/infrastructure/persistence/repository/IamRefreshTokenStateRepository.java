@@ -3,12 +3,10 @@ package io.github.chrisshi.mom.iam.infrastructure.persistence.repository;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamRefreshTokenEntity;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamRefreshTokenMapper;
-import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
 /** Refresh Token 摘要状态仓储；不生成 Token、不计算 HMAC、不执行 Rotation。 */
-@Repository
 public class IamRefreshTokenStateRepository {
     private final IamRefreshTokenMapper mapper;
 

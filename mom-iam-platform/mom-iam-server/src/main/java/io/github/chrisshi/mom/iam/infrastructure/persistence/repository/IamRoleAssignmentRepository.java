@@ -4,10 +4,8 @@ import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamRolePermi
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserRoleEntity;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamRolePermissionMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserRoleMapper;
-import org.springframework.stereotype.Repository;
 
 /** 用户角色与角色 Permission 关系仓储；不提供 Deny、继承或用户直接 Permission。 */
-@Repository
 public class IamRoleAssignmentRepository {
     private final IamUserRoleMapper userRoleMapper;
     private final IamRolePermissionMapper rolePermissionMapper;

@@ -5,12 +5,10 @@ import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamExternalU
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamInternalUserProfileEntity;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamExternalUserBindingMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamInternalUserProfileMapper;
-import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
 /** 内部资料与外部 Party Binding 的持久化边界，不跨 Schema 查询业务主数据。 */
-@Repository
 public class IamIdentityBindingRepository {
     private final IamInternalUserProfileMapper internalProfileMapper;
     private final IamExternalUserBindingMapper externalBindingMapper;
