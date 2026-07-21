@@ -13,6 +13,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -24,8 +29,18 @@ import java.util.function.Supplier;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** IAM 领域关系、Session、Refresh、安全审计和 Slice 01 审计的真实 PostgreSQL 验证。 */
+@Testcontainers(disabledWithoutDocker = true)
 class IamPersistencePostgresqlIntegrationTest extends AbstractIamPostgresqlIntegrationTest {
     private static final AtomicLong IDS = new AtomicLong(900_000_000_000_000_000L);
+
+    @Container
+    private static final PostgreSQLContainer POSTGRESQL = newPostgresqlContainer();
+
+    @DynamicPropertySource
+    static void databaseProperties(DynamicPropertyRegistry registry) {
+        registerDatabaseProperties(registry, POSTGRESQL);
+    }
+
     @Autowired JdbcTemplate jdbc;
     @Autowired AuditContextExecutor actors;
     @Autowired IamUserMapper users;

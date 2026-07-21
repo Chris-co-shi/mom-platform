@@ -7,6 +7,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import javax.sql.DataSource;
 import java.util.List;
@@ -20,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** IAM Schema、中文注释、官方协议表和初始化目录的真实 PostgreSQL 验证。 */
+@Testcontainers(disabledWithoutDocker = true)
 class IamSchemaCatalogPostgresqlIntegrationTest extends AbstractIamPostgresqlIntegrationTest {
     private static final List<String> TABLES = List.of(
             "iam_user", "iam_internal_user_profile", "iam_external_user_binding",
@@ -27,6 +33,14 @@ class IamSchemaCatalogPostgresqlIntegrationTest extends AbstractIamPostgresqlInt
             "iam_user_application", "iam_user_factory_scope", "iam_oauth_client_policy",
             "oauth2_registered_client", "oauth2_authorization", "oauth2_authorization_consent",
             "iam_user_session", "iam_refresh_token", "iam_security_audit_event");
+
+    @Container
+    private static final PostgreSQLContainer POSTGRESQL = newPostgresqlContainer();
+
+    @DynamicPropertySource
+    static void databaseProperties(DynamicPropertyRegistry registry) {
+        registerDatabaseProperties(registry, POSTGRESQL);
+    }
 
     @Autowired DataSource dataSource;
     @Autowired JdbcTemplate jdbc;
