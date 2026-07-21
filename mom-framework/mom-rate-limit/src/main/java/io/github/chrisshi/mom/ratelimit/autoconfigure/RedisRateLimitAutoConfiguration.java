@@ -3,6 +3,8 @@ package io.github.chrisshi.mom.ratelimit.autoconfigure;
 import io.github.chrisshi.mom.ratelimit.FailClosedRedisRateLimiter;
 import io.github.chrisshi.mom.ratelimit.RedisRateLimitFailureWebExceptionHandler;
 import io.github.chrisshi.mom.ratelimit.RequestIdentityKeyResolver;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -20,7 +22,8 @@ import org.springframework.web.server.WebExceptionHandler;
  *
  * <p>仅在响应式 Web 应用并且存在 Spring Cloud Gateway 限流接口时生效，避免 Servlet 服务
  * 因为传递依赖意外创建 Gateway Bean。自动配置安排在 Gateway 官方 Redis 自动配置之后执行，
- * 复用其 Lua 脚本、连接和 {@link RedisRateLimiter}，只增加 MOM 的身份解析与 fail-closed 策略。</p>
+ * 复用其 Lua 脚本、连接和 {@link RedisRateLimiter}，只增加 MOM 的身份解析、fail-closed 策略和
+ * 可选低基数运行指标。</p>
  */
 @AutoConfiguration(afterName = "org.springframework.cloud.gateway.config.GatewayRedisAutoConfiguration")
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.REACTIVE)
@@ -47,9 +50,10 @@ public class RedisRateLimitAutoConfiguration {
      *
      * <p>路由通过 Bean 名显式引用该包装器。同时将其标记为 {@link Primary}，满足 Gateway 默认
      * RequestRateLimiter 工厂按类型注入单个 {@code RateLimiter<?>} 的要求；官方 RedisRateLimiter
-     * 仍作为内部委托存在，不会被直接用于请求放行判断。</p>
+     * 仍作为内部委托存在，不会被直接用于请求放行判断。MeterRegistry 缺失时仍创建限流器，只关闭指标。</p>
      *
      * @param redisRateLimiter Gateway 官方自动配置创建的 RedisRateLimiter
+     * @param meterRegistryProvider 可选 Micrometer 指标注册表
      * @return 保留官方算法并把异常放行转换为错误信号的 RateLimiter
      */
     @Bean(name = "momFailClosedRedisRateLimiter")
@@ -57,8 +61,11 @@ public class RedisRateLimitAutoConfiguration {
     @ConditionalOnBean(RedisRateLimiter.class)
     @ConditionalOnMissingBean(name = "momFailClosedRedisRateLimiter")
     RateLimiter<RedisRateLimiter.Config> momFailClosedRedisRateLimiter(
-            RedisRateLimiter redisRateLimiter) {
-        return new FailClosedRedisRateLimiter(redisRateLimiter);
+            RedisRateLimiter redisRateLimiter,
+            ObjectProvider<MeterRegistry> meterRegistryProvider) {
+        return new FailClosedRedisRateLimiter(
+                redisRateLimiter,
+                meterRegistryProvider.getIfAvailable());
     }
 
     /**
