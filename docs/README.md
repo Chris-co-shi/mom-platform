@@ -2,7 +2,7 @@
 
 本目录是 `mom-platform` 的需求、计划、架构、安全协议和架构决策权威入口。
 
-> 文档变更使用与具体 Work/Slice 对应的任务分支。本次 P1.5 S00 使用 `feat/p15-s00-design-baseline`；历史 `agent/complete-chinese-docs` 仅作为既有文档整理分支，不再是所有后续文档变更的唯一分支。
+> 文档变更使用与具体 Work/Slice 对应的任务分支。P1.5 S01 使用 `feat/p15-s01-actor-audit-foundation`；历史 `agent/complete-chinese-docs` 仅作为既有文档整理分支，不再是后续变更的唯一分支。
 
 ## 文档使用原则
 
@@ -17,13 +17,15 @@
 ## 当前权威阶段
 
 - Phase 01：基础技术骨架已完成。
-- P1.5：认证与授权闭环正在实施，当前为 S00 设计基线。
+- P1.5：S00 设计基线已完成；S01 CurrentActor 与数据审计基础已实现并进入 Review。
 - Phase 02：业务垂直切片仍为计划阶段；安全闭环完成前不得标记为可安全上线。
 
 ## P1.5 认证与授权
 
 - [P1.5 认证与授权设计基线](security/P1.5-认证与授权设计基线.md)
 - [P1.5 认证与授权闭环实施计划](plans/P1.5-认证与授权闭环计划.md)
+- [P1.5 实施进度](plans/P1.5-实施进度.md)
+- [CurrentActor 与数据审计基础](architecture/CurrentActor与数据审计.md)
 - [安全架构](architecture/安全架构.md)
 - [ADR-019：P1.5 认证与授权闭环](adr/ADR-019-P1.5认证与授权闭环.md)
 
@@ -41,6 +43,7 @@
 - [Phase 01：技术骨架计划](plans/Phase-01-技术骨架计划.md)
 - [Phase 01：完成报告](plans/Phase-01-完成报告.md)
 - [P1.5：认证与授权闭环实施计划](plans/P1.5-认证与授权闭环计划.md)
+- [P1.5：实施进度](plans/P1.5-实施进度.md)
 - [V1 垂直切片计划](plans/V1垂直切片计划.md)
 
 ## 技术架构
@@ -50,6 +53,7 @@
 - [模块边界](architecture/module-boundaries.md)
 - [领域边界](architecture/领域边界.md)
 - [数据架构](architecture/数据架构.md)
+- [CurrentActor 与数据审计基础](architecture/CurrentActor与数据审计.md)
 - [集成架构](architecture/集成架构.md)
 - [安全架构](architecture/安全架构.md)
 - [可观测性架构](architecture/可观测性架构.md)

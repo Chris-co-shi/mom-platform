@@ -1,6 +1,8 @@
 package io.github.chrisshi.mom.mdm;
 
 import com.zaxxer.hikari.HikariDataSource;
+import io.github.chrisshi.mom.core.security.ActorType;
+import io.github.chrisshi.mom.core.security.AuditActor;
 import io.github.chrisshi.mom.core.security.CurrentActorProvider;
 import io.github.chrisshi.mom.mdm.application.MdmDataProbeService;
 import io.github.chrisshi.mom.mdm.infrastructure.persistence.MdmDataProbeEntity;
@@ -112,10 +114,6 @@ class MdmPostgresqlDataIntegrationTest {
 
     /**
      * 验证默认应用上下文只存在一个权威 DataSource，并锁定 P01-S04.5 的 HikariCP 资源预算。
-     *
-     * <p>该测试不是限制未来永远不能接入第二数据源，而是防止普通领域服务在没有 ADR、独立事务边界和
-     * 故障策略的情况下被动态数据源框架隐式改造成多数据源应用。外部遗留库或报表库需要独立设计后才能
-     * 调整此契约。</p>
      */
     @Test
     void dataSourceTopologyAndHikariDefaultsShouldMatchGovernanceBaseline() {
@@ -137,21 +135,14 @@ class MdmPostgresqlDataIntegrationTest {
                 String.class));
     }
 
-    /**
-     * 验证 Flyway 顺序执行 V1、V2，最终形成 varchar(19) 主键、逻辑删除列和 UTC 应用会话。
-     */
+    /** 验证 Flyway 顺序执行、String ID、逻辑删除列和 UTC 应用会话。 */
     @Test
     void flywayShouldMigrateStringIdLogicDeleteAndUseUtcSession() {
-        assertEquals(SCHEMA, jdbcTemplate.queryForObject(
-                "select current_schema()",
-                String.class));
-        assertEquals("UTC", jdbcTemplate.queryForObject(
-                "show timezone",
-                String.class));
+        assertEquals(SCHEMA, jdbcTemplate.queryForObject("select current_schema()", String.class));
+        assertEquals("UTC", jdbcTemplate.queryForObject("show timezone", String.class));
         assertTrue(flyway.info().applied().length >= 2);
         assertEquals(2L, jdbcTemplate.queryForObject(
-                "select count(*) from flyway_schema_history "
-                        + "where success = true and version in ('1', '2')",
+                "select count(*) from flyway_schema_history where success = true and version in ('1', '2')",
                 Long.class));
         assertEquals("character varying", jdbcTemplate.queryForObject(
                 "select data_type from information_schema.columns "
@@ -170,14 +161,10 @@ class MdmPostgresqlDataIntegrationTest {
                 SCHEMA));
     }
 
-    /**
-     * 验证 MyBatis-Plus 为 String 字段生成数字字符串主键，并填充审计、版本及未删除状态。
-     */
+    /** 验证 String 主键和基础审计、版本、逻辑删除字段。 */
     @Test
     void mybatisPlusShouldGenerateStringIdAndFillBaseFields() {
-        MdmDataProbeEntity entity = service.create(
-                uniqueKey("audit"),
-                "created-value");
+        MdmDataProbeEntity entity = service.create(uniqueKey("audit"), "created-value");
 
         assertNotNull(entity.getId());
         assertTrue(entity.getId().matches("[0-9]{1,19}"));
@@ -191,35 +178,21 @@ class MdmPostgresqlDataIntegrationTest {
         MdmDataProbeEntity persisted = mapper.selectById(entity.getId());
         assertEquals(entity.getId(), persisted.getId());
         assertEquals(entity.getProbeKey(), persisted.getProbeKey());
-        assertWithinPostgresqlTimestampPrecision(
-                entity.getCreatedAt(),
-                persisted.getCreatedAt());
-        assertWithinPostgresqlTimestampPrecision(
-                entity.getUpdatedAt(),
-                persisted.getUpdatedAt());
+        assertWithinPostgresqlTimestampPrecision(entity.getCreatedAt(), persisted.getCreatedAt());
+        assertWithinPostgresqlTimestampPrecision(entity.getUpdatedAt(), persisted.getUpdatedAt());
         assertEquals("p01-s04-test-actor", persisted.getCreatedBy());
         assertFalse(persisted.getDeleted());
     }
 
-    /**
-     * 验证相同版本只能成功更新一次，过期版本不会覆盖其他事务已经提交的数据。
-     */
+    /** 验证相同版本只能成功更新一次。 */
     @Test
     void optimisticLockShouldRejectStaleVersion() {
-        MdmDataProbeEntity created = service.create(
-                uniqueKey("optimistic"),
-                "initial-value");
+        MdmDataProbeEntity created = service.create(uniqueKey("optimistic"), "initial-value");
         MdmDataProbeEntity firstSnapshot = mapper.selectById(created.getId());
         MdmDataProbeEntity staleSnapshot = mapper.selectById(created.getId());
 
-        assertTrue(service.updateValue(
-                firstSnapshot.getId(),
-                firstSnapshot.getVersion(),
-                "first-update"));
-        assertFalse(service.updateValue(
-                staleSnapshot.getId(),
-                staleSnapshot.getVersion(),
-                "stale-update"));
+        assertTrue(service.updateValue(firstSnapshot.getId(), firstSnapshot.getVersion(), "first-update"));
+        assertFalse(service.updateValue(staleSnapshot.getId(), staleSnapshot.getVersion(), "stale-update"));
 
         MdmDataProbeEntity persisted = mapper.selectById(created.getId());
         assertEquals("first-update", persisted.getProbeValue());
@@ -227,9 +200,7 @@ class MdmPostgresqlDataIntegrationTest {
         assertEquals("p01-s04-test-actor", persisted.getUpdatedBy());
     }
 
-    /**
-     * 验证 deleteById 只更新删除标记，并让普通查询自动排除已删除记录。
-     */
+    /** 验证逻辑删除不物理删除记录。 */
     @Test
     void logicDeleteShouldHideRowWithoutPhysicalDeletion() {
         String probeKey = uniqueKey("logic-delete");
@@ -249,61 +220,40 @@ class MdmPostgresqlDataIntegrationTest {
                 created.getId()));
     }
 
-    /**
-     * 验证运行时异常会回滚已经执行的 INSERT，数据库中不留下半成品记录。
-     */
+    /** 验证运行时异常会回滚 INSERT。 */
     @Test
     void transactionShouldRollbackInsertOnRuntimeException() {
         String probeKey = uniqueKey("rollback");
-
         assertThrows(IllegalStateException.class, () ->
                 service.createThenRollback(probeKey, "must-not-persist"));
-
         assertTrue(service.findByKey(probeKey).isEmpty());
     }
 
-    /**
-     * 按 PostgreSQL {@code timestamptz} 的微秒精度比较 Java Instant。
-     *
-     * <p>Java Instant 支持纳秒，而 PostgreSQL 会把时间舍入到微秒。测试允许不超过一微秒的差异，
-     * 但仍能发现时区错误或明显的审计时间偏移。</p>
-     *
-     * @param expected 写入前的 Java 时间
-     * @param actual PostgreSQL 读取后的时间
-     */
-    private static void assertWithinPostgresqlTimestampPrecision(
-            Instant expected,
-            Instant actual) {
+    private static void assertWithinPostgresqlTimestampPrecision(Instant expected, Instant actual) {
         Duration difference = Duration.between(expected, actual).abs();
         assertTrue(
                 difference.compareTo(POSTGRESQL_TIMESTAMP_TOLERANCE) <= 0,
                 () -> "PostgreSQL 时间精度差异超过一微秒：" + difference);
     }
 
-    /**
-     * 为并行或重复执行的测试生成互不冲突的唯一验证键。
-     *
-     * @param prefix 用于辨识测试场景的前缀
-     * @return 带随机后缀的验证键
-     */
     private static String uniqueKey(String prefix) {
         return prefix + "-" + UUID.randomUUID();
     }
 
-    /**
-     * 测试环境提供稳定主体，用于验证审计抽象与数据模块之间的依赖方向。
-     */
+    /** 测试环境提供稳定 Actor，同时保持 CurrentActorProvider 新契约。 */
     @TestConfiguration(proxyBeanMethods = false)
     static class TestActorConfiguration {
 
-        /**
-         * 提供固定测试主体，生产环境后续由安全模块实现同一接口。
-         *
-         * @return 固定主体提供器
-         */
+        /** 提供固定 USER Actor。 */
         @Bean
         CurrentActorProvider testCurrentActorProvider() {
-            return () -> Optional.of("p01-s04-test-actor");
+            return () -> Optional.of(new AuditActor(
+                    "p01-s04-test-actor",
+                    ActorType.USER,
+                    "INTERNAL",
+                    "mom-admin-web",
+                    "p01-s04-session",
+                    "p01-s04-correlation"));
         }
     }
 }
