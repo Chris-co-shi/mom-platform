@@ -3,6 +3,7 @@ package io.github.chrisshi.mom.iam.security;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
@@ -15,7 +16,7 @@ import java.util.Map;
 public final class IamRefreshGrantAuthenticationConverter implements AuthenticationConverter {
     @Override
     public Authentication convert(HttpServletRequest request) {
-        if (!OAuth2ParameterNames.REFRESH_TOKEN_GRANT_TYPE.equals(
+        if (!AuthorizationGrantType.REFRESH_TOKEN.getValue().equals(
                 request.getParameter(OAuth2ParameterNames.GRANT_TYPE))) {
             return null;
         }
