@@ -110,6 +110,7 @@ public class IamAuthorizationServerConfiguration {
     }
 
     @Bean
+    @Primary
     AuthenticationProvider iamAuthenticationProvider(
             IamAccountAuthenticationService accounts,
             PasswordEncoder passwordEncoder) {
