@@ -1,21 +1,26 @@
 package io.github.chrisshi.mom.iam.admin;
 
+import io.github.chrisshi.mom.iam.autoconfigure.IamPersistenceRepositoryAutoConfiguration;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSecurityAuditEventAppender;
+import io.github.chrisshi.mom.iam.security.IamAuthorizationServerConfiguration;
 import io.github.chrisshi.mom.iam.security.IamSecureIdGenerator;
 import io.github.chrisshi.mom.iam.security.IamSessionTokenService;
 import io.github.chrisshi.mom.security.authorization.MomAuthorizationService;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Clock;
 
 /** S07 IAM 管理 API Bean 组装；只复用已冻结 Schema、认证和 Session 权威服务。 */
-@Configuration(proxyBeanMethods = false)
+@AutoConfiguration(after = {
+        IamPersistenceRepositoryAutoConfiguration.class,
+        IamAuthorizationServerConfiguration.class
+})
 @ConditionalOnBean({JdbcTemplate.class, IamSessionTokenService.class})
 @ConditionalOnProperty(
         prefix = "mom.iam.admin",
