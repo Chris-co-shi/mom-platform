@@ -5,6 +5,7 @@ import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserEntit
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -45,6 +46,7 @@ public class IamUserRepository {
      * 到期锁定在读取认证账号前原子清理。该 JDBC 路径显式维护 S01 审计字段。
      */
     public void clearExpiredLock(String username, Instant now) {
+        Timestamp timestamp = Timestamp.from(now);
         jdbcTemplate.update("""
                 UPDATE iam_user
                 SET failed_login_count = 0,
@@ -56,14 +58,15 @@ public class IamUserRepository {
                   AND deleted = false
                   AND locked_until IS NOT NULL
                   AND locked_until <= ?
-                """, now, AUTHENTICATION_ACTOR, username, now);
+                """, timestamp, AUTHENTICATION_ACTOR, username, timestamp);
     }
 
     /**
      * 对存在且当前可尝试认证的启用账号累计失败次数；达到阈值后设置临时锁定。
      */
     public void recordLoginFailure(String username, int maximumAttempts, Duration lockDuration, Instant now) {
-        Instant lockedUntil = now.plus(lockDuration);
+        Timestamp timestamp = Timestamp.from(now);
+        Timestamp lockedUntil = Timestamp.from(now.plus(lockDuration));
         jdbcTemplate.update("""
                 UPDATE iam_user
                 SET failed_login_count = failed_login_count + 1,
@@ -78,11 +81,13 @@ public class IamUserRepository {
                   AND status = 'ENABLED'
                   AND deleted = false
                   AND (locked_until IS NULL OR locked_until <= ?)
-                """, maximumAttempts, lockedUntil, now, AUTHENTICATION_ACTOR, username, now);
+                """, maximumAttempts, lockedUntil, timestamp,
+                AUTHENTICATION_ACTOR, username, timestamp);
     }
 
     /** 登录成功后清除失败状态并记录最近登录 UTC 时间。 */
     public void recordLoginSuccess(String username, Instant now) {
+        Timestamp timestamp = Timestamp.from(now);
         int rows = jdbcTemplate.update("""
                 UPDATE iam_user
                 SET failed_login_count = 0,
@@ -94,7 +99,7 @@ public class IamUserRepository {
                 WHERE username = ?
                   AND status = 'ENABLED'
                   AND deleted = false
-                """, now, now, AUTHENTICATION_ACTOR, username);
+                """, timestamp, timestamp, AUTHENTICATION_ACTOR, username);
         if (rows != 1) {
             throw new IllegalStateException("IAM 登录成功状态更新失败");
         }
@@ -114,6 +119,6 @@ public class IamUserRepository {
                 WHERE username = ?
                   AND status = 'ENABLED'
                   AND deleted = false
-                """, passwordHash, now, AUTHENTICATION_ACTOR, username) == 1;
+                """, passwordHash, Timestamp.from(now), AUTHENTICATION_ACTOR, username) == 1;
     }
 }
