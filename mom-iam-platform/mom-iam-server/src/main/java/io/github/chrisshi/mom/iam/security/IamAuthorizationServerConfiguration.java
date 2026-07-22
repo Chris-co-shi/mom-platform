@@ -4,10 +4,12 @@ import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserEntity;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamAuthorizationCatalogRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamAuthorizationContextRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamIdentityBindingRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserAccessRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserRepository;
 import io.github.chrisshi.mom.iam.web.IamAuthenticationPageController;
+import io.github.chrisshi.mom.iam.web.IamMeController;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -36,6 +38,7 @@ import org.springframework.security.oauth2.server.authorization.JdbcOAuth2Author
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
@@ -55,7 +58,7 @@ import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import javax.sql.DataSource;
 import java.time.Clock;
 
-/** P1.5 S03 Authorization Server、账号认证、四 Client 与 JWK/JWT 基础自动配置。 */
+/** P1.5 S03 Authorization Server 与 S04 RBAC/Scope/Me 自动配置。 */
 @AutoConfiguration(afterName = {
         "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
         "com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration",
@@ -104,6 +107,19 @@ public class IamAuthorizationServerConfiguration {
             IamUserAccessRepository accessRepository,
             Clock clock) {
         return new IamClientAccessPolicyService(accounts, catalog, bindings, accessRepository, clock);
+    }
+
+    @Bean
+    IamAuthorizationContextService iamAuthorizationContextService(
+            IamUserRepository users,
+            IamAuthorizationContextRepository contexts,
+            Clock clock) {
+        return new IamAuthorizationContextService(users, contexts, clock);
+    }
+
+    @Bean
+    IamScopeGuard iamScopeGuard() {
+        return new IamScopeGuard();
     }
 
     @Bean
@@ -197,21 +213,32 @@ public class IamAuthorizationServerConfiguration {
 
     @Bean
     OAuth2TokenCustomizer<JwtEncodingContext> iamJwtCustomizer(
-            IamAccountAuthenticationService accounts) {
+            IamAuthorizationContextService contexts) {
         return context -> {
             Authentication principal = context.getPrincipal();
             if (principal == null || principal.getName() == null) {
                 return;
             }
-            IamUserEntity user = accounts.requireUser(principal.getName());
+            IamAuthorizationContext authorization = contexts.loadByUsername(principal.getName());
             context.getClaims()
-                    .subject(user.getId())
+                    .subject(authorization.userId())
                     .claim("client_id", context.getRegisteredClient().getClientId())
-                    .claim("user_type", user.getUserType().name());
+                    .claim("user_type", authorization.userType().name());
+            if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
+                context.getClaims()
+                        .claim("roles", authorization.roles())
+                        .claim("permissions", authorization.permissions())
+                        .claim("factory_ids", authorization.factoryIds());
+                if (authorization.externalPartyBound()) {
+                    context.getClaims()
+                            .claim("party_type", authorization.partyType().name())
+                            .claim("party_id", authorization.partyId());
+                }
+            }
             if ("id_token".equals(context.getTokenType().getValue())) {
                 context.getClaims()
-                        .claim("preferred_username", user.getUsername())
-                        .claim("name", user.getDisplayName());
+                        .claim("preferred_username", authorization.username())
+                        .claim("name", authorization.displayName());
             }
         };
     }
@@ -241,7 +268,7 @@ public class IamAuthorizationServerConfiguration {
 
     @Bean
     @Order(2)
-    SecurityFilterChain iamLoginSecurityFilterChain(
+    SecurityFilterChain iamLoginAndApiSecurityFilterChain(
             HttpSecurity http,
             AuthenticationProvider authenticationProvider,
             AuthenticationSuccessHandler successHandler,
@@ -250,10 +277,11 @@ public class IamAuthorizationServerConfiguration {
         http.authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/login", "/error", "/actuator/health/**", "/actuator/info")
                         .permitAll()
-                        .requestMatchers("/password/change").authenticated()
+                        .requestMatchers("/password/change", "/api/iam/me").authenticated()
                         .anyRequest().authenticated())
                 .authenticationProvider(authenticationProvider)
                 .requestCache(cache -> cache.requestCache(requestCache))
+                .oauth2ResourceServer(resourceServer -> resourceServer.jwt(Customizer.withDefaults()))
                 .formLogin(form -> form
                         .loginPage("/login")
                         .loginProcessingUrl("/login")
@@ -274,5 +302,12 @@ public class IamAuthorizationServerConfiguration {
             IamAccountAuthenticationService accounts,
             SavedRequestAwareAuthenticationSuccessHandler continuation) {
         return new IamAuthenticationPageController(accounts, continuation);
+    }
+
+    @Bean
+    IamMeController iamMeController(
+            IamAuthorizationContextService contexts,
+            IamScopeGuard scopeGuard) {
+        return new IamMeController(contexts, scopeGuard);
     }
 }
