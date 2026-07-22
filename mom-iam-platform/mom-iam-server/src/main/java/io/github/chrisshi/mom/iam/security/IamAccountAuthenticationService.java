@@ -3,6 +3,8 @@ package io.github.chrisshi.mom.iam.security;
 import io.github.chrisshi.mom.iam.domain.type.IamRecordStatus;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserEntity;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserRepository;
+import org.springframework.security.core.authority.FactorGrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -45,7 +47,12 @@ public final class IamAccountAuthenticationService implements UserDetailsService
         boolean locked = user.getLockedUntil() != null && user.getLockedUntil().isAfter(now);
         return User.withUsername(user.getUsername())
                 .password(user.getPasswordHash())
-                .authorities("ROLE_IAM_USER")
+                .authorities(
+                        new SimpleGrantedAuthority("ROLE_IAM_USER"),
+                        FactorGrantedAuthority
+                                .withAuthority(FactorGrantedAuthority.PASSWORD_AUTHORITY)
+                                .issuedAt(now)
+                                .build())
                 .disabled(user.getStatus() != IamRecordStatus.ENABLED)
                 .accountLocked(locked)
                 .build();
