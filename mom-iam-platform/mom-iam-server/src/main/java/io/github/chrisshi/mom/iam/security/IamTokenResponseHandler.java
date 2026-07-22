@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.AbstractOAuth2Token;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AccessTokenAuthenticationToken;
@@ -47,7 +48,7 @@ public final class IamTokenResponseHandler implements AuthenticationSuccessHandl
         }
         tokenAuthentication.getAdditionalParameters().forEach((name, value) -> {
             if (!payload.containsKey(name) && value != null) {
-                payload.put(name, value instanceof CharSequence ? value.toString() : value);
+                payload.put(name, responseValue(value));
             }
         });
 
@@ -57,6 +58,19 @@ public final class IamTokenResponseHandler implements AuthenticationSuccessHandl
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         response.setHeader(HttpHeaders.PRAGMA, "no-cache");
         response.getWriter().write(json(payload));
+    }
+
+    private static Object responseValue(Object value) {
+        if (value instanceof AbstractOAuth2Token token) {
+            return token.getTokenValue();
+        }
+        if (value instanceof CharSequence) {
+            return value.toString();
+        }
+        if (value instanceof Number || value instanceof Boolean) {
+            return value;
+        }
+        throw new IllegalStateException("Token 响应包含不支持的附加参数类型");
     }
 
     private static String stringAttribute(HttpServletRequest request, String name) {
