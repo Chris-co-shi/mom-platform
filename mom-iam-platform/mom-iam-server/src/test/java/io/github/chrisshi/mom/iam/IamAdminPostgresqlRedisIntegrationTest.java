@@ -201,14 +201,14 @@ class IamAdminPostgresqlRedisIntegrationTest {
                         .with(adminJwt()).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"roleIds\":[\"" + internalRoleId
-                                + "\"],\"reason\":\"role review\"}"))
+                                + "\"],\"version\":0,\"reason\":\"role review\"}"))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(put("/api/iam/admin/users/{id}/factory-scopes", supplier.id())
                         .with(adminJwt()).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"factoryIds\":[\"" + nextId()
-                                + "\"],\"reason\":\"scope review\"}"))
+                                + "\"],\"version\":0,\"reason\":\"scope review\"}"))
                 .andExpect(status().isConflict());
         assertEquals(0, jdbc.queryForObject(
                 "SELECT count(*) FROM iam_user_factory_scope WHERE user_id=?",

@@ -46,6 +46,12 @@ public class IamAdminConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    IamAdminReadModelRepository iamAdminReadModelRepository(JdbcTemplate jdbcTemplate) {
+        return new IamAdminReadModelRepository(jdbcTemplate);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     MomAuthorizationService momAuthorizationService() {
         return new MomAuthorizationService();
     }
@@ -60,6 +66,7 @@ public class IamAdminConfiguration {
     @ConditionalOnMissingBean
     IamAdminService iamAdminService(
             IamAdminJdbcRepository repository,
+            IamAdminReadModelRepository readModels,
             MomAuthorizationService authorization,
             PasswordEncoder passwordEncoder,
             IamSessionTokenService sessions,
@@ -68,7 +75,7 @@ public class IamAdminConfiguration {
             IamSecureIdGenerator ids,
             Clock clock) {
         return new IamAdminService(
-                repository, authorization, passwordEncoder, sessions, auditEvents,
+                repository, readModels, authorization, passwordEncoder, sessions, auditEvents,
                 externalFactoryVerifier, ids, clock);
     }
 

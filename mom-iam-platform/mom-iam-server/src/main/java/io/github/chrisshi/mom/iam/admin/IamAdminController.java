@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /** S07 IAM 管理 REST API；密码摘要、Token、授权码和私钥永不进入响应 DTO。 */
 @RestController
@@ -44,6 +43,12 @@ public class IamAdminController {
     IamAdminJdbcRepository.UserRow user(
             Authentication authentication, @PathVariable String userId) {
         return service.getUser(authentication, userId);
+    }
+
+    @GetMapping("/users/{userId}/authorizations")
+    IamAdminReadModelRepository.UserAuthorizationView userAuthorization(
+            Authentication authentication, @PathVariable String userId) {
+        return service.getUserAuthorization(authentication, userId);
     }
 
     @PostMapping("/users")
@@ -102,37 +107,34 @@ public class IamAdminController {
     }
 
     @PutMapping("/users/{userId}/roles")
-    Map<String, Set<String>> replaceUserRoles(
+    IamAdminReadModelRepository.UserAuthorizationView replaceUserRoles(
             Authentication authentication,
             HttpServletRequest request,
             @PathVariable String userId,
             @RequestBody IamAdminService.RoleAssignment command) {
-        return Map.of("roleIds", service.replaceUserRoles(
-                authentication, userId, command, context(request)));
+        return service.replaceUserRoles(authentication, userId, command, context(request));
     }
 
     @PutMapping("/users/{userId}/factory-scopes")
-    Map<String, Set<String>> replaceFactoryScopes(
+    IamAdminReadModelRepository.UserAuthorizationView replaceFactoryScopes(
             Authentication authentication,
             HttpServletRequest request,
             @PathVariable String userId,
             @RequestBody IamAdminService.FactoryScopeChange command) {
-        return Map.of("factoryIds", service.replaceFactoryScopes(
-                authentication, userId, command, context(request)));
+        return service.replaceFactoryScopes(authentication, userId, command, context(request));
     }
 
     @PutMapping("/users/{userId}/mobile-access")
-    Map<String, Boolean> setMobileAccess(
+    IamAdminReadModelRepository.UserAuthorizationView setMobileAccess(
             Authentication authentication,
             HttpServletRequest request,
             @PathVariable String userId,
             @RequestBody IamAdminService.MobileAccessChange command) {
-        return Map.of("enabled", service.setMobileAccess(
-                authentication, userId, command, context(request)));
+        return service.setMobileAccess(authentication, userId, command, context(request));
     }
 
     @PutMapping("/users/{userId}/party-binding")
-    IamAdminJdbcRepository.PartyBindingRow rebindParty(
+    IamAdminReadModelRepository.UserAuthorizationView rebindParty(
             Authentication authentication,
             HttpServletRequest request,
             @PathVariable String userId,
@@ -147,6 +149,12 @@ public class IamAdminController {
             @RequestParam(defaultValue = "50") int limit,
             @RequestParam(defaultValue = "0") int offset) {
         return service.listRoles(authentication, userType, limit, offset);
+    }
+
+    @GetMapping("/roles/{roleId}/permissions")
+    IamAdminReadModelRepository.RolePermissionView rolePermissions(
+            Authentication authentication, @PathVariable String roleId) {
+        return service.getRolePermissions(authentication, roleId);
     }
 
     @PostMapping("/roles")
@@ -168,13 +176,12 @@ public class IamAdminController {
     }
 
     @PutMapping("/roles/{roleId}/permissions")
-    Map<String, Set<String>> replaceRolePermissions(
+    IamAdminReadModelRepository.RolePermissionView replaceRolePermissions(
             Authentication authentication,
             HttpServletRequest request,
             @PathVariable String roleId,
             @RequestBody IamAdminService.PermissionAssignment command) {
-        return Map.of("permissionIds", service.replaceRolePermissions(
-                authentication, roleId, command, context(request)));
+        return service.replaceRolePermissions(authentication, roleId, command, context(request));
     }
 
     @GetMapping("/permissions")

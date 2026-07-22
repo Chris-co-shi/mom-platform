@@ -28,13 +28,20 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/** S07 IAM 管理事务服务；所有写操作执行 Permission、安全约束、Session 撤销和追加型审计。 */
+/**
+ * S07 IAM 管理事务服务。
+ *
+ * <p>该应用服务位于 REST 适配器与 JDBC/安全端口之间，统一执行 Permission、安全约束、父聚合
+ * 行锁、客户端版本校验、关系替换、版本推进、Session 撤销和追加型审计。所有关系写入均由
+ * Spring 事务保证数据库内原子性；外部 Factory 校验不可用时 Fail Closed，绝不降级为放行。</p>
+ */
 public class IamAdminService {
     private static final Pattern USERNAME = Pattern.compile("[A-Za-z][A-Za-z0-9._@-]{2,119}");
     private static final Pattern MOM_ID = Pattern.compile("[1-9][0-9]{0,18}");
     private static final int MAX_PAGE_SIZE = 200;
 
     private final IamAdminJdbcRepository repository;
+    private final IamAdminReadModelRepository readModels;
     private final MomAuthorizationService authorization;
     private final PasswordEncoder passwordEncoder;
     private final IamSessionTokenService sessions;
@@ -45,6 +52,7 @@ public class IamAdminService {
 
     public IamAdminService(
             IamAdminJdbcRepository repository,
+            IamAdminReadModelRepository readModels,
             MomAuthorizationService authorization,
             PasswordEncoder passwordEncoder,
             IamSessionTokenService sessions,
@@ -53,6 +61,7 @@ public class IamAdminService {
             IamSecureIdGenerator ids,
             Clock clock) {
         this.repository = repository;
+        this.readModels = readModels;
         this.authorization = authorization;
         this.passwordEncoder = passwordEncoder;
         this.sessions = sessions;
@@ -71,6 +80,19 @@ public class IamAdminService {
     public IamAdminJdbcRepository.UserRow getUser(Authentication authentication, String userId) {
         authorization.requirePermission(authentication, "iam:user:read");
         return requireUser(userId);
+    }
+
+    /**
+     * 读取用户授权聚合及其客户端并发版本，不产生数据库写入或审计副作用。
+     *
+     * @param authentication 当前管理员认证
+     * @param userId 用户聚合 ID
+     * @return 不含凭证材料的完整用户授权快照
+     */
+    public IamAdminReadModelRepository.UserAuthorizationView getUserAuthorization(
+            Authentication authentication, String userId) {
+        authorization.requirePermission(authentication, "iam:user:read");
+        return readModels.userAuthorization(requireId(userId, "userId"));
     }
 
     @Transactional
@@ -188,12 +210,23 @@ public class IamAdminService {
                 requireReason(command.reason(), "reason"), null, json("deleted", "true"));
     }
 
+    /**
+     * 以用户聚合版本替换角色关系；版本、关系、父版本和成功审计在同一事务中提交或回滚。
+     *
+     * @param authentication 当前管理员认证
+     * @param userId 用户聚合 ID
+     * @param command 带读取版本的全量角色集合和审计原因
+     * @param request 非敏感请求审计上下文
+     * @return 版本推进后的完整用户授权快照
+     * @throws IamAdminExceptions.StaleVersion 客户端版本过期；事务无关系或成功审计副作用
+     */
     @Transactional
-    public Set<String> replaceUserRoles(
+    public IamAdminReadModelRepository.UserAuthorizationView replaceUserRoles(
             Authentication authentication, String userId, RoleAssignment command, RequestContext request) {
         authorization.requirePermission(authentication, "iam:user:role-assign");
         MomJwtAuthorization actor = authorization.current(authentication);
         IamAdminJdbcRepository.UserRow user = lockUser(userId);
+        long version = requireVersion(command.version(), user.version());
         Set<String> roleIds = normalizedIds(command.roleIds(), "roleIds");
         List<IamAdminJdbcRepository.RoleRow> roles = repository.findRoles(roleIds);
         if (roles.size() != roleIds.size()) {
@@ -210,20 +243,33 @@ public class IamAdminService {
                 && !retainsPlatformAdmin && repository.effectivePlatformAdminCount(clock.instant()) <= 1) {
             throw new IamAdminExceptions.Conflict("系统必须至少保留一个有效 PLATFORM_ADMIN");
         }
-        repository.replaceUserRoles(userId, roleIds, actor.userId(), clock.instant(), ids::nextId);
+        Instant now = clock.instant();
+        repository.replaceUserRoles(userId, roleIds, actor.userId(), now, ids::nextId);
+        repository.advanceUserVersion(userId, version, actor.userId(), now);
         audit(actor, request, "iam.user.roles-replaced", SecurityEventCategory.AUTHORIZATION,
                 PermissionRiskLevel.HIGH, "USER", userId, null,
                 requireReason(command.reason(), "reason"), null,
                 json("roleCount", Integer.toString(roleIds.size())));
-        return repository.userRoleIds(userId);
+        return readModels.userAuthorization(userId);
     }
 
+    /**
+     * 以用户聚合版本替换 Factory Scope；外部关系校验失败时不更新关系、版本或成功审计。
+     *
+     * @param authentication 当前管理员认证
+     * @param userId 用户聚合 ID
+     * @param command 带读取版本的全量 Factory 集合和审计原因
+     * @param request 非敏感请求审计上下文
+     * @return 版本推进后的完整用户授权快照
+     * @throws IamAdminExceptions.StaleVersion 客户端版本过期；事务无关系或成功审计副作用
+     */
     @Transactional
-    public Set<String> replaceFactoryScopes(
+    public IamAdminReadModelRepository.UserAuthorizationView replaceFactoryScopes(
             Authentication authentication, String userId, FactoryScopeChange command, RequestContext request) {
         authorization.requirePermission(authentication, "iam:user:factory-scope-assign");
         MomJwtAuthorization actor = authorization.current(authentication);
         IamAdminJdbcRepository.UserRow user = lockUser(userId);
+        long version = requireVersion(command.version(), user.version());
         Set<String> factoryIds = normalizedIds(command.factoryIds(), "factoryIds");
         if (user.userType() != UserType.INTERNAL && !factoryIds.isEmpty()) {
             IamAdminJdbcRepository.PartyBindingRow binding = repository.partyBinding(userId)
@@ -242,55 +288,96 @@ public class IamAdminService {
                 throw new IamAdminExceptions.Conflict("外部 Factory Scope 不是有效业务关系工厂的子集");
             }
         }
-        repository.replaceFactoryScopes(userId, factoryIds, actor.userId(), clock.instant(), ids::nextId);
+        Instant now = clock.instant();
+        repository.replaceFactoryScopes(userId, factoryIds, actor.userId(), now, ids::nextId);
+        repository.advanceUserVersion(userId, version, actor.userId(), now);
         audit(actor, request, "iam.user.factory-scopes-replaced", SecurityEventCategory.AUTHORIZATION,
                 PermissionRiskLevel.HIGH, "USER", userId, null,
                 requireReason(command.reason(), "reason"), null,
                 json("factoryCount", Integer.toString(factoryIds.size())));
-        return repository.factoryIds(userId);
+        return readModels.userAuthorization(userId);
     }
 
+    /**
+     * 以用户聚合版本变更移动端访问；禁用时的 Session 撤销与聚合变更共享事务边界。
+     *
+     * @param authentication 当前管理员认证
+     * @param userId 用户聚合 ID
+     * @param command 带读取版本的移动端访问状态和审计原因
+     * @param request 非敏感请求审计上下文
+     * @return 版本推进后的完整用户授权快照
+     * @throws IamAdminExceptions.StaleVersion 客户端版本过期；不变更关系、不撤销 Session、不写成功审计
+     */
     @Transactional
-    public boolean setMobileAccess(
+    public IamAdminReadModelRepository.UserAuthorizationView setMobileAccess(
             Authentication authentication, String userId, MobileAccessChange command, RequestContext request) {
         authorization.requirePermission(authentication, "iam:user:mobile-access-manage");
         MomJwtAuthorization actor = authorization.current(authentication);
         IamAdminJdbcRepository.UserRow user = lockUser(userId);
+        long version = requireVersion(command.version(), user.version());
         IamDomainRules.requireApplicationAccess(user.userType(), ApplicationCode.MOM_MOBILE_PDA);
+        Instant now = clock.instant();
         repository.setMobileAccess(
-                userId, command.enabled(), actor.userId(), clock.instant(), ids::nextId);
+                userId, command.enabled(), actor.userId(), now, ids::nextId);
         if (!command.enabled()) {
             revokeUserSessions(userId, actor.userId(), "mobile_access_disabled");
         }
+        repository.advanceUserVersion(userId, version, actor.userId(), now);
         audit(actor, request, "iam.user.mobile-access-changed", SecurityEventCategory.AUTHORIZATION,
                 PermissionRiskLevel.HIGH, "USER", userId, null,
                 requireReason(command.reason(), "reason"), null,
                 json("enabled", Boolean.toString(command.enabled())));
-        return repository.mobileAccessEnabled(userId);
+        return readModels.userAuthorization(userId);
     }
 
+    /**
+     * 以用户聚合版本重绑外部 Party，并在成功时返回包含新版本的完整用户授权快照。
+     *
+     * @param authentication 当前管理员认证
+     * @param userId 用户聚合 ID
+     * @param command 带读取版本的 Party Binding 和审计原因
+     * @param request 非敏感请求审计上下文
+     * @return 版本推进后的完整用户授权快照
+     * @throws IamAdminExceptions.StaleVersion 客户端版本过期；不变更绑定、不撤销 Session、不写成功审计
+     */
     @Transactional
-    public IamAdminJdbcRepository.PartyBindingRow rebindParty(
+    public IamAdminReadModelRepository.UserAuthorizationView rebindParty(
             Authentication authentication, String userId, PartyRebind command, RequestContext request) {
         authorization.requirePermission(authentication, "iam:user:party-rebind");
         MomJwtAuthorization actor = authorization.current(authentication);
         IamAdminJdbcRepository.UserRow user = lockUser(userId);
+        long version = requireVersion(command.version(), user.version());
         PartyType partyType = Objects.requireNonNull(command.partyType(), "partyType 不能为空");
         IamDomainRules.requireExternalBinding(user.userType(), partyType);
         String partyId = requireId(command.partyId(), "partyId");
-        repository.rebindParty(userId, partyType, partyId, actor.userId(), clock.instant(), ids::nextId);
+        Instant now = clock.instant();
+        repository.rebindParty(userId, partyType, partyId, actor.userId(), now, ids::nextId);
         revokeUserSessions(userId, actor.userId(), "party_rebound");
+        repository.advanceUserVersion(userId, version, actor.userId(), now);
         audit(actor, request, "iam.user.party-rebound", SecurityEventCategory.AUTHORIZATION,
                 PermissionRiskLevel.HIGH, "USER", userId, null,
                 requireReason(command.reason(), "reason"), null,
                 json("partyType", partyType.name()));
-        return repository.partyBinding(userId).orElseThrow();
+        return readModels.userAuthorization(userId);
     }
 
     public List<IamAdminJdbcRepository.RoleRow> listRoles(
             Authentication authentication, String userType, int limit, int offset) {
         authorization.requirePermission(authentication, "iam:role:read");
         return repository.listRoles(userType, pageSize(limit), pageOffset(offset));
+    }
+
+    /**
+     * 读取角色 Permission 聚合及其客户端并发版本，不产生数据库写入或审计副作用。
+     *
+     * @param authentication 当前管理员认证
+     * @param roleId 角色聚合 ID
+     * @return 不含凭证材料的完整角色 Permission 快照
+     */
+    public IamAdminReadModelRepository.RolePermissionView getRolePermissions(
+            Authentication authentication, String roleId) {
+        authorization.requirePermission(authentication, "iam:role:read");
+        return readModels.rolePermissions(requireId(roleId, "roleId"));
     }
 
     @Transactional
@@ -331,12 +418,23 @@ public class IamAdminService {
         return repository.lockRole(roleId).orElseThrow();
     }
 
+    /**
+     * 以角色聚合版本替换 Permission 关系；内置角色继续保持只读，失败时事务整体回滚。
+     *
+     * @param authentication 当前管理员认证
+     * @param roleId 角色聚合 ID
+     * @param command 带读取版本的全量 Permission 集合和审计原因
+     * @param request 非敏感请求审计上下文
+     * @return 版本推进后的完整角色 Permission 快照
+     * @throws IamAdminExceptions.StaleVersion 客户端版本过期；事务无关系或成功审计副作用
+     */
     @Transactional
-    public Set<String> replaceRolePermissions(
+    public IamAdminReadModelRepository.RolePermissionView replaceRolePermissions(
             Authentication authentication, String roleId, PermissionAssignment command, RequestContext request) {
         authorization.requirePermission(authentication, "iam:role:permission-manage");
         MomJwtAuthorization actor = authorization.current(authentication);
         IamAdminJdbcRepository.RoleRow role = lockRole(roleId);
+        long version = requireVersion(command.version(), role.version());
         if (role.builtIn()) {
             throw new IamAdminExceptions.Conflict("内置角色 Permission 关系由 Flyway 管理");
         }
@@ -344,13 +442,15 @@ public class IamAdminService {
         if (repository.findPermissionIds(permissionIds).size() != permissionIds.size()) {
             throw new IamAdminExceptions.NotFound("存在无效或禁用 Permission");
         }
+        Instant now = clock.instant();
         repository.replaceRolePermissions(
-                roleId, permissionIds, actor.userId(), clock.instant(), ids::nextId);
+                roleId, permissionIds, actor.userId(), now, ids::nextId);
+        repository.advanceRoleVersion(roleId, version, actor.userId(), now);
         audit(actor, request, "iam.role.permissions-replaced", SecurityEventCategory.AUTHORIZATION,
                 PermissionRiskLevel.HIGH, "ROLE", roleId, null,
                 requireReason(command.reason(), "reason"), null,
                 json("permissionCount", Integer.toString(permissionIds.size())));
-        return repository.rolePermissionIds(roleId);
+        return readModels.rolePermissions(roleId);
     }
 
     public List<IamAdminJdbcRepository.PermissionRow> listPermissions(
@@ -503,8 +603,11 @@ public class IamAdminService {
     }
 
     private static long requireVersion(Long requested, long current) {
-        if (requested == null || requested != current) {
-            throw new IamAdminExceptions.Conflict("version 已过期，请重新读取后重试");
+        if (requested == null) {
+            throw new IllegalArgumentException("version 不能为空");
+        }
+        if (requested != current) {
+            throw new IamAdminExceptions.StaleVersion("version 已过期，请重新读取后重试");
         }
         return current;
     }
@@ -594,14 +697,19 @@ public class IamAdminService {
     public record StatusChange(IamRecordStatus status, Long version, String reason) { }
     public record VersionedReason(Long version, String reason) { }
     public record PasswordReset(String temporaryPassword, Long version, String reason) { }
-    public record RoleAssignment(Set<String> roleIds, String reason) { }
-    public record FactoryScopeChange(Set<String> factoryIds, String reason) { }
-    public record MobileAccessChange(boolean enabled, String reason) { }
-    public record PartyRebind(PartyType partyType, String partyId, String reason) { }
+    /** 用户角色全量替换命令；version 必须来自最近一次用户授权读取。 */
+    public record RoleAssignment(Set<String> roleIds, Long version, String reason) { }
+    /** 用户 Factory Scope 全量替换命令；version 必须来自最近一次用户授权读取。 */
+    public record FactoryScopeChange(Set<String> factoryIds, Long version, String reason) { }
+    /** 用户移动端访问变更命令；version 必须来自最近一次用户授权读取。 */
+    public record MobileAccessChange(boolean enabled, Long version, String reason) { }
+    /** 外部用户 Party 重绑命令；version 必须来自最近一次用户授权读取。 */
+    public record PartyRebind(PartyType partyType, String partyId, Long version, String reason) { }
     public record CreateRole(String code, String name, UserType applicableUserType, String description) { }
     public record UpdateRole(
             String name, String description, IamRecordStatus status, Long version, String reason) { }
-    public record PermissionAssignment(Set<String> permissionIds, String reason) { }
+    /** 角色 Permission 全量替换命令；version 必须来自最近一次角色 Permission 读取。 */
+    public record PermissionAssignment(Set<String> permissionIds, Long version, String reason) { }
     public record Reason(String reason) { }
     public record ClientStatusChange(IamRecordStatus status, Long version, String reason) { }
 }

@@ -48,6 +48,7 @@ class IamAdminAutoConfigurationTest {
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context).hasSingleBean(IamAdminJdbcRepository.class);
+                    assertThat(context).hasSingleBean(IamAdminReadModelRepository.class);
                     assertThat(context).hasSingleBean(IamAdminService.class);
                     assertThat(context).hasSingleBean(IamAdminController.class);
                     assertThat(context).hasSingleBean(IamAdminExceptionHandler.class);
@@ -68,6 +69,7 @@ class IamAdminAutoConfigurationTest {
     private void assertAdminBeansAbsent(AssertableWebApplicationContext context) {
         assertThat(context).hasNotFailed();
         assertThat(context).doesNotHaveBean(IamAdminJdbcRepository.class);
+        assertThat(context).doesNotHaveBean(IamAdminReadModelRepository.class);
         assertThat(context).doesNotHaveBean(IamAdminService.class);
         assertThat(context).doesNotHaveBean(IamAdminController.class);
         assertThat(context).doesNotHaveBean(IamAdminExceptionHandler.class);

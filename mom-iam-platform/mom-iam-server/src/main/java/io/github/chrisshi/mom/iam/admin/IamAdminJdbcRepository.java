@@ -228,6 +228,27 @@ public final class IamAdminJdbcRepository {
         }
     }
 
+    /**
+     * 在关系替换后以读取版本推进用户聚合版本。
+     *
+     * @param userId 用户聚合 ID
+     * @param expectedVersion 客户端提交且已在父行锁内验证的版本
+     * @param actor 操作人 ID
+     * @param now 更新时间
+     * @throws IamAdminExceptions.StaleVersion 父版本未按预期推进时抛出，触发整个事务回滚
+     */
+    public void advanceUserVersion(
+            String userId, long expectedVersion, String actor, Instant now) {
+        int rows = jdbc.update("""
+                UPDATE iam_user
+                   SET updated_at=?,updated_by=?,version=version+1
+                 WHERE id=? AND deleted=false AND version=?
+                """, timestamp(now), actor, userId, expectedVersion);
+        if (rows != 1) {
+            throw new IamAdminExceptions.StaleVersion("version 已过期，请重新读取后重试");
+        }
+    }
+
     public Set<String> rolePermissionIds(String roleId) {
         return Set.copyOf(jdbc.queryForList(
                 "SELECT permission_id FROM iam_role_permission WHERE role_id=? ORDER BY permission_id",
@@ -242,6 +263,27 @@ public final class IamAdminJdbcRepository {
                     INSERT INTO iam_role_permission (id,role_id,permission_id,created_at,created_by)
                     VALUES (?,?,?,?,?)
                     """, ids.nextId(), roleId, permissionId, timestamp(now), actor);
+        }
+    }
+
+    /**
+     * 在 Permission 关系替换后以读取版本推进角色聚合版本。
+     *
+     * @param roleId 角色聚合 ID
+     * @param expectedVersion 客户端提交且已在父行锁内验证的版本
+     * @param actor 操作人 ID
+     * @param now 更新时间
+     * @throws IamAdminExceptions.StaleVersion 父版本未按预期推进时抛出，触发关系替换回滚
+     */
+    public void advanceRoleVersion(
+            String roleId, long expectedVersion, String actor, Instant now) {
+        int rows = jdbc.update("""
+                UPDATE iam_role
+                   SET updated_at=?,updated_by=?,version=version+1
+                 WHERE id=? AND deleted=false AND version=?
+                """, timestamp(now), actor, roleId, expectedVersion);
+        if (rows != 1) {
+            throw new IamAdminExceptions.StaleVersion("version 已过期，请重新读取后重试");
         }
     }
 

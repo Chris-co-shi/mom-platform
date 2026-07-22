@@ -21,6 +21,12 @@ public class IamAdminExceptionHandler {
         return error("not_found", exception.getMessage());
     }
 
+    @ExceptionHandler(IamAdminExceptions.StaleVersion.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    Map<String, String> staleVersion(IamAdminExceptions.StaleVersion exception) {
+        return error("stale_version", exception.getMessage());
+    }
+
     @ExceptionHandler({IamAdminExceptions.Conflict.class, DataIntegrityViolationException.class,
             IllegalStateException.class})
     @ResponseStatus(HttpStatus.CONFLICT)

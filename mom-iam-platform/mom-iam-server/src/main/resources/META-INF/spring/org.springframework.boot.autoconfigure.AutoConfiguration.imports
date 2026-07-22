@@ -1,4 +1,3 @@
 io.github.chrisshi.mom.iam.autoconfigure.IamPersistenceRepositoryAutoConfiguration
 io.github.chrisshi.mom.iam.security.IamAuthorizationServerConfiguration
 io.github.chrisshi.mom.iam.admin.IamAdminConfiguration
-io.github.chrisshi.mom.iam.admin.IamAdminReadModelConfiguration
