@@ -9,6 +9,8 @@ import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -32,6 +34,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -54,7 +57,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Testcontainers(disabledWithoutDocker = true)
 class IamAdminPostgresqlRedisIntegrationTest {
     private static final AtomicLong IDS = new AtomicLong(760_000_000_000_000_000L);
-    private static final String ACTOR_ID = "760000000000000001";
+    private static final String ACTOR_ID = "769000000000000001";
     private static final String INITIAL_CREDENTIAL = "S07-Initial-Secret-123!";
     private static final List<String> ALL_IAM_PERMISSIONS = List.of(
             "iam:user:read", "iam:user:create", "iam:user:update", "iam:user:enable",
@@ -113,6 +116,7 @@ class IamAdminPostgresqlRedisIntegrationTest {
         jdbc.update("DELETE FROM iam_role WHERE id LIKE '76%'");
         jdbc.update("DELETE FROM iam_user WHERE id LIKE '76%'");
         jdbc.update("UPDATE iam_oauth_client_policy SET status='ENABLED',version=0");
+        insertActor();
     }
 
     @Test
@@ -180,7 +184,10 @@ class IamAdminPostgresqlRedisIntegrationTest {
                         .content("""
                                 {"status":"DISABLED","version":0,"reason":"security maintenance"}
                                 """))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("conflict"));
+        assertEquals("ENABLED", jdbc.queryForObject(
+                "SELECT status FROM iam_user WHERE id=?", String.class, ACTOR_ID));
     }
 
     @Test
@@ -277,32 +284,43 @@ class IamAdminPostgresqlRedisIntegrationTest {
     }
 
     private RequestPostProcessor adminJwt() {
+        List<GrantedAuthority> authorities = ALL_IAM_PERMISSIONS.stream()
+                .map(permission -> (GrantedAuthority) new SimpleGrantedAuthority(permission))
+                .toList();
         return jwt().jwt(token -> token
                         .subject(ACTOR_ID)
                         .audience(List.of("mom-admin-web"))
-                        .claim("sid", "760000000000000002")
+                        .claim("sid", "769000000000000002")
                         .claim("client_id", "mom-admin-web")
                         .claim("user_type", "INTERNAL")
                         .claim("roles", List.of("PLATFORM_ADMIN"))
                         .claim("permissions", ALL_IAM_PERMISSIONS)
                         .claim("factory_ids", List.of()))
-                .authorities(ALL_IAM_PERMISSIONS.stream()
-                        .map(org.springframework.security.core.authority.SimpleGrantedAuthority::new)
-                        .toList());
+                .authorities(authorities);
     }
 
     private RequestPostProcessor readOnlyJwt() {
         return jwt().jwt(token -> token
                         .subject(ACTOR_ID)
                         .audience(List.of("mom-admin-web"))
-                        .claim("sid", "760000000000000002")
+                        .claim("sid", "769000000000000002")
                         .claim("client_id", "mom-admin-web")
                         .claim("user_type", "INTERNAL")
                         .claim("roles", List.of("SECURITY_AUDITOR"))
                         .claim("permissions", List.of("iam:user:read"))
                         .claim("factory_ids", List.of()))
-                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority(
-                        "iam:user:read"));
+                .authorities(new SimpleGrantedAuthority("iam:user:read"));
+    }
+
+    private void insertActor() {
+        jdbc.update("""
+                INSERT INTO iam_user (
+                    id,username,password_hash,display_name,user_type,status,
+                    failed_login_count,password_change_required,
+                    created_at,created_by,updated_at,updated_by,version,deleted)
+                VALUES (?, 's07-actor', ?, 'S07 Actor','INTERNAL','ENABLED',0,false,
+                    now(),'test-s07',now(),'test-s07',0,false)
+                """, ACTOR_ID, passwordEncoder.encode(INITIAL_CREDENTIAL));
     }
 
     private TestUser insertUser(UserType type, String suffix) {
