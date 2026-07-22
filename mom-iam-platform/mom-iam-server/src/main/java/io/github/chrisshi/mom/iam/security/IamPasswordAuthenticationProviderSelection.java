@@ -1,20 +1,12 @@
 package io.github.chrisshi.mom.iam.security;
 
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
-import org.springframework.security.authentication.AuthenticationProvider;
-
-/** 登录安全链只使用数据库密码 Provider；Refresh Provider 仅注册到 Token Endpoint。 */
-@Configuration(proxyBeanMethods = false)
-@ConditionalOnBean(name = "iamAuthenticationProvider")
-class IamPasswordAuthenticationProviderSelection {
-    @Bean
-    @Primary
-    AuthenticationProvider iamPrimaryPasswordAuthenticationProvider(
-            @Qualifier("iamAuthenticationProvider") AuthenticationProvider delegate) {
-        return delegate;
+/**
+ * 保留空类型用于兼容已发布的阶段提交历史。
+ *
+ * <p>密码 AuthenticationProvider 直接在 IAM Authorization AutoConfiguration 中标记为 Primary，
+ * 不再创建第二个代理 Bean。</p>
+ */
+final class IamPasswordAuthenticationProviderSelection {
+    private IamPasswordAuthenticationProviderSelection() {
     }
 }
