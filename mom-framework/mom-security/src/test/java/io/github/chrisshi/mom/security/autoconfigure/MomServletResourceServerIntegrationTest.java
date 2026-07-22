@@ -3,18 +3,20 @@ package io.github.chrisshi.mom.security.autoconfigure;
 import io.github.chrisshi.mom.security.authorization.MomAuthorizationService;
 import io.github.chrisshi.mom.security.authorization.MomScopedResourceNotFoundException;
 import io.github.chrisshi.mom.security.token.MomSecurityClaims;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -22,11 +24,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.WebApplicationContext;
 
 import java.util.List;
 import java.util.Map;
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.mockJwt;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -41,9 +45,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 "mom.security.resource-server.issuer-uri=https://iam.mom.example",
                 "mom.security.resource-server.jwk-set-uri=https://iam.mom.example/oauth2/jwks"
         })
-@AutoConfigureMockMvc
 class MomServletResourceServerIntegrationTest {
-    @Autowired MockMvc mockMvc;
+    @Autowired WebApplicationContext applicationContext;
+    private MockMvc mockMvc;
+
+    @BeforeEach
+    void setUp() {
+        mockMvc = MockMvcBuilders.webAppContextSetup(applicationContext)
+                .apply(springSecurity())
+                .build();
+    }
 
     @Test
     void protectedApiWithoutBearerMustReturnUnauthorized() throws Exception {
@@ -95,7 +106,7 @@ class MomServletResourceServerIntegrationTest {
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor internalJwt(
             String permission) {
-        return mockJwt().jwt(jwt -> jwt
+        return jwt().jwt(jwt -> jwt
                         .subject("user-1")
                         .audience(List.of("mom-admin-web"))
                         .claim(MomSecurityClaims.SESSION_ID, "session-1")
@@ -104,11 +115,11 @@ class MomServletResourceServerIntegrationTest {
                         .claim(MomSecurityClaims.ROLES, List.of("PLATFORM_ADMIN"))
                         .claim(MomSecurityClaims.PERMISSIONS, List.of(permission))
                         .claim(MomSecurityClaims.FACTORY_IDS, List.of("factory-1")))
-                .authorities(() -> permission);
+                .authorities(new SimpleGrantedAuthority(permission));
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor supplierJwt() {
-        return mockJwt().jwt(jwt -> jwt
+        return jwt().jwt(jwt -> jwt
                         .subject("supplier-user-1")
                         .audience(List.of("mom-supplier-web"))
                         .claim(MomSecurityClaims.SESSION_ID, "session-9")
@@ -119,14 +130,14 @@ class MomServletResourceServerIntegrationTest {
                         .claim(MomSecurityClaims.FACTORY_IDS, List.of("factory-9"))
                         .claim(MomSecurityClaims.PARTY_TYPE, "SUPPLIER")
                         .claim(MomSecurityClaims.PARTY_ID, "supplier-9"))
-                .authorities(() -> "supplier:order:read");
+                .authorities(new SimpleGrantedAuthority("supplier:order:read"));
     }
 
     @SpringBootConfiguration
     @EnableAutoConfiguration
     @Import({ProtectedController.class, ScopedNotFoundAdvice.class})
     static class TestApplication {
-        /** mockJwt 直接建立 SecurityContext；该 Bean 只满足 Resource Server 启动条件，不访问外部 JWK。 */
+        /** jwt() 直接建立 SecurityContext；该 Bean 只满足 Resource Server 启动条件，不访问外部 JWK。 */
         @Bean
         JwtDecoder jwtDecoder() {
             return token -> {
