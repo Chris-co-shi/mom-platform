@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.authority.FactorGrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
@@ -22,6 +24,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -352,7 +355,16 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
             uri.queryParam("code_challenge_method", codeChallengeMethod);
         }
         return get(uri.build().encode().toUriString())
-                .with(user(username).roles("IAM_USER"));
+                .with(authenticatedPasswordUser(username));
+    }
+
+    private static RequestPostProcessor authenticatedPasswordUser(String username) {
+        return user(username).authorities(
+                new SimpleGrantedAuthority("ROLE_IAM_USER"),
+                FactorGrantedAuthority
+                        .withAuthority(FactorGrantedAuthority.PASSWORD_AUTHORITY)
+                        .issuedAt(Instant.parse("2026-07-22T00:00:00Z"))
+                        .build());
     }
 
     private String authorize(String clientId, String username, String redirectUri) throws Exception {
