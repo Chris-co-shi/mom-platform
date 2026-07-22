@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -36,6 +37,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -99,10 +101,14 @@ class IamSessionRefreshPostgresqlRedisIntegrationTest {
         mockMvc = MockMvcBuilders.webAppContextSetup(applicationContext)
                 .apply(springSecurity())
                 .build();
-        redis.execute(connection -> {
+        RedisConnection connection = Objects.requireNonNull(
+                redis.getConnectionFactory()).getConnection();
+        try {
             connection.serverCommands().flushDb();
-            return null;
-        });
+        }
+        finally {
+            connection.close();
+        }
         jdbc.update("DELETE FROM oauth2_authorization_consent");
         jdbc.update("DELETE FROM oauth2_authorization");
         jdbc.update("DELETE FROM iam_refresh_token");
