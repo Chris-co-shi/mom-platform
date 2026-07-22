@@ -14,7 +14,7 @@ import org.springframework.security.oauth2.server.authorization.settings.TokenSe
 
 import java.time.Duration;
 
-/** 将四个固定 Public Client 幂等同步到 S02 官方 JDBC Registered Client Store。 */
+/** 将四个固定 Public Client 幂等同步到官方 JDBC Registered Client Store。 */
 final class IamPublicClientRegistrar implements ApplicationRunner {
     private final RegisteredClientRepository repository;
     private final IamAuthorizationProperties properties;
@@ -43,6 +43,7 @@ final class IamPublicClientRegistrar implements ApplicationRunner {
                 .clientName(registration.clientName())
                 .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .redirectUri(registration.client().getRedirectUri().toString())
                 .postLogoutRedirectUri(registration.client().getPostLogoutRedirectUri().toString())
                 .scope(OidcScopes.OPENID)
@@ -54,6 +55,7 @@ final class IamPublicClientRegistrar implements ApplicationRunner {
                 .tokenSettings(TokenSettings.builder()
                         .authorizationCodeTimeToLive(Duration.ofMinutes(5))
                         .accessTokenTimeToLive(Duration.ofMinutes(10))
+                        .reuseRefreshTokens(false)
                         .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED)
                         .idTokenSignatureAlgorithm(SignatureAlgorithm.RS256)
                         .build())
