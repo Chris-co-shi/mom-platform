@@ -3,6 +3,7 @@ package io.github.chrisshi.mom.iam.web;
 import io.github.chrisshi.mom.iam.security.IamAccountAuthenticationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
@@ -18,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 
 /** IAM 自有最小登录页面与首次改密页面；不引入 BFF 或应用 API Session。 */
 @Controller
+@ConditionalOnBean(IamAccountAuthenticationService.class)
 public class IamAuthenticationPageController {
     private final IamAccountAuthenticationService accounts;
     private final SavedRequestAwareAuthenticationSuccessHandler continuation;
