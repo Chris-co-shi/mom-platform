@@ -1,6 +1,7 @@
 package io.github.chrisshi.mom.iam.admin;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -20,6 +21,7 @@ import java.util.Set;
 
 /** S07 IAM 管理 REST API；密码摘要、Token、授权码和私钥永不进入响应 DTO。 */
 @RestController
+@ConditionalOnBean(IamAdminService.class)
 @RequestMapping("/api/iam/admin")
 public class IamAdminController {
     private final IamAdminService service;
