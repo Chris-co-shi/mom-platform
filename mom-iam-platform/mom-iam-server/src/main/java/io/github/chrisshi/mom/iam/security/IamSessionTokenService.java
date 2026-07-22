@@ -16,7 +16,7 @@ import java.time.Duration;
 import java.time.Instant;
 
 /** S05 用户授权 Session 与 Refresh Rotation 权威服务。 */
-public final class IamSessionTokenService {
+public class IamSessionTokenService {
     public static final String REQUEST_REFRESH_TOKEN_ATTRIBUTE =
             IamSessionTokenService.class.getName() + ".refreshToken";
     public static final String REQUEST_SESSION_ID_ATTRIBUTE =
