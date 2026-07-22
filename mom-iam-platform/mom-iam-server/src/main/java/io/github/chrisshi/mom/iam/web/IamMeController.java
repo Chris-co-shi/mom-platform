@@ -5,16 +5,10 @@ import io.github.chrisshi.mom.iam.security.IamAuthorizationContextService;
 import io.github.chrisshi.mom.iam.security.IamScopeGuard;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** `/api/iam/me` 是 Web/Mobile 当前权限上下文的服务端权威来源。 */
-@RestController
-@RequestMapping("/api/iam")
+/** `/api/iam/me` 处理器，由 IAM Authorization AutoConfiguration 条件注册对应 MVC 路由。 */
 public final class IamMeController {
     public static final String CURRENT_FACTORY_HEADER = "X-Factory-Id";
 
@@ -32,10 +26,7 @@ public final class IamMeController {
      * <p>即使 Access Token 中已有 Claims，本接口仍重新读取 IAM 权威数据，以便前端启动时校验当前权限
      * 与 Current Factory 偏好。它不返回密码、Token、Session Cookie 或 Authorization 数据。</p>
      */
-    @GetMapping("/me")
-    public IamMeResponse me(
-            Authentication authentication,
-            @RequestHeader(name = CURRENT_FACTORY_HEADER, required = false) String requestedFactoryId) {
+    public IamMeResponse me(Authentication authentication, String requestedFactoryId) {
         IamAuthorizationContext context = loadContext(authentication);
         String currentFactoryId = scopeGuard.requireCurrentFactory(context, requestedFactoryId);
         String clientId = authentication.getPrincipal() instanceof Jwt jwt
