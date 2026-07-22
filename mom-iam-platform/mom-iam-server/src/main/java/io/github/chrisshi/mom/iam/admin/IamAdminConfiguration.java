@@ -7,9 +7,9 @@ import io.github.chrisshi.mom.iam.security.IamSecureIdGenerator;
 import io.github.chrisshi.mom.iam.security.IamSessionTokenService;
 import io.github.chrisshi.mom.security.authorization.MomAuthorizationService;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,6 +21,7 @@ import java.time.Clock;
         IamPersistenceRepositoryAutoConfiguration.class,
         IamAuthorizationServerConfiguration.class
 })
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @ConditionalOnProperty(
         prefix = "mom.iam.admin",
         name = "enabled",
@@ -29,7 +30,6 @@ import java.time.Clock;
 public class IamAdminConfiguration {
 
     @Bean
-    @ConditionalOnBean(JdbcTemplate.class)
     @ConditionalOnMissingBean
     IamAdminJdbcRepository iamAdminJdbcRepository(JdbcTemplate jdbcTemplate) {
         return new IamAdminJdbcRepository(jdbcTemplate);
@@ -48,14 +48,6 @@ public class IamAdminConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean({
-            IamAdminJdbcRepository.class,
-            PasswordEncoder.class,
-            IamSessionTokenService.class,
-            IamSecurityAuditEventAppender.class,
-            IamSecureIdGenerator.class,
-            Clock.class
-    })
     @ConditionalOnMissingBean
     IamAdminService iamAdminService(
             IamAdminJdbcRepository repository,
@@ -72,14 +64,12 @@ public class IamAdminConfiguration {
     }
 
     @Bean
-    @ConditionalOnBean(IamAdminService.class)
     @ConditionalOnMissingBean
     IamAdminController iamAdminController(IamAdminService service) {
         return new IamAdminController(service);
     }
 
     @Bean
-    @ConditionalOnBean(IamAdminController.class)
     @ConditionalOnMissingBean
     IamAdminExceptionHandler iamAdminExceptionHandler() {
         return new IamAdminExceptionHandler();
