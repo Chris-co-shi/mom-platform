@@ -47,6 +47,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** S05 PostgreSQL + Redis 用户授权 Session、Opaque Refresh Rotation 与重放检测验收。 */
@@ -217,6 +218,22 @@ class IamSessionRefreshPostgresqlRedisIntegrationTest {
                 """, jwt.getClaimAsString("sid"));
         assertEquals("MOBILE", session.get("channel"));
         assertDurationSeconds(session, "login_at", "absolute_expires_at", 12 * 60 * 60);
+        mockMvc.perform(get("/api/iam/me")
+                        .header("Authorization", "Bearer " + initial.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clientId").value("mom-mobile-pda"))
+                .andExpect(jsonPath("$.sid").value(jwt.getClaimAsString("sid")))
+                .andExpect(jsonPath("$.mobileAccessEnabled").value(true))
+                .andExpect(jsonPath("$.partyType").doesNotExist())
+                .andExpect(jsonPath("$.partyId").doesNotExist());
+
+        jdbc.update("""
+                UPDATE iam_user_application SET status='DISABLED',updated_at=now()
+                 WHERE user_id=? AND application_code='MOM_MOBILE_PDA'
+                """, user.id());
+        mockMvc.perform(get("/api/iam/me")
+                        .header("Authorization", "Bearer " + initial.accessToken()))
+                .andExpect(status().isForbidden());
     }
 
     private TokenResponse issueAuthorizationCodeTokens(
