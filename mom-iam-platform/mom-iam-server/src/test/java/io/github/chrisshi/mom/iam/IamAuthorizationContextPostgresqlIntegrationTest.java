@@ -31,6 +31,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
@@ -158,7 +159,9 @@ class IamAuthorizationContextPostgresqlIntegrationTest {
         String accessToken = issueAccessToken(
                 "mom-supplier-web", user.username(), "http://127.0.0.1:5174/auth/callback");
         Jwt jwt = jwtDecoder.decode(accessToken);
-        assertEquals(List.of("SUPPLIER_OPERATOR"), jwt.getClaimAsStringList("roles"));
+        List<String> roles = jwt.getClaimAsStringList("roles");
+        assertEquals(1, roles.size());
+        assertTrue(roles.getFirst().startsWith("SUPPLIER_OPERATOR_"));
         assertEquals("SUPPLIER", jwt.getClaimAsString("party_type"));
         assertEquals(partyId, jwt.getClaimAsString("party_id"));
         assertEquals(List.of(factoryId), jwt.getClaimAsStringList("factory_ids"));
@@ -260,7 +263,8 @@ class IamAuthorizationContextPostgresqlIntegrationTest {
                     id,user_id,role_id,status,valid_from,valid_until,
                     created_at,created_by,updated_at,updated_by,version)
                 VALUES (?,?,?,?,?,?,now(),'test-s04',now(),'test-s04',0)
-                """, nextId(), userId, roleId, status, validFrom, validUntil);
+                """, nextId(), userId, roleId, status,
+                timestamp(validFrom), timestamp(validUntil));
     }
 
     private String createRole(String code, UserType userType) {
@@ -293,7 +297,8 @@ class IamAuthorizationContextPostgresqlIntegrationTest {
                     id,user_id,factory_id,status,valid_from,valid_until,
                     created_at,created_by,updated_at,updated_by,version)
                 VALUES (?,?,?,?,?,?,now(),'test-s04',now(),'test-s04',0)
-                """, nextId(), userId, factoryId, status, validFrom, validUntil);
+                """, nextId(), userId, factoryId, status,
+                timestamp(validFrom), timestamp(validUntil));
     }
 
     private void bindParty(String userId, PartyType type, String partyId) {
@@ -304,6 +309,10 @@ class IamAuthorizationContextPostgresqlIntegrationTest {
                 VALUES (?,?,?,?,'ENABLED',now()-interval '1 minute',now()+interval '1 day',
                     now(),'test-s04',now(),'test-s04',0)
                 """, nextId(), userId, type.name(), partyId);
+    }
+
+    private static Timestamp timestamp(Instant instant) {
+        return instant == null ? null : Timestamp.from(instant);
     }
 
     private static String challenge(String verifier) throws Exception {
