@@ -1,12 +1,14 @@
 package io.github.chrisshi.mom.iam.infrastructure.persistence.repository;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import io.github.chrisshi.mom.iam.domain.type.ApplicationCode;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserApplicationEntity;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserFactoryScopeEntity;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserApplicationMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserFactoryScopeMapper;
 
 import java.util.List;
+import java.util.Optional;
 
 /** Mobile Access 与 Factory Scope 仓储；Factory 只保存 MDM 引用 ID。 */
 public class IamUserAccessRepository {
@@ -28,6 +30,15 @@ public class IamUserAccessRepository {
     /** @param scope Factory Scope 引用 */
     public void grantFactoryScope(IamUserFactoryScopeEntity scope) {
         requireOne(userFactoryScopeMapper.insert(scope), "用户 Factory Scope 写入失败");
+    }
+
+    /** @param userId 用户 ID @param applicationCode 应用编码 @return 用户级应用访问记录 */
+    public Optional<IamUserApplicationEntity> findApplicationAccess(
+            String userId, ApplicationCode applicationCode) {
+        return Optional.ofNullable(userApplicationMapper.selectOne(
+                Wrappers.<IamUserApplicationEntity>lambdaQuery()
+                        .eq(IamUserApplicationEntity::getUserId, userId)
+                        .eq(IamUserApplicationEntity::getApplicationCode, applicationCode)));
     }
 
     /** @param userId 用户 ID @return 该用户的 Factory Scope */

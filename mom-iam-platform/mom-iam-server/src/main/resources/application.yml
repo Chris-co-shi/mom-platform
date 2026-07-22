@@ -1,5 +1,12 @@
 server:
   port: ${SERVER_PORT:20100}
+  servlet:
+    session:
+      cookie:
+        name: MOM_IAM_SESSION
+        http-only: true
+        secure: ${IAM_COOKIE_SECURE:false}
+        same-site: lax
 
 spring:
   application:
@@ -35,6 +42,33 @@ spring:
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
+
+mom:
+  iam:
+    authorization:
+      enabled: ${IAM_AUTHORIZATION_ENABLED:true}
+      issuer: ${IAM_ISSUER:http://127.0.0.1:20100}
+      security:
+        max-failed-attempts: ${IAM_MAX_FAILED_ATTEMPTS:5}
+        lock-duration: ${IAM_LOCK_DURATION:15m}
+        minimum-password-length: ${IAM_MINIMUM_PASSWORD_LENGTH:12}
+      key:
+        key-id: ${IAM_JWK_KEY_ID:mom-iam-local-2026}
+        private-key-location: ${IAM_JWK_PRIVATE_KEY:classpath:keys/test/mom-iam-private.pem}
+        public-key-location: ${IAM_JWK_PUBLIC_KEY:classpath:keys/test/mom-iam-public.pem}
+        allow-test-key: ${IAM_ALLOW_TEST_KEY:true}
+      admin-web:
+        redirect-uri: ${MOM_ADMIN_WEB_REDIRECT_URI:http://127.0.0.1:5173/auth/callback}
+        post-logout-redirect-uri: ${MOM_ADMIN_WEB_POST_LOGOUT_REDIRECT_URI:http://127.0.0.1:5173/}
+      supplier-web:
+        redirect-uri: ${MOM_SUPPLIER_WEB_REDIRECT_URI:http://127.0.0.1:5174/auth/callback}
+        post-logout-redirect-uri: ${MOM_SUPPLIER_WEB_POST_LOGOUT_REDIRECT_URI:http://127.0.0.1:5174/}
+      customer-web:
+        redirect-uri: ${MOM_CUSTOMER_WEB_REDIRECT_URI:http://127.0.0.1:5175/auth/callback}
+        post-logout-redirect-uri: ${MOM_CUSTOMER_WEB_POST_LOGOUT_REDIRECT_URI:http://127.0.0.1:5175/}
+      mobile-pda:
+        redirect-uri: ${MOM_MOBILE_PDA_REDIRECT_URI:com.mom.mobile:/oauth2/callback}
+        post-logout-redirect-uri: ${MOM_MOBILE_PDA_POST_LOGOUT_REDIRECT_URI:com.mom.mobile:/logout/callback}
 
 mybatis-plus:
   configuration:
