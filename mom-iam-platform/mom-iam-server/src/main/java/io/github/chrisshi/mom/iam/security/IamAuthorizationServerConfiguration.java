@@ -54,9 +54,15 @@ import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
+import org.springframework.web.servlet.function.RouterFunction;
+import org.springframework.web.servlet.function.ServerResponse;
 
 import javax.sql.DataSource;
+import java.security.Principal;
 import java.time.Clock;
+
+import static org.springframework.web.servlet.function.RequestPredicates.GET;
+import static org.springframework.web.servlet.function.RouterFunctions.route;
 
 /** P1.5 S03 Authorization Server 与 S04 RBAC/Scope/Me 自动配置。 */
 @AutoConfiguration(afterName = {
@@ -309,5 +315,20 @@ public class IamAuthorizationServerConfiguration {
             IamAuthorizationContextService contexts,
             IamScopeGuard scopeGuard) {
         return new IamMeController(contexts, scopeGuard);
+    }
+
+    @Bean
+    RouterFunction<ServerResponse> iamMeRoutes(IamMeController controller) {
+        return route(GET("/api/iam/me"), request -> {
+            Principal principal = request.principal()
+                    .orElseThrow(() -> new IllegalStateException("缺少已认证用户"));
+            if (!(principal instanceof Authentication authentication)) {
+                throw new IllegalStateException("认证主体类型无效");
+            }
+            IamMeController.IamMeResponse response = controller.me(
+                    authentication,
+                    request.headers().firstHeader(IamMeController.CURRENT_FACTORY_HEADER));
+            return ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(response);
+        });
     }
 }
