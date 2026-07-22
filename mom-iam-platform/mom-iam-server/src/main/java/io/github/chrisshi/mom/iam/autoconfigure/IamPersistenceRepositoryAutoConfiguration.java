@@ -19,6 +19,7 @@ import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamIdent
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamRefreshTokenStateRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamRoleAssignmentRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSecurityAuditEventAppender;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSessionRefreshJdbcRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSessionStateRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserAccessRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserRepository;
@@ -40,13 +41,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @ConditionalOnBean(SqlSessionFactory.class)
 public class IamPersistenceRepositoryAutoConfiguration {
 
-    /** 创建用户仓储。 */
     @Bean @ConditionalOnMissingBean
     IamUserRepository iamUserRepository(IamUserMapper mapper, JdbcTemplate jdbcTemplate) {
         return new IamUserRepository(mapper, jdbcTemplate);
     }
 
-    /** 创建授权目录仓储。 */
     @Bean @ConditionalOnMissingBean
     IamAuthorizationCatalogRepository iamAuthorizationCatalogRepository(
             IamRoleMapper roleMapper,
@@ -57,13 +56,16 @@ public class IamPersistenceRepositoryAutoConfiguration {
                 roleMapper, permissionMapper, rolePermissionMapper, clientPolicyMapper);
     }
 
-    /** 创建 S04 当前有效 Role、Permission、Factory 与 Party Scope 只读仓储。 */
     @Bean @ConditionalOnMissingBean
     IamAuthorizationContextRepository iamAuthorizationContextRepository(JdbcTemplate jdbcTemplate) {
         return new IamAuthorizationContextRepository(jdbcTemplate);
     }
 
-    /** 创建内部资料和外部主体绑定仓储。 */
+    @Bean @ConditionalOnMissingBean
+    IamSessionRefreshJdbcRepository iamSessionRefreshJdbcRepository(JdbcTemplate jdbcTemplate) {
+        return new IamSessionRefreshJdbcRepository(jdbcTemplate);
+    }
+
     @Bean @ConditionalOnMissingBean
     IamIdentityBindingRepository iamIdentityBindingRepository(
             IamInternalUserProfileMapper internalProfileMapper,
@@ -71,7 +73,6 @@ public class IamPersistenceRepositoryAutoConfiguration {
         return new IamIdentityBindingRepository(internalProfileMapper, externalBindingMapper);
     }
 
-    /** 创建角色关系仓储。 */
     @Bean @ConditionalOnMissingBean
     IamRoleAssignmentRepository iamRoleAssignmentRepository(
             IamUserRoleMapper userRoleMapper,
@@ -79,7 +80,6 @@ public class IamPersistenceRepositoryAutoConfiguration {
         return new IamRoleAssignmentRepository(userRoleMapper, rolePermissionMapper);
     }
 
-    /** 创建用户应用与工厂范围仓储。 */
     @Bean @ConditionalOnMissingBean
     IamUserAccessRepository iamUserAccessRepository(
             IamUserApplicationMapper applicationMapper,
@@ -87,19 +87,16 @@ public class IamPersistenceRepositoryAutoConfiguration {
         return new IamUserAccessRepository(applicationMapper, factoryScopeMapper);
     }
 
-    /** 创建 Session 状态仓储。 */
     @Bean @ConditionalOnMissingBean
     IamSessionStateRepository iamSessionStateRepository(IamUserSessionMapper mapper) {
         return new IamSessionStateRepository(mapper);
     }
 
-    /** 创建 Refresh Token 摘要状态仓储。 */
     @Bean @ConditionalOnMissingBean
     IamRefreshTokenStateRepository iamRefreshTokenStateRepository(IamRefreshTokenMapper mapper) {
         return new IamRefreshTokenStateRepository(mapper);
     }
 
-    /** 创建追加型安全审计写入端口。 */
     @Bean @ConditionalOnMissingBean
     IamSecurityAuditEventAppender iamSecurityAuditEventAppender(IamSecurityAuditEventMapper mapper) {
         return new IamSecurityAuditEventAppender(mapper);
