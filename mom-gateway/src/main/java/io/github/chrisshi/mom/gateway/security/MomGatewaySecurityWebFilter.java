@@ -56,8 +56,10 @@ public final class MomGatewaySecurityWebFilter implements WebFilter, Ordered {
 
         return sanitized.getPrincipal()
                 .ofType(JwtAuthenticationToken.class)
-                .flatMap(authentication -> authorize(sanitized, chain, authentication))
-                .switchIfEmpty(chain.filter(sanitized));
+                .flatMap(authentication -> authorize(sanitized, chain, authentication)
+                        .thenReturn(Boolean.TRUE))
+                .defaultIfEmpty(Boolean.FALSE)
+                .flatMap(processed -> processed ? Mono.empty() : chain.filter(sanitized));
     }
 
     private Mono<Void> authorize(
