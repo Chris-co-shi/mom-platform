@@ -7,13 +7,14 @@ import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamAutho
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamIdentityBindingRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserAccessRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserRepository;
+import io.github.chrisshi.mom.iam.web.IamAuthenticationPageController;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
@@ -53,12 +54,16 @@ import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import javax.sql.DataSource;
 import java.time.Clock;
 
-/** P1.5 S03 Authorization Server、账号认证、四 Client 与 JWK/JWT 基础配置。 */
-@Configuration(proxyBeanMethods = false)
+/** P1.5 S03 Authorization Server、账号认证、四 Client 与 JWK/JWT 基础自动配置。 */
+@AutoConfiguration(afterName = {
+        "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
+        "com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration",
+        "io.github.chrisshi.mom.iam.autoconfigure.IamPersistenceRepositoryAutoConfiguration"
+})
 @EnableWebSecurity
 @EnableConfigurationProperties(IamAuthorizationProperties.class)
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
-@ConditionalOnBean(DataSource.class)
+@ConditionalOnBean({DataSource.class, IamUserRepository.class})
 @ConditionalOnProperty(
         prefix = "mom.iam.authorization",
         name = "enabled",
@@ -260,5 +265,12 @@ public class IamAuthorizationServerConfiguration {
                         .deleteCookies("MOM_IAM_SESSION"))
                 .sessionManagement(session -> session.sessionFixation(fixation -> fixation.migrateSession()));
         return http.build();
+    }
+
+    @Bean
+    IamAuthenticationPageController iamAuthenticationPageController(
+            IamAccountAuthenticationService accounts,
+            SavedRequestAwareAuthenticationSuccessHandler continuation) {
+        return new IamAuthenticationPageController(accounts, continuation);
     }
 }
