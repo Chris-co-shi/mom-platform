@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** S06 JWT 协议、Authority、Permission、Factory/Party 与 404 防枚举契约测试。 */
 class MomJwtSecurityContractTest {
     private static final String ISSUER = "https://iam.mom.example";
-    private static final Instant NOW = Instant.parse("2026-07-22T00:00:00Z");
+    private static final Instant NOW = Instant.now().minusSeconds(5);
 
     @Test
     void validInternalTokenMustMapRolesPermissionsAndFactoryScope() {
@@ -89,7 +89,7 @@ class MomJwtSecurityContractTest {
                 .issuedAt(NOW)
                 .notBefore(NOW)
                 .expiresAt(NOW.plusSeconds(600))
-                .id("jti-1")
+                .claim("jti", "jti-1")
                 .claim(MomSecurityClaims.CLIENT_ID, "mom-admin-web")
                 .claim(MomSecurityClaims.USER_TYPE, "INTERNAL")
                 .claim(MomSecurityClaims.ROLES, List.of())
@@ -118,7 +118,7 @@ class MomJwtSecurityContractTest {
                 .issuedAt(NOW)
                 .notBefore(NOW)
                 .expiresAt(NOW.plusSeconds(600))
-                .id("jti-1")
+                .claim("jti", "jti-1")
                 .claim(MomSecurityClaims.SESSION_ID, "session-1")
                 .claim(MomSecurityClaims.CLIENT_ID, clientId);
     }
