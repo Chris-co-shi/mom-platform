@@ -358,6 +358,7 @@ public class IamAuthorizationServerConfiguration {
             IamAccountAuthenticationService accounts,
             IamClientAccessPolicyService accessPolicy,
             RequestCache requestCache,
+            RegisteredClientRepository registeredClients,
             OAuth2TokenGenerator<?> tokenGenerator,
             IamRefreshGrantAuthenticationProvider refreshProvider,
             IamTokenResponseHandler tokenResponseHandler) throws Exception {
@@ -367,6 +368,12 @@ public class IamAuthorizationServerConfiguration {
         http.oauth2AuthorizationServer(authorizationServer -> {
                     http.securityMatcher(authorizationServer.getEndpointsMatcher());
                     authorizationServer
+                            .clientAuthentication(clientAuthentication -> clientAuthentication
+                                    .authenticationConverter(
+                                            new IamPublicRefreshClientAuthenticationConverter())
+                                    .authenticationProvider(
+                                            new IamPublicRefreshClientAuthenticationProvider(
+                                                    registeredClients)))
                             .tokenGenerator(tokenGenerator)
                             .tokenEndpoint(tokenEndpoint -> tokenEndpoint
                                     .accessTokenRequestConverter(
