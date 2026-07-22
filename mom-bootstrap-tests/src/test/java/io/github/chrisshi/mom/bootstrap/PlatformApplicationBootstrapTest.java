@@ -9,6 +9,7 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
 import org.springframework.context.ConfigurableApplicationContext;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -23,26 +24,29 @@ class PlatformApplicationBootstrapTest {
 
     @Test
     void iamStartsWithoutExternalInfrastructure() {
-        assertApplicationStarts(MomIamApplication.class);
+        assertApplicationStarts(MomIamApplication.class, true);
     }
 
     @Test
     void mdmStartsWithoutExternalInfrastructure() {
-        assertApplicationStarts(MomMdmApplication.class);
+        assertApplicationStarts(MomMdmApplication.class, false);
     }
 
     @Test
     void integrationStartsWithoutExternalInfrastructure() {
-        assertApplicationStarts(MomIntegrationApplication.class);
+        assertApplicationStarts(MomIntegrationApplication.class, false);
     }
 
     /**
      * 使用统一离线参数启动指定应用并验证健康端点存在。
      *
      * @param applicationClass 待启动的 Spring Boot 应用入口
+     * @param explicitlyEnableIamAdmin 是否显式开启 IAM Admin；IAM 无数据库场景用于验证 JdbcTemplate 条件
      */
-    private void assertApplicationStarts(Class<?> applicationClass) {
-        try (ConfigurableApplicationContext context = new SpringApplicationBuilder(applicationClass)
+    private void assertApplicationStarts(
+            Class<?> applicationClass,
+            boolean explicitlyEnableIamAdmin) {
+        SpringApplicationBuilder builder = new SpringApplicationBuilder(applicationClass)
                 .web(WebApplicationType.SERVLET)
                 .properties(
                         "server.port=0",
@@ -53,10 +57,16 @@ class PlatformApplicationBootstrapTest {
                         "mom.mdm.seata-at-probe.enabled=false",
                         "mom.integration.seata-at-probe.enabled=false",
                         "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
-                        "management.endpoints.enabled-by-default=true")
-                .run()) {
+                        "management.endpoints.enabled-by-default=true");
+        if (explicitlyEnableIamAdmin) {
+            builder.properties("mom.iam.admin.enabled=true");
+        }
+        try (ConfigurableApplicationContext context = builder.run()) {
             assertTrue(context.isActive());
             assertNotNull(context.getBean(HealthEndpoint.class));
+            assertFalse(context.containsBean("iamAdminJdbcRepository"));
+            assertFalse(context.containsBean("iamAdminService"));
+            assertFalse(context.containsBean("iamAdminController"));
         }
     }
 }

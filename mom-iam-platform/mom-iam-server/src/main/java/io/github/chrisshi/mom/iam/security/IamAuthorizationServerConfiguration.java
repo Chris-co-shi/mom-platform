@@ -6,10 +6,12 @@ import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserEntit
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamAuthorizationCatalogRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamAuthorizationContextRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamIdentityBindingRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSessionRefreshJdbcRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserAccessRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserRepository;
 import io.github.chrisshi.mom.iam.web.IamAuthenticationPageController;
 import io.github.chrisshi.mom.iam.web.IamMeController;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -21,6 +23,8 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -33,7 +37,10 @@ import org.springframework.security.config.annotation.web.configuration.OAuth2Au
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
@@ -42,8 +49,12 @@ import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
+import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2AccessTokenGenerator;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -54,6 +65,8 @@ import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.ServerResponse;
 
@@ -64,14 +77,14 @@ import java.time.Clock;
 import static org.springframework.web.servlet.function.RequestPredicates.GET;
 import static org.springframework.web.servlet.function.RouterFunctions.route;
 
-/** P1.5 S03 Authorization Server 与 S04 RBAC/Scope/Me 自动配置。 */
+/** P1.5 S03～S05 Authorization Server、授权上下文与 Session Rotation 自动配置。 */
 @AutoConfiguration(afterName = {
         "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
         "com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration",
         "io.github.chrisshi.mom.iam.autoconfigure.IamPersistenceRepositoryAutoConfiguration"
 })
 @EnableWebSecurity
-@EnableConfigurationProperties(IamAuthorizationProperties.class)
+@EnableConfigurationProperties({IamAuthorizationProperties.class, IamSessionProperties.class})
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @ConditionalOnBean({DataSource.class, IamUserRepository.class})
 @ConditionalOnProperty(
@@ -97,6 +110,7 @@ public class IamAuthorizationServerConfiguration {
     }
 
     @Bean
+    @Primary
     AuthenticationProvider iamAuthenticationProvider(
             IamAccountAuthenticationService accounts,
             PasswordEncoder passwordEncoder) {
@@ -126,6 +140,40 @@ public class IamAuthorizationServerConfiguration {
     @Bean
     IamScopeGuard iamScopeGuard() {
         return new IamScopeGuard();
+    }
+
+    @Bean
+    IamRefreshTokenCodec iamRefreshTokenCodec(IamSessionProperties properties) {
+        return new IamRefreshTokenCodec(properties);
+    }
+
+    @Bean
+    IamSecureIdGenerator iamSecureIdGenerator() {
+        return new IamSecureIdGenerator();
+    }
+
+    @Bean
+    IamRevokedSessionStore iamRevokedSessionStore(
+            StringRedisTemplate redis,
+            IamSessionProperties properties,
+            Clock clock) {
+        return new IamRevokedSessionStore(redis, properties, clock);
+    }
+
+    @Bean
+    IamSessionTokenService iamSessionTokenService(
+            IamAuthorizationContextService contexts,
+            IamAuthorizationCatalogRepository catalog,
+            IamSessionRefreshJdbcRepository repository,
+            IamRefreshTokenCodec codec,
+            IamSecureIdGenerator ids,
+            IamRevokedSessionStore revokedSessions,
+            IamSessionProperties properties,
+            Environment environment,
+            Clock clock) {
+        properties.validate(environment.acceptsProfiles(Profiles.of("prod", "production")));
+        return new IamSessionTokenService(
+                contexts, catalog, repository, codec, ids, revokedSessions, properties, clock);
     }
 
     @Bean
@@ -213,13 +261,19 @@ public class IamAuthorizationServerConfiguration {
     }
 
     @Bean
+    JwtEncoder iamJwtEncoder(JWKSource<SecurityContext> jwkSource) {
+        return new NimbusJwtEncoder(jwkSource);
+    }
+
+    @Bean
     JwtDecoder iamJwtDecoder(JWKSource<SecurityContext> jwkSource) {
         return OAuth2AuthorizationServerConfiguration.jwtDecoder(jwkSource);
     }
 
     @Bean
     OAuth2TokenCustomizer<JwtEncodingContext> iamJwtCustomizer(
-            IamAuthorizationContextService contexts) {
+            IamAuthorizationContextService contexts,
+            IamSessionTokenService sessions) {
         return context -> {
             Authentication principal = context.getPrincipal();
             if (principal == null || principal.getName() == null) {
@@ -231,6 +285,23 @@ public class IamAuthorizationServerConfiguration {
                     .claim("client_id", context.getRegisteredClient().getClientId())
                     .claim("user_type", authorization.userType().name());
             if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
+                if (AuthorizationGrantType.AUTHORIZATION_CODE.equals(context.getAuthorizationGrantType())) {
+                    HttpServletRequest request = currentRequest();
+                    IamSessionTokenService.InitialIssue initial = sessions.issueInitial(
+                            principal.getName(),
+                            context.getRegisteredClient().getClientId(),
+                            request.getRemoteAddr(),
+                            request.getHeader("User-Agent"),
+                            request.getHeader("X-Device-Name"));
+                    authorization = initial.authorization();
+                    request.setAttribute(
+                            IamSessionTokenService.REQUEST_REFRESH_TOKEN_ATTRIBUTE,
+                            initial.refreshToken());
+                    request.setAttribute(
+                            IamSessionTokenService.REQUEST_SESSION_ID_ATTRIBUTE,
+                            initial.sessionId());
+                    context.getClaims().claim("sid", initial.sessionId());
+                }
                 context.getClaims()
                         .claim("roles", authorization.roles())
                         .claim("permissions", authorization.permissions())
@@ -250,18 +321,66 @@ public class IamAuthorizationServerConfiguration {
     }
 
     @Bean
+    OAuth2TokenGenerator<?> iamTokenGenerator(
+            JwtEncoder encoder,
+            OAuth2TokenCustomizer<JwtEncodingContext> customizer) {
+        JwtGenerator jwtGenerator = new JwtGenerator(encoder);
+        jwtGenerator.setJwtCustomizer(customizer);
+        return new DelegatingOAuth2TokenGenerator(
+                jwtGenerator,
+                new OAuth2AccessTokenGenerator());
+    }
+
+    @Bean
+    IamSessionJwtIssuer iamSessionJwtIssuer(
+            JwtEncoder encoder,
+            AuthorizationServerSettings settings,
+            IamAuthorizationProperties properties) {
+        return new IamSessionJwtIssuer(encoder, settings, properties);
+    }
+
+    @Bean
+    IamRefreshGrantAuthenticationProvider iamRefreshGrantAuthenticationProvider(
+            IamSessionTokenService sessions,
+            IamSessionJwtIssuer jwtIssuer) {
+        return new IamRefreshGrantAuthenticationProvider(sessions, jwtIssuer);
+    }
+
+    @Bean
+    IamTokenResponseHandler iamTokenResponseHandler() {
+        return new IamTokenResponseHandler();
+    }
+
+    @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
     SecurityFilterChain iamAuthorizationServerSecurityFilterChain(
             HttpSecurity http,
             IamAccountAuthenticationService accounts,
             IamClientAccessPolicyService accessPolicy,
-            RequestCache requestCache) throws Exception {
+            RequestCache requestCache,
+            RegisteredClientRepository registeredClients,
+            OAuth2TokenGenerator<?> tokenGenerator,
+            IamRefreshGrantAuthenticationProvider refreshProvider,
+            IamTokenResponseHandler tokenResponseHandler) throws Exception {
         PkceS256AuthorizationRequestFilter pkceFilter = new PkceS256AuthorizationRequestFilter();
         IamClientAuthorizationRequestFilter accessFilter = new IamClientAuthorizationRequestFilter(
                 accounts, accessPolicy, requestCache);
         http.oauth2AuthorizationServer(authorizationServer -> {
                     http.securityMatcher(authorizationServer.getEndpointsMatcher());
-                    authorizationServer.oidc(Customizer.withDefaults());
+                    authorizationServer
+                            .clientAuthentication(clientAuthentication -> clientAuthentication
+                                    .authenticationConverter(
+                                            new IamPublicRefreshClientAuthenticationConverter())
+                                    .authenticationProvider(
+                                            new IamPublicRefreshClientAuthenticationProvider(
+                                                    registeredClients)))
+                            .tokenGenerator(tokenGenerator)
+                            .tokenEndpoint(tokenEndpoint -> tokenEndpoint
+                                    .accessTokenRequestConverter(
+                                            new IamRefreshGrantAuthenticationConverter())
+                                    .authenticationProvider(refreshProvider)
+                                    .accessTokenResponseHandler(tokenResponseHandler))
+                            .oidc(Customizer.withDefaults());
                 })
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions.defaultAuthenticationEntryPointFor(
@@ -330,5 +449,12 @@ public class IamAuthorizationServerConfiguration {
                     request.headers().firstHeader(IamMeController.CURRENT_FACTORY_HEADER));
             return ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(response);
         });
+    }
+
+    private static HttpServletRequest currentRequest() {
+        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
+            return attributes.getRequest();
+        }
+        throw new IllegalStateException("Token 签发缺少当前 HTTP 请求");
     }
 }

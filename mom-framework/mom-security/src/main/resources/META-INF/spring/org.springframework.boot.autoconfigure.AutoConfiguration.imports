@@ -1,1 +1,2 @@
 io.github.chrisshi.mom.security.autoconfigure.MomSecurityActorAutoConfiguration
+io.github.chrisshi.mom.security.autoconfigure.MomServletResourceServerAutoConfiguration

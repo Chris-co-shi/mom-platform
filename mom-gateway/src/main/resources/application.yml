@@ -29,6 +29,10 @@ spring:
           observability:
             enabled: true
           routes:
+            - id: iam-api
+              uri: lb://mom-iam-server
+              predicates:
+                - Path=/api/iam/**
             - id: integration-service
               uri: lb://mom-integration-server
               predicates:
@@ -42,6 +46,20 @@ spring:
                     redis-rate-limiter.replenishRate: ${GATEWAY_RATE_LIMIT_REPLENISH_RATE:10}
                     redis-rate-limiter.burstCapacity: ${GATEWAY_RATE_LIMIT_BURST_CAPACITY:20}
                     redis-rate-limiter.requestedTokens: ${GATEWAY_RATE_LIMIT_REQUESTED_TOKENS:1}
+
+mom:
+  gateway:
+    security:
+      enabled: ${GATEWAY_SECURITY_ENABLED:true}
+      issuer-uri: ${IAM_ISSUER:http://127.0.0.1:20100}
+      jwk-set-uri: ${IAM_JWK_SET_URI:http://127.0.0.1:20100/oauth2/jwks}
+      accepted-audiences:
+        - mom-admin-web
+        - mom-supplier-web
+        - mom-customer-web
+        - mom-mobile-pda
+      revoked-sid-key-prefix: ${IAM_REVOKED_SID_KEY_PREFIX:mom:iam:revoked:sid:}
+      redis-timeout: ${IAM_REVOKED_SID_REDIS_TIMEOUT:2s}
 
 management:
   endpoints:

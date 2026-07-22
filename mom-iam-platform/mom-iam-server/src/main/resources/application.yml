@@ -23,6 +23,14 @@ spring:
       validation-timeout: ${POSTGRES_VALIDATION_TIMEOUT:2000}
       leak-detection-threshold: ${POSTGRES_LEAK_DETECTION_THRESHOLD:0}
       connection-init-sql: SET TIME ZONE 'UTC'
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${REDIS_COMMAND_TIMEOUT:2s}
   flyway:
     enabled: ${FLYWAY_ENABLED:true}
     create-schemas: true
@@ -45,6 +53,8 @@ spring:
 
 mom:
   iam:
+    admin:
+      enabled: ${IAM_ADMIN_ENABLED:true}
     authorization:
       enabled: ${IAM_AUTHORIZATION_ENABLED:true}
       issuer: ${IAM_ISSUER:http://127.0.0.1:20100}
@@ -69,6 +79,14 @@ mom:
       mobile-pda:
         redirect-uri: ${MOM_MOBILE_PDA_REDIRECT_URI:com.mom.mobile:/oauth2/callback}
         post-logout-redirect-uri: ${MOM_MOBILE_PDA_POST_LOGOUT_REDIRECT_URI:com.mom.mobile:/logout/callback}
+    session:
+      web-absolute-ttl: ${IAM_WEB_SESSION_TTL:8h}
+      mobile-absolute-ttl: ${IAM_MOBILE_SESSION_TTL:12h}
+      access-token-ttl: ${IAM_ACCESS_TOKEN_TTL:10m}
+      refresh-token-bytes: ${IAM_REFRESH_TOKEN_BYTES:48}
+      hmac-pepper: ${IAM_REFRESH_HMAC_PEPPER:mom-iam-local-refresh-pepper-change-me}
+      revoked-key-prefix: ${IAM_REVOKED_SID_PREFIX:mom:iam:revoked:sid:}
+      allow-local-pepper: ${IAM_ALLOW_LOCAL_REFRESH_PEPPER:true}
 
 mybatis-plus:
   configuration:

@@ -37,7 +37,7 @@ jobs:
 
       - name: Run Prometheus Loki Grafana smoke test
         shell: bash
-        run: bash .github/scripts/run-p01-s08-observability-stack-smoke.sh
+        run: GATEWAY_SECURITY_ENABLED=false bash .github/scripts/run-p01-s08-observability-stack-smoke.sh
 
       - name: Upload observability stack diagnostics on failure
         if: failure()
