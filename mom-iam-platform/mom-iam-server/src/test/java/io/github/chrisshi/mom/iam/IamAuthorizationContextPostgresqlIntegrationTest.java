@@ -90,6 +90,8 @@ class IamAuthorizationContextPostgresqlIntegrationTest {
                 .build();
         jdbc.update("DELETE FROM oauth2_authorization_consent");
         jdbc.update("DELETE FROM oauth2_authorization");
+        jdbc.update("DELETE FROM iam_refresh_token");
+        jdbc.update("DELETE FROM iam_user_session");
         jdbc.update("DELETE FROM iam_user_factory_scope");
         jdbc.update("DELETE FROM iam_external_user_binding");
         jdbc.update("DELETE FROM iam_user_role");
@@ -197,6 +199,7 @@ class IamAuthorizationContextPostgresqlIntegrationTest {
         String body = tokenResult.getResponse().getContentAsString();
         String token = jsonString(body, "access_token");
         assertNotNull(token, body);
+        assertNotNull(jsonString(body, "refresh_token"), body);
         return token;
     }
 
