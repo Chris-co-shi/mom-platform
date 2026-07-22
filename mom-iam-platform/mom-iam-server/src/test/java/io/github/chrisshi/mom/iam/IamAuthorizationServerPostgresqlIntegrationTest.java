@@ -342,7 +342,7 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
                 .queryParam("response_type", "code")
                 .queryParam("client_id", clientId)
                 .queryParam("redirect_uri", redirectUri)
-                .queryParam("scope", "openid profile")
+                .queryParam("scope", "openid")
                 .queryParam("state", "state-value")
                 .queryParam("nonce", "nonce-value");
         if (codeChallenge != null) {
