@@ -14,6 +14,7 @@ import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserMappe
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserRoleMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserSessionMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamAuthorizationCatalogRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamAuthorizationContextRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamIdentityBindingRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamRefreshTokenStateRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamRoleAssignmentRepository;
@@ -54,6 +55,12 @@ public class IamPersistenceRepositoryAutoConfiguration {
             IamOauthClientPolicyMapper clientPolicyMapper) {
         return new IamAuthorizationCatalogRepository(
                 roleMapper, permissionMapper, rolePermissionMapper, clientPolicyMapper);
+    }
+
+    /** 创建 S04 当前有效 Role、Permission、Factory 与 Party Scope 只读仓储。 */
+    @Bean @ConditionalOnMissingBean
+    IamAuthorizationContextRepository iamAuthorizationContextRepository(JdbcTemplate jdbcTemplate) {
+        return new IamAuthorizationContextRepository(jdbcTemplate);
     }
 
     /** 创建内部资料和外部主体绑定仓储。 */
