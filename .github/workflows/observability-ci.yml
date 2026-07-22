@@ -37,7 +37,7 @@ jobs:
 
       - name: Run OpenTelemetry and Tempo smoke test
         shell: bash
-        run: bash .github/scripts/p01-s07-observability-smoke.sh
+        run: GATEWAY_SECURITY_ENABLED=false bash .github/scripts/p01-s07-observability-smoke.sh
 
       - name: Upload observability diagnostics on failure
         if: failure()
