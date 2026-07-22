@@ -1,6 +1,7 @@
 package io.github.chrisshi.mom.iam.web;
 
 import io.github.chrisshi.mom.iam.security.IamAccountAuthenticationService;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -82,7 +83,7 @@ public class IamAuthenticationPageController {
             @RequestParam String newPassword,
             @RequestParam String confirmation,
             HttpServletRequest request,
-            HttpServletResponse response) throws IOException {
+            HttpServletResponse response) throws IOException, ServletException {
         try {
             accounts.changeRequiredPassword(authentication.getName(), newPassword, confirmation);
             continuation.onAuthenticationSuccess(request, response, authentication);
