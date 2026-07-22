@@ -16,7 +16,7 @@ import java.io.IOException;
 final class PkceS256AuthorizationRequestFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !"/oauth2/authorize".equals(request.getServletPath());
+        return !isAuthorizationEndpoint(request);
     }
 
     @Override
@@ -33,6 +33,13 @@ final class PkceS256AuthorizationRequestFilter extends OncePerRequestFilter {
             }
         }
         filterChain.doFilter(request, response);
+    }
+
+    private static boolean isAuthorizationEndpoint(HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        String expected = (contextPath == null ? "" : contextPath) + "/oauth2/authorize";
+        return expected.equals(requestUri);
     }
 }
 
@@ -53,7 +60,10 @@ final class IamClientAuthorizationRequestFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !"/oauth2/authorize".equals(request.getServletPath());
+        String requestUri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        String expected = (contextPath == null ? "" : contextPath) + "/oauth2/authorize";
+        return !expected.equals(requestUri);
     }
 
     @Override
