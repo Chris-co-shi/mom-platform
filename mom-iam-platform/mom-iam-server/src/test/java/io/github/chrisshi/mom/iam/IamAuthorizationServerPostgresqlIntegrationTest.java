@@ -103,6 +103,8 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
                 .build();
         jdbc.update("DELETE FROM oauth2_authorization_consent");
         jdbc.update("DELETE FROM oauth2_authorization");
+        jdbc.update("DELETE FROM iam_refresh_token");
+        jdbc.update("DELETE FROM iam_user_session");
         jdbc.update("DELETE FROM iam_user_factory_scope");
         jdbc.update("DELETE FROM iam_user_role");
         jdbc.update("DELETE FROM iam_user_application");
@@ -123,11 +125,14 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
             assertNotNull(client);
             assertNull(client.getClientSecret());
             assertEquals(Set.of(ClientAuthenticationMethod.NONE), client.getClientAuthenticationMethods());
-            assertEquals(Set.of(AuthorizationGrantType.AUTHORIZATION_CODE), client.getAuthorizationGrantTypes());
+            assertEquals(Set.of(
+                    AuthorizationGrantType.AUTHORIZATION_CODE,
+                    AuthorizationGrantType.REFRESH_TOKEN), client.getAuthorizationGrantTypes());
             assertTrue(client.getClientSettings().isRequireProofKey());
             assertFalse(client.getClientSettings().isRequireAuthorizationConsent());
             assertEquals(Duration.ofMinutes(5), client.getTokenSettings().getAuthorizationCodeTimeToLive());
             assertEquals(Duration.ofMinutes(10), client.getTokenSettings().getAccessTokenTimeToLive());
+            assertFalse(client.getTokenSettings().isReuseRefreshTokens());
             assertEquals(Set.of("openid", "profile"), client.getScopes());
         }
 
@@ -258,7 +263,7 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
     }
 
     @Test
-    void authorizationCodeMustBeSingleUseAndIssueTenMinuteJwtAndIdToken() throws Exception {
+    void authorizationCodeMustBeSingleUseAndIssueSessionBoundTokens() throws Exception {
         String username = insertUser(UserType.INTERNAL, "token-user", false, "ENABLED", 0, null);
         String redirectUri = "http://127.0.0.1:5173/auth/callback";
         String code = authorize("mom-admin-web", username, redirectUri);
@@ -267,7 +272,10 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
                 .andExpect(status().isOk()).andReturn();
         String body = tokenResult.getResponse().getContentAsString();
         String accessToken = jsonString(body, "access_token");
+        String refreshToken = jsonString(body, "refresh_token");
         assertNotNull(accessToken, body);
+        assertNotNull(refreshToken, body);
+        assertTrue(refreshToken.length() >= 43, body);
         assertNotNull(jsonString(body, "id_token"), body);
         assertEquals("Bearer", jsonString(body, "token_type"));
         long expiresIn = jsonNumber(body, "expires_in");
@@ -277,11 +285,21 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
         assertEquals(usernameId(username), jwt.getSubject());
         assertEquals("mom-admin-web", jwt.getClaimAsString("client_id"));
         assertEquals("INTERNAL", jwt.getClaimAsString("user_type"));
+        assertNotNull(jwt.getClaimAsString("sid"));
         assertEquals(600, Duration.between(jwt.getIssuedAt(), jwt.getExpiresAt()).toSeconds());
         assertEquals("mom-iam-local-2026", jwt.getHeaders().get("kid"));
         assertEquals(List.of(), jwt.getClaimAsStringList("roles"));
         assertEquals(List.of(), jwt.getClaimAsStringList("permissions"));
         assertEquals(List.of(), jwt.getClaimAsStringList("factory_ids"));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT count(*) FROM iam_user_session WHERE id=? AND status='ACTIVE'",
+                Integer.class, jwt.getClaimAsString("sid")));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT count(*) FROM iam_refresh_token WHERE session_id=? AND status='ACTIVE'",
+                Integer.class, jwt.getClaimAsString("sid")));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM oauth2_authorization WHERE refresh_token_value IS NOT NULL",
+                Integer.class));
 
         exchange(code, VERIFIER, redirectUri).andExpect(status().isBadRequest());
         String secondCode = authorize("mom-admin-web", username, redirectUri);
