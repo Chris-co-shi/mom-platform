@@ -53,6 +53,8 @@ spring:
 
 mom:
   iam:
+    admin:
+      enabled: ${IAM_ADMIN_ENABLED:true}
     authorization:
       enabled: ${IAM_AUTHORIZATION_ENABLED:true}
       issuer: ${IAM_ISSUER:http://127.0.0.1:20100}
