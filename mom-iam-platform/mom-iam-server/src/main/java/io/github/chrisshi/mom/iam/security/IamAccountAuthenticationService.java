@@ -55,7 +55,7 @@ public final class IamAccountAuthenticationService implements UserDetailsService
     public void recordBadCredentials(String username) {
         users.recordLoginFailure(
                 normalizeUsername(username),
-                properties.getSecurity().getMaximumFailedAttempts(),
+                properties.getSecurity().getMaxFailedAttempts(),
                 properties.getSecurity().getLockDuration(),
                 clock.instant());
     }
