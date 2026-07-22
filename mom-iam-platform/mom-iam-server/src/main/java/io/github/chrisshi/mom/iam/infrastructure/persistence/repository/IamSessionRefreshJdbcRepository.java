@@ -37,7 +37,7 @@ public final class IamSessionRefreshJdbcRepository {
                     absolute_expires_at,latest_access_token_expires_at,
                     ip_address,user_agent,device_name,
                     created_at,created_by,updated_at,updated_by,version)
-                VALUES (?,?,?,?,'ACTIVE',?,NULL,?,?,?,?,?,?,?, ?,?, ?,0)
+                VALUES (?,?,?,?,'ACTIVE',?,NULL,?,?,?,?,?,?,?,?,?,0)
                 """,
                 id, userId, clientId, channel.name(), timestamp(loginAt),
                 timestamp(absoluteExpiresAt), timestamp(latestAccessTokenExpiresAt),
