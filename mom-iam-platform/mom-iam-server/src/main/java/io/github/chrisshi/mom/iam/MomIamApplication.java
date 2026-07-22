@@ -6,8 +6,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 /**
  * MOM IAM 服务启动入口。
  *
- * <p>S02 只启用 PostgreSQL、Flyway、MyBatis-Plus 与持久化领域模型，不配置登录页、Authorization
- * Server 端点、JWT 签发、RBAC 运行时计算或管理 API。无数据库 Bootstrap 测试通过明确排除数据源保持轻量启动。</p>
+ * <p>S03 在 S02 PostgreSQL、Flyway、MyBatis-Plus 与领域模型之上启用 Authorization Server、OIDC、
+ * Authorization Code + PKCE、账号密码认证和四个 Public Client。S04 完整权限 Claims 与 S05 自定义
+ * Refresh Rotation、Session 撤销仍不在本 Slice 实现。</p>
  */
 @SpringBootApplication
 public class MomIamApplication {
