@@ -1,9 +1,5 @@
 package io.github.chrisshi.mom.iam.security;
 
-import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.jwk.JWKSet;
-import com.nimbusds.jose.jwk.RSAKey;
-import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserEntity;
@@ -18,12 +14,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplicat
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
-import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -32,31 +25,21 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
-import org.springframework.security.oauth2.core.OAuth2TokenType;
-import org.springframework.security.oauth2.core.oidc.OidcScopes;
-import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository;
-import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
-import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
-import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
-import org.springframework.security.oauth2.server.authorization.settings.OAuth2TokenFormat;
-import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.oauth2.server.authorization.web.OAuth2AuthorizationEndpointFilter;
-import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -68,17 +51,7 @@ import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 
 import javax.sql.DataSource;
-import java.io.IOException;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.security.KeyFactory;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
 import java.time.Clock;
-import java.time.Duration;
-import java.util.Base64;
 
 /** P1.5 S03 Authorization Server、账号认证、四 Client 与 JWK/JWT 基础配置。 */
 @Configuration(proxyBeanMethods = false)
@@ -189,38 +162,7 @@ public class IamAuthorizationServerConfiguration {
     ApplicationRunner iamRegisteredClientInitializer(
             RegisteredClientRepository repository,
             IamAuthorizationProperties properties) {
-        return arguments -> {
-            properties.validate();
-            for (IamAuthorizationProperties.ClientRegistration registration : properties.registrations()) {
-                RegisteredClient existing = repository.findByClientId(registration.clientId());
-                String id = existing == null ? registration.clientId() : existing.getId();
-                repository.save(publicClient(id, registration));
-            }
-        };
-    }
-
-    private static RegisteredClient publicClient(
-            String id, IamAuthorizationProperties.ClientRegistration registration) {
-        return RegisteredClient.withId(id)
-                .clientId(registration.clientId())
-                .clientName(registration.clientName())
-                .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
-                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .redirectUri(registration.client().getRedirectUri().toString())
-                .postLogoutRedirectUri(registration.client().getPostLogoutRedirectUri().toString())
-                .scope(OidcScopes.OPENID)
-                .scope(OidcScopes.PROFILE)
-                .clientSettings(ClientSettings.builder()
-                        .requireProofKey(true)
-                        .requireAuthorizationConsent(false)
-                        .build())
-                .tokenSettings(TokenSettings.builder()
-                        .authorizationCodeTimeToLive(Duration.ofMinutes(5))
-                        .accessTokenTimeToLive(Duration.ofMinutes(10))
-                        .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED)
-                        .idTokenSignatureAlgorithm(SignatureAlgorithm.RS256)
-                        .build())
-                .build();
+        return new IamPublicClientRegistrar(repository, properties);
     }
 
     @Bean
@@ -228,7 +170,7 @@ public class IamAuthorizationServerConfiguration {
             IamAuthorizationProperties properties,
             Environment environment) {
         properties.validate();
-        requireProductionIssuer(properties.getIssuer(), environment);
+        IamRsaKeyMaterial.requireProductionIssuer(properties.getIssuer(), environment);
         return AuthorizationServerSettings.builder()
                 .issuer(properties.getIssuer().toString())
                 .build();
@@ -238,21 +180,7 @@ public class IamAuthorizationServerConfiguration {
     JWKSource<SecurityContext> iamJwkSource(
             IamAuthorizationProperties properties,
             Environment environment) {
-        properties.validate();
-        IamAuthorizationProperties.SigningKey key = properties.getKey();
-        rejectTestKeyInProduction(key, environment);
-        RSAPrivateKey privateKey = readPrivateKey(key.getPrivateKeyLocation());
-        RSAPublicKey publicKey = readPublicKey(key.getPublicKeyLocation());
-        if (!privateKey.getModulus().equals(publicKey.getModulus())
-                || publicKey.getModulus().bitLength() < 2048) {
-            throw new IllegalStateException("IAM RSA 公私钥不匹配或长度小于 2048 位");
-        }
-        RSAKey rsaKey = new RSAKey.Builder(publicKey)
-                .privateKey(privateKey)
-                .keyID(key.getKeyId())
-                .algorithm(JWSAlgorithm.RS256)
-                .build();
-        return new ImmutableJWKSet<>(new JWKSet(rsaKey));
+        return IamRsaKeyMaterial.load(properties, environment);
     }
 
     @Bean
@@ -332,58 +260,5 @@ public class IamAuthorizationServerConfiguration {
                         .deleteCookies("MOM_IAM_SESSION"))
                 .sessionManagement(session -> session.sessionFixation(fixation -> fixation.migrateSession()));
         return http.build();
-    }
-
-    private static RSAPrivateKey readPrivateKey(Resource resource) {
-        try {
-            String pem = resource.getContentAsString(StandardCharsets.US_ASCII);
-            byte[] encoded = decodePem(pem, "PRIVATE KEY");
-            return (RSAPrivateKey) KeyFactory.getInstance("RSA")
-                    .generatePrivate(new PKCS8EncodedKeySpec(encoded));
-        }
-        catch (Exception exception) {
-            throw new IllegalStateException("IAM RSA 私钥无法读取", exception);
-        }
-    }
-
-    private static RSAPublicKey readPublicKey(Resource resource) {
-        try {
-            String pem = resource.getContentAsString(StandardCharsets.US_ASCII);
-            byte[] encoded = decodePem(pem, "PUBLIC KEY");
-            return (RSAPublicKey) KeyFactory.getInstance("RSA")
-                    .generatePublic(new X509EncodedKeySpec(encoded));
-        }
-        catch (Exception exception) {
-            throw new IllegalStateException("IAM RSA 公钥无法读取", exception);
-        }
-    }
-
-    private static byte[] decodePem(String pem, String type) {
-        String normalized = pem
-                .replace("-----BEGIN " + type + "-----", "")
-                .replace("-----END " + type + "-----", "")
-                .replaceAll("\\s", "");
-        return Base64.getDecoder().decode(normalized);
-    }
-
-    private static void rejectTestKeyInProduction(
-            IamAuthorizationProperties.SigningKey key, Environment environment) {
-        if (!environment.acceptsProfiles(Profiles.of("prod"))) {
-            return;
-        }
-        String privateDescription = key.getPrivateKeyLocation().getDescription();
-        String publicDescription = key.getPublicKeyLocation().getDescription();
-        if (key.isAllowTestKey()
-                || privateDescription.contains("/test/")
-                || publicDescription.contains("/test/")) {
-            throw new IllegalStateException("生产环境禁止使用 IAM 本地测试签名密钥");
-        }
-    }
-
-    private static void requireProductionIssuer(URI issuer, Environment environment) {
-        if (environment.acceptsProfiles(Profiles.of("prod"))
-                && !"https".equalsIgnoreCase(issuer.getScheme())) {
-            throw new IllegalStateException("生产环境 IAM issuer 必须使用 HTTPS");
-        }
     }
 }
