@@ -152,7 +152,7 @@ class MomGatewaySecurityWebFilterTest {
                 .issuedAt(now)
                 .notBefore(now)
                 .expiresAt(now.plusSeconds(600))
-                .id("jti-1")
+                .claim("jti", "jti-1")
                 .claim(MomSecurityClaims.SESSION_ID, "session-1")
                 .claim(MomSecurityClaims.CLIENT_ID, clientId)
                 .claim(MomSecurityClaims.USER_TYPE, MomSecurityClaims.USER_TYPE_INTERNAL)
