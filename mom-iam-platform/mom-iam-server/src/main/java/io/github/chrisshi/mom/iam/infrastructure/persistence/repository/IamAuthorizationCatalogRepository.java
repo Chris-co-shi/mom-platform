@@ -48,6 +48,13 @@ public class IamAuthorizationCatalogRepository {
         return clientPolicyMapper.selectList(Wrappers.emptyWrapper());
     }
 
+    /** @param clientId OAuth Client ID @return 唯一 Client Policy */
+    public Optional<IamOauthClientPolicyEntity> findClientPolicyByClientId(String clientId) {
+        return Optional.ofNullable(clientPolicyMapper.selectOne(
+                Wrappers.<IamOauthClientPolicyEntity>lambdaQuery()
+                        .eq(IamOauthClientPolicyEntity::getClientId, clientId)));
+    }
+
     /** @param roleId 角色 ID @return Permission 关系数量 */
     public long countPermissionsForRole(String roleId) {
         return rolePermissionMapper.selectCount(Wrappers.<IamRolePermissionEntity>lambdaQuery()
