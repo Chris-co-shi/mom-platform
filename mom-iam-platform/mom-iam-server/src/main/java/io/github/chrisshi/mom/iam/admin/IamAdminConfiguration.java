@@ -62,4 +62,16 @@ public class IamAdminConfiguration {
                 repository, authorization, passwordEncoder, sessions, auditEvents,
                 externalFactoryVerifier, ids, clock);
     }
+
+    @Bean
+    @ConditionalOnMissingBean
+    IamAdminController iamAdminController(IamAdminService service) {
+        return new IamAdminController(service);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    IamAdminExceptionHandler iamAdminExceptionHandler() {
+        return new IamAdminExceptionHandler();
+    }
 }
