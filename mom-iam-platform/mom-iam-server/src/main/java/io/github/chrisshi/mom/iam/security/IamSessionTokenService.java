@@ -95,8 +95,9 @@ public class IamSessionTokenService {
 
     /**
      * 使用行锁消费 ACTIVE Token 并创建唯一后继；任何 ROTATED Token 再次出现都视为重放。
+     * OAuth invalid_grant 用于向客户端表达终止状态，但不得回滚已确认的 EXPIRED/COMPROMISED 安全事实。
      */
-    @Transactional
+    @Transactional(noRollbackFor = OAuth2AuthenticationException.class)
     public Rotation rotate(String rawRefreshToken, String clientId) {
         Instant now = clock.instant();
         String digest = codec.digest(rawRefreshToken);
