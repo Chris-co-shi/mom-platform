@@ -4,10 +4,12 @@ import io.github.chrisshi.mom.iam.security.IamAccountAuthenticationService;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -17,6 +19,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 /** IAM 自有最小登录页面与首次改密页面；由 IAM Authorization AutoConfiguration 注册。 */
+@Controller
+@ConditionalOnBean(IamAccountAuthenticationService.class)
 public class IamAuthenticationPageController {
     private final IamAccountAuthenticationService accounts;
     private final SavedRequestAwareAuthenticationSuccessHandler continuation;
