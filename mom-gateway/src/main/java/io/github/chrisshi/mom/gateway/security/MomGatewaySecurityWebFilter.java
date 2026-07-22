@@ -93,7 +93,7 @@ public final class MomGatewaySecurityWebFilter implements WebFilter, Ordered {
 
     private static ServerWebExchange sanitizeIdentityHeaders(ServerWebExchange exchange) {
         ServerHttpRequest request = exchange.getRequest().mutate().headers(headers -> {
-            for (String name : new ArrayList<>(headers.keySet())) {
+            for (String name : new ArrayList<>(headers.headerNames())) {
                 if (name.toUpperCase(Locale.ROOT).startsWith("X-MOM-")) {
                     headers.remove(name);
                 }
