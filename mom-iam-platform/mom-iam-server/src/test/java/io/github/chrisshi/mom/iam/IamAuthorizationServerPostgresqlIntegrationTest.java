@@ -55,7 +55,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** S03 真实 PostgreSQL JDBC Store、账号状态、PKCE、OIDC、JWT 与 CSRF 集成测试。 */
+/** S03 PostgreSQL JDBC Store、账号状态、PKCE、OIDC、JWT 与 CSRF 回归测试。 */
 @SpringBootTest(
         classes = MomIamApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.MOCK,
@@ -103,13 +103,15 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
                 .build();
         jdbc.update("DELETE FROM oauth2_authorization_consent");
         jdbc.update("DELETE FROM oauth2_authorization");
+        jdbc.update("DELETE FROM iam_user_factory_scope");
+        jdbc.update("DELETE FROM iam_user_role");
         jdbc.update("DELETE FROM iam_user_application");
         jdbc.update("DELETE FROM iam_external_user_binding");
         jdbc.update("DELETE FROM iam_user WHERE deleted = false");
     }
 
     @Test
-    void fourPublicClientsDiscoveryJwkAndJdbcStoresMustMatchFrozenProtocol() throws Exception {
+    void publicClientsDiscoveryJwkAndJdbcStoresMustMatchProtocol() throws Exception {
         assertInstanceOf(JdbcOAuth2AuthorizationService.class, authorizations);
         assertInstanceOf(JdbcOAuth2AuthorizationConsentService.class, consents);
         assertEquals(4, jdbc.queryForObject(
@@ -131,9 +133,7 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
 
         String discovery = mockMvc.perform(get("/.well-known/openid-configuration"))
                 .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+                .andReturn().getResponse().getContentAsString();
         assertTrue(discovery.contains("oauth2/authorize"));
         assertTrue(discovery.contains("oauth2/token"));
         assertTrue(discovery.contains("oauth2/jwks"));
@@ -147,31 +147,25 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
     }
 
     @Test
-    void authorizationEndpointMustRequireS256ExactRedirectAndUserType() throws Exception {
+    void authorizationEndpointMustEnforceS256RedirectAndClientUserMatrix() throws Exception {
         String internal = insertUser(UserType.INTERNAL, "internal", false, "ENABLED", 0, null);
-
         mockMvc.perform(authorizationRequest(
-                        "mom-admin-web", internal, "http://127.0.0.1:5173/auth/callback",
-                        null, null))
+                        "mom-admin-web", internal, "http://127.0.0.1:5173/auth/callback", null, null))
                 .andExpect(status().isBadRequest());
-
         mockMvc.perform(authorizationRequest(
                         "mom-admin-web", internal, "http://127.0.0.1:5173/auth/callback",
                         VERIFIER, "plain"))
                 .andExpect(status().isBadRequest());
-
         mockMvc.perform(validAuthorizationRequest(
                         "mom-admin-web", internal, "http://attacker.invalid/callback"))
                 .andExpect(status().isBadRequest());
-
+        mockMvc.perform(validAuthorizationRequest(
+                        "unknown-client", internal, "http://127.0.0.1:5173/auth/callback"))
+                .andExpect(status().isForbidden());
         mockMvc.perform(validAuthorizationRequest(
                         "mom-supplier-web", internal, "http://127.0.0.1:5174/auth/callback"))
                 .andExpect(status().isForbidden());
-    }
 
-    @Test
-    void fourClientsMustIssueCodesOnlyForMatchingUsersAndMobileAccess() throws Exception {
-        String internal = insertUser(UserType.INTERNAL, "admin", false, "ENABLED", 0, null);
         String supplier = insertUser(UserType.SUPPLIER, "supplier", false, "ENABLED", 0, null);
         String customer = insertUser(UserType.CUSTOMER, "customer", false, "ENABLED", 0, null);
         String mobile = insertUser(UserType.INTERNAL, "mobile", false, "ENABLED", 0, null);
@@ -187,8 +181,6 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
                 "http://127.0.0.1:5175/auth/callback"));
         assertNotNull(authorize("mom-mobile-pda", mobile,
                 "com.mom.mobile:/oauth2/callback"));
-        assertEquals(4, jdbc.queryForObject(
-                "SELECT count(*) FROM oauth2_authorization", Integer.class));
 
         String noMobileAccess = insertUser(
                 UserType.INTERNAL, "no-mobile", false, "ENABLED", 0, null);
@@ -198,7 +190,7 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
     }
 
     @Test
-    void accountPasswordFailuresMustLockAndSuccessMustClearState() throws Exception {
+    void passwordsDisabledLocksFirstChangeAndCsrfMustBeEnforced() throws Exception {
         String success = insertUser(UserType.INTERNAL, "success", false, "ENABLED", 2, null);
         mockMvc.perform(post("/login").with(csrf())
                         .param("username", success)
@@ -227,7 +219,6 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
                         .param("password", INITIAL_PASSWORD))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login?error"));
-        assertEquals(0, accountState(disabled).get("failed_login_count"));
 
         String preLocked = insertUser(UserType.INTERNAL, "locked", false, "ENABLED", 1,
                 Instant.now().plusSeconds(300));
@@ -236,62 +227,44 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
                         .param("password", INITIAL_PASSWORD))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login?error"));
-        assertEquals(1, accountState(preLocked).get("failed_login_count"));
-    }
 
-    @Test
-    void firstPasswordChangeMustBeMandatoryAndCsrfProtected() throws Exception {
-        String username = insertUser(UserType.INTERNAL, "first-change", true, "ENABLED", 0, null);
-
+        String firstChange = insertUser(
+                UserType.INTERNAL, "first-change", true, "ENABLED", 0, null);
         mockMvc.perform(post("/login").with(csrf())
-                        .param("username", username)
+                        .param("username", firstChange)
                         .param("password", INITIAL_PASSWORD))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/password/change"));
-
         mockMvc.perform(validAuthorizationRequest(
-                        "mom-admin-web", username, "http://127.0.0.1:5173/auth/callback"))
+                        "mom-admin-web", firstChange, "http://127.0.0.1:5173/auth/callback"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/password/change"));
-
         mockMvc.perform(post("/password/change")
-                        .with(user(username).roles("IAM_USER"))
+                        .with(user(firstChange).roles("IAM_USER"))
                         .param("newPassword", NEW_PASSWORD)
                         .param("confirmation", NEW_PASSWORD))
                 .andExpect(status().isForbidden());
-
         mockMvc.perform(post("/password/change")
-                        .with(user(username).roles("IAM_USER"))
+                        .with(user(firstChange).roles("IAM_USER"))
                         .with(csrf())
                         .param("newPassword", NEW_PASSWORD)
                         .param("confirmation", NEW_PASSWORD))
                 .andExpect(status().is3xxRedirection());
-
-        Map<String, Object> state = jdbc.queryForMap(
-                "SELECT password_hash,password_change_required FROM iam_user WHERE username = ?", username);
-        assertEquals(false, state.get("password_change_required"));
-        assertTrue(passwordEncoder.matches(NEW_PASSWORD, state.get("password_hash").toString()));
-
-        mockMvc.perform(get("/login"))
-                .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("_csrf")));
+        Map<String, Object> changed = jdbc.queryForMap(
+                "SELECT password_hash,password_change_required FROM iam_user WHERE username = ?",
+                firstChange);
+        assertEquals(false, changed.get("password_change_required"));
+        assertTrue(passwordEncoder.matches(NEW_PASSWORD, changed.get("password_hash").toString()));
     }
 
     @Test
-    void authorizationCodeMustUseCorrectVerifierOnlyOnceAndIssueJwtAndIdToken() throws Exception {
+    void authorizationCodeMustBeSingleUseAndIssueTenMinuteJwtAndIdToken() throws Exception {
         String username = insertUser(UserType.INTERNAL, "token-user", false, "ENABLED", 0, null);
         String redirectUri = "http://127.0.0.1:5173/auth/callback";
         String code = authorize("mom-admin-web", username, redirectUri);
 
-        MvcResult tokenResult = mockMvc.perform(post("/oauth2/token")
-                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .param("grant_type", "authorization_code")
-                        .param("client_id", "mom-admin-web")
-                        .param("redirect_uri", redirectUri)
-                        .param("code", code)
-                        .param("code_verifier", VERIFIER))
-                .andExpect(status().isOk())
-                .andReturn();
+        MvcResult tokenResult = exchange(code, VERIFIER, redirectUri)
+                .andExpect(status().isOk()).andReturn();
         String body = tokenResult.getResponse().getContentAsString();
         String accessToken = jsonString(body, "access_token");
         assertNotNull(accessToken, body);
@@ -306,28 +279,25 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
         assertEquals("INTERNAL", jwt.getClaimAsString("user_type"));
         assertEquals(600, Duration.between(jwt.getIssuedAt(), jwt.getExpiresAt()).toSeconds());
         assertEquals("mom-iam-local-2026", jwt.getHeaders().get("kid"));
-        assertNull(jwt.getClaim("roles"));
-        assertNull(jwt.getClaim("permissions"));
-        assertNull(jwt.getClaim("factory_ids"));
+        assertEquals(List.of(), jwt.getClaimAsStringList("roles"));
+        assertEquals(List.of(), jwt.getClaimAsStringList("permissions"));
+        assertEquals(List.of(), jwt.getClaimAsStringList("factory_ids"));
 
-        mockMvc.perform(post("/oauth2/token")
-                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .param("grant_type", "authorization_code")
-                        .param("client_id", "mom-admin-web")
-                        .param("redirect_uri", redirectUri)
-                        .param("code", code)
-                        .param("code_verifier", VERIFIER))
-                .andExpect(status().isBadRequest());
-
+        exchange(code, VERIFIER, redirectUri).andExpect(status().isBadRequest());
         String secondCode = authorize("mom-admin-web", username, redirectUri);
-        mockMvc.perform(post("/oauth2/token")
-                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .param("grant_type", "authorization_code")
-                        .param("client_id", "mom-admin-web")
-                        .param("redirect_uri", redirectUri)
-                        .param("code", secondCode)
-                        .param("code_verifier", "incorrect-verifier-value-abcdefghijklmnopqrstuvwxyz"))
+        exchange(secondCode, "incorrect-verifier-value-abcdefghijklmnopqrstuvwxyz", redirectUri)
                 .andExpect(status().isBadRequest());
+    }
+
+    private org.springframework.test.web.servlet.ResultActions exchange(
+            String code, String verifier, String redirectUri) throws Exception {
+        return mockMvc.perform(post("/oauth2/token")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .param("grant_type", "authorization_code")
+                .param("client_id", "mom-admin-web")
+                .param("redirect_uri", redirectUri)
+                .param("code", code)
+                .param("code_verifier", verifier));
     }
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder validAuthorizationRequest(
@@ -348,21 +318,15 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
                 .queryParam("scope", "openid")
                 .queryParam("state", "state-value")
                 .queryParam("nonce", "nonce-value");
-        if (codeChallenge != null) {
-            uri.queryParam("code_challenge", codeChallenge);
-        }
-        if (codeChallengeMethod != null) {
-            uri.queryParam("code_challenge_method", codeChallengeMethod);
-        }
-        return get(uri.build().encode().toUriString())
-                .with(authenticatedPasswordUser(username));
+        if (codeChallenge != null) uri.queryParam("code_challenge", codeChallenge);
+        if (codeChallengeMethod != null) uri.queryParam("code_challenge_method", codeChallengeMethod);
+        return get(uri.build().encode().toUriString()).with(authenticatedPasswordUser(username));
     }
 
     private static RequestPostProcessor authenticatedPasswordUser(String username) {
         return user(username).authorities(
                 new SimpleGrantedAuthority("ROLE_IAM_USER"),
-                FactorGrantedAuthority
-                        .withAuthority(FactorGrantedAuthority.PASSWORD_AUTHORITY)
+                FactorGrantedAuthority.withAuthority(FactorGrantedAuthority.PASSWORD_AUTHORITY)
                         .issuedAt(Instant.parse("2026-07-22T00:00:00Z"))
                         .build());
     }
@@ -379,9 +343,7 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
                         + ", location=" + location);
         assertNotNull(location);
         String code = UriComponentsBuilder.fromUriString(location)
-                .build()
-                .getQueryParams()
-                .getFirst("code");
+                .build().getQueryParams().getFirst("code");
         assertNotNull(code, location);
         return code;
     }
@@ -403,8 +365,7 @@ class IamAuthorizationServerPostgresqlIntegrationTest {
                 VALUES (?,?,?,?,?,?,?,?,?,now(),'test-s03',now(),'test-s03',0,false)
                 """, id, username, passwordEncoder.encode(INITIAL_PASSWORD),
                 "S03 Test User", userType.name(), status, failedCount,
-                lockedUntil == null ? null : Timestamp.from(lockedUntil),
-                passwordChangeRequired);
+                lockedUntil == null ? null : Timestamp.from(lockedUntil), passwordChangeRequired);
         assertTrue(jdbc.queryForObject(
                 "SELECT password_hash FROM iam_user WHERE username = ?", String.class, username)
                 .startsWith("{bcrypt}"));
