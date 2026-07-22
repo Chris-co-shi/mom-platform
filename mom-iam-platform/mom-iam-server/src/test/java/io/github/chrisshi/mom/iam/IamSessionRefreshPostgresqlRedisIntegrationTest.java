@@ -99,7 +99,10 @@ class IamSessionRefreshPostgresqlRedisIntegrationTest {
         mockMvc = MockMvcBuilders.webAppContextSetup(applicationContext)
                 .apply(springSecurity())
                 .build();
-        redis.getConnectionFactory().getConnection().serverCommands().flushDb();
+        redis.execute(connection -> {
+            connection.serverCommands().flushDb();
+            return null;
+        });
         jdbc.update("DELETE FROM oauth2_authorization_consent");
         jdbc.update("DELETE FROM oauth2_authorization");
         jdbc.update("DELETE FROM iam_refresh_token");
@@ -142,9 +145,10 @@ class IamSessionRefreshPostgresqlRedisIntegrationTest {
                 "SELECT count(*) FROM oauth2_authorization WHERE refresh_token_value IS NOT NULL",
                 Integer.class));
 
-        TokenResponse rotated = refresh("mom-admin-web", initial.refreshToken())
+        MvcResult rotatedResult = refresh("mom-admin-web", initial.refreshToken())
                 .andExpect(status().isOk())
-                .andReturn(result -> tokenResponse(result.getResponse().getContentAsString()));
+                .andReturn();
+        TokenResponse rotated = tokenResponse(rotatedResult.getResponse().getContentAsString());
         assertNotEquals(initial.refreshToken(), rotated.refreshToken());
         Jwt rotatedJwt = jwtDecoder.decode(rotated.accessToken());
         assertEquals(sessionId, rotatedJwt.getClaimAsString("sid"));
