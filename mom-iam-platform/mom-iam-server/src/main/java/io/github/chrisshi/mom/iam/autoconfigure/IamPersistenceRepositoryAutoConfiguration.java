@@ -26,6 +26,7 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * IAM 持久化仓储条件自动配置。
@@ -40,8 +41,8 @@ public class IamPersistenceRepositoryAutoConfiguration {
 
     /** 创建用户仓储。 */
     @Bean @ConditionalOnMissingBean
-    IamUserRepository iamUserRepository(IamUserMapper mapper) {
-        return new IamUserRepository(mapper);
+    IamUserRepository iamUserRepository(IamUserMapper mapper, JdbcTemplate jdbcTemplate) {
+        return new IamUserRepository(mapper, jdbcTemplate);
     }
 
     /** 创建授权目录仓储。 */
