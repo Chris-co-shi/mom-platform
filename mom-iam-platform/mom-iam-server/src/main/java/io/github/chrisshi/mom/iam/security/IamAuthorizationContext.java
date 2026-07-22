@@ -3,6 +3,7 @@ package io.github.chrisshi.mom.iam.security;
 import io.github.chrisshi.mom.iam.domain.type.PartyType;
 import io.github.chrisshi.mom.iam.domain.type.UserType;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -34,6 +35,26 @@ public record IamAuthorizationContext(
         if ((partyType == null) != (partyId == null)) {
             throw new IllegalArgumentException("partyType 与 partyId 必须同时存在或同时为空");
         }
+    }
+
+    /**
+     * 返回防御性 ArrayList，兼容 Spring Authorization Server JDBC Store 的 Jackson 类型白名单。
+     */
+    @Override
+    public List<String> roles() {
+        return new ArrayList<>(roles);
+    }
+
+    /** 返回防御性 ArrayList，避免把 JDK 内部 ImmutableCollections 类型写入 OAuth JDBC Store。 */
+    @Override
+    public List<String> permissions() {
+        return new ArrayList<>(permissions);
+    }
+
+    /** 返回防御性 ArrayList，供 JWT Claims 和 Me API 稳定序列化。 */
+    @Override
+    public List<String> factoryIds() {
+        return new ArrayList<>(factoryIds);
     }
 
     /** @return 用户是否拥有指定业务 Permission */
