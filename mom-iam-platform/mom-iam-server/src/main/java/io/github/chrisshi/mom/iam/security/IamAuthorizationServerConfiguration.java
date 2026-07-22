@@ -432,8 +432,9 @@ public class IamAuthorizationServerConfiguration {
     @Bean
     IamMeController iamMeController(
             IamAuthorizationContextService contexts,
+            IamClientAccessPolicyService clientAccess,
             IamScopeGuard scopeGuard) {
-        return new IamMeController(contexts, scopeGuard);
+        return new IamMeController(contexts, clientAccess, scopeGuard);
     }
 
     @Bean

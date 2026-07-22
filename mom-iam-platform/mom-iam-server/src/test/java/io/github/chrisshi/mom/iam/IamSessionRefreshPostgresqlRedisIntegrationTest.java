@@ -217,6 +217,22 @@ class IamSessionRefreshPostgresqlRedisIntegrationTest {
                 """, jwt.getClaimAsString("sid"));
         assertEquals("MOBILE", session.get("channel"));
         assertDurationSeconds(session, "login_at", "absolute_expires_at", 12 * 60 * 60);
+        mockMvc.perform(get("/api/iam/me")
+                        .header("Authorization", "Bearer " + initial.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clientId").value("mom-mobile-pda"))
+                .andExpect(jsonPath("$.sid").value(jwt.getClaimAsString("sid")))
+                .andExpect(jsonPath("$.mobileAccessEnabled").value(true))
+                .andExpect(jsonPath("$.partyType").doesNotExist())
+                .andExpect(jsonPath("$.partyId").doesNotExist());
+
+        jdbc.update("""
+                UPDATE iam_user_application SET status='DISABLED',updated_at=now()
+                 WHERE user_id=? AND application_code='MOM_MOBILE_PDA'
+                """, user.id());
+        mockMvc.perform(get("/api/iam/me")
+                        .header("Authorization", "Bearer " + initial.accessToken()))
+                .andExpect(status().isForbidden());
     }
 
     private TokenResponse issueAuthorizationCodeTokens(

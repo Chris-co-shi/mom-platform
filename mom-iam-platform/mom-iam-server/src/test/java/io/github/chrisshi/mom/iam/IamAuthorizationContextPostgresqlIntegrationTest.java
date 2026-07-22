@@ -130,6 +130,8 @@ class IamAuthorizationContextPostgresqlIntegrationTest {
                 .andExpect(jsonPath("$.username").value(user.username()))
                 .andExpect(jsonPath("$.userType").value("INTERNAL"))
                 .andExpect(jsonPath("$.clientId").value("mom-admin-web"))
+                .andExpect(jsonPath("$.sid").value(jwt.getClaimAsString("sid")))
+                .andExpect(jsonPath("$.mobileAccessEnabled").value(false))
                 .andExpect(jsonPath("$.roles[0]").value("IAM_ADMIN"))
                 .andExpect(jsonPath("$.factoryIds[0]").value(allowedFactory))
                 .andExpect(jsonPath("$.currentFactoryId").value(allowedFactory));
