@@ -44,7 +44,7 @@ public class IamAuthorizationProperties {
         if (issuer == null || !issuer.isAbsolute() || issuer.getFragment() != null) {
             throw new IllegalStateException("IAM issuer 必须是无 fragment 的绝对 URI");
         }
-        if (security.maximumFailedAttempts < 1) {
+        if (security.maxFailedAttempts < 1) {
             throw new IllegalStateException("IAM 登录失败锁定阈值必须大于零");
         }
         if (security.lockDuration == null || security.lockDuration.isZero()
@@ -63,13 +63,13 @@ public class IamAuthorizationProperties {
 
     /** 账号认证安全配置。 */
     public static class AccountSecurity {
-        private int maximumFailedAttempts = 5;
+        private int maxFailedAttempts = 5;
         private Duration lockDuration = Duration.ofMinutes(15);
         private int minimumPasswordLength = 12;
 
-        public int getMaximumFailedAttempts() { return maximumFailedAttempts; }
-        public void setMaximumFailedAttempts(int maximumFailedAttempts) {
-            this.maximumFailedAttempts = maximumFailedAttempts;
+        public int getMaxFailedAttempts() { return maxFailedAttempts; }
+        public void setMaxFailedAttempts(int maxFailedAttempts) {
+            this.maxFailedAttempts = maxFailedAttempts;
         }
         public Duration getLockDuration() { return lockDuration; }
         public void setLockDuration(Duration lockDuration) { this.lockDuration = lockDuration; }
