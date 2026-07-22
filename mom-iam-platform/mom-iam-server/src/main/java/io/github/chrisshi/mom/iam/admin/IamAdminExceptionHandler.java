@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.iam.admin;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
@@ -11,6 +12,7 @@ import java.util.Map;
 
 /** S07 管理 API 稳定错误映射；不回显 SQL、凭证或内部堆栈。 */
 @RestControllerAdvice(assignableTypes = IamAdminController.class)
+@ConditionalOnBean(IamAdminService.class)
 public class IamAdminExceptionHandler {
 
     @ExceptionHandler(IamAdminExceptions.NotFound.class)
