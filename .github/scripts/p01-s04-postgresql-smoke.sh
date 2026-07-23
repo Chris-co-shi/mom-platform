@@ -72,6 +72,16 @@ for attempt in {1..60}; do
   sleep 2
 done
 
+technical_table_count=$(docker exec "$POSTGRES_CONTAINER" \
+  psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -tAc \
+  "select count(*) from information_schema.tables where table_schema = '${POSTGRES_SCHEMA}' and table_name in ('technical_data_probe', 'technical_seata_at_coordinator')")
+[[ "$technical_table_count" == "0" ]]
+
+docker exec -i "$POSTGRES_CONTAINER" \
+  psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -v ON_ERROR_STOP=1 \
+  -v schema="$POSTGRES_SCHEMA" -f - \
+  < .github/scripts/sql/mdm-phase01-technical-tables.sql
+
 create_status=$(curl --silent --output mdm-data-probe-create.json \
   --write-out '%{http_code}' \
   --request POST \

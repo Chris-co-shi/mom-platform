@@ -97,6 +97,8 @@ seata:
       table-meta-check-enable: true
 
 mom:
+  technical-probe:
+    enabled: ${MOM_TECHNICAL_PROBE_ENABLED:false}
   integration:
     message-consumer:
       enabled: ${MOM_MESSAGE_CONSUMER_ENABLED:false}

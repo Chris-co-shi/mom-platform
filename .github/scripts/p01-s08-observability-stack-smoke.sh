@@ -184,6 +184,7 @@ GATEWAY_JAR=mom-gateway/target/mom-gateway-0.1.0-SNAPSHOT-exec.jar
 
 env "${COMMON_TRACE_ENV[@]}" \
   java -jar "$MDM_JAR" \
+  --mom.technical-probe.enabled=true \
   --server.port=$MDM_PORT \
   --spring.application.name=mom-mdm-server \
   --spring.cloud.nacos.discovery.enabled=true \
@@ -196,6 +197,7 @@ MDM_PID=$!
 
 env "${COMMON_TRACE_ENV[@]}" REDIS_HOST=127.0.0.1 REDIS_PORT=6379 \
   java -jar "$INTEGRATION_JAR" \
+  --mom.technical-probe.enabled=true \
   --server.port=$INTEGRATION_PORT \
   --spring.application.name=mom-integration-server \
   --spring.cloud.nacos.discovery.enabled=true \
@@ -207,6 +209,7 @@ env "${COMMON_TRACE_ENV[@]}" REDIS_HOST=127.0.0.1 REDIS_PORT=6379 \
 INTEGRATION_PID=$!
 
 env "${COMMON_TRACE_ENV[@]}" REDIS_HOST=127.0.0.1 REDIS_PORT=6379 \
+  MOM_TECHNICAL_PROBE_ENABLED=true \
   GATEWAY_RATE_LIMIT_REPLENISH_RATE=100 \
   GATEWAY_RATE_LIMIT_BURST_CAPACITY=100 \
   GATEWAY_RATE_LIMIT_REQUESTED_TOKENS=1 \

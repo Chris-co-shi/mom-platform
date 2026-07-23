@@ -89,6 +89,8 @@ mybatis-plus:
     banner: false
 
 mom:
+  technical-probe:
+    enabled: ${MOM_TECHNICAL_PROBE_ENABLED:false}
   mdm:
     data-probe:
       enabled: ${MDM_DATA_PROBE_ENABLED:false}

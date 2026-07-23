@@ -2,7 +2,7 @@
 
 本目录是 `mom-platform` 的需求、计划、架构、安全协议和架构决策权威入口。
 
-> 文档变更使用与具体 Work/Slice 对应的任务分支。P1.5 S02 使用 `feat/p15-s02-iam-schema-domain`；历史分支不再是后续变更的唯一分支。
+> P1.5 S00～S12 已完成并合并。当前清理仍使用既有 `phase/p1.5-auth-authorization`，Phase 02 必须在清理合并后从最新 `main` 创建。
 
 ## 文档使用原则
 
@@ -17,8 +17,9 @@
 ## 当前权威阶段
 
 - Phase 01：基础技术骨架已完成。
-- P1.5：S00、S01 已合并；S02 IAM Schema 与领域模型已完成并进入 PR Review。
-- Phase 02：业务垂直切片仍为计划阶段；安全闭环完成前不得标记为可安全上线。
+- P1.5：**Completed / Merged**，S00～S12 全部完成。
+- Phase 02：**Pending / Ready after preflight cleanup**，业务垂直切片尚未开始。
+- Android Keystore、HTTPS App Link 与真机强杀恢复：Phase 02 Mobile 正式联调前置验收项。
 
 ## P1.5 认证与授权
 

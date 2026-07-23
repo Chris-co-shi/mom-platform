@@ -191,6 +191,24 @@ wait_for_http_200 \
   "http://127.0.0.1:${MDM_PORT}/actuator/health" \
   p01-s05-mdm-health.json
 
+mdm_technical_table_count=$(docker exec "$POSTGRES_CONTAINER" \
+  psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -tAc \
+  "select count(*) from information_schema.tables where table_schema = '${MDM_SCHEMA}' and table_name in ('technical_data_probe', 'technical_seata_at_coordinator')")
+integration_technical_table_count=$(docker exec "$POSTGRES_CONTAINER" \
+  psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -tAc \
+  "select count(*) from information_schema.tables where table_schema = '${INTEGRATION_SCHEMA}' and table_name in ('technical_message_receipt', 'technical_seata_at_participant')")
+[[ "$mdm_technical_table_count" == "0" ]]
+[[ "$integration_technical_table_count" == "0" ]]
+
+docker exec -i "$POSTGRES_CONTAINER" \
+  psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -v ON_ERROR_STOP=1 \
+  -v schema="$MDM_SCHEMA" -f - \
+  < .github/scripts/sql/mdm-phase01-technical-tables.sql
+docker exec -i "$POSTGRES_CONTAINER" \
+  psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -v ON_ERROR_STOP=1 \
+  -v schema="$INTEGRATION_SCHEMA" -f - \
+  < .github/scripts/sql/integration-phase01-technical-tables.sql
+
 create_outbox_event() {
   local key="$1"
   local poison="$2"
