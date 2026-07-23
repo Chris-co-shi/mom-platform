@@ -100,6 +100,7 @@ jobs:
           done
 
           java -jar mom-mdm-platform/mom-mdm-server/target/mom-mdm-server-0.1.0-SNAPSHOT-exec.jar \
+            --mom.technical-probe.enabled=true \
             --server.port=20200 \
             --spring.application.name=mom-mdm-server \
             --spring.cloud.nacos.discovery.enabled=true \
@@ -111,6 +112,7 @@ jobs:
 
           REDIS_HOST=127.0.0.1 REDIS_PORT=6379 IDEMPOTENCY_DEFAULT_TTL=30s \
           java -jar mom-integration-platform/mom-integration-server/target/mom-integration-server-0.1.0-SNAPSHOT-exec.jar \
+            --mom.technical-probe.enabled=true \
             --server.port=20800 \
             --spring.application.name=mom-integration-server \
             --spring.cloud.nacos.discovery.enabled=true \
@@ -122,6 +124,7 @@ jobs:
 
           REDIS_HOST=127.0.0.1 REDIS_PORT=6379 \
           GATEWAY_SECURITY_ENABLED=false \
+          MOM_TECHNICAL_PROBE_ENABLED=true \
           GATEWAY_RATE_LIMIT_REPLENISH_RATE=100 \
           GATEWAY_RATE_LIMIT_BURST_CAPACITY=100 \
           GATEWAY_RATE_LIMIT_REQUESTED_TOKENS=1 \
@@ -186,6 +189,7 @@ jobs:
 
           REDIS_HOST=127.0.0.1 REDIS_PORT=6379 \
           GATEWAY_SECURITY_ENABLED=false \
+          MOM_TECHNICAL_PROBE_ENABLED=true \
           GATEWAY_RATE_LIMIT_REPLENISH_RATE=1 \
           GATEWAY_RATE_LIMIT_BURST_CAPACITY=3 \
           GATEWAY_RATE_LIMIT_REQUESTED_TOKENS=3 \
@@ -200,6 +204,7 @@ jobs:
 
           REDIS_HOST=127.0.0.1 REDIS_PORT=6379 \
           GATEWAY_SECURITY_ENABLED=false \
+          MOM_TECHNICAL_PROBE_ENABLED=true \
           GATEWAY_RATE_LIMIT_REPLENISH_RATE=1 \
           GATEWAY_RATE_LIMIT_BURST_CAPACITY=3 \
           GATEWAY_RATE_LIMIT_REQUESTED_TOKENS=3 \

@@ -49,6 +49,8 @@ spring:
 
 mom:
   gateway:
+    technical-probe:
+      enabled: ${MOM_TECHNICAL_PROBE_ENABLED:false}
     security:
       enabled: ${GATEWAY_SECURITY_ENABLED:true}
       issuer-uri: ${IAM_ISSUER:http://127.0.0.1:20100}

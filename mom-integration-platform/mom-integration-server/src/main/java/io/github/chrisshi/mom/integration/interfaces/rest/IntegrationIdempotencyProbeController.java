@@ -8,6 +8,7 @@ import io.github.chrisshi.mom.idempotency.IdempotencyGuard;
 import io.github.chrisshi.mom.idempotency.IdempotencyUnavailableException;
 import io.github.chrisshi.mom.idempotency.RedisIdempotencyProperties;
 import io.github.chrisshi.mom.integration.api.probe.IdempotencyProbeResponse;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,6 +27,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/integration")
+@ConditionalOnProperty(prefix = "mom.technical-probe", name = "enabled", havingValue = "true")
 public class IntegrationIdempotencyProbeController {
 
     private static final String IDEMPOTENCY_SCOPE = "integration-probe";

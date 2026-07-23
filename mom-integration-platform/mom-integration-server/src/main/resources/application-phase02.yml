@@ -1,0 +1,17 @@
+spring:
+  config:
+    activate:
+      on-profile: phase02
+
+mom:
+  security:
+    resource-server:
+      enabled: true
+      issuer-uri: ${IAM_ISSUER}
+      jwk-set-uri: ${IAM_JWK_SET_URI}
+      accepted-audiences:
+        - mom-admin-web
+        - mom-supplier-web
+        - mom-customer-web
+        - mom-mobile-pda
+

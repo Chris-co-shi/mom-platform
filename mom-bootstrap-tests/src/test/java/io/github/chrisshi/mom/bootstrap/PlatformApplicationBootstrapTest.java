@@ -67,6 +67,9 @@ class PlatformApplicationBootstrapTest {
             assertFalse(context.containsBean("iamAdminJdbcRepository"));
             assertFalse(context.containsBean("iamAdminService"));
             assertFalse(context.containsBean("iamAdminController"));
+            assertFalse(context.containsBean("integrationMdmProbeController"));
+            assertFalse(context.containsBean("integrationIdempotencyProbeController"));
+            assertFalse(context.containsBean("mdmServiceProbeController"));
         }
     }
 }

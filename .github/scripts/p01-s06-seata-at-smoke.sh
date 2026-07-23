@@ -135,6 +135,18 @@ integration_undo_exists=$(docker exec "$INTEGRATION_DB_CONTAINER" psql -U mom -d
 [[ "$mdm_undo_exists" == "1" ]]
 [[ "$integration_undo_exists" == "1" ]]
 
+mdm_technical_table_count=$(docker exec "$MDM_DB_CONTAINER" psql -U mom -d mom_platform -Atc \
+  "select count(*) from information_schema.tables where table_schema='mom_mdm' and table_name in ('technical_data_probe', 'technical_seata_at_coordinator')")
+integration_technical_table_count=$(docker exec "$INTEGRATION_DB_CONTAINER" psql -U mom -d mom_platform -Atc \
+  "select count(*) from information_schema.tables where table_schema='mom_integration' and table_name in ('technical_message_receipt', 'technical_seata_at_participant')")
+[[ "$mdm_technical_table_count" == "0" ]]
+[[ "$integration_technical_table_count" == "0" ]]
+
+docker exec -i "$MDM_DB_CONTAINER" psql -U mom -d mom_platform -v ON_ERROR_STOP=1 \
+  -v schema=mom_mdm -f - < .github/scripts/sql/mdm-phase01-technical-tables.sql
+docker exec -i "$INTEGRATION_DB_CONTAINER" psql -U mom -d mom_platform -v ON_ERROR_STOP=1 \
+  -v schema=mom_integration -f - < .github/scripts/sql/integration-phase01-technical-tables.sql
+
 kill "$MDM_PID" "$INTEGRATION_PID"
 wait "$MDM_PID" 2>/dev/null || true
 wait "$INTEGRATION_PID" 2>/dev/null || true

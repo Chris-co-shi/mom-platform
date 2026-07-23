@@ -13,7 +13,7 @@
   <img alt="Java" src="https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white">
   <img alt="Spring Boot" src="https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white">
   <img alt="Spring Cloud" src="https://img.shields.io/badge/Spring%20Cloud-2025.1-6DB33F?logo=spring&logoColor=white">
-  <img alt="Status" src="https://img.shields.io/badge/Status-P1.5%20Security%20Baseline-2563EB">
+  <img alt="Status" src="https://img.shields.io/badge/Status-Phase%2002%20Ready-2563EB">
 </p>
 
 [文档中心](docs/README.md) · [P1.5 设计基线](docs/security/P1.5-认证与授权设计基线.md) · [P1.5 实施计划](docs/plans/P1.5-认证与授权闭环计划.md) · [V1 路线图](docs/plans/V1路线图.md) · [ADR](docs/adr/README.md)
@@ -23,7 +23,7 @@
 ---
 
 > [!IMPORTANT]
-> Phase 01 已完成 **V1 基础技术骨架**，但完整 IAM、Authorization Server、Gateway/业务服务认证授权、用户授权 Session、Web/Mobile 登录仍未实现。当前阶段为 **P1.5：认证与授权闭环，S00 设计基线**。
+> Phase 01 基础技术骨架与 P1.5 认证授权闭环均已完成并合并；S00～S12 状态统一为 **Completed / Merged**。当前仅执行 Phase 02 开工前清理，Phase 02 状态为 **Pending / Ready after preflight cleanup**。
 
 ## 🌟 项目愿景
 
@@ -130,7 +130,7 @@ flowchart LR
 | Java 运行时 | JDK 25 |
 | 应用框架 | Spring Boot 4.1.x、Spring Framework 7.x |
 | 微服务体系 | Spring Cloud 2025.1.x、Spring Cloud Alibaba 2025.1.x |
-| 身份认证 | Spring Authorization Server、OAuth 2.0/OIDC、PKCE（P1.5 实现中） |
+| 身份认证 | Spring Authorization Server、OAuth 2.0/OIDC、PKCE（P1.5 已完成） |
 | 数据存储 | PostgreSQL，按服务独立 Schema |
 | 缓存与限流 | Redis、分布式令牌桶 |
 | 消息与一致性 | RocketMQ、Outbox/Inbox、幂等、Seata |
@@ -190,7 +190,7 @@ mom-platform
 mvn -B -ntp clean verify
 ```
 
-当前命令验证构建、模块依赖、基础测试、兼容性与架构门禁；不代表 P1.5 安全 E2E 已完成。
+当前命令验证构建、模块依赖、基础测试、兼容性与架构门禁；P1.5 安全 E2E 已完成，Android Keystore、HTTPS App Link 与真机强杀恢复作为 Phase 02 Mobile 正式联调前置验收项。
 
 ## 📚 文档导航
 
@@ -210,8 +210,8 @@ mvn -B -ntp clean verify
 | 阶段 | 目标 | 状态 |
 |---|---|---|
 | Phase 01 | JDK 25 + Boot 4 基础技术骨架与观测闭环 | ✅ 基础完成 |
-| P1.5 | 认证与授权闭环 | 🚧 S00 设计基线 |
-| Phase 02 | 供应商送货、来料检验、PDA 入库、库存闭环 | ⏳ 等待安全门禁 |
+| P1.5 | 认证与授权闭环 | ✅ Completed / Merged（S00～S12） |
+| Phase 02 | 供应商送货、来料检验、PDA 入库、库存闭环 | ⏳ Pending / Ready after preflight cleanup |
 | Phase 03 | 生产工单、PCS 协同、半成品与成品批次 | ⏳ 计划中 |
 | Phase 04 | 成品放行、WCS 入库、客户发运、追溯和召回 | ⏳ 计划中 |
 
