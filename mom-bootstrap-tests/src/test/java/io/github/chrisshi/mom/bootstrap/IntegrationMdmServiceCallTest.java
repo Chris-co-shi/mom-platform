@@ -25,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Integration 通过 OpenFeign 调用真实 MDM 应用的回归测试。
  *
  * <p>该测试验证 P01-S02 的同步调用和关联标识传播，不验证分布式事务。由于 Bootstrap 测试类路径同时包含
- * MDM 与 Integration 的全部依赖，必须显式关闭 Seata，防止 GlobalTransactionScanner 在没有 TC 的既有
- * HTTP 回归中启动。Seata Feign XID 传播由独立 P01-S06 双数据库 CI 覆盖。</p>
+ * MDM 与 Integration 的全部依赖，必须显式开启技术探针并关闭 Seata，防止 GlobalTransactionScanner 在
+ * 没有 TC 的既有 HTTP 回归中启动。Seata Feign XID 传播由独立 P01-S06 双数据库 CI 覆盖。</p>
  */
 class IntegrationMdmServiceCallTest {
 
@@ -93,6 +93,7 @@ class IntegrationMdmServiceCallTest {
                 "spring.cloud.nacos.discovery.enabled=false",
                 "spring.cloud.nacos.config.enabled=false",
                 "seata.enabled=false",
+                "mom.technical-probe.enabled=true",
                 "mom.mdm.seata-at-probe.enabled=false",
                 "mom.integration.seata-at-probe.enabled=false",
                 "spring.autoconfigure.exclude=" + BOOTSTRAP_EXCLUSIONS));
