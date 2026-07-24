@@ -19,7 +19,7 @@ import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamIdent
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamRefreshTokenStateRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamRoleAssignmentRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSecurityAuditEventAppender;
-import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSessionRefreshJdbcRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSessionRefreshRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSessionStateRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserAccessRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserRepository;
@@ -28,7 +28,6 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * IAM 持久化仓储条件自动配置。
@@ -42,8 +41,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public class IamPersistenceRepositoryAutoConfiguration {
 
     @Bean @ConditionalOnMissingBean
-    IamUserRepository iamUserRepository(IamUserMapper mapper, JdbcTemplate jdbcTemplate) {
-        return new IamUserRepository(mapper, jdbcTemplate);
+    IamUserRepository iamUserRepository(IamUserMapper mapper) {
+        return new IamUserRepository(mapper);
     }
 
     @Bean @ConditionalOnMissingBean
@@ -57,13 +56,18 @@ public class IamPersistenceRepositoryAutoConfiguration {
     }
 
     @Bean @ConditionalOnMissingBean
-    IamAuthorizationContextRepository iamAuthorizationContextRepository(JdbcTemplate jdbcTemplate) {
-        return new IamAuthorizationContextRepository(jdbcTemplate);
+    IamAuthorizationContextRepository iamAuthorizationContextRepository(
+            IamUserRoleMapper userRoleMapper,
+            IamUserFactoryScopeMapper factoryScopeMapper,
+            IamExternalUserBindingMapper bindingMapper) {
+        return new IamAuthorizationContextRepository(
+                userRoleMapper, factoryScopeMapper, bindingMapper);
     }
 
     @Bean @ConditionalOnMissingBean
-    IamSessionRefreshJdbcRepository iamSessionRefreshJdbcRepository(JdbcTemplate jdbcTemplate) {
-        return new IamSessionRefreshJdbcRepository(jdbcTemplate);
+    IamSessionRefreshRepository iamSessionRefreshRepository(
+            IamUserSessionMapper sessionMapper, IamRefreshTokenMapper refreshMapper) {
+        return new IamSessionRefreshRepository(sessionMapper, refreshMapper);
     }
 
     @Bean @ConditionalOnMissingBean

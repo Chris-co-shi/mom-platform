@@ -6,7 +6,7 @@ import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserEntit
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamAuthorizationCatalogRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamAuthorizationContextRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamIdentityBindingRepository;
-import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSessionRefreshJdbcRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSessionRefreshRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserAccessRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserRepository;
 import io.github.chrisshi.mom.iam.web.IamAuthenticationPageController;
@@ -164,7 +164,7 @@ public class IamAuthorizationServerConfiguration {
     IamSessionTokenService iamSessionTokenService(
             IamAuthorizationContextService contexts,
             IamAuthorizationCatalogRepository catalog,
-            IamSessionRefreshJdbcRepository repository,
+            IamSessionRefreshRepository repository,
             IamRefreshTokenCodec codec,
             IamSecureIdGenerator ids,
             IamRevokedSessionStore revokedSessions,

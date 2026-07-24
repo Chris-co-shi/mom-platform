@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserMapper">
+
+    <sql id="adminUserColumns">
+        id, username, display_name, user_type, status, failed_login_count, locked_until,
+        password_change_required, last_login_at, version
+    </sql>
+
+    <select id="selectAdminUsers"
+            resultType="io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews$UserView">
+        SELECT <include refid="adminUserColumns"/>
+          FROM iam_user
+         WHERE deleted = false
+        <if test="userType != null and userType != ''">
+           AND user_type = #{userType}
+        </if>
+        <if test="status != null and status != ''">
+           AND status = #{status}
+        </if>
+         ORDER BY username
+         LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="selectAdminById"
+            resultType="io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews$UserView">
+        SELECT <include refid="adminUserColumns"/>
+          FROM iam_user
+         WHERE id = #{userId}
+           AND deleted = false
+    </select>
+
+    <select id="selectAdminForUpdate"
+            resultType="io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews$UserView">
+        SELECT <include refid="adminUserColumns"/>
+          FROM iam_user
+         WHERE id = #{userId}
+           AND deleted = false
+         FOR UPDATE
+    </select>
+</mapper>

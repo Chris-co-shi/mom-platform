@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamPermissionMapper">
+
+    <select id="selectAdminPermissions"
+            resultType="io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews$PermissionView">
+        SELECT id, code, name, domain_code, resource_code, action_code, risk_level, status, description
+          FROM iam_permission
+         WHERE deleted = false
+        <if test="domainCode != null and domainCode != ''">
+           AND domain_code = #{domainCode}
+        </if>
+         ORDER BY code
+         LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="selectEnabledIds" resultType="java.lang.String">
+        SELECT id
+          FROM iam_permission
+         WHERE deleted = false
+           AND status = 'ENABLED'
+           AND id IN
+        <foreach collection="permissionIds" item="permissionId" open="(" separator="," close=")">
+            #{permissionId}
+        </foreach>
+         ORDER BY id
+    </select>
+</mapper>

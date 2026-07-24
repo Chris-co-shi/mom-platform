@@ -5,7 +5,7 @@ import io.github.chrisshi.mom.iam.domain.type.RefreshTokenStatus;
 import io.github.chrisshi.mom.iam.domain.type.UserSessionStatus;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamOauthClientPolicyEntity;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamAuthorizationCatalogRepository;
-import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSessionRefreshJdbcRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSessionRefreshRepository;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
@@ -24,7 +24,7 @@ public class IamSessionTokenService {
 
     private final IamAuthorizationContextService contexts;
     private final IamAuthorizationCatalogRepository catalog;
-    private final IamSessionRefreshJdbcRepository repository;
+    private final IamSessionRefreshRepository repository;
     private final IamRefreshTokenCodec codec;
     private final IamSecureIdGenerator ids;
     private final IamRevokedSessionStore revokedSessions;
@@ -34,7 +34,7 @@ public class IamSessionTokenService {
     public IamSessionTokenService(
             IamAuthorizationContextService contexts,
             IamAuthorizationCatalogRepository catalog,
-            IamSessionRefreshJdbcRepository repository,
+            IamSessionRefreshRepository repository,
             IamRefreshTokenCodec codec,
             IamSecureIdGenerator ids,
             IamRevokedSessionStore revokedSessions,
@@ -101,9 +101,9 @@ public class IamSessionTokenService {
     public Rotation rotate(String rawRefreshToken, String clientId) {
         Instant now = clock.instant();
         String digest = codec.digest(rawRefreshToken);
-        IamSessionRefreshJdbcRepository.RefreshRow token = repository.lockRefreshByDigest(digest)
+        IamSessionRefreshRepository.RefreshRow token = repository.lockRefreshByDigest(digest)
                 .orElseThrow(IamSessionTokenService::invalidGrant);
-        IamSessionRefreshJdbcRepository.SessionRow session = repository.lockSession(token.sessionId())
+        IamSessionRefreshRepository.SessionRow session = repository.lockSession(token.sessionId())
                 .orElseThrow(IamSessionTokenService::invalidGrant);
 
         if (!session.clientId().equals(clientId)) {
@@ -159,7 +159,7 @@ public class IamSessionTokenService {
     @Transactional
     public void revoke(String sessionId, String actor, String reason) {
         Instant now = clock.instant();
-        IamSessionRefreshJdbcRepository.SessionRow session = repository.lockSession(sessionId)
+        IamSessionRefreshRepository.SessionRow session = repository.lockSession(sessionId)
                 .orElseThrow(IamSessionTokenService::invalidGrant);
         repository.revoke(sessionId, now, actor, reason);
         revokedSessions.revoke(sessionId, session.latestAccessTokenExpiresAt());

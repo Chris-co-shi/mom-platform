@@ -1,6 +1,7 @@
 package io.github.chrisshi.mom.iam.admin;
 
 import io.github.chrisshi.mom.core.context.CorrelationContext;
+import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
 import io.github.chrisshi.mom.iam.domain.model.IamDomainRules;
 import io.github.chrisshi.mom.iam.domain.type.ApplicationCode;
 import io.github.chrisshi.mom.iam.domain.type.IamRecordStatus;
@@ -12,6 +13,13 @@ import io.github.chrisshi.mom.iam.domain.type.SecurityEventCategory;
 import io.github.chrisshi.mom.iam.domain.type.UserType;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamSecurityAuditEventEntity;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSecurityAuditEventAppender;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamAuthorizationAssignmentRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamClientPolicyAdminRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamRoleAdminRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamSecurityAuditQueryRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamSessionAdminRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamUserAccessAdminRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamUserAdminRepository;
 import io.github.chrisshi.mom.iam.security.IamSecureIdGenerator;
 import io.github.chrisshi.mom.iam.security.IamSessionTokenService;
 import io.github.chrisshi.mom.security.authorization.MomAuthorizationService;
@@ -31,7 +39,7 @@ import java.util.regex.Pattern;
 /**
  * S07 IAM 管理事务服务。
  *
- * <p>该应用服务位于 REST 适配器与 JDBC/安全端口之间，统一执行 Permission、安全约束、父聚合
+ * <p>该应用服务位于 REST 适配器与 MyBatis Repository/安全端口之间，统一执行 Permission、安全约束、父聚合
  * 行锁、客户端版本校验、关系替换、版本推进、Session 撤销和追加型审计。所有关系写入均由
  * Spring 事务保证数据库内原子性；外部 Factory 校验不可用时 Fail Closed，绝不降级为放行。</p>
  */
@@ -40,7 +48,13 @@ public class IamAdminService {
     private static final Pattern MOM_ID = Pattern.compile("[1-9][0-9]{0,18}");
     private static final int MAX_PAGE_SIZE = 200;
 
-    private final IamAdminJdbcRepository repository;
+    private final IamUserAdminRepository users;
+    private final IamRoleAdminRepository roles;
+    private final IamAuthorizationAssignmentRepository assignments;
+    private final IamUserAccessAdminRepository access;
+    private final IamSessionAdminRepository sessionQueries;
+    private final IamClientPolicyAdminRepository clients;
+    private final IamSecurityAuditQueryRepository auditQueries;
     private final IamAdminReadModelRepository readModels;
     private final MomAuthorizationService authorization;
     private final PasswordEncoder passwordEncoder;
@@ -51,7 +65,13 @@ public class IamAdminService {
     private final Clock clock;
 
     public IamAdminService(
-            IamAdminJdbcRepository repository,
+            IamUserAdminRepository users,
+            IamRoleAdminRepository roles,
+            IamAuthorizationAssignmentRepository assignments,
+            IamUserAccessAdminRepository access,
+            IamSessionAdminRepository sessionQueries,
+            IamClientPolicyAdminRepository clients,
+            IamSecurityAuditQueryRepository auditQueries,
             IamAdminReadModelRepository readModels,
             MomAuthorizationService authorization,
             PasswordEncoder passwordEncoder,
@@ -60,7 +80,13 @@ public class IamAdminService {
             IamExternalFactoryScopeVerifier externalFactoryVerifier,
             IamSecureIdGenerator ids,
             Clock clock) {
-        this.repository = repository;
+        this.users = users;
+        this.roles = roles;
+        this.assignments = assignments;
+        this.access = access;
+        this.sessionQueries = sessionQueries;
+        this.clients = clients;
+        this.auditQueries = auditQueries;
         this.readModels = readModels;
         this.authorization = authorization;
         this.passwordEncoder = passwordEncoder;
@@ -71,13 +97,13 @@ public class IamAdminService {
         this.clock = clock;
     }
 
-    public List<IamAdminJdbcRepository.UserRow> listUsers(
+    public List<IamAdminViews.UserView> listUsers(
             Authentication authentication, String userType, String status, int limit, int offset) {
         authorization.requirePermission(authentication, "iam:user:read");
-        return repository.listUsers(userType, status, pageSize(limit), pageOffset(offset));
+        return users.listUsers(userType, status, pageSize(limit), pageOffset(offset));
     }
 
-    public IamAdminJdbcRepository.UserRow getUser(Authentication authentication, String userId) {
+    public IamAdminViews.UserView getUser(Authentication authentication, String userId) {
         authorization.requirePermission(authentication, "iam:user:read");
         return requireUser(userId);
     }
@@ -89,14 +115,14 @@ public class IamAdminService {
      * @param userId 用户聚合 ID
      * @return 不含凭证材料的完整用户授权快照
      */
-    public IamAdminReadModelRepository.UserAuthorizationView getUserAuthorization(
+    public IamAdminViews.UserAuthorizationView getUserAuthorization(
             Authentication authentication, String userId) {
         authorization.requirePermission(authentication, "iam:user:read");
         return readModels.userAuthorization(requireId(userId, "userId"));
     }
 
     @Transactional
-    public IamAdminJdbcRepository.UserRow createUser(
+    public IamAdminViews.UserView createUser(
             Authentication authentication, CreateUser command, RequestContext request) {
         authorization.requirePermission(authentication, "iam:user:create");
         MomJwtAuthorization actor = authorization.current(authentication);
@@ -106,14 +132,14 @@ public class IamAdminService {
         String password = requireInitialPassword(command.initialPassword());
         Instant now = clock.instant();
         String userId = ids.nextId();
-        repository.insertUser(
+        users.insertUser(
                 userId, username, passwordEncoder.encode(password), displayName, userType, actor.userId(), now);
 
         if (userType != UserType.INTERNAL) {
             PartyType partyType = Objects.requireNonNull(command.partyType(), "外部用户必须提供 partyType");
             String partyId = requireId(command.partyId(), "partyId");
             IamDomainRules.requireExternalBinding(userType, partyType);
-            repository.rebindParty(userId, partyType, partyId, actor.userId(), now, ids::nextId);
+            access.rebindParty(userId, partyType, partyId, actor.userId(), now, ids::nextId);
         }
         else if (command.partyType() != null || command.partyId() != null) {
             throw new IllegalArgumentException("INTERNAL 用户不得绑定外部 Party");
@@ -126,12 +152,12 @@ public class IamAdminService {
     }
 
     @Transactional
-    public IamAdminJdbcRepository.UserRow updateUser(
+    public IamAdminViews.UserView updateUser(
             Authentication authentication, String userId, UpdateUser command, RequestContext request) {
         authorization.requirePermission(authentication, "iam:user:update");
         MomJwtAuthorization actor = authorization.current(authentication);
-        IamAdminJdbcRepository.UserRow user = lockUser(userId);
-        repository.updateDisplayName(
+        IamAdminViews.UserView user = lockUser(userId);
+        users.updateDisplayName(
                 userId, requireText(command.displayName(), "displayName", 200),
                 requireVersion(command.version(), user.version()), actor.userId(), clock.instant());
         audit(actor, request, "iam.user.updated", SecurityEventCategory.ACCOUNT,
@@ -141,18 +167,18 @@ public class IamAdminService {
     }
 
     @Transactional
-    public IamAdminJdbcRepository.UserRow setUserStatus(
+    public IamAdminViews.UserView setUserStatus(
             Authentication authentication, String userId, StatusChange command, RequestContext request) {
         IamRecordStatus status = Objects.requireNonNull(command.status(), "status 不能为空");
         String permission = status == IamRecordStatus.ENABLED ? "iam:user:enable" : "iam:user:disable";
         authorization.requirePermission(authentication, permission);
         MomJwtAuthorization actor = authorization.current(authentication);
-        IamAdminJdbcRepository.UserRow user = lockUser(userId);
+        IamAdminViews.UserView user = lockUser(userId);
         if (status == IamRecordStatus.DISABLED) {
             requireNotSelf(actor, userId, "不能禁用当前登录账号");
             protectLastPlatformAdmin(userId);
         }
-        repository.updateUserStatus(
+        users.updateUserStatus(
                 userId, status, requireVersion(command.version(), user.version()), actor.userId(), clock.instant());
         if (status == IamRecordStatus.DISABLED) {
             revokeUserSessions(userId, actor.userId(), "user_disabled");
@@ -164,12 +190,12 @@ public class IamAdminService {
     }
 
     @Transactional
-    public IamAdminJdbcRepository.UserRow unlockUser(
+    public IamAdminViews.UserView unlockUser(
             Authentication authentication, String userId, VersionedReason command, RequestContext request) {
         authorization.requirePermission(authentication, "iam:user:unlock");
         MomJwtAuthorization actor = authorization.current(authentication);
-        IamAdminJdbcRepository.UserRow user = lockUser(userId);
-        repository.unlockUser(
+        IamAdminViews.UserView user = lockUser(userId);
+        users.unlockUser(
                 userId, requireVersion(command.version(), user.version()), actor.userId(), clock.instant());
         audit(actor, request, "iam.user.unlocked", SecurityEventCategory.ACCOUNT,
                 PermissionRiskLevel.HIGH, "USER", userId, null,
@@ -178,13 +204,13 @@ public class IamAdminService {
     }
 
     @Transactional
-    public IamAdminJdbcRepository.UserRow resetPassword(
+    public IamAdminViews.UserView resetPassword(
             Authentication authentication, String userId, PasswordReset command, RequestContext request) {
         authorization.requirePermission(authentication, "iam:user:password-reset");
         MomJwtAuthorization actor = authorization.current(authentication);
         requireNotSelf(actor, userId, "管理员重置接口不能重置当前登录账号");
-        IamAdminJdbcRepository.UserRow user = lockUser(userId);
-        repository.resetPassword(
+        IamAdminViews.UserView user = lockUser(userId);
+        users.resetPassword(
                 userId, passwordEncoder.encode(requireInitialPassword(command.temporaryPassword())),
                 requireVersion(command.version(), user.version()), actor.userId(), clock.instant());
         revokeUserSessions(userId, actor.userId(), "credential_reset");
@@ -200,10 +226,10 @@ public class IamAdminService {
         authorization.requirePermission(authentication, "iam:user:delete");
         MomJwtAuthorization actor = authorization.current(authentication);
         requireNotSelf(actor, userId, "不能删除当前登录账号");
-        IamAdminJdbcRepository.UserRow user = lockUser(userId);
+        IamAdminViews.UserView user = lockUser(userId);
         protectLastPlatformAdmin(userId);
         revokeUserSessions(userId, actor.userId(), "user_deleted");
-        repository.logicalDeleteUser(
+        users.logicalDeleteUser(
                 userId, requireVersion(command.version(), user.version()), actor.userId(), clock.instant());
         audit(actor, request, "iam.user.deleted", SecurityEventCategory.ACCOUNT,
                 PermissionRiskLevel.HIGH, "USER", userId, null,
@@ -221,31 +247,32 @@ public class IamAdminService {
      * @throws IamAdminExceptions.StaleVersion 客户端版本过期；事务无关系或成功审计副作用
      */
     @Transactional
-    public IamAdminReadModelRepository.UserAuthorizationView replaceUserRoles(
+    public IamAdminViews.UserAuthorizationView replaceUserRoles(
             Authentication authentication, String userId, RoleAssignment command, RequestContext request) {
         authorization.requirePermission(authentication, "iam:user:role-assign");
         MomJwtAuthorization actor = authorization.current(authentication);
-        IamAdminJdbcRepository.UserRow user = lockUser(userId);
+        IamAdminViews.UserView user = lockUser(userId);
         long version = requireVersion(command.version(), user.version());
         Set<String> roleIds = normalizedIds(command.roleIds(), "roleIds");
-        List<IamAdminJdbcRepository.RoleRow> roles = repository.findRoles(roleIds);
-        if (roles.size() != roleIds.size()) {
+        List<IamAdminViews.RoleView> selectedRoles = roles.findRoles(roleIds);
+        if (selectedRoles.size() != roleIds.size()) {
             throw new IamAdminExceptions.NotFound("存在无效角色");
         }
-        for (IamAdminJdbcRepository.RoleRow role : roles) {
+        for (IamAdminViews.RoleView role : selectedRoles) {
             IamDomainRules.requireRoleAssignment(user.userType(), role.applicableUserType());
             if (role.status() != IamRecordStatus.ENABLED) {
                 throw new IamAdminExceptions.Conflict("禁用角色不能分配");
             }
         }
-        boolean retainsPlatformAdmin = roles.stream().anyMatch(role -> "PLATFORM_ADMIN".equals(role.code()));
-        if (repository.userHasEffectivePlatformAdmin(userId, clock.instant())
-                && !retainsPlatformAdmin && repository.effectivePlatformAdminCount(clock.instant()) <= 1) {
+        boolean retainsPlatformAdmin = selectedRoles.stream()
+                .anyMatch(role -> "PLATFORM_ADMIN".equals(role.code()));
+        if (assignments.userHasEffectivePlatformAdmin(userId, clock.instant())
+                && !retainsPlatformAdmin && assignments.effectivePlatformAdminCount(clock.instant()) <= 1) {
             throw new IamAdminExceptions.Conflict("系统必须至少保留一个有效 PLATFORM_ADMIN");
         }
         Instant now = clock.instant();
-        repository.replaceUserRoles(userId, roleIds, actor.userId(), now, ids::nextId);
-        repository.advanceUserVersion(userId, version, actor.userId(), now);
+        assignments.replaceUserRoles(userId, roleIds, actor.userId(), now, ids::nextId);
+        assignments.advanceUserVersion(userId, version, actor.userId(), now);
         audit(actor, request, "iam.user.roles-replaced", SecurityEventCategory.AUTHORIZATION,
                 PermissionRiskLevel.HIGH, "USER", userId, null,
                 requireReason(command.reason(), "reason"), null,
@@ -264,15 +291,15 @@ public class IamAdminService {
      * @throws IamAdminExceptions.StaleVersion 客户端版本过期；事务无关系或成功审计副作用
      */
     @Transactional
-    public IamAdminReadModelRepository.UserAuthorizationView replaceFactoryScopes(
+    public IamAdminViews.UserAuthorizationView replaceFactoryScopes(
             Authentication authentication, String userId, FactoryScopeChange command, RequestContext request) {
         authorization.requirePermission(authentication, "iam:user:factory-scope-assign");
         MomJwtAuthorization actor = authorization.current(authentication);
-        IamAdminJdbcRepository.UserRow user = lockUser(userId);
+        IamAdminViews.UserView user = lockUser(userId);
         long version = requireVersion(command.version(), user.version());
         Set<String> factoryIds = normalizedIds(command.factoryIds(), "factoryIds");
         if (user.userType() != UserType.INTERNAL && !factoryIds.isEmpty()) {
-            IamAdminJdbcRepository.PartyBindingRow binding = repository.partyBinding(userId)
+            IamAdminViews.PartyBindingView binding = access.partyBinding(userId)
                     .filter(item -> item.status() == IamRecordStatus.ENABLED)
                     .orElseThrow(() -> new IamAdminExceptions.Conflict("外部用户缺少有效 Party Binding"));
             boolean allowed;
@@ -289,8 +316,8 @@ public class IamAdminService {
             }
         }
         Instant now = clock.instant();
-        repository.replaceFactoryScopes(userId, factoryIds, actor.userId(), now, ids::nextId);
-        repository.advanceUserVersion(userId, version, actor.userId(), now);
+        access.replaceFactoryScopes(userId, factoryIds, actor.userId(), now, ids::nextId);
+        assignments.advanceUserVersion(userId, version, actor.userId(), now);
         audit(actor, request, "iam.user.factory-scopes-replaced", SecurityEventCategory.AUTHORIZATION,
                 PermissionRiskLevel.HIGH, "USER", userId, null,
                 requireReason(command.reason(), "reason"), null,
@@ -309,20 +336,20 @@ public class IamAdminService {
      * @throws IamAdminExceptions.StaleVersion 客户端版本过期；不变更关系、不撤销 Session、不写成功审计
      */
     @Transactional
-    public IamAdminReadModelRepository.UserAuthorizationView setMobileAccess(
+    public IamAdminViews.UserAuthorizationView setMobileAccess(
             Authentication authentication, String userId, MobileAccessChange command, RequestContext request) {
         authorization.requirePermission(authentication, "iam:user:mobile-access-manage");
         MomJwtAuthorization actor = authorization.current(authentication);
-        IamAdminJdbcRepository.UserRow user = lockUser(userId);
+        IamAdminViews.UserView user = lockUser(userId);
         long version = requireVersion(command.version(), user.version());
         IamDomainRules.requireApplicationAccess(user.userType(), ApplicationCode.MOM_MOBILE_PDA);
         Instant now = clock.instant();
-        repository.setMobileAccess(
+        access.setMobileAccess(
                 userId, command.enabled(), actor.userId(), now, ids::nextId);
         if (!command.enabled()) {
             revokeUserSessions(userId, actor.userId(), "mobile_access_disabled");
         }
-        repository.advanceUserVersion(userId, version, actor.userId(), now);
+        assignments.advanceUserVersion(userId, version, actor.userId(), now);
         audit(actor, request, "iam.user.mobile-access-changed", SecurityEventCategory.AUTHORIZATION,
                 PermissionRiskLevel.HIGH, "USER", userId, null,
                 requireReason(command.reason(), "reason"), null,
@@ -341,19 +368,19 @@ public class IamAdminService {
      * @throws IamAdminExceptions.StaleVersion 客户端版本过期；不变更绑定、不撤销 Session、不写成功审计
      */
     @Transactional
-    public IamAdminReadModelRepository.UserAuthorizationView rebindParty(
+    public IamAdminViews.UserAuthorizationView rebindParty(
             Authentication authentication, String userId, PartyRebind command, RequestContext request) {
         authorization.requirePermission(authentication, "iam:user:party-rebind");
         MomJwtAuthorization actor = authorization.current(authentication);
-        IamAdminJdbcRepository.UserRow user = lockUser(userId);
+        IamAdminViews.UserView user = lockUser(userId);
         long version = requireVersion(command.version(), user.version());
         PartyType partyType = Objects.requireNonNull(command.partyType(), "partyType 不能为空");
         IamDomainRules.requireExternalBinding(user.userType(), partyType);
         String partyId = requireId(command.partyId(), "partyId");
         Instant now = clock.instant();
-        repository.rebindParty(userId, partyType, partyId, actor.userId(), now, ids::nextId);
+        access.rebindParty(userId, partyType, partyId, actor.userId(), now, ids::nextId);
         revokeUserSessions(userId, actor.userId(), "party_rebound");
-        repository.advanceUserVersion(userId, version, actor.userId(), now);
+        assignments.advanceUserVersion(userId, version, actor.userId(), now);
         audit(actor, request, "iam.user.party-rebound", SecurityEventCategory.AUTHORIZATION,
                 PermissionRiskLevel.HIGH, "USER", userId, null,
                 requireReason(command.reason(), "reason"), null,
@@ -361,10 +388,10 @@ public class IamAdminService {
         return readModels.userAuthorization(userId);
     }
 
-    public List<IamAdminJdbcRepository.RoleRow> listRoles(
+    public List<IamAdminViews.RoleView> listRoles(
             Authentication authentication, String userType, int limit, int offset) {
         authorization.requirePermission(authentication, "iam:role:read");
-        return repository.listRoles(userType, pageSize(limit), pageOffset(offset));
+        return roles.listRoles(userType, pageSize(limit), pageOffset(offset));
     }
 
     /**
@@ -374,14 +401,14 @@ public class IamAdminService {
      * @param roleId 角色聚合 ID
      * @return 不含凭证材料的完整角色 Permission 快照
      */
-    public IamAdminReadModelRepository.RolePermissionView getRolePermissions(
+    public IamAdminViews.RolePermissionView getRolePermissions(
             Authentication authentication, String roleId) {
         authorization.requirePermission(authentication, "iam:role:read");
         return readModels.rolePermissions(requireId(roleId, "roleId"));
     }
 
     @Transactional
-    public IamAdminJdbcRepository.RoleRow createRole(
+    public IamAdminViews.RoleView createRole(
             Authentication authentication, CreateRole command, RequestContext request) {
         authorization.requirePermission(authentication, "iam:role:create");
         MomJwtAuthorization actor = authorization.current(authentication);
@@ -390,23 +417,23 @@ public class IamAdminService {
         String name = requireText(command.name(), "name", 200);
         String description = optionalText(command.description(), 1000);
         UserType type = Objects.requireNonNull(command.applicableUserType(), "applicableUserType 不能为空");
-        repository.insertRole(roleId, code, name, type, description, actor.userId(), clock.instant());
+        roles.insertRole(roleId, code, name, type, description, actor.userId(), clock.instant());
         audit(actor, request, "iam.role.created", SecurityEventCategory.AUTHORIZATION,
                 PermissionRiskLevel.MEDIUM, "ROLE", roleId, null,
                 "role_created", null, json("code", code));
-        return repository.lockRole(roleId).orElseThrow();
+        return roles.lockRole(roleId).orElseThrow();
     }
 
     @Transactional
-    public IamAdminJdbcRepository.RoleRow updateRole(
+    public IamAdminViews.RoleView updateRole(
             Authentication authentication, String roleId, UpdateRole command, RequestContext request) {
         authorization.requirePermission(authentication, "iam:role:update");
         MomJwtAuthorization actor = authorization.current(authentication);
-        IamAdminJdbcRepository.RoleRow role = lockRole(roleId);
+        IamAdminViews.RoleView role = lockRole(roleId);
         if (role.builtIn()) {
             throw new IamAdminExceptions.Conflict("内置角色在 P1.5 管理 API 中只读");
         }
-        repository.updateRole(
+        roles.updateRole(
                 roleId, requireText(command.name(), "name", 200),
                 optionalText(command.description(), 1000),
                 Objects.requireNonNull(command.status(), "status 不能为空"),
@@ -415,7 +442,7 @@ public class IamAdminService {
                 PermissionRiskLevel.MEDIUM, "ROLE", roleId, null,
                 requireReason(command.reason(), "reason"), null,
                 json("status", command.status().name()));
-        return repository.lockRole(roleId).orElseThrow();
+        return roles.lockRole(roleId).orElseThrow();
     }
 
     /**
@@ -429,23 +456,23 @@ public class IamAdminService {
      * @throws IamAdminExceptions.StaleVersion 客户端版本过期；事务无关系或成功审计副作用
      */
     @Transactional
-    public IamAdminReadModelRepository.RolePermissionView replaceRolePermissions(
+    public IamAdminViews.RolePermissionView replaceRolePermissions(
             Authentication authentication, String roleId, PermissionAssignment command, RequestContext request) {
         authorization.requirePermission(authentication, "iam:role:permission-manage");
         MomJwtAuthorization actor = authorization.current(authentication);
-        IamAdminJdbcRepository.RoleRow role = lockRole(roleId);
+        IamAdminViews.RoleView role = lockRole(roleId);
         long version = requireVersion(command.version(), role.version());
         if (role.builtIn()) {
             throw new IamAdminExceptions.Conflict("内置角色 Permission 关系由 Flyway 管理");
         }
         Set<String> permissionIds = normalizedIds(command.permissionIds(), "permissionIds");
-        if (repository.findPermissionIds(permissionIds).size() != permissionIds.size()) {
+        if (roles.findEnabledPermissionIds(permissionIds).size() != permissionIds.size()) {
             throw new IamAdminExceptions.NotFound("存在无效或禁用 Permission");
         }
         Instant now = clock.instant();
-        repository.replaceRolePermissions(
+        assignments.replaceRolePermissions(
                 roleId, permissionIds, actor.userId(), now, ids::nextId);
-        repository.advanceRoleVersion(roleId, version, actor.userId(), now);
+        assignments.advanceRoleVersion(roleId, version, actor.userId(), now);
         audit(actor, request, "iam.role.permissions-replaced", SecurityEventCategory.AUTHORIZATION,
                 PermissionRiskLevel.HIGH, "ROLE", roleId, null,
                 requireReason(command.reason(), "reason"), null,
@@ -453,16 +480,16 @@ public class IamAdminService {
         return readModels.rolePermissions(roleId);
     }
 
-    public List<IamAdminJdbcRepository.PermissionRow> listPermissions(
+    public List<IamAdminViews.PermissionView> listPermissions(
             Authentication authentication, String domainCode, int limit, int offset) {
         authorization.requirePermission(authentication, "iam:permission:read");
-        return repository.listPermissions(domainCode, pageSize(limit), pageOffset(offset));
+        return roles.listPermissions(domainCode, pageSize(limit), pageOffset(offset));
     }
 
-    public List<IamAdminJdbcRepository.SessionRow> listSessions(
+    public List<IamAdminViews.SessionView> listSessions(
             Authentication authentication, String userId, String status, int limit, int offset) {
         authorization.requirePermission(authentication, "iam:session:read");
-        return repository.listSessions(userId, status, pageSize(limit), pageOffset(offset));
+        return sessionQueries.listSessions(userId, status, pageSize(limit), pageOffset(offset));
     }
 
     @Transactional
@@ -491,32 +518,32 @@ public class IamAdminService {
         return count;
     }
 
-    public List<IamAdminJdbcRepository.AuditRow> listAudit(
+    public List<IamAdminViews.SecurityAuditView> listAudit(
             Authentication authentication, String category, String targetId, int limit, int offset) {
         authorization.requirePermission(authentication, "iam:audit:read");
-        return repository.listAudit(category, targetId, pageSize(limit), pageOffset(offset));
+        return auditQueries.listAudit(category, targetId, pageSize(limit), pageOffset(offset));
     }
 
-    public List<IamAdminJdbcRepository.ClientRow> listClients(Authentication authentication) {
+    public List<IamAdminViews.ClientView> listClients(Authentication authentication) {
         authorization.requirePermission(authentication, "iam:client:read");
-        return repository.listClients();
+        return clients.listClients();
     }
 
     @Transactional
-    public IamAdminJdbcRepository.ClientRow setClientStatus(
+    public IamAdminViews.ClientView setClientStatus(
             Authentication authentication, String clientId, ClientStatusChange command, RequestContext request) {
         IamRecordStatus status = Objects.requireNonNull(command.status(), "status 不能为空");
         authorization.requirePermission(authentication,
                 status == IamRecordStatus.ENABLED ? "iam:client:enable" : "iam:client:disable");
         MomJwtAuthorization actor = authorization.current(authentication);
-        IamAdminJdbcRepository.ClientRow client = repository.lockClient(clientId)
+        IamAdminViews.ClientView client = clients.lockClient(clientId)
                 .orElseThrow(() -> new IamAdminExceptions.NotFound("Client Policy 不存在"));
-        repository.updateClientStatus(
+        clients.updateClientStatus(
                 clientId, status, requireVersion(command.version(), client.version()),
                 actor.userId(), clock.instant());
         int revoked = 0;
         if (status == IamRecordStatus.DISABLED) {
-            for (String sessionId : repository.activeSessionIdsForClient(clientId)) {
+            for (String sessionId : sessionQueries.activeSessionIdsForClient(clientId)) {
                 sessions.revoke(sessionId, actor.userId(), "client_disabled");
                 revoked++;
             }
@@ -525,12 +552,12 @@ public class IamAdminService {
                 PermissionRiskLevel.HIGH, "CLIENT", clientId, null,
                 requireReason(command.reason(), "reason"), null,
                 json("revokedSessions", Integer.toString(revoked)));
-        return repository.lockClient(clientId).orElseThrow();
+        return clients.lockClient(clientId).orElseThrow();
     }
 
     private int revokeUserSessions(String userId, String actor, String reason) {
         int count = 0;
-        for (String sessionId : repository.activeSessionIdsForUser(userId)) {
+        for (String sessionId : sessionQueries.activeSessionIdsForUser(userId)) {
             sessions.revoke(sessionId, actor, reason);
             count++;
         }
@@ -539,24 +566,24 @@ public class IamAdminService {
 
     private void protectLastPlatformAdmin(String userId) {
         Instant now = clock.instant();
-        if (repository.userHasEffectivePlatformAdmin(userId, now)
-                && repository.effectivePlatformAdminCount(now) <= 1) {
+        if (assignments.userHasEffectivePlatformAdmin(userId, now)
+                && assignments.effectivePlatformAdminCount(now) <= 1) {
             throw new IamAdminExceptions.Conflict("系统必须至少保留一个有效 PLATFORM_ADMIN");
         }
     }
 
-    private IamAdminJdbcRepository.UserRow requireUser(String userId) {
-        return repository.findUser(requireId(userId, "userId"))
+    private IamAdminViews.UserView requireUser(String userId) {
+        return users.findUser(requireId(userId, "userId"))
                 .orElseThrow(() -> new IamAdminExceptions.NotFound("用户不存在"));
     }
 
-    private IamAdminJdbcRepository.UserRow lockUser(String userId) {
-        return repository.lockUser(requireId(userId, "userId"))
+    private IamAdminViews.UserView lockUser(String userId) {
+        return users.lockUser(requireId(userId, "userId"))
                 .orElseThrow(() -> new IamAdminExceptions.NotFound("用户不存在"));
     }
 
-    private IamAdminJdbcRepository.RoleRow lockRole(String roleId) {
-        return repository.lockRole(requireId(roleId, "roleId"))
+    private IamAdminViews.RoleView lockRole(String roleId) {
+        return roles.lockRole(requireId(roleId, "roleId"))
                 .orElseThrow(() -> new IamAdminExceptions.NotFound("角色不存在"));
     }
 

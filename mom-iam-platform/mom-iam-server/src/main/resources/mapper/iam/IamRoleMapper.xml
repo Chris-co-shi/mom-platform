@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamRoleMapper">
+
+    <sql id="adminRoleColumns">
+        id, code, name, applicable_user_type, status, built_in, description, version
+    </sql>
+
+    <select id="selectAdminRoles"
+            resultType="io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews$RoleView">
+        SELECT <include refid="adminRoleColumns"/>
+          FROM iam_role
+         WHERE deleted = false
+        <if test="userType != null and userType != ''">
+           AND applicable_user_type = #{userType}
+        </if>
+         ORDER BY code
+         LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="selectAdminForUpdate"
+            resultType="io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews$RoleView">
+        SELECT <include refid="adminRoleColumns"/>
+          FROM iam_role
+         WHERE id = #{roleId}
+           AND deleted = false
+         FOR UPDATE
+    </select>
+
+    <select id="selectAdminByIds"
+            resultType="io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews$RoleView">
+        SELECT <include refid="adminRoleColumns"/>
+          FROM iam_role
+         WHERE deleted = false
+           AND id IN
+        <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">
+            #{roleId}
+        </foreach>
+         ORDER BY code
+    </select>
+</mapper>

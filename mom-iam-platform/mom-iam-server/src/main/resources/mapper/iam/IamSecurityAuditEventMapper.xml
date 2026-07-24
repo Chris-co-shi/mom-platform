@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamSecurityAuditEventMapper">
+
+    <select id="selectAdminAudit"
+            resultType="io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews$SecurityAuditView">
+        SELECT id, event_type, event_category, risk_level, result, actor_type,
+               actor_user_id, actor_client_id, target_type, target_id, session_id,
+               reason_code, reason_detail, change_summary::text, correlation_id, occurred_at
+          FROM iam_security_audit_event
+         WHERE 1 = 1
+        <if test="category != null and category != ''">
+           AND event_category = #{category}
+        </if>
+        <if test="targetId != null and targetId != ''">
+           AND target_id = #{targetId}
+        </if>
+         ORDER BY occurred_at DESC
+         LIMIT #{limit} OFFSET #{offset}
+    </select>
+</mapper>

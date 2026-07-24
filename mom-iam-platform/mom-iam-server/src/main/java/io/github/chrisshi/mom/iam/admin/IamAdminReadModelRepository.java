@@ -1,116 +1,93 @@
 package io.github.chrisshi.mom.iam.admin;
 
-import org.springframework.jdbc.core.JdbcTemplate;
+import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
+import io.github.chrisshi.mom.iam.domain.type.ApplicationCode;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamExternalUserBindingEntity;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamRoleEntity;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamExternalUserBindingMapper;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamRoleMapper;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamRolePermissionMapper;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserApplicationMapper;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserFactoryScopeMapper;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserMapper;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserRoleMapper;
 
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Set;
 
 /**
- * S07 管理契约加固使用的授权聚合只读仓储。
+ * IAM 管理授权聚合只读仓储。
  *
- * <p>该仓储只读取 {@code iam_user.version}、{@code iam_role.version} 及其授权关系，供管理端在提交
- * 全量替换命令前取得乐观并发版本。查询结果刻意不选择密码摘要、Token、授权码、私钥或 Session
- * 凭证；读取不加锁，也不承担写事务边界。</p>
+ * <p>该仓储组合表级 MyBatis Mapper 形成应用查询模型，不依赖 JDBC、ResultSet 或持久化实体泄漏。
+ * 查询不加锁，只为客户端返回下一次全量替换必须携带的聚合版本；密码、Token、授权码与密钥材料
+ * 不在任何 Mapper SELECT 列表中。</p>
  */
 public final class IamAdminReadModelRepository {
-    private final JdbcTemplate jdbc;
+    private final IamUserMapper userMapper;
+    private final IamRoleMapper roleMapper;
+    private final IamUserRoleMapper userRoleMapper;
+    private final IamRolePermissionMapper rolePermissionMapper;
+    private final IamUserFactoryScopeMapper factoryScopeMapper;
+    private final IamUserApplicationMapper applicationMapper;
+    private final IamExternalUserBindingMapper bindingMapper;
 
-    public IamAdminReadModelRepository(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    /** 创建授权聚合只读仓储。 */
+    public IamAdminReadModelRepository(
+            IamUserMapper userMapper,
+            IamRoleMapper roleMapper,
+            IamUserRoleMapper userRoleMapper,
+            IamRolePermissionMapper rolePermissionMapper,
+            IamUserFactoryScopeMapper factoryScopeMapper,
+            IamUserApplicationMapper applicationMapper,
+            IamExternalUserBindingMapper bindingMapper) {
+        this.userMapper = userMapper;
+        this.roleMapper = roleMapper;
+        this.userRoleMapper = userRoleMapper;
+        this.rolePermissionMapper = rolePermissionMapper;
+        this.factoryScopeMapper = factoryScopeMapper;
+        this.applicationMapper = applicationMapper;
+        this.bindingMapper = bindingMapper;
     }
 
     /**
      * 读取用户授权聚合的当前版本和全部可管理关系。
      *
-     * @param userId 用户聚合 ID
-     * @return 不含凭证材料的用户授权快照
      * @throws IamAdminExceptions.NotFound 用户不存在或已逻辑删除
      */
-    public UserAuthorizationView userAuthorization(String userId) {
-        Long userVersion = jdbc.query(
-                "SELECT version FROM iam_user WHERE id=? AND deleted=false",
-                (rs, row) -> rs.getLong("version"), userId).stream().findFirst()
+    public IamAdminViews.UserAuthorizationView userAuthorization(String userId) {
+        IamAdminViews.UserView user = java.util.Optional.ofNullable(
+                userMapper.selectAdminById(userId))
                 .orElseThrow(() -> new IamAdminExceptions.NotFound("用户不存在"));
-        Set<String> roleIds = orderedSet(jdbc.queryForList("""
-                SELECT role_id FROM iam_user_role
-                 WHERE user_id=? AND status='ENABLED'
-                 ORDER BY role_id
-                """, String.class, userId));
-        Set<String> factoryIds = orderedSet(jdbc.queryForList("""
-                SELECT factory_id FROM iam_user_factory_scope
-                 WHERE user_id=? AND status='ENABLED'
-                 ORDER BY factory_id
-                """, String.class, userId));
-        Integer mobileCount = jdbc.queryForObject("""
-                SELECT count(*) FROM iam_user_application
-                 WHERE user_id=? AND application_code='MOM_MOBILE_PDA' AND status='ENABLED'
-                   AND (valid_from IS NULL OR valid_from<=now())
-                   AND (valid_until IS NULL OR valid_until>now())
-                """, Integer.class, userId);
-        PartyBindingView partyBinding = jdbc.query("""
-                SELECT id,party_type,party_id,status,version
-                  FROM iam_external_user_binding
-                 WHERE user_id=?
-                """, (rs, row) -> new PartyBindingView(
-                rs.getString("id"), rs.getString("party_type"), rs.getString("party_id"),
-                rs.getString("status"), rs.getLong("version")), userId)
-                .stream().findFirst().orElse(null);
-        return new UserAuthorizationView(
-                userId, userVersion, roleIds, factoryIds,
-                mobileCount != null && mobileCount > 0, partyBinding);
+        IamExternalUserBindingEntity binding = bindingMapper.selectByUserId(userId);
+        IamAdminViews.PartyBindingView bindingView = binding == null ? null
+                : new IamAdminViews.PartyBindingView(
+                        binding.getId(), binding.getPartyType(), binding.getPartyId(),
+                        binding.getStatus(), binding.getVersion());
+        return new IamAdminViews.UserAuthorizationView(
+                userId,
+                user.version(),
+                orderedSet(userRoleMapper.selectRoleIds(userId)),
+                orderedSet(factoryScopeMapper.selectFactoryIds(userId)),
+                applicationMapper.countEffective(userId, ApplicationCode.MOM_MOBILE_PDA) > 0,
+                bindingView);
     }
 
     /**
      * 读取角色聚合的当前版本和有效 Permission 关系。
      *
-     * @param roleId 角色聚合 ID
-     * @return 不含凭证材料的角色 Permission 快照
      * @throws IamAdminExceptions.NotFound 角色不存在或已逻辑删除
      */
-    public RolePermissionView rolePermissions(String roleId) {
-        Long roleVersion = jdbc.query(
-                "SELECT version FROM iam_role WHERE id=? AND deleted=false",
-                (rs, row) -> rs.getLong("version"), roleId).stream().findFirst()
+    public IamAdminViews.RolePermissionView rolePermissions(String roleId) {
+        IamRoleEntity role = java.util.Optional.ofNullable(roleMapper.selectById(roleId))
                 .orElseThrow(() -> new IamAdminExceptions.NotFound("角色不存在"));
-        Set<String> permissionIds = orderedSet(jdbc.queryForList("""
-                SELECT rp.permission_id
-                  FROM iam_role_permission rp
-                  JOIN iam_permission p ON p.id=rp.permission_id
-                 WHERE rp.role_id=? AND p.deleted=false AND p.status='ENABLED'
-                 ORDER BY rp.permission_id
-                """, String.class, roleId));
-        return new RolePermissionView(roleId, roleVersion, permissionIds);
+        return new IamAdminViews.RolePermissionView(
+                roleId, role.getVersion(),
+                orderedSet(rolePermissionMapper.selectEnabledPermissionIds(roleId)));
     }
 
-    private static Set<String> orderedSet(List<String> values) {
-        return Set.copyOf(new LinkedHashSet<>(values));
+    private static Set<String> orderedSet(Iterable<String> values) {
+        LinkedHashSet<String> result = new LinkedHashSet<>();
+        values.forEach(result::add);
+        return Set.copyOf(result);
     }
-
-    /**
-     * 用户授权聚合的完整管理快照；{@code userVersion} 是后续全量替换命令唯一允许使用的并发版本。
-     */
-    public record UserAuthorizationView(
-            String userId,
-            long userVersion,
-            Set<String> roleIds,
-            Set<String> factoryIds,
-            boolean mobileAccessEnabled,
-            PartyBindingView partyBinding) { }
-
-    /** 外部用户当前 Party Binding 的非敏感投影。 */
-    public record PartyBindingView(
-            String id,
-            String partyType,
-            String partyId,
-            String status,
-            long version) { }
-
-    /**
-     * 角色 Permission 聚合的完整管理快照；{@code roleVersion} 用于保护后续全量替换命令。
-     */
-    public record RolePermissionView(
-            String roleId,
-            long roleVersion,
-            Set<String> permissionIds) { }
 }

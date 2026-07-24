@@ -1,9 +1,13 @@
 package io.github.chrisshi.mom.iam.infrastructure.persistence.mapper;
 
 import io.github.chrisshi.mom.data.mapper.MomBaseMapper;
+import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamSecurityAuditEventEntity;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 /** IAM 追加型安全审计 Mapper；应用层只暴露 append。 */
 @Mapper
@@ -29,4 +33,13 @@ public interface IamSecurityAuditEventMapper extends MomBaseMapper<IamSecurityAu
             )
             """)
     int append(IamSecurityAuditEventEntity event);
+
+    /**
+     * 查询追加型安全审计投影。
+     *
+     * @return 不包含 IP、User-Agent 或凭证材料的稳定分页结果
+     */
+    List<IamAdminViews.SecurityAuditView> selectAdminAudit(
+            @Param("category") String category, @Param("targetId") String targetId,
+            @Param("limit") int limit, @Param("offset") int offset);
 }

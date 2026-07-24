@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserSessionMapper">
+
+    <select id="selectAdminSessions"
+            resultType="io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews$SessionView">
+        SELECT id, user_id, client_id, channel, status, login_at, last_refresh_at,
+               absolute_expires_at, latest_access_token_expires_at, device_name,
+               revoked_at, revoke_reason
+          FROM iam_user_session
+         WHERE 1 = 1
+        <if test="userId != null and userId != ''">
+           AND user_id = #{userId}
+        </if>
+        <if test="status != null and status != ''">
+           AND status = #{status}
+        </if>
+         ORDER BY login_at DESC
+         LIMIT #{limit} OFFSET #{offset}
+    </select>
+</mapper>
