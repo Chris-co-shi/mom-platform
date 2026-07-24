@@ -6,7 +6,7 @@ spring:
     name: mom-gateway
   data:
     redis:
-      host: ${REDIS_HOST:127.0.0.1}
+      host: ${REDIS_HOST:100.101.189.22}
       port: ${REDIS_PORT:6379}
       database: ${REDIS_DATABASE:0}
       username: ${REDIS_USERNAME:}
@@ -17,9 +17,9 @@ spring:
     nacos:
       discovery:
         enabled: ${NACOS_DISCOVERY_ENABLED:false}
-        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        server-addr: ${NACOS_SERVER_ADDR:100.101.189.22:8848}
         username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:nacos}
+        password: ${NACOS_PASSWORD:mamnan920130.}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
