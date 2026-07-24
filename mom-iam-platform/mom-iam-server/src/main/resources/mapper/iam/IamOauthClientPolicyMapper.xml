@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamOauthClientPolicyMapper">
+
+    <sql id="adminClientColumns">
+        p.client_id, p.application_code, p.channel, p.allowed_user_type,
+        p.mobile_access_required, p.status, p.description, p.version,
+        r.client_name, r.redirect_uris, r.post_logout_redirect_uris, r.scopes
+    </sql>
+
+    <select id="selectAdminClients"
+            resultType="io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews$ClientView">
+        SELECT <include refid="adminClientColumns"/>
+          FROM iam_oauth_client_policy p
+          LEFT JOIN oauth2_registered_client r ON r.client_id = p.client_id
+         ORDER BY p.client_id
+    </select>
+
+    <select id="selectAdminForUpdate"
+            resultType="io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews$ClientView">
+        SELECT <include refid="adminClientColumns"/>
+          FROM iam_oauth_client_policy p
+          LEFT JOIN oauth2_registered_client r ON r.client_id = p.client_id
+         WHERE p.client_id = #{clientId}
+         FOR UPDATE OF p
+    </select>
+</mapper>

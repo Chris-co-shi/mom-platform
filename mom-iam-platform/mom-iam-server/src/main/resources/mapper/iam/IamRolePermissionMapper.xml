@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamRolePermissionMapper">
+
+    <select id="selectEnabledPermissionIds" resultType="java.lang.String">
+        SELECT rp.permission_id
+          FROM iam_role_permission rp
+          JOIN iam_permission p ON p.id = rp.permission_id
+         WHERE rp.role_id = #{roleId}
+           AND p.deleted = false
+           AND p.status = 'ENABLED'
+         ORDER BY rp.permission_id
+    </select>
+</mapper>

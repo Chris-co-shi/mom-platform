@@ -38,6 +38,11 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -199,6 +204,42 @@ class IamSessionRefreshPostgresqlRedisIntegrationTest {
     }
 
     @Test
+    void concurrentRefreshMustAllowExactlyOneRotation() throws Exception {
+        TestUser user = insertUser(UserType.INTERNAL, "concurrent");
+        TokenResponse initial = issueAuthorizationCodeTokens(
+                "mom-admin-web", user.username(), "http://127.0.0.1:5173/auth/callback");
+        String sessionId = jwtDecoder.decode(initial.accessToken()).getClaimAsString("sid");
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<Integer> first = executor.submit(
+                    () -> concurrentRefreshStatus(initial.refreshToken(), ready, start));
+            Future<Integer> second = executor.submit(
+                    () -> concurrentRefreshStatus(initial.refreshToken(), ready, start));
+            assertTrue(ready.await(10, TimeUnit.SECONDS), "两个刷新请求未能同时就绪");
+            start.countDown();
+
+            int firstStatus = first.get(30, TimeUnit.SECONDS);
+            int secondStatus = second.get(30, TimeUnit.SECONDS);
+            assertEquals(1, (firstStatus == 200 ? 1 : 0) + (secondStatus == 200 ? 1 : 0));
+            assertEquals(1, (firstStatus == 400 ? 1 : 0) + (secondStatus == 400 ? 1 : 0));
+        }
+        finally {
+            executor.shutdownNow();
+        }
+
+        assertEquals("COMPROMISED", jdbc.queryForObject(
+                "SELECT status FROM iam_user_session WHERE id=?", String.class, sessionId));
+        assertEquals(0, jdbc.queryForObject("""
+                SELECT count(*) FROM iam_refresh_token
+                 WHERE session_id=? AND status='ACTIVE'
+                """, Integer.class, sessionId));
+        assertTrue(revokedSessions.isRevoked(sessionId));
+    }
+
+    @Test
     void mobileSessionMustUseTwelveHourAbsoluteExpiry() throws Exception {
         TestUser user = insertUser(UserType.INTERNAL, "mobile");
         jdbc.update("""
@@ -260,6 +301,16 @@ class IamSessionRefreshPostgresqlRedisIntegrationTest {
                 .param("grant_type", "refresh_token")
                 .param("client_id", clientId)
                 .param("refresh_token", refreshToken));
+    }
+
+    private int concurrentRefreshStatus(
+            String refreshToken, CountDownLatch ready, CountDownLatch start) throws Exception {
+        ready.countDown();
+        assertTrue(start.await(10, TimeUnit.SECONDS), "刷新请求未收到并发开始信号");
+        return refresh("mom-admin-web", refreshToken)
+                .andReturn()
+                .getResponse()
+                .getStatus();
     }
 
     private String authorize(String clientId, String username, String redirectUri) throws Exception {

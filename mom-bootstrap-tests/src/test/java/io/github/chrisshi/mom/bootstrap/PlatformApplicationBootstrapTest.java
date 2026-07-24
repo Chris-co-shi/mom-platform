@@ -41,7 +41,7 @@ class PlatformApplicationBootstrapTest {
      * 使用统一离线参数启动指定应用并验证健康端点存在。
      *
      * @param applicationClass 待启动的 Spring Boot 应用入口
-     * @param explicitlyEnableIamAdmin 是否显式开启 IAM Admin；IAM 无数据库场景用于验证 JdbcTemplate 条件
+     * @param explicitlyEnableIamAdmin 是否显式开启 IAM Admin；IAM 无数据库场景用于验证 MyBatis 条件
      */
     private void assertApplicationStarts(
             Class<?> applicationClass,
@@ -64,7 +64,7 @@ class PlatformApplicationBootstrapTest {
         try (ConfigurableApplicationContext context = builder.run()) {
             assertTrue(context.isActive());
             assertNotNull(context.getBean(HealthEndpoint.class));
-            assertFalse(context.containsBean("iamAdminJdbcRepository"));
+            assertFalse(context.containsBean("iamUserAdminRepository"));
             assertFalse(context.containsBean("iamAdminService"));
             assertFalse(context.containsBean("iamAdminController"));
             assertFalse(context.containsBean("integrationMdmProbeController"));

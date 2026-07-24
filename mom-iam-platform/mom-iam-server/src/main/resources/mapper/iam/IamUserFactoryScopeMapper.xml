@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserFactoryScopeMapper">
+
+    <select id="selectEffectiveFactoryIds" resultType="java.lang.String">
+        SELECT DISTINCT factory_id
+          FROM iam_user_factory_scope
+         WHERE user_id = #{userId}
+           AND status = 'ENABLED'
+           AND (valid_from IS NULL OR valid_from &lt;= #{now})
+           AND (valid_until IS NULL OR valid_until &gt; #{now})
+         ORDER BY factory_id
+    </select>
+</mapper>

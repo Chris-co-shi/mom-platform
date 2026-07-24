@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserRoleMapper">
+
+    <select id="selectEffectiveRoleCodes" resultType="java.lang.String">
+        SELECT DISTINCT r.code
+          FROM iam_user_role ur
+          JOIN iam_role r ON r.id = ur.role_id
+         WHERE ur.user_id = #{userId}
+           AND ur.status = 'ENABLED'
+           AND (ur.valid_from IS NULL OR ur.valid_from &lt;= #{now})
+           AND (ur.valid_until IS NULL OR ur.valid_until &gt; #{now})
+           AND r.status = 'ENABLED'
+           AND r.deleted = false
+           AND r.applicable_user_type = #{userType}
+         ORDER BY r.code
+    </select>
+
+    <select id="selectEffectivePermissionCodes" resultType="java.lang.String">
+        SELECT DISTINCT p.code
+          FROM iam_user_role ur
+          JOIN iam_role r ON r.id = ur.role_id
+          JOIN iam_role_permission rp ON rp.role_id = r.id
+          JOIN iam_permission p ON p.id = rp.permission_id
+         WHERE ur.user_id = #{userId}
+           AND ur.status = 'ENABLED'
+           AND (ur.valid_from IS NULL OR ur.valid_from &lt;= #{now})
+           AND (ur.valid_until IS NULL OR ur.valid_until &gt; #{now})
+           AND r.status = 'ENABLED'
+           AND r.deleted = false
+           AND r.applicable_user_type = #{userType}
+           AND p.status = 'ENABLED'
+           AND p.deleted = false
+         ORDER BY p.code
+    </select>
+
+    <select id="existsEffectivePlatformAdmin" resultType="boolean">
+        SELECT count(*) &gt; 0
+          FROM iam_user_role ur
+          JOIN iam_role r ON r.id = ur.role_id
+          JOIN iam_user u ON u.id = ur.user_id
+         WHERE ur.user_id = #{userId}
+           AND r.code = 'PLATFORM_ADMIN'
+           AND u.deleted = false
+           AND u.status = 'ENABLED'
+           AND r.deleted = false
+           AND r.status = 'ENABLED'
+           AND ur.status = 'ENABLED'
+           AND (ur.valid_from IS NULL OR ur.valid_from &lt;= #{now})
+           AND (ur.valid_until IS NULL OR ur.valid_until &gt; #{now})
+    </select>
+
+    <select id="countEffectivePlatformAdmins" resultType="int">
+        SELECT count(DISTINCT ur.user_id)
+          FROM iam_user_role ur
+          JOIN iam_role r ON r.id = ur.role_id
+          JOIN iam_user u ON u.id = ur.user_id
+         WHERE r.code = 'PLATFORM_ADMIN'
+           AND u.deleted = false
+           AND u.status = 'ENABLED'
+           AND r.deleted = false
+           AND r.status = 'ENABLED'
+           AND ur.status = 'ENABLED'
+           AND (ur.valid_from IS NULL OR ur.valid_from &lt;= #{now})
+           AND (ur.valid_until IS NULL OR ur.valid_until &gt; #{now})
+    </select>
+</mapper>

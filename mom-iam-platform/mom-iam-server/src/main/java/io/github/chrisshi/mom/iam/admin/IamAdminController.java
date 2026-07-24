@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.iam.admin;
 
+import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.HttpStatus;
@@ -30,7 +31,7 @@ public class IamAdminController {
     }
 
     @GetMapping("/users")
-    List<IamAdminJdbcRepository.UserRow> users(
+    List<IamAdminViews.UserView> users(
             Authentication authentication,
             @RequestParam(required = false) String userType,
             @RequestParam(required = false) String status,
@@ -40,20 +41,20 @@ public class IamAdminController {
     }
 
     @GetMapping("/users/{userId}")
-    IamAdminJdbcRepository.UserRow user(
+    IamAdminViews.UserView user(
             Authentication authentication, @PathVariable String userId) {
         return service.getUser(authentication, userId);
     }
 
     @GetMapping("/users/{userId}/authorizations")
-    IamAdminReadModelRepository.UserAuthorizationView userAuthorization(
+    IamAdminViews.UserAuthorizationView userAuthorization(
             Authentication authentication, @PathVariable String userId) {
         return service.getUserAuthorization(authentication, userId);
     }
 
     @PostMapping("/users")
     @ResponseStatus(HttpStatus.CREATED)
-    IamAdminJdbcRepository.UserRow createUser(
+    IamAdminViews.UserView createUser(
             Authentication authentication,
             HttpServletRequest request,
             @RequestBody IamAdminService.CreateUser command) {
@@ -61,7 +62,7 @@ public class IamAdminController {
     }
 
     @PutMapping("/users/{userId}")
-    IamAdminJdbcRepository.UserRow updateUser(
+    IamAdminViews.UserView updateUser(
             Authentication authentication,
             HttpServletRequest request,
             @PathVariable String userId,
@@ -70,7 +71,7 @@ public class IamAdminController {
     }
 
     @PutMapping("/users/{userId}/status")
-    IamAdminJdbcRepository.UserRow setUserStatus(
+    IamAdminViews.UserView setUserStatus(
             Authentication authentication,
             HttpServletRequest request,
             @PathVariable String userId,
@@ -79,7 +80,7 @@ public class IamAdminController {
     }
 
     @PostMapping("/users/{userId}/unlock")
-    IamAdminJdbcRepository.UserRow unlockUser(
+    IamAdminViews.UserView unlockUser(
             Authentication authentication,
             HttpServletRequest request,
             @PathVariable String userId,
@@ -88,7 +89,7 @@ public class IamAdminController {
     }
 
     @PostMapping("/users/{userId}/credential-reset")
-    IamAdminJdbcRepository.UserRow resetCredential(
+    IamAdminViews.UserView resetCredential(
             Authentication authentication,
             HttpServletRequest request,
             @PathVariable String userId,
@@ -107,7 +108,7 @@ public class IamAdminController {
     }
 
     @PutMapping("/users/{userId}/roles")
-    IamAdminReadModelRepository.UserAuthorizationView replaceUserRoles(
+    IamAdminViews.UserAuthorizationView replaceUserRoles(
             Authentication authentication,
             HttpServletRequest request,
             @PathVariable String userId,
@@ -116,7 +117,7 @@ public class IamAdminController {
     }
 
     @PutMapping("/users/{userId}/factory-scopes")
-    IamAdminReadModelRepository.UserAuthorizationView replaceFactoryScopes(
+    IamAdminViews.UserAuthorizationView replaceFactoryScopes(
             Authentication authentication,
             HttpServletRequest request,
             @PathVariable String userId,
@@ -125,7 +126,7 @@ public class IamAdminController {
     }
 
     @PutMapping("/users/{userId}/mobile-access")
-    IamAdminReadModelRepository.UserAuthorizationView setMobileAccess(
+    IamAdminViews.UserAuthorizationView setMobileAccess(
             Authentication authentication,
             HttpServletRequest request,
             @PathVariable String userId,
@@ -134,7 +135,7 @@ public class IamAdminController {
     }
 
     @PutMapping("/users/{userId}/party-binding")
-    IamAdminReadModelRepository.UserAuthorizationView rebindParty(
+    IamAdminViews.UserAuthorizationView rebindParty(
             Authentication authentication,
             HttpServletRequest request,
             @PathVariable String userId,
@@ -143,7 +144,7 @@ public class IamAdminController {
     }
 
     @GetMapping("/roles")
-    List<IamAdminJdbcRepository.RoleRow> roles(
+    List<IamAdminViews.RoleView> roles(
             Authentication authentication,
             @RequestParam(required = false) String userType,
             @RequestParam(defaultValue = "50") int limit,
@@ -152,14 +153,14 @@ public class IamAdminController {
     }
 
     @GetMapping("/roles/{roleId}/permissions")
-    IamAdminReadModelRepository.RolePermissionView rolePermissions(
+    IamAdminViews.RolePermissionView rolePermissions(
             Authentication authentication, @PathVariable String roleId) {
         return service.getRolePermissions(authentication, roleId);
     }
 
     @PostMapping("/roles")
     @ResponseStatus(HttpStatus.CREATED)
-    IamAdminJdbcRepository.RoleRow createRole(
+    IamAdminViews.RoleView createRole(
             Authentication authentication,
             HttpServletRequest request,
             @RequestBody IamAdminService.CreateRole command) {
@@ -167,7 +168,7 @@ public class IamAdminController {
     }
 
     @PutMapping("/roles/{roleId}")
-    IamAdminJdbcRepository.RoleRow updateRole(
+    IamAdminViews.RoleView updateRole(
             Authentication authentication,
             HttpServletRequest request,
             @PathVariable String roleId,
@@ -176,7 +177,7 @@ public class IamAdminController {
     }
 
     @PutMapping("/roles/{roleId}/permissions")
-    IamAdminReadModelRepository.RolePermissionView replaceRolePermissions(
+    IamAdminViews.RolePermissionView replaceRolePermissions(
             Authentication authentication,
             HttpServletRequest request,
             @PathVariable String roleId,
@@ -185,7 +186,7 @@ public class IamAdminController {
     }
 
     @GetMapping("/permissions")
-    List<IamAdminJdbcRepository.PermissionRow> permissions(
+    List<IamAdminViews.PermissionView> permissions(
             Authentication authentication,
             @RequestParam(required = false) String domainCode,
             @RequestParam(defaultValue = "100") int limit,
@@ -194,7 +195,7 @@ public class IamAdminController {
     }
 
     @GetMapping("/sessions")
-    List<IamAdminJdbcRepository.SessionRow> sessions(
+    List<IamAdminViews.SessionView> sessions(
             Authentication authentication,
             @RequestParam(required = false) String userId,
             @RequestParam(required = false) String status,
@@ -224,7 +225,7 @@ public class IamAdminController {
     }
 
     @GetMapping("/security-audit")
-    List<IamAdminJdbcRepository.AuditRow> securityAudit(
+    List<IamAdminViews.SecurityAuditView> securityAudit(
             Authentication authentication,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String targetId,
@@ -234,12 +235,12 @@ public class IamAdminController {
     }
 
     @GetMapping("/oauth-clients")
-    List<IamAdminJdbcRepository.ClientRow> clients(Authentication authentication) {
+    List<IamAdminViews.ClientView> clients(Authentication authentication) {
         return service.listClients(authentication);
     }
 
     @PutMapping("/oauth-clients/{clientId}/status")
-    IamAdminJdbcRepository.ClientRow setClientStatus(
+    IamAdminViews.ClientView setClientStatus(
             Authentication authentication,
             HttpServletRequest request,
             @PathVariable String clientId,
