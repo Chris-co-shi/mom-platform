@@ -3,6 +3,7 @@ package io.github.chrisshi.mom.iam.infrastructure.persistence.mapper;
 import io.github.chrisshi.mom.data.mapper.MomBaseMapper;
 import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
 import io.github.chrisshi.mom.iam.domain.type.IamRecordStatus;
+import io.github.chrisshi.mom.iam.domain.type.UserType;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserEntity;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
