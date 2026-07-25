@@ -53,6 +53,11 @@ spring:
 
 mom:
   iam:
+    bootstrap:
+      enabled: ${IAM_BOOTSTRAP_ENABLED:false}
+      username: admin
+      password: ${IAM_BOOTSTRAP_PASSWORD:}
+      display-name: ${IAM_BOOTSTRAP_DISPLAY_NAME:Platform Administrator}
     admin:
       enabled: ${IAM_ADMIN_ENABLED:true}
     authorization:

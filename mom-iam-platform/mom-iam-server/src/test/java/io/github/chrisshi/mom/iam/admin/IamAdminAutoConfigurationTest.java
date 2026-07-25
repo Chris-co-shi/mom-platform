@@ -11,6 +11,7 @@ import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserFacto
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserRoleMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserSessionMapper;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamBuiltInAdministratorRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSecurityAuditEventAppender;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamUserAdminRepository;
 import io.github.chrisshi.mom.iam.security.IamSecureIdGenerator;
@@ -86,6 +87,8 @@ class IamAdminAutoConfigurationTest {
                         () -> mock(IamOauthClientPolicyMapper.class))
                 .withBean(IamSecurityAuditEventMapper.class,
                         () -> mock(IamSecurityAuditEventMapper.class))
+                .withBean(IamBuiltInAdministratorRepository.class,
+                        () -> mock(IamBuiltInAdministratorRepository.class))
                 .withBean(PasswordEncoder.class, () -> mock(PasswordEncoder.class))
                 .withBean(IamSessionTokenService.class, () -> mock(IamSessionTokenService.class))
                 .withBean(IamSecurityAuditEventAppender.class,

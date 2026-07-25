@@ -53,6 +53,7 @@ public final class IamUserAdminRepository {
         user.setStatus(IamRecordStatus.ENABLED);
         user.setFailedLoginCount(0);
         user.setPasswordChangeRequired(Boolean.TRUE);
+        user.setSystemAccount(Boolean.FALSE);
         user.setCreatedAt(now);
         user.setCreatedBy(actor);
         user.setUpdatedAt(now);

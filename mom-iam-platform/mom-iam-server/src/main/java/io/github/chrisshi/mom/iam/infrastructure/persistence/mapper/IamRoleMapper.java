@@ -23,6 +23,15 @@ public interface IamRoleMapper extends MomBaseMapper<IamRoleEntity> {
     /** @return 持有 {@code FOR UPDATE} 行锁的角色投影 */
     IamAdminViews.RoleView selectAdminForUpdate(@Param("roleId") String roleId);
 
+    /**
+     * 锁定唯一内置 {@code PLATFORM_ADMIN} 角色行。
+     *
+     * <p>所有可能降低有效平台管理员数量的事务必须先竞争该行锁，再重新计算人数。</p>
+     *
+     * @return 内置平台管理员角色；不存在时为 null
+     */
+    IamAdminViews.RoleView selectBuiltInPlatformAdminForUpdate();
+
     /** @return 指定 ID 集合中仍未删除的角色投影 */
     List<IamAdminViews.RoleView> selectAdminByIds(@Param("roleIds") Collection<String> roleIds);
 

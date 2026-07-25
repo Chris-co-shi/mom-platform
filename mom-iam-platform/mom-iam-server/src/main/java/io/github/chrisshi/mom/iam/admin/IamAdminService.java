@@ -12,6 +12,7 @@ import io.github.chrisshi.mom.iam.domain.type.SecurityAuditResult;
 import io.github.chrisshi.mom.iam.domain.type.SecurityEventCategory;
 import io.github.chrisshi.mom.iam.domain.type.UserType;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamSecurityAuditEventEntity;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamBuiltInAdministratorRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSecurityAuditEventAppender;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamAuthorizationAssignmentRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamClientPolicyAdminRepository;
@@ -56,6 +57,7 @@ public class IamAdminService {
     private final IamClientPolicyAdminRepository clients;
     private final IamSecurityAuditQueryRepository auditQueries;
     private final IamAdminReadModelRepository readModels;
+    private final IamBuiltInAdministratorRepository builtInAdministrators;
     private final MomAuthorizationService authorization;
     private final PasswordEncoder passwordEncoder;
     private final IamSessionTokenService sessions;
@@ -73,6 +75,7 @@ public class IamAdminService {
             IamClientPolicyAdminRepository clients,
             IamSecurityAuditQueryRepository auditQueries,
             IamAdminReadModelRepository readModels,
+            IamBuiltInAdministratorRepository builtInAdministrators,
             MomAuthorizationService authorization,
             PasswordEncoder passwordEncoder,
             IamSessionTokenService sessions,
@@ -88,6 +91,7 @@ public class IamAdminService {
         this.clients = clients;
         this.auditQueries = auditQueries;
         this.readModels = readModels;
+        this.builtInAdministrators = builtInAdministrators;
         this.authorization = authorization;
         this.passwordEncoder = passwordEncoder;
         this.sessions = sessions;
@@ -176,7 +180,7 @@ public class IamAdminService {
         IamAdminViews.UserView user = lockUser(userId);
         if (status == IamRecordStatus.DISABLED) {
             requireNotSelf(actor, userId, "不能禁用当前登录账号");
-            protectLastPlatformAdmin(userId);
+            protectPlatformAdminReduction(userId);
         }
         users.updateUserStatus(
                 userId, status, requireVersion(command.version(), user.version()), actor.userId(), clock.instant());
@@ -227,7 +231,7 @@ public class IamAdminService {
         MomJwtAuthorization actor = authorization.current(authentication);
         requireNotSelf(actor, userId, "不能删除当前登录账号");
         IamAdminViews.UserView user = lockUser(userId);
-        protectLastPlatformAdmin(userId);
+        protectPlatformAdminReduction(userId);
         revokeUserSessions(userId, actor.userId(), "user_deleted");
         users.logicalDeleteUser(
                 userId, requireVersion(command.version(), user.version()), actor.userId(), clock.instant());
@@ -266,9 +270,8 @@ public class IamAdminService {
         }
         boolean retainsPlatformAdmin = selectedRoles.stream()
                 .anyMatch(role -> "PLATFORM_ADMIN".equals(role.code()));
-        if (assignments.userHasEffectivePlatformAdmin(userId, clock.instant())
-                && !retainsPlatformAdmin && assignments.effectivePlatformAdminCount(clock.instant()) <= 1) {
-            throw new IamAdminExceptions.Conflict("系统必须至少保留一个有效 PLATFORM_ADMIN");
+        if (!retainsPlatformAdmin) {
+            protectPlatformAdminReduction(userId);
         }
         Instant now = clock.instant();
         assignments.replaceUserRoles(userId, roleIds, actor.userId(), now, ids::nextId);
@@ -564,10 +567,27 @@ public class IamAdminService {
         return count;
     }
 
-    private void protectLastPlatformAdmin(String userId) {
+    /**
+     * 串行化并校验可能降低有效平台管理员数量的操作。
+     *
+     * <p>方法先锁定唯一内置 {@code PLATFORM_ADMIN} 角色行，再在同一事务与新快照中重新判断目标是否
+     * 仍为有效管理员及总数。并发禁用、逻辑删除或角色移除必须竞争同一把锁，因此最多一个事务可把
+     * 两名管理员降为一名，后续事务会看到最新提交并 Fail Closed。</p>
+     *
+     * @param userId 可能被降权的用户 ID
+     */
+    private void protectPlatformAdminReduction(String userId) {
+        IamAdminViews.RoleView platformAdminRole = builtInAdministrators.lockPlatformAdminRole()
+                .orElseThrow(() -> new IamAdminExceptions.Conflict(
+                        "内置 PLATFORM_ADMIN 角色不存在"));
+        if (platformAdminRole.status() != IamRecordStatus.ENABLED
+                || platformAdminRole.applicableUserType() != UserType.INTERNAL) {
+            throw new IamAdminExceptions.Conflict(
+                    "内置 PLATFORM_ADMIN 角色必须保持 ENABLED 且适用于 INTERNAL");
+        }
         Instant now = clock.instant();
-        if (assignments.userHasEffectivePlatformAdmin(userId, now)
-                && assignments.effectivePlatformAdminCount(now) <= 1) {
+        if (builtInAdministrators.isEffectivePlatformAdmin(userId, now)
+                && builtInAdministrators.countEffectivePlatformAdministrators(now) <= 1) {
             throw new IamAdminExceptions.Conflict("系统必须至少保留一个有效 PLATFORM_ADMIN");
         }
     }
