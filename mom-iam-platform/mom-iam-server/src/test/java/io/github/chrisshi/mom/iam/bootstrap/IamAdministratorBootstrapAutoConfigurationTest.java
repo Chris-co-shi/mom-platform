@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.iam.bootstrap;
 
+import io.github.chrisshi.mom.core.security.AuditContextExecutor;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamRoleMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserRoleMapper;
@@ -78,6 +79,7 @@ class IamAdministratorBootstrapAutoConfigurationTest {
                 .withConfiguration(AutoConfigurations.of(
                         IamAdministratorBootstrapConfiguration.class))
                 .withBean(SqlSessionFactory.class, () -> mock(SqlSessionFactory.class))
+                .withBean(AuditContextExecutor.class, AuditContextExecutor::new)
                 .withBean(IamUserMapper.class, () -> mock(IamUserMapper.class))
                 .withBean(IamRoleMapper.class, () -> mock(IamRoleMapper.class))
                 .withBean(IamUserRoleMapper.class, () -> mock(IamUserRoleMapper.class))

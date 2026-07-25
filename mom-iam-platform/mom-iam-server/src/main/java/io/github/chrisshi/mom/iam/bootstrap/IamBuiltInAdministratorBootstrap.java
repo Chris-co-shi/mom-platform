@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.iam.bootstrap;
 
+import io.github.chrisshi.mom.core.security.AuditContextExecutor;
 import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
 import io.github.chrisshi.mom.iam.domain.type.IamRecordStatus;
 import io.github.chrisshi.mom.iam.domain.type.UserType;
@@ -27,8 +28,10 @@ public class IamBuiltInAdministratorBootstrap {
             LoggerFactory.getLogger(IamBuiltInAdministratorBootstrap.class);
     private static final String PLATFORM_ADMIN = "PLATFORM_ADMIN";
     private static final String SYSTEM_ACTOR = "IAM_BOOTSTRAP";
+    private static final String SYSTEM_AUDIT_ACTOR = "mom-iam-bootstrap";
 
     private final IamBuiltInAdministratorRepository repository;
+    private final AuditContextExecutor auditContextExecutor;
     private final IamAdministratorBootstrapProperties properties;
     private final PasswordEncoder passwordEncoder;
     private final IamSecureIdGenerator ids;
@@ -39,6 +42,7 @@ public class IamBuiltInAdministratorBootstrap {
      * 创建 Bootstrap 事务服务。
      *
      * @param repository 内置管理员精确仓储
+     * @param auditContextExecutor 显式 SYSTEM 审计上下文执行器
      * @param properties Bootstrap 配置
      * @param passwordEncoder Spring Security 密码编码器
      * @param ids 安全 ID 生成器
@@ -47,12 +51,14 @@ public class IamBuiltInAdministratorBootstrap {
      */
     public IamBuiltInAdministratorBootstrap(
             IamBuiltInAdministratorRepository repository,
+            AuditContextExecutor auditContextExecutor,
             IamAdministratorBootstrapProperties properties,
             PasswordEncoder passwordEncoder,
             IamSecureIdGenerator ids,
             Environment environment,
             Clock clock) {
         this.repository = repository;
+        this.auditContextExecutor = auditContextExecutor;
         this.properties = properties;
         this.passwordEncoder = passwordEncoder;
         this.ids = ids;
@@ -71,6 +77,11 @@ public class IamBuiltInAdministratorBootstrap {
     @Transactional
     public void initialize() {
         properties.validate(environment);
+        auditContextExecutor.runAsSystem(SYSTEM_AUDIT_ACTOR, this::initializeWithinAuditContext);
+    }
+
+    /** 在显式 SYSTEM Actor 下完成所有数据库读取和写入。 */
+    private void initializeWithinAuditContext() {
         IamAdminViews.RoleView role = repository.lockPlatformAdminRole()
                 .orElseThrow(() -> new IllegalStateException(
                         "Built-in PLATFORM_ADMIN role is required for IAM bootstrap"));

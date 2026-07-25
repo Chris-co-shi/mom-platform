@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.iam.bootstrap;
 
+import io.github.chrisshi.mom.core.security.AuditContextExecutor;
 import io.github.chrisshi.mom.iam.autoconfigure.IamPersistenceRepositoryAutoConfiguration;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamRoleMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserMapper;
@@ -51,13 +52,14 @@ public class IamAdministratorBootstrapConfiguration {
     @ConditionalOnBean({PasswordEncoder.class, IamSecureIdGenerator.class})
     IamBuiltInAdministratorBootstrap iamBuiltInAdministratorBootstrap(
             IamBuiltInAdministratorRepository repository,
+            AuditContextExecutor auditContextExecutor,
             IamAdministratorBootstrapProperties properties,
             PasswordEncoder passwordEncoder,
             IamSecureIdGenerator ids,
             Environment environment,
             Clock clock) {
         return new IamBuiltInAdministratorBootstrap(
-                repository, properties, passwordEncoder, ids, environment, clock);
+                repository, auditContextExecutor, properties, passwordEncoder, ids, environment, clock);
     }
 
     /**
