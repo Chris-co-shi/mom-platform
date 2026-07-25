@@ -3,6 +3,7 @@ package io.github.chrisshi.mom.iam.infrastructure.persistence.mapper;
 import io.github.chrisshi.mom.data.mapper.MomBaseMapper;
 import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
 import io.github.chrisshi.mom.iam.domain.type.IamRecordStatus;
+import io.github.chrisshi.mom.iam.domain.type.UserType;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserEntity;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -32,6 +33,14 @@ public interface IamUserMapper extends MomBaseMapper<IamUserEntity> {
 
     /** @return 持有 {@code FOR UPDATE} 行锁的用户管理投影，未找到时为 null */
     IamAdminViews.UserView selectAdminForUpdate(@Param("userId") String userId);
+
+    /**
+     * 按全局唯一用户名读取 Bootstrap 判定所需的非敏感身份字段。
+     *
+     * @param username 固定内置用户名
+     * @return 不包含密码摘要的账号身份，未找到时为 null
+     */
+    BootstrapIdentity selectBootstrapIdentityByUsername(@Param("username") String username);
 
     /** 按客户端版本更新展示名并推进聚合版本。 */
     @Update("""
@@ -135,4 +144,22 @@ public interface IamUserMapper extends MomBaseMapper<IamUserEntity> {
             """)
     int changePassword(@Param("username") String username, @Param("passwordHash") String passwordHash,
             @Param("now") Instant now, @Param("actor") String actor);
+
+    /**
+     * Bootstrap 幂等与冲突判定投影。
+     *
+     * <p>该投影刻意排除密码摘要，确保初始化路径不会读取、记录或返回凭证材料。</p>
+     */
+    record BootstrapIdentity(
+            String id,
+            String username,
+            UserType userType,
+            IamRecordStatus status,
+            boolean passwordChangeRequired,
+            boolean systemAccount,
+            int failedLoginCount,
+            Instant lockedUntil,
+            long version,
+            boolean deleted) {
+    }
 }

@@ -1,6 +1,7 @@
 package io.github.chrisshi.mom.iam.admin;
 
 import io.github.chrisshi.mom.iam.autoconfigure.IamPersistenceRepositoryAutoConfiguration;
+import io.github.chrisshi.mom.iam.bootstrap.IamAdministratorBootstrapConfiguration;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamExternalUserBindingMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamOauthClientPolicyMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamPermissionMapper;
@@ -12,6 +13,7 @@ import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserFacto
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserRoleMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserSessionMapper;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamBuiltInAdministratorRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSecurityAuditEventAppender;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamAuthorizationAssignmentRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamClientPolicyAdminRepository;
@@ -45,7 +47,8 @@ import java.time.Clock;
  */
 @AutoConfiguration(after = {
         IamPersistenceRepositoryAutoConfiguration.class,
-        IamAuthorizationServerConfiguration.class
+        IamAuthorizationServerConfiguration.class,
+        IamAdministratorBootstrapConfiguration.class
 })
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @ConditionalOnBean(SqlSessionFactory.class)
@@ -155,6 +158,7 @@ public class IamAdminConfiguration {
             IamClientPolicyAdminRepository clients,
             IamSecurityAuditQueryRepository auditQueries,
             IamAdminReadModelRepository readModels,
+            IamBuiltInAdministratorRepository builtInAdministrators,
             MomAuthorizationService authorization,
             PasswordEncoder passwordEncoder,
             IamSessionTokenService sessions,
@@ -164,7 +168,7 @@ public class IamAdminConfiguration {
             Clock clock) {
         return new IamAdminService(
                 users, roles, assignments, access, sessionQueries, clients, auditQueries,
-                readModels, authorization, passwordEncoder, sessions, auditEvents,
+                readModels, builtInAdministrators, authorization, passwordEncoder, sessions, auditEvents,
                 externalFactoryVerifier, ids, clock);
     }
 

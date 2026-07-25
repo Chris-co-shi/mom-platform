@@ -5,7 +5,7 @@
 
     <sql id="adminUserColumns">
         id, username, display_name, user_type, status, failed_login_count, locked_until,
-        password_change_required, last_login_at, version
+        password_change_required, system_account, last_login_at, version
     </sql>
 
     <select id="selectAdminUsers"
@@ -38,5 +38,13 @@
          WHERE id = #{userId}
            AND deleted = false
          FOR UPDATE
+    </select>
+
+    <select id="selectBootstrapIdentityByUsername"
+            resultType="io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserMapper$BootstrapIdentity">
+        SELECT id, username, user_type, status, password_change_required, system_account,
+               failed_login_count, locked_until, version, deleted
+          FROM iam_user
+         WHERE username = #{username}
     </select>
 </mapper>

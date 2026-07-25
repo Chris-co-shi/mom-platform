@@ -57,8 +57,8 @@ class IamSchemaCatalogPostgresqlIntegrationTest extends AbstractIamPostgresqlInt
         assertEquals("UTC", jdbc.queryForObject("show timezone", String.class));
         assertEquals(APPLICATION_NAME, jdbc.queryForObject(
                 "select application_name from pg_stat_activity where pid=pg_backend_pid()", String.class));
-        assertEquals(7L, jdbc.queryForObject(
-                "select count(*) from flyway_schema_history where success=true and version in ('1','2','3','4','5','6','7')",
+        assertEquals(8L, jdbc.queryForObject(
+                "select count(*) from flyway_schema_history where success=true and version in ('1','2','3','4','5','6','7','8')",
                 Long.class));
         long before = jdbc.queryForObject(
                 "select count(*) from flyway_schema_history where success=true", Long.class);
@@ -120,6 +120,10 @@ class IamSchemaCatalogPostgresqlIntegrationTest extends AbstractIamPostgresqlInt
                 SELECT character_maximum_length FROM information_schema.columns
                  WHERE table_schema=? AND table_name='iam_user' AND column_name='created_by'
                 """, Integer.class, SCHEMA));
+        assertEquals("false", jdbc.queryForObject("""
+                SELECT column_default FROM information_schema.columns
+                 WHERE table_schema=? AND table_name='iam_user' AND column_name='system_account'
+                """, String.class, SCHEMA));
         String activeIndex = jdbc.queryForObject("""
                 SELECT indexdef FROM pg_indexes
                  WHERE schemaname=? AND indexname='uk_iam_refresh_token_one_active_per_session'

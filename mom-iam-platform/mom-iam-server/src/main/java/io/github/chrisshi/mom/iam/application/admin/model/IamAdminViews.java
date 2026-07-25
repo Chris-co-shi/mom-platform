@@ -29,6 +29,7 @@ public final class IamAdminViews {
             int failedLoginCount,
             Instant lockedUntil,
             boolean passwordChangeRequired,
+            boolean systemAccount,
             Instant lastLoginAt,
             long version) {
     }

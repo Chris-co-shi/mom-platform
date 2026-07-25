@@ -35,6 +35,8 @@ public class IamUserEntity extends BaseEntity {
     @TableField("locked_until") private Instant lockedUntil;
     /** 是否要求后续认证后修改密码。 */
     @TableField("password_change_required") private Boolean passwordChangeRequired;
+    /** 是否为只能由受控 Bootstrap 插入的内置系统账号。 */
+    @TableField("system_account") private Boolean systemAccount;
     /** 最近一次成功登录 UTC 时间。 */
     @TableField("last_login_at") private Instant lastLoginAt;
 }

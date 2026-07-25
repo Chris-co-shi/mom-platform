@@ -17,6 +17,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -27,14 +28,19 @@ import org.testcontainers.utility.DockerImageName;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -191,6 +197,157 @@ class IamAdminPostgresqlRedisIntegrationTest {
     }
 
     @Test
+    @Transactional
+    void systemAccountFlagAndAllowedCredentialSessionOperationsMustRemainAvailable() throws Exception {
+        TestUser systemAdmin = insertSystemAdmin();
+        assignRole(systemAdmin.id(), "PLATFORM_ADMIN");
+        String resetSession = insertSession(systemAdmin.id(), "mom-admin-web", "WEB");
+
+        mockMvc.perform(get("/api/iam/admin/users/{id}", systemAdmin.id())
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("admin"))
+                .andExpect(jsonPath("$.systemAccount").value(true))
+                .andExpect(jsonPath("$.passwordHash").doesNotExist());
+
+        mockMvc.perform(post("/api/iam/admin/users/{id}/credential-reset", systemAdmin.id())
+                        .with(adminJwt()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "temporaryPassword":"Reset-Temporary-Secret-2026!",
+                                  "version":0,
+                                  "reason":"credential recovery"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.passwordChangeRequired").value(true))
+                .andExpect(jsonPath("$.systemAccount").value(true));
+        assertEquals("REVOKED", jdbc.queryForObject(
+                "SELECT status FROM iam_user_session WHERE id=?", String.class, resetSession));
+
+        String activeSession = insertSession(systemAdmin.id(), "mom-admin-web", "WEB");
+        mockMvc.perform(post("/api/iam/admin/users/{id}/sessions/revoke", systemAdmin.id())
+                        .with(adminJwt()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"session incident\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.revoked").value(1));
+        assertEquals("REVOKED", jdbc.queryForObject(
+                "SELECT status FROM iam_user_session WHERE id=?", String.class, activeSession));
+    }
+
+    @Test
+    @Transactional
+    void onlyEffectiveSystemAdministratorMustNotBeDisabledRoleRemovedOrLogicallyDeleted()
+            throws Exception {
+        TestUser systemAdmin = insertSystemAdmin();
+        assignRole(systemAdmin.id(), "PLATFORM_ADMIN");
+        String platformRoleId = jdbc.queryForObject(
+                "SELECT id FROM iam_role WHERE code='PLATFORM_ADMIN'", String.class);
+
+        mockMvc.perform(put("/api/iam/admin/users/{id}/status", systemAdmin.id())
+                        .with(adminJwt()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status":"DISABLED","version":0,"reason":"security maintenance"}
+                                """))
+                .andExpect(status().isConflict());
+        mockMvc.perform(put("/api/iam/admin/users/{id}/roles", systemAdmin.id())
+                        .with(adminJwt()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roleIds":[],"version":0,"reason":"role review"}
+                                """))
+                .andExpect(status().isConflict());
+        mockMvc.perform(delete("/api/iam/admin/users/{id}", systemAdmin.id())
+                        .with(adminJwt()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"version":0,"reason":"account retirement"}
+                                """))
+                .andExpect(status().isConflict());
+
+        assertEquals("ENABLED", jdbc.queryForObject(
+                "SELECT status FROM iam_user WHERE id=?", String.class, systemAdmin.id()));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT count(*) FROM iam_user_role
+                 WHERE user_id=? AND role_id=?
+                """, Integer.class, systemAdmin.id(), platformRoleId));
+        assertEquals(false, jdbc.queryForObject(
+                "SELECT deleted FROM iam_user WHERE id=?", Boolean.class, systemAdmin.id()));
+    }
+
+    @Test
+    @Transactional
+    void secondEffectiveAdministratorMustAllowSystemAdminDisableAndRoleRemoval() throws Exception {
+        TestUser systemAdmin = insertSystemAdmin();
+        TestUser secondAdmin = insertUser(UserType.INTERNAL, "second-admin");
+        assignRole(systemAdmin.id(), "PLATFORM_ADMIN");
+        assignRole(secondAdmin.id(), "PLATFORM_ADMIN");
+
+        mockMvc.perform(put("/api/iam/admin/users/{id}/status", systemAdmin.id())
+                        .with(adminJwt()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status":"DISABLED","version":0,"reason":"planned maintenance"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DISABLED"));
+        assertEquals(1, effectivePlatformAdminCount());
+
+        jdbc.update("""
+                UPDATE iam_user
+                   SET status='ENABLED',version=0,updated_at=now(),updated_by='test-s07'
+                 WHERE id=?
+                """, systemAdmin.id());
+        mockMvc.perform(put("/api/iam/admin/users/{id}/roles", systemAdmin.id())
+                        .with(adminJwt()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roleIds":[],"version":0,"reason":"role reassignment"}
+                                """))
+                .andExpect(status().isOk());
+        assertEquals(1, effectivePlatformAdminCount());
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM iam_user_role WHERE user_id=?",
+                Integer.class, systemAdmin.id()));
+    }
+
+    @Test
+    void concurrentAdministratorDisableMustLeaveExactlyOneEffectiveAdministrator() throws Exception {
+        TestUser first = insertUser(UserType.INTERNAL, "concurrent-disable-a");
+        TestUser second = insertUser(UserType.INTERNAL, "concurrent-disable-b");
+        assignRole(first.id(), "PLATFORM_ADMIN");
+        assignRole(second.id(), "PLATFORM_ADMIN");
+
+        List<Integer> statuses = runConcurrently(
+                () -> disableStatus(first.id()),
+                () -> disableStatus(second.id()));
+
+        assertEquals(1, statuses.stream().filter(status -> status == 200).count());
+        assertEquals(1, statuses.stream().filter(status -> status == 409).count());
+        assertEquals(1, effectivePlatformAdminCount());
+    }
+
+    @Test
+    void concurrentAdministratorRoleRemovalMustLeaveExactlyOneEffectiveAdministrator()
+            throws Exception {
+        TestUser first = insertUser(UserType.INTERNAL, "concurrent-role-a");
+        TestUser second = insertUser(UserType.INTERNAL, "concurrent-role-b");
+        assignRole(first.id(), "PLATFORM_ADMIN");
+        assignRole(second.id(), "PLATFORM_ADMIN");
+
+        List<Integer> statuses = runConcurrently(
+                () -> removeAllRoles(first.id()),
+                () -> removeAllRoles(second.id()));
+
+        assertEquals(1, statuses.stream().filter(status -> status == 200).count());
+        assertEquals(1, statuses.stream().filter(status -> status == 409).count());
+        assertEquals(1, effectivePlatformAdminCount());
+    }
+
+    @Test
     void crossUserTypeRoleAndExternalFactoryScopeMustBeRejected() throws Exception {
         TestUser supplier = insertUser(UserType.SUPPLIER, "supplier");
         bindParty(supplier.id(), "SUPPLIER", nextId());
@@ -338,6 +495,19 @@ class IamAdminPostgresqlRedisIntegrationTest {
         return new TestUser(id, username);
     }
 
+    private TestUser insertSystemAdmin() {
+        String id = nextId();
+        jdbc.update("""
+                INSERT INTO iam_user (
+                    id,username,password_hash,display_name,user_type,status,
+                    failed_login_count,password_change_required,system_account,
+                    created_at,created_by,updated_at,updated_by,version,deleted)
+                VALUES (?,'admin',?,'Platform Administrator','INTERNAL','ENABLED',0,true,true,
+                    now(),'test-s07',now(),'test-s07',0,false)
+                """, id, passwordEncoder.encode(INITIAL_CREDENTIAL));
+        return new TestUser(id, "admin");
+    }
+
     private void assignRole(String userId, String roleCode) {
         String roleId = jdbc.queryForObject(
                 "SELECT id FROM iam_role WHERE code=?", String.class, roleCode);
@@ -388,6 +558,72 @@ class IamAdminPostgresqlRedisIntegrationTest {
 
     private static String nextId() {
         return Long.toString(IDS.incrementAndGet());
+    }
+
+    private int disableStatus(String userId) throws Exception {
+        return mockMvc.perform(put("/api/iam/admin/users/{id}/status", userId)
+                        .with(adminJwt()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status":"DISABLED","version":0,"reason":"concurrent review"}
+                                """))
+                .andReturn().getResponse().getStatus();
+    }
+
+    private int removeAllRoles(String userId) throws Exception {
+        return mockMvc.perform(put("/api/iam/admin/users/{id}/roles", userId)
+                        .with(adminJwt()).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roleIds":[],"version":0,"reason":"concurrent review"}
+                                """))
+                .andReturn().getResponse().getStatus();
+    }
+
+    private List<Integer> runConcurrently(
+            java.util.concurrent.Callable<Integer> firstOperation,
+            java.util.concurrent.Callable<Integer> secondOperation) throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<Integer> first = executor.submit(
+                    () -> awaitAndRun(ready, start, firstOperation));
+            Future<Integer> second = executor.submit(
+                    () -> awaitAndRun(ready, start, secondOperation));
+            assertTrue(ready.await(10, TimeUnit.SECONDS), "两个管理员操作未能同时就绪");
+            start.countDown();
+            return List.of(
+                    first.get(30, TimeUnit.SECONDS),
+                    second.get(30, TimeUnit.SECONDS));
+        }
+        finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private static int awaitAndRun(
+            CountDownLatch ready,
+            CountDownLatch start,
+            java.util.concurrent.Callable<Integer> operation) throws Exception {
+        ready.countDown();
+        assertTrue(start.await(10, TimeUnit.SECONDS), "管理员操作未收到并发开始信号");
+        return operation.call();
+    }
+
+    private int effectivePlatformAdminCount() {
+        return jdbc.queryForObject("""
+                SELECT count(DISTINCT ur.user_id)
+                  FROM iam_user_role ur
+                  JOIN iam_role r ON r.id=ur.role_id
+                  JOIN iam_user u ON u.id=ur.user_id
+                 WHERE r.code='PLATFORM_ADMIN'
+                   AND r.status='ENABLED' AND r.deleted=false
+                   AND u.status='ENABLED' AND u.deleted=false
+                   AND ur.status='ENABLED'
+                   AND (ur.valid_from IS NULL OR ur.valid_from<=now())
+                   AND (ur.valid_until IS NULL OR ur.valid_until>now())
+                """, Integer.class);
     }
 
     private record TestUser(String id, String username) { }
