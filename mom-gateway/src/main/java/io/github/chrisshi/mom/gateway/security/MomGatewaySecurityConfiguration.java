@@ -27,6 +27,12 @@ import org.springframework.security.web.server.context.NoOpServerSecurityContext
         matchIfMissing = true)
 public class MomGatewaySecurityConfiguration {
 
+    private static final String[] PUBLIC_FIRST_PARTY_AUTH_ENDPOINTS = {
+            "/api/iam/auth/login",
+            "/api/iam/auth/password/change-required",
+            "/api/iam/auth/refresh"
+    };
+
     @Bean
     ReactiveJwtDecoder momGatewayJwtDecoder(MomGatewaySecurityProperties properties) {
         properties.validate();
@@ -54,6 +60,8 @@ public class MomGatewaySecurityConfiguration {
                 .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
                 .authorizeExchange(authorize -> authorize
                         .pathMatchers("/actuator/health/**", "/actuator/info", "/error").permitAll()
+                        // 只公开第一方登录、首次改密与 Refresh；Logout、/me 和管理 API 仍要求 Bearer。
+                        .pathMatchers(PUBLIC_FIRST_PARTY_AUTH_ENDPOINTS).permitAll()
                         .pathMatchers("/api/**").authenticated()
                         .anyExchange().permitAll())
                 .oauth2ResourceServer(resourceServer -> resourceServer.jwt(jwt -> jwt
