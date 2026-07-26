@@ -65,11 +65,11 @@
       <scope>provided</scope>
     </dependency>
     <!-- Spring Framework 7 TestContext 直接使用 Commons Logging API；版本由 Spring Boot 4.1 BOM 统一管理。 -->
-<!--    <dependency>-->
-<!--      <groupId>commons-logging</groupId>-->
-<!--      <artifactId>commons-logging</artifactId>-->
-<!--      <scope>test</scope>-->
-<!--    </dependency>-->
+    <dependency>
+      <groupId>commons-logging</groupId>
+      <artifactId>commons-logging</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.springframework.security</groupId>
       <artifactId>spring-security-test</artifactId>
