@@ -4,6 +4,8 @@ import io.github.chrisshi.mom.iam.security.IamAccountAuthenticationService;
 import io.github.chrisshi.mom.iam.security.IamClientAccessPolicyService;
 import io.github.chrisshi.mom.iam.security.IamSessionJwtIssuer;
 import io.github.chrisshi.mom.iam.security.IamSessionTokenService;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -33,6 +35,12 @@ import java.util.Set;
  */
 @RestController
 @RequestMapping("/api/iam/auth")
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+@ConditionalOnBean({
+        IamAccountAuthenticationService.class,
+        IamSessionTokenService.class,
+        IamSessionJwtIssuer.class
+})
 public final class IamDirectAuthenticationController {
     private static final Set<String> FIRST_PARTY_SCOPES = Set.of("openid", "profile");
 
