@@ -10,7 +10,7 @@ spring:
       port: ${REDIS_PORT:6379}
       database: ${REDIS_DATABASE:0}
       username: ${REDIS_USERNAME:}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:redis123}
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
       timeout: ${REDIS_TIMEOUT:2s}
   cloud:
@@ -87,7 +87,7 @@ management:
     tracing:
       export:
         otlp:
-          endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://127.0.0.1:4318/v1/traces}
+          endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://100.101.189.22:4318/v1/traces}
           timeout: ${OTEL_EXPORTER_OTLP_TRACES_TIMEOUT:2s}
 
 logging:
