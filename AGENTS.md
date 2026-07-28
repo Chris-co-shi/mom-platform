@@ -50,6 +50,17 @@
 - PCS、WCS 保持独立仓库和部署边界；
 - MES、WMS、QMS、库存事实、批次谱系、Integration Hub 等 MOM 核心能力必须自主建模。
 
+模块职责、Server 包分层、HTTP API 和演进规则的详细权威来源为：
+
+- `docs/engineering/standards/module-layering-standard.md`；
+- `docs/engineering/standards/http-api-contract-standard.md`；
+- `docs/engineering/standards/api-evolution-idempotency-standard.md`。
+
+强制摘要：Web 只能适配 HTTP 并调用 Application；Application 负责用例、事务和业务授权；Domain
+不得依赖 Web、Infrastructure、Servlet、MyBatis、JDBC、Feign 或 Redis Template；Infrastructure
+实现 Port 并转换、脱敏底层异常；Configuration 只负责装配。新业务 API 不引入通用成功响应信封，
+不得改变 OAuth2/OIDC 标准错误；历史例外必须逐文件登记，不得用宽泛排除规避架构门禁。
+
 ## 4. 数据访问约束
 
 - Java 技术主键统一使用 `String`，数据库使用 `varchar(19)`；禁止把 Snowflake 或 64 位整数 ID 作为 JSON Number 暴露给前端；
