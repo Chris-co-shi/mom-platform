@@ -1,0 +1,41 @@
+name: Engineering Baseline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engineering-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  baseline:
+    name: Validate JDK and Spring engineering baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate shell syntax
+        shell: bash
+        run: >-
+          bash -n
+          scripts/codex-mvn-test.sh
+          scripts/codex-doctor.sh
+          scripts/codex-verify-changed.sh
+          .github/scripts/detect-ci-scope.sh
+          .github/scripts/validate-engineering-baseline.sh
+
+      - name: Validate Python syntax
+        shell: bash
+        run: python3 -m py_compile scripts/summarize-maven-failure.py
+
+      - name: Validate official engineering baseline
+        shell: bash
+        run: bash .github/scripts/validate-engineering-baseline.sh
