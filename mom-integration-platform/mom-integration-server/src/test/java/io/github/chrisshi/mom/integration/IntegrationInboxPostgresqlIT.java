@@ -46,7 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
                         + "org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration,"
                         + "org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration"
         })
-class IntegrationInboxPostgresqlIntegrationTest {
+class IntegrationInboxPostgresqlIT {
 
     private static final String SCHEMA = "mom_integration";
     private static final String CONSUMER = "integration-inbox-test-v1";

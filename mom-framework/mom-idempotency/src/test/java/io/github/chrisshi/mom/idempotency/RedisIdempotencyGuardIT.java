@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * fail-closed 与 fail-open 的差异。Docker 不可用时跳过，GitHub Actions 必须提供 Docker 并执行该测试。</p>
  */
 @Testcontainers(disabledWithoutDocker = true)
-class RedisIdempotencyGuardIntegrationTest {
+class RedisIdempotencyGuardIT {
 
     @Container
     private static final GenericContainer<?> REDIS = new GenericContainer<>(

@@ -11,12 +11,13 @@ permissions:
 
 concurrency:
   group: seata-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   changes:
     name: Detect Seata scope
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       seata: ${{ steps.scope.outputs.seata }}
     steps:
@@ -30,6 +31,8 @@ jobs:
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
+          PR_ACTION: ${{ github.event.action }}
+          PR_PREVIOUS_SHA: ${{ github.event.before }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PUSH_BASE_SHA: ${{ github.event.before }}

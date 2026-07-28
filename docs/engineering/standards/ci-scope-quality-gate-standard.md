@@ -22,7 +22,7 @@ Scope Detector 或主 CI 自身修改触发主 CI 全部基础设施分支；各
 
 ## 4. Job 结构
 
-基础设施 Job 均设置小于 Workflow 总预算的 timeout、独立 Artifact 和 cleanup；三个 Nacos/Redis Job只依赖 scope 与 Fast Reactor，不相互串行。缓存只用于 Maven 依赖，不缓存运行时正确性状态。权限保持 `contents: read`，并使用 concurrency 取消同引用的过期执行。
+基础设施 Job 均设置小于 Workflow 总预算的 timeout、独立 Artifact 和 cleanup；三个 Nacos/Redis Job 只依赖 scope 与 Fast Reactor，不相互串行。缓存只用于 Maven 依赖，不缓存运行时正确性状态。权限保持 `contents: read`。使用 Previous Head 增量范围的基础设施 Workflow 必须保留已开始的执行（`cancel-in-progress: false`），防止新 Push 取消尚未产生证据的范围；只有不承载增量基础设施证据的快速静态 Workflow 可取消过期运行。
 
 ## 5. Codex 与日志
 

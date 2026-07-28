@@ -4,16 +4,43 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: observability-stack-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
+  changes:
+    name: Detect observability stack scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      observability: ${{ steps.scope.outputs.observability }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect observability-related changes
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_ACTION: ${{ github.event.action }}
+          PR_PREVIOUS_SHA: ${{ github.event.before }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
+          MANUAL_SCOPE: ${{ github.event_name == 'workflow_dispatch' && 'observability' || 'auto' }}
+        run: bash .github/scripts/detect-ci-scope.sh
+
   observability-stack:
+    needs: changes
+    if: needs.changes.outputs.observability == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -29,11 +56,11 @@ jobs:
 
       - name: Package observed applications
         shell: bash
-        run: |
-          set -o pipefail
-          mvn -B -ntp -DskipTests package \
-            -pl mom-gateway,mom-mdm-platform/mom-mdm-server,mom-integration-platform/mom-integration-server \
-            -am 2>&1 | tee p01-s08-maven-package.log
+        run: >-
+          bash scripts/codex-mvn-test.sh
+          -DskipTests package
+          -pl mom-gateway,mom-mdm-platform/mom-mdm-server,mom-integration-platform/mom-integration-server
+          -am
 
       - name: Run Prometheus Loki Grafana smoke test
         shell: bash
@@ -46,6 +73,8 @@ jobs:
           name: observability-stack-diagnostics
           path: |
             p01-s08-*.log
+            .codex/runtime/logs/**
+            .codex/runtime/summaries/**
             p01-s08-*.json
             p01-s08-*.txt
             mom-p01-s08-*.log

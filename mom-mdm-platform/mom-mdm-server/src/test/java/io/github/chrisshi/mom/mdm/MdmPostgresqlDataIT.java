@@ -59,8 +59,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
                         + "org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration,"
                         + "org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration"
         })
-@Import(MdmPostgresqlDataIntegrationTest.TestActorConfiguration.class)
-class MdmPostgresqlDataIntegrationTest {
+@Import(MdmPostgresqlDataIT.TestActorConfiguration.class)
+class MdmPostgresqlDataIT {
 
     private static final String SCHEMA = "mom_mdm";
     private static final String APPLICATION_NAME = "mom-mdm-server";

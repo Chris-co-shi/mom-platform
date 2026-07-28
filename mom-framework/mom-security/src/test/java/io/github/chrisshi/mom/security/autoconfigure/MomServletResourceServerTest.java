@@ -37,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** S06 业务服务二次验证、Permission、Factory/Party 与 404 防枚举集成测试。 */
 @SpringBootTest(
-        classes = MomServletResourceServerIntegrationTest.TestApplication.class,
+        classes = MomServletResourceServerTest.TestApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.MOCK,
         properties = {
                 "spring.main.banner-mode=off",
@@ -45,7 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 "mom.security.resource-server.issuer-uri=https://iam.mom.example",
                 "mom.security.resource-server.jwk-set-uri=https://iam.mom.example/oauth2/jwks"
         })
-class MomServletResourceServerIntegrationTest {
+class MomServletResourceServerTest {
     @Autowired WebApplicationContext applicationContext;
     private MockMvc mockMvc;
 

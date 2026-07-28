@@ -8,201 +8,149 @@ EVENT_NAME="${EVENT_NAME:-local}"
 PR_ACTION="${PR_ACTION:-}"
 PR_PREVIOUS_SHA="${PR_PREVIOUS_SHA:-}"
 
-emit() {
-  printf '%s=%s\n' "$1" "$2" >>"$OUTPUT_FILE"
-}
+emit() { printf '%s=%s\n' "$1" "$2" >> "$OUTPUT_FILE"; }
+emit_summary() { printf '%s\n' "$1" >> "$SUMMARY_FILE"; }
 
-emit_summary() {
-  printf '%s\n' "$1" >>"$SUMMARY_FILE"
+emit_scopes() {
+  emit nacos "$nacos"
+  emit redis_idempotency "$redis_idempotency"
+  emit redis_rate_limit "$redis_rate_limit"
+  emit postgresql "$postgresql"
+  emit messaging "$messaging"
+  emit seata "$seata"
+  emit observability "$observability"
 }
 
 set_manual_scope() {
   local scope="$1"
-  local nacos_redis=false
-  local postgresql=false
-  local seata=false
+  nacos=false
+  redis_idempotency=false
+  redis_rate_limit=false
+  postgresql=false
+  messaging=false
+  seata=false
+  observability=false
 
   case "$scope" in
     all)
-      nacos_redis=true
+      nacos=true
+      redis_idempotency=true
+      redis_rate_limit=true
       postgresql=true
+      messaging=true
       seata=true
+      observability=true
       ;;
-    none)
-      ;;
-    nacos-redis)
-      nacos_redis=true
-      ;;
-    postgresql)
-      postgresql=true
-      ;;
-    seata)
-      seata=true
-      ;;
-    auto)
-      return 1
-      ;;
-    *)
-      echo "Unsupported infrastructure scope: $scope" >&2
-      exit 2
-      ;;
+    none) ;;
+    nacos) nacos=true ;;
+    redis) redis_idempotency=true; redis_rate_limit=true ;;
+    postgresql) postgresql=true ;;
+    messaging) messaging=true ;;
+    seata) seata=true ;;
+    observability) observability=true ;;
+    auto) return 1 ;;
+    *) echo "Unsupported infrastructure scope: $scope" >&2; exit 2 ;;
   esac
 
-  emit nacos_redis "$nacos_redis"
-  emit postgresql "$postgresql"
-  emit seata "$seata"
+  emit_scopes
   emit mode "manual:${scope}"
-  emit_summary "### Infrastructure scope"
-  emit_summary ""
-  emit_summary "- Mode: manual:${scope}"
-  emit_summary "- Nacos/Redis: ${nacos_redis}"
-  emit_summary "- PostgreSQL: ${postgresql}"
-  emit_summary "- Seata: ${seata}"
+  emit changed_count 0
+  emit_scope_summary "manual:${scope}" "manual"
   return 0
 }
 
-if set_manual_scope "$MANUAL_SCOPE"; then
-  exit 0
-fi
+emit_scope_summary() {
+  local mode="$1"
+  local range="$2"
+  emit_summary "### Infrastructure scope"
+  emit_summary ""
+  emit_summary "- Mode: ${mode}"
+  emit_summary "- Diff range: ${range}"
+  emit_summary "- Nacos: ${nacos}"
+  emit_summary "- Redis Idempotency: ${redis_idempotency}"
+  emit_summary "- Redis Rate Limit: ${redis_rate_limit}"
+  emit_summary "- PostgreSQL: ${postgresql}"
+  emit_summary "- Messaging: ${messaging}"
+  emit_summary "- Seata: ${seata}"
+  emit_summary "- Observability: ${observability}"
+}
+
+if set_manual_scope "$MANUAL_SCOPE"; then exit 0; fi
 
 AUTO_MODE="auto"
 case "$EVENT_NAME" in
   pull_request)
     HEAD_SHA="${PR_HEAD_SHA:?PR_HEAD_SHA is required}"
-    if [[ "$PR_ACTION" == "synchronize" \
-          && -n "$PR_PREVIOUS_SHA" \
-          && ! "$PR_PREVIOUS_SHA" =~ ^0+$ ]] \
-       && git cat-file -e "${PR_PREVIOUS_SHA}^{commit}" 2>/dev/null; then
-      # 长期 PR 后续 push 只验证本次新增差异，避免旧基础设施改动在纯文档提交后反复触发。
+    if [[ "$PR_ACTION" == "synchronize" && -n "$PR_PREVIOUS_SHA" && ! "$PR_PREVIOUS_SHA" =~ ^0+$ ]] \
+      && git merge-base --is-ancestor "$PR_PREVIOUS_SHA" "$HEAD_SHA" 2>/dev/null; then
       BASE_SHA="$PR_PREVIOUS_SHA"
       AUTO_MODE="auto:pull-request-incremental"
     else
-      # PR 首次创建、重新打开或旧 Head 不可达时，使用完整 PR 差异确保首次基础设施验收不遗漏。
       BASE_SHA="${PR_BASE_SHA:?PR_BASE_SHA is required}"
       AUTO_MODE="auto:pull-request-full"
     fi
     ;;
   push)
-    BASE_SHA="${PUSH_BASE_SHA:-}"
     HEAD_SHA="${PUSH_HEAD_SHA:-HEAD}"
-    if [[ -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
-      BASE_SHA="$(git rev-parse "${HEAD_SHA}^")"
+    BASE_SHA="${PUSH_BASE_SHA:-}"
+    if [[ -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]] || ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+      BASE_SHA="$(git rev-list --max-parents=0 "$HEAD_SHA" | tail -n 1)"
+      AUTO_MODE="auto:push-full"
+    else
+      AUTO_MODE="auto:push"
     fi
-    AUTO_MODE="auto:push"
     ;;
   *)
     HEAD_SHA="${PUSH_HEAD_SHA:-HEAD}"
-    BASE_SHA="$(git rev-parse "${HEAD_SHA}^")"
+    BASE_SHA="${PUSH_BASE_SHA:-$(git rev-parse "${HEAD_SHA}^")}"
     AUTO_MODE="auto:local"
     ;;
 esac
 
 git diff --name-only "$BASE_SHA" "$HEAD_SHA" > changed-files.txt
 
-# 只从可能影响运行时的源码、配置、POM 和 CI 脚本中提取新增内容。
-# 工程规范、PR 模板和本地 Codex 工具即使提到 Nacos/PostgreSQL/Seata，
-# 也不能因此启动重型基础设施验证。
-python3 - "$BASE_SHA" "$HEAD_SHA" > changed-additions.diff <<'PY'
-from __future__ import annotations
+path_matches() { grep --extended-regexp --quiet "$1" changed-files.txt; }
 
-import pathlib
-import subprocess
-import sys
-
-base, head = sys.argv[1:3]
-diff = subprocess.check_output(
-    ["git", "diff", "--unified=0", base, head],
-    text=True,
-    errors="replace",
-)
-
-excluded_exact = {
-    "AGENTS.md",
-    ".github/pull_request_template.md",
-    ".github/workflows/ci.yml",
-    ".github/scripts/detect-ci-scope.sh",
-    ".github/scripts/validate-engineering-baseline.sh",
-    ".github/scripts/validate-runtime-security-baseline.sh",
-    ".github/scripts/validate_runtime_security_baseline.py",
-    ".github/scripts/test_validate_runtime_security_baseline.py",
-    "scripts/codex-doctor.sh",
-    "scripts/codex-verify-changed.sh",
-    "scripts/codex-mvn-test.sh",
-    "scripts/summarize-maven-failure.py",
-}
-relevant_suffixes = {".java", ".xml", ".yml", ".yaml", ".properties", ".sql", ".sh"}
-
-
-def relevant(path: str | None) -> bool:
-    if not path or path == "/dev/null":
-        return False
-    if path in excluded_exact or path.startswith(("docs/", ".codex/")):
-        return False
-    if path == "pom.xml" or path.endswith("/pom.xml"):
-        return True
-    if path.startswith((".github/workflows/", ".github/scripts/")):
-        return True
-    return pathlib.PurePosixPath(path).suffix.lower() in relevant_suffixes
-
-
-current: str | None = None
-for line in diff.splitlines():
-    if line.startswith("+++ b/"):
-        current = line[6:]
-        continue
-    if line.startswith("+++ /dev/null"):
-        current = None
-        continue
-    if line.startswith("+") and not line.startswith("+++") and relevant(current):
-        print(line)
-PY
-
-path_matches() {
-  local pattern="$1"
-  grep --extended-regexp --quiet "$pattern" changed-files.txt
-}
-
-content_matches() {
-  local pattern="$1"
-  grep --extended-regexp --ignore-case --quiet "$pattern" changed-additions.diff
-}
-
-nacos_redis=false
+nacos=false
+redis_idempotency=false
+redis_rate_limit=false
 postgresql=false
+messaging=false
 seata=false
+observability=false
 
-if path_matches '(^\.github/scripts/nacos-redis-smoke\.sh$|^mom-gateway/|^mom-integration-platform/|^mom-framework/(mom-openfeign|mom-idempotency|mom-rate-limit)/|/nacos/|/redis/)'; then
-  nacos_redis=true
-fi
-if content_matches '(spring-cloud-starter-alibaba-nacos|nacos-client|spring\.cloud\.nacos|DiscoveryClient|LoadBalanced|RedisTemplate|ReactiveRedis|idempotenc|rate.?limit)'; then
-  nacos_redis=true
-fi
-
-if path_matches '(^\.github/scripts/p01-s04-postgresql-smoke\.sh$|^mom-framework/mom-data/|^mom-mdm-platform/mom-mdm-server/src/main/resources/db/|/(mapper|repository|persistence)/|\.sql$)'; then
+# Scope detector 或主 CI 自身变化必须验证所有主 CI 基础设施分支，避免脚本修改跳过自身。
+if path_matches '(^\.github/scripts/detect-ci-scope\.sh$|^\.github/workflows/ci\.yml$)'; then
+  nacos=true
+  redis_idempotency=true
+  redis_rate_limit=true
   postgresql=true
-fi
-if content_matches '(postgresql|flyway|jdbc:postgresql|DataSource|SqlSession|BaseMapper|@Mapper|timestamptz)'; then
-  postgresql=true
-fi
-
-if path_matches '(^mom-framework/mom-seata/|/seata/|seata[^/]*\.(yml|yaml|properties|sql)$|undo_log)'; then
-  seata=true
-fi
-if content_matches '(spring-cloud-starter-alibaba-seata|@GlobalTransactional|GlobalTransactional|DataSourceProxy|RootContext|undo_log|tx-service-group|service\.vgroupMapping|XID)'; then
   seata=true
 fi
 
-emit nacos_redis "$nacos_redis"
-emit postgresql "$postgresql"
-emit seata "$seata"
+if path_matches '(^\.github/scripts/nacos-discovery-smoke\.sh$|^mom-gateway/|^mom-(mdm|integration)-platform/.*/(client|.*ServiceProbe)|/nacos/)'; then
+  nacos=true
+fi
+if path_matches '(^\.github/scripts/redis-idempotency-smoke\.sh$|^mom-framework/mom-idempotency/|IntegrationIdempotencyProbeController|/idempotenc)'; then
+  redis_idempotency=true
+fi
+if path_matches '(^\.github/scripts/redis-rate-limit-smoke\.sh$|^mom-framework/mom-rate-limit/|^mom-gateway/|/rate.?limit|RedisRate)'; then
+  redis_rate_limit=true
+fi
+if path_matches '(^\.github/scripts/p01-s04-postgresql-smoke\.sh$|^mom-framework/(mom-data|mom-outbox)/|^mom-(mdm|integration)-platform/.*/src/(main|test)/resources/db/|/(mapper|repository|persistence)/|\.sql$)'; then
+  postgresql=true
+fi
+if path_matches '(^\.github/workflows/messaging-ci\.yml$|^\.github/scripts/p01-s05-rocketmq-outbox-smoke\.sh$|^mom-framework/(mom-messaging|mom-outbox)/|/messaging/|rocketmq|outbox|inbox)'; then
+  messaging=true
+fi
+if path_matches '(^\.github/workflows/seata-ci\.yml$|^\.github/scripts/p01-s06-seata-at-smoke\.sh$|^mom-framework/mom-seata/|/seata/|undo_log)'; then
+  seata=true
+fi
+if path_matches '(^\.github/workflows/observability(-stack)?-ci\.yml$|^\.github/scripts/.*observability.*smoke\.sh$|^mom-framework/(mom-observation|mom-tracing|mom-metrics|mom-logging)/|/observability/|/tracing/)'; then
+  observability=true
+fi
+
+emit_scopes
 emit mode "$AUTO_MODE"
 emit changed_count "$(wc -l < changed-files.txt | tr -d ' ')"
-
-emit_summary "### Infrastructure scope"
-emit_summary ""
-emit_summary "- Mode: ${AUTO_MODE}"
-emit_summary "- Diff range: ${BASE_SHA}..${HEAD_SHA}"
-emit_summary "- Changed files: $(wc -l < changed-files.txt | tr -d ' ')"
-emit_summary "- Nacos/Redis: ${nacos_redis}"
-emit_summary "- PostgreSQL: ${postgresql}"
-emit_summary "- Seata: ${seata}"
+emit_scope_summary "$AUTO_MODE" "${BASE_SHA}..${HEAD_SHA}"

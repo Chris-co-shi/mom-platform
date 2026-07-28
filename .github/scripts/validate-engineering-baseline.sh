@@ -27,6 +27,12 @@ required_files = [
     ".github/scripts/validate-runtime-security-baseline.sh",
     ".github/scripts/validate_runtime_security_baseline.py",
     ".github/scripts/test_validate_runtime_security_baseline.py",
+    ".github/scripts/validate-test-baseline.sh",
+    ".github/scripts/validate_test_baseline.py",
+    ".github/scripts/test_validate_test_baseline.py",
+    ".github/scripts/nacos-discovery-smoke.sh",
+    ".github/scripts/redis-idempotency-smoke.sh",
+    ".github/scripts/redis-rate-limit-smoke.sh",
     "docs/engineering/codex-local-workflow.md",
     "docs/engineering/standards/official-source-policy.md",
     "docs/engineering/standards/jdk-25-engineering-standard.md",
@@ -43,10 +49,16 @@ required_files = [
     "docs/engineering/standards/security-protocol-runtime-standard.md",
     "docs/engineering/standards/outbound-http-client-standard.md",
     "docs/engineering/standards/redis-key-ttl-failure-standard.md",
+    "docs/engineering/standards/testing-strategy-standard.md",
+    "docs/engineering/standards/maven-test-lifecycle-standard.md",
+    "docs/engineering/standards/testcontainers-smoke-acceptance-standard.md",
+    "docs/engineering/standards/ci-scope-quality-gate-standard.md",
     "docs/engineering/P1.6-S02-持久化历史例外清单.md",
     "docs/adr/ADR-020-PostgreSQL物理Schema命名空间.md",
     "docs/engineering/P1.6-S03-安全配置历史例外清单.md",
     "docs/adr/ADR-021-运行时配置来源与Secret边界.md",
+    "docs/engineering/P1.6-S04-测试与CI历史例外清单.md",
+    "docs/adr/ADR-022-测试分层与CI质量门禁.md",
     "mom-architecture-tests/pom.xml",
     "mom-architecture-tests/src/test/java/io/github/chrisshi/mom/architecture/MavenModuleDependencyArchitectureTest.java",
     "mom-architecture-tests/src/test/java/io/github/chrisshi/mom/architecture/ServerPackageArchitectureTest.java",
@@ -175,5 +187,5 @@ for note in notes:
 print("- no preview/internal API/module-escape violations")
 print("- no legacy Nacos bootstrap or disabled compatibility checks")
 print("- IAM default tests contain no external data-store integration tests")
-print("- S01/S02/S03 standards and Maven architecture-test module are wired")
+print("- S01/S02/S03/S04 standards and Maven architecture-test module are wired")
 PY

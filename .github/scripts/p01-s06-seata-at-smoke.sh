@@ -10,6 +10,7 @@ MDM_MIGRATION_PORT=20211
 INTEGRATION_MIGRATION_PORT=20811
 MDM_PORT=20210
 INTEGRATION_PORT=20810
+POSTGRES_TEST_PASSWORD=mom-s04-seata-test
 MDM_PID=""
 INTEGRATION_PID=""
 
@@ -35,7 +36,7 @@ docker rm -f "$MDM_DB_CONTAINER" "$INTEGRATION_DB_CONTAINER" "$SEATA_CONTAINER" 
 docker run --name "$MDM_DB_CONTAINER" \
   -e POSTGRES_DB=mom_platform \
   -e POSTGRES_USER=mom \
-  -e POSTGRES_PASSWORD=mom \
+  -e POSTGRES_PASSWORD="$POSTGRES_TEST_PASSWORD" \
   -p ${MDM_DB_PORT}:5432 \
   -d postgres:17.7-alpine \
   postgres -c fsync=off -c timezone=Asia/Tokyo
@@ -43,7 +44,7 @@ docker run --name "$MDM_DB_CONTAINER" \
 docker run --name "$INTEGRATION_DB_CONTAINER" \
   -e POSTGRES_DB=mom_platform \
   -e POSTGRES_USER=mom \
-  -e POSTGRES_PASSWORD=mom \
+  -e POSTGRES_PASSWORD="$POSTGRES_TEST_PASSWORD" \
   -p ${INTEGRATION_DB_PORT}:5432 \
   -d postgres:17.7-alpine \
   postgres -c fsync=off -c timezone=Asia/Tokyo
@@ -66,7 +67,7 @@ for attempt in {1..90}; do
   if docker exec "$INTEGRATION_DB_CONTAINER" pg_isready -U mom -d mom_platform >/dev/null 2>&1; then
     integration_ready=true
   fi
-  if timeout 1 bash -c '</dev/tcp/127.0.0.1/8091' >/dev/null 2>&1; then
+  if nc -z -w 1 127.0.0.1 8091 >/dev/null 2>&1; then
     seata_ready=true
   fi
   if [[ "$mdm_ready" == "true" && "$integration_ready" == "true" && "$seata_ready" == "true" ]]; then
@@ -83,6 +84,7 @@ done
 # 该阶段运行同一打包应用和同一 Flyway 脚本，但显式关闭 Seata 和技术接口；
 # 完成后停止迁移实例，再启动启用数据源代理的正式验证实例。
 POSTGRES_PORT=$INTEGRATION_DB_PORT \
+POSTGRES_PASSWORD=$POSTGRES_TEST_PASSWORD \
 POSTGRES_SCHEMA=mom_integration \
 POSTGRES_APPLICATION_NAME=mom-integration-seata-migration-ci \
 SEATA_ENABLED=false \
@@ -98,6 +100,7 @@ java -jar mom-integration-platform/mom-integration-server/target/mom-integration
 INTEGRATION_PID=$!
 
 POSTGRES_PORT=$MDM_DB_PORT \
+POSTGRES_PASSWORD=$POSTGRES_TEST_PASSWORD \
 POSTGRES_SCHEMA=mom_mdm \
 POSTGRES_APPLICATION_NAME=mom-mdm-seata-migration-ci \
 SEATA_ENABLED=false \
@@ -154,6 +157,7 @@ MDM_PID=""
 INTEGRATION_PID=""
 
 POSTGRES_PORT=$INTEGRATION_DB_PORT \
+POSTGRES_PASSWORD=$POSTGRES_TEST_PASSWORD \
 POSTGRES_SCHEMA=mom_integration \
 POSTGRES_APPLICATION_NAME=mom-integration-seata-ci \
 SEATA_ENABLED=true \
@@ -170,6 +174,7 @@ java -jar mom-integration-platform/mom-integration-server/target/mom-integration
 INTEGRATION_PID=$!
 
 POSTGRES_PORT=$MDM_DB_PORT \
+POSTGRES_PASSWORD=$POSTGRES_TEST_PASSWORD \
 POSTGRES_SCHEMA=mom_mdm \
 POSTGRES_APPLICATION_NAME=mom-mdm-seata-ci \
 SEATA_ENABLED=true \

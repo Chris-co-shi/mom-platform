@@ -4,16 +4,43 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: messaging-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
+  changes:
+    name: Detect messaging scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      messaging: ${{ steps.scope.outputs.messaging }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect messaging-related changes
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_ACTION: ${{ github.event.action }}
+          PR_PREVIOUS_SHA: ${{ github.event.before }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
+          MANUAL_SCOPE: ${{ github.event_name == 'workflow_dispatch' && 'messaging' || 'auto' }}
+        run: bash .github/scripts/detect-ci-scope.sh
+
   rocketmq-outbox:
+    needs: changes
+    if: needs.changes.outputs.messaging == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -29,11 +56,11 @@ jobs:
 
       - name: Package MDM and Integration applications
         shell: bash
-        run: |
-          set -o pipefail
-          mvn -B -ntp -DskipTests \
-            -pl :mom-mdm-server,:mom-integration-server \
-            -am package 2>&1 | tee messaging-build.log
+        run: >-
+          bash scripts/codex-mvn-test.sh
+          -DskipTests
+          -pl :mom-mdm-server,:mom-integration-server
+          -am package
 
       - name: Run RocketMQ Stream Outbox smoke test
         shell: bash
@@ -49,6 +76,8 @@ jobs:
           name: messaging-verification-diagnostics
           path: |
             messaging-build.log
+            .codex/runtime/logs/**
+            .codex/runtime/summaries/**
             p01-s05-smoke.log
             p01-s05-postgresql.log
             p01-s05-rocketmq-namesrv.log

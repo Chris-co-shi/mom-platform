@@ -52,7 +52,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
                         + "org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration,"
                         + "org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration"
         })
-class MdmAuditPostgresqlIntegrationTest {
+class MdmAuditPostgresqlIT {
 
     private static final String SCHEMA = "mom_mdm";
     private static final Duration PG_PRECISION = Duration.ofNanos(1_000);

@@ -47,7 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
                         + "org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration,"
                         + "org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration"
         })
-class MdmOutboxPostgresqlIntegrationTest {
+class MdmOutboxPostgresqlIT {
 
     private static final String SCHEMA = "mom_mdm";
     private static final String SYSTEM_ACTOR = "mom-mdm-outbox-test";

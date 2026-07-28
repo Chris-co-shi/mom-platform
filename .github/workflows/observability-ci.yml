@@ -4,16 +4,43 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: observability-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
+  changes:
+    name: Detect observability scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      observability: ${{ steps.scope.outputs.observability }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect observability-related changes
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_ACTION: ${{ github.event.action }}
+          PR_PREVIOUS_SHA: ${{ github.event.before }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
+          MANUAL_SCOPE: ${{ github.event_name == 'workflow_dispatch' && 'observability' || 'auto' }}
+        run: bash .github/scripts/detect-ci-scope.sh
+
   tracing:
+    needs: changes
+    if: needs.changes.outputs.observability == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -29,11 +56,11 @@ jobs:
 
       - name: Package traced applications
         shell: bash
-        run: |
-          set -o pipefail
-          mvn -B -ntp -DskipTests \
-            -pl :mom-gateway,:mom-mdm-server,:mom-integration-server \
-            -am package 2>&1 | tee observability-build.log
+        run: >-
+          bash scripts/codex-mvn-test.sh
+          -DskipTests
+          -pl :mom-gateway,:mom-mdm-server,:mom-integration-server
+          -am package
 
       - name: Run OpenTelemetry and Tempo smoke test
         shell: bash
@@ -46,6 +73,8 @@ jobs:
           name: observability-verification-diagnostics
           path: |
             observability-build.log
+            .codex/runtime/logs/**
+            .codex/runtime/summaries/**
             p01-s07-nacos.log
             p01-s07-redis.log
             p01-s07-tempo.log
