@@ -38,4 +38,14 @@ jobs:
 
       - name: Validate official engineering baseline
         shell: bash
-        run: bash .github/scripts/validate-engineering-baseline.sh
+        run: |
+          set -o pipefail
+          bash .github/scripts/validate-engineering-baseline.sh 2>&1 | tee engineering-baseline.log
+
+      - name: Upload engineering baseline report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: engineering-baseline-report
+          path: engineering-baseline.log
+          if-no-files-found: error
