@@ -1,11 +1,12 @@
 package io.github.chrisshi.mom.iam.security;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -18,7 +19,6 @@ import org.springframework.security.web.SecurityFilterChain;
  * 并由控制器按 sid 撤销权威 Session。</p>
  */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnBean({IamAccountAuthenticationService.class, JwtDecoder.class})
 public class IamDirectAuthenticationConfiguration {
 
     @Bean
@@ -26,10 +26,10 @@ public class IamDirectAuthenticationConfiguration {
     SecurityFilterChain iamDirectAuthenticationSecurityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .securityMatcher("/api/iam/auth/**")
-                .csrf(csrf -> csrf.disable())
-                .httpBasic(basic -> basic.disable())
-                .formLogin(form -> form.disable())
-                .requestCache(cache -> cache.disable())
+                .csrf(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .requestCache(RequestCacheConfigurer::disable)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize

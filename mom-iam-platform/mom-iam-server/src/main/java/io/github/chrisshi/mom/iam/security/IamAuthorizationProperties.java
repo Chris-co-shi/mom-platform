@@ -1,5 +1,7 @@
 package io.github.chrisshi.mom.iam.security;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.core.io.Resource;
 
@@ -8,9 +10,12 @@ import java.time.Duration;
 import java.util.List;
 
 /** IAM Authorization Server、账号锁定、JWK 与四个 Public Client 的环境配置。 */
+@Getter
 @ConfigurationProperties("mom.iam.authorization")
 public class IamAuthorizationProperties {
+    @Setter
     private boolean enabled = true;
+    @Setter
     private URI issuer = URI.create("http://127.0.0.1:20100");
     private final AccountSecurity security = new AccountSecurity();
     private final SigningKey key = new SigningKey();
@@ -18,17 +23,6 @@ public class IamAuthorizationProperties {
     private final Client supplierWeb = new Client();
     private final Client customerWeb = new Client();
     private final Client mobilePda = new Client();
-
-    public boolean isEnabled() { return enabled; }
-    public void setEnabled(boolean enabled) { this.enabled = enabled; }
-    public URI getIssuer() { return issuer; }
-    public void setIssuer(URI issuer) { this.issuer = issuer; }
-    public AccountSecurity getSecurity() { return security; }
-    public SigningKey getKey() { return key; }
-    public Client getAdminWeb() { return adminWeb; }
-    public Client getSupplierWeb() { return supplierWeb; }
-    public Client getCustomerWeb() { return customerWeb; }
-    public Client getMobilePda() { return mobilePda; }
 
     /** 返回固定 Client ID 与环境 URI 的不可变注册清单。 */
     public List<ClientRegistration> registrations() {
@@ -62,55 +56,33 @@ public class IamAuthorizationProperties {
     }
 
     /** 账号认证安全配置。 */
+    @Setter
+    @Getter
     public static class AccountSecurity {
         private int maxFailedAttempts = 5;
         private Duration lockDuration = Duration.ofMinutes(15);
         private int minimumPasswordLength = 12;
 
-        public int getMaxFailedAttempts() { return maxFailedAttempts; }
-        public void setMaxFailedAttempts(int maxFailedAttempts) {
-            this.maxFailedAttempts = maxFailedAttempts;
-        }
-        public Duration getLockDuration() { return lockDuration; }
-        public void setLockDuration(Duration lockDuration) { this.lockDuration = lockDuration; }
-        public int getMinimumPasswordLength() { return minimumPasswordLength; }
-        public void setMinimumPasswordLength(int minimumPasswordLength) {
-            this.minimumPasswordLength = minimumPasswordLength;
-        }
     }
 
     /** RSA 签名密钥配置。 */
+    @Setter
+    @Getter
     public static class SigningKey {
         private String keyId;
         private Resource privateKeyLocation;
         private Resource publicKeyLocation;
         private boolean allowTestKey;
 
-        public String getKeyId() { return keyId; }
-        public void setKeyId(String keyId) { this.keyId = keyId; }
-        public Resource getPrivateKeyLocation() { return privateKeyLocation; }
-        public void setPrivateKeyLocation(Resource privateKeyLocation) {
-            this.privateKeyLocation = privateKeyLocation;
-        }
-        public Resource getPublicKeyLocation() { return publicKeyLocation; }
-        public void setPublicKeyLocation(Resource publicKeyLocation) {
-            this.publicKeyLocation = publicKeyLocation;
-        }
-        public boolean isAllowTestKey() { return allowTestKey; }
-        public void setAllowTestKey(boolean allowTestKey) { this.allowTestKey = allowTestKey; }
     }
 
     /** 单个 Public Client 的环境相关回调 URI。 */
+    @Setter
+    @Getter
     public static class Client {
         private URI redirectUri;
         private URI postLogoutRedirectUri;
 
-        public URI getRedirectUri() { return redirectUri; }
-        public void setRedirectUri(URI redirectUri) { this.redirectUri = redirectUri; }
-        public URI getPostLogoutRedirectUri() { return postLogoutRedirectUri; }
-        public void setPostLogoutRedirectUri(URI postLogoutRedirectUri) {
-            this.postLogoutRedirectUri = postLogoutRedirectUri;
-        }
     }
 
     /** 固定 Client ID、名称与环境 URI 的组合。 */

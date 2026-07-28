@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -12,18 +13,20 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-/** 授权请求只允许带 S256 Challenge 的 Authorization Code 流程。 */
+/**
+ * 授权请求只允许带 S256 Challenge 的 Authorization Code 流程。
+ */
 final class PkceS256AuthorizationRequestFilter extends OncePerRequestFilter {
     @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
+    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
         return !isAuthorizationEndpoint(request);
     }
 
     @Override
     protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain) throws ServletException, IOException {
+        HttpServletRequest request,
+        @NonNull HttpServletResponse response,
+        @NonNull FilterChain filterChain) throws ServletException, IOException {
         if ("code".equals(request.getParameter("response_type"))) {
             String challenge = request.getParameter("code_challenge");
             String method = request.getParameter("code_challenge_method");
@@ -43,16 +46,18 @@ final class PkceS256AuthorizationRequestFilter extends OncePerRequestFilter {
     }
 }
 
-/** 已登录用户在进入官方 Authorization Endpoint 前执行 MOM Client 访问矩阵校验。 */
+/**
+ * 已登录用户在进入官方 Authorization Endpoint 前执行 MOM Client 访问矩阵校验。
+ */
 final class IamClientAuthorizationRequestFilter extends OncePerRequestFilter {
     private final IamAccountAuthenticationService accounts;
     private final IamClientAccessPolicyService accessPolicy;
     private final RequestCache requestCache;
 
     IamClientAuthorizationRequestFilter(
-            IamAccountAuthenticationService accounts,
-            IamClientAccessPolicyService accessPolicy,
-            RequestCache requestCache) {
+        IamAccountAuthenticationService accounts,
+        IamClientAccessPolicyService accessPolicy,
+        RequestCache requestCache) {
         this.accounts = accounts;
         this.accessPolicy = accessPolicy;
         this.requestCache = requestCache;
@@ -68,12 +73,12 @@ final class IamClientAuthorizationRequestFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain) throws ServletException, IOException {
+        @NonNull HttpServletRequest request,
+        @NonNull HttpServletResponse response,
+        @NonNull FilterChain filterChain) throws ServletException, IOException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()
-                || authentication instanceof AnonymousAuthenticationToken) {
+            || authentication instanceof AnonymousAuthenticationToken) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -84,8 +89,7 @@ final class IamClientAuthorizationRequestFilter extends OncePerRequestFilter {
         }
         try {
             accessPolicy.requireAuthorization(authentication.getName(), request.getParameter("client_id"));
-        }
-        catch (IamClientAccessPolicyService.AccessDeniedException exception) {
+        } catch (IamClientAccessPolicyService.AccessDeniedException exception) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "authorization denied");
             return;
         }

@@ -127,6 +127,62 @@ class IamSessionRefreshPostgresqlRedisIntegrationTest {
     }
 
     @Test
+    void directJsonLoginWithoutCsrfMustCreateAuditedSession() throws Exception {
+        TestUser user = insertUser(UserType.INTERNAL, "direct-login");
+
+        MvcResult result = mockMvc.perform(post("/api/iam/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "%s",
+                                  "clientId": "mom-admin-web",
+                                  "deviceName": "JUnit"
+                                }
+                                """.formatted(user.username(), PASSWORD)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andReturn();
+        String sessionId = jsonString(result.getResponse().getContentAsString(), "sessionId");
+        assertNotNull(sessionId);
+        assertEquals("mom-iam-session", jdbc.queryForObject(
+                "SELECT created_by FROM iam_user_session WHERE id=?",
+                String.class,
+                sessionId));
+    }
+
+    @Test
+    void requiredPasswordChangeMustCreateAuditedSession() throws Exception {
+        TestUser user = insertUser(UserType.INTERNAL, "direct-change");
+        jdbc.update("UPDATE iam_user SET password_change_required=true WHERE id=?", user.id());
+
+        MvcResult result = mockMvc.perform(post("/api/iam/auth/password/change-required")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "currentPassword": "%s",
+                                  "newPassword": "S05-New-Password-456!",
+                                  "confirmation": "S05-New-Password-456!",
+                                  "clientId": "mom-admin-web",
+                                  "deviceName": "JUnit"
+                                }
+                                """.formatted(user.username(), PASSWORD)))
+                .andExpect(status().isOk())
+                .andReturn();
+        String sessionId = jsonString(result.getResponse().getContentAsString(), "sessionId");
+        assertNotNull(sessionId);
+        assertEquals(false, jdbc.queryForObject(
+                "SELECT password_change_required FROM iam_user WHERE id=?",
+                Boolean.class,
+                user.id()));
+        assertEquals("mom-iam-session", jdbc.queryForObject(
+                "SELECT created_by FROM iam_user_session WHERE id=?",
+                String.class,
+                sessionId));
+    }
+
+    @Test
     void webRefreshMustRotateOnceAndReplayMustCompromiseSession() throws Exception {
         TestUser user = insertUser(UserType.INTERNAL, "web");
         TokenResponse initial = issueAuthorizationCodeTokens(

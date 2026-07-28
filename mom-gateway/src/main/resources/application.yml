@@ -64,6 +64,17 @@ mom:
       redis-timeout: ${IAM_REVOKED_SID_REDIS_TIMEOUT:2s}
 
 management:
+  otlp:
+    metrics:
+      export:
+        enabled: ${OTEL_METRICS_EXPORT_ENABLED:true}
+        # 注意：必须使用独立的 METRICS 环境变量
+        url: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:http://100.101.189.22:4318/v1/metrics}
+        # 建议明确配置，避免远端异常时长时间阻塞
+        connect-timeout: ${OTEL_EXPORTER_OTLP_METRICS_CONNECT_TIMEOUT:2s}
+        read-timeout: ${OTEL_EXPORTER_OTLP_METRICS_TIMEOUT:5s}
+        # 指标推送周期
+        step: ${OTEL_EXPORTER_OTLP_METRICS_STEP:30s}
   endpoints:
     web:
       exposure:
@@ -80,15 +91,23 @@ management:
     export:
       otlp:
         enabled: ${OTEL_TRACING_EXPORT_ENABLED:false}
+    # 建议排障阶段先关闭指标 Exemplar
+    # 确认 Metrics 和 Traces 都正常后，再改回 sampled-traces
+    exemplars:
+      include: ${OTEL_METRICS_EXEMPLARS_INCLUDE:none}
   opentelemetry:
     resource-attributes:
+      # 强烈建议补充，否则可能出现 unknown_service
+      service.name: ${spring.application.name}
       service.namespace: mom-platform
       deployment.environment.name: ${MOM_ENVIRONMENT:local}
     tracing:
       export:
         otlp:
-          endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://127.0.0.1:4318/v1/traces}
-          timeout: ${OTEL_EXPORTER_OTLP_TRACES_TIMEOUT:2s}
+          endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://100.101.189.22:4318/v1/traces}
+          connect-timeout: ${OTEL_EXPORTER_OTLP_TRACES_CONNECT_TIMEOUT:2s}
+          timeout: ${OTEL_EXPORTER_OTLP_TRACES_TIMEOUT:5s}
+          transport: http
 
 logging:
   pattern:

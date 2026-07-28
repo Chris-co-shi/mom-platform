@@ -1,6 +1,8 @@
 package io.github.chrisshi.mom.iam.web;
 
+import io.github.chrisshi.mom.core.security.AuditContextExecutor;
 import io.github.chrisshi.mom.iam.domain.type.UserType;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserEntity;
 import io.github.chrisshi.mom.iam.security.IamAccountAuthenticationService;
 import io.github.chrisshi.mom.iam.security.IamAuthorizationContext;
 import io.github.chrisshi.mom.iam.security.IamClientAccessPolicyService;
@@ -46,7 +48,12 @@ class IamDirectAuthenticationControllerTest {
     @BeforeEach
     void setUp() {
         controller = new IamDirectAuthenticationController(
-                authenticationProvider, accounts, clientAccess, sessions, jwtIssuer);
+                authenticationProvider,
+                accounts,
+                clientAccess,
+                sessions,
+                jwtIssuer,
+                new AuditContextExecutor());
     }
 
     @Test
@@ -69,6 +76,7 @@ class IamDirectAuthenticationControllerTest {
     @Test
     void requiredPasswordChangeMustNotIssueSessionOrToken() {
         when(authenticationProvider.authenticate(any())).thenReturn(authenticated("admin"));
+        when(accounts.requireUser("admin")).thenReturn(user());
         when(accounts.requiresPasswordChange("admin")).thenReturn(true);
         MockHttpServletRequest request = request();
 
@@ -86,6 +94,7 @@ class IamDirectAuthenticationControllerTest {
     @Test
     void successfulLoginMustReuseAuthoritativeSessionAndJwtServices() {
         when(authenticationProvider.authenticate(any())).thenReturn(authenticated("admin"));
+        when(accounts.requireUser("admin")).thenReturn(user());
         when(accounts.requiresPasswordChange("admin")).thenReturn(false);
         Instant issuedAt = Instant.parse("2026-07-26T10:00:00Z");
         Instant accessExpiresAt = issuedAt.plusSeconds(600);
@@ -206,5 +215,13 @@ class IamDirectAuthenticationControllerTest {
                 List.of("factory-1"),
                 null,
                 null);
+    }
+
+    private static IamUserEntity user() {
+        IamUserEntity user = new IamUserEntity();
+        user.setId("user-1");
+        user.setUsername("admin");
+        user.setUserType(UserType.INTERNAL);
+        return user;
     }
 }
