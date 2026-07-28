@@ -84,6 +84,7 @@ jobs:
             **/target/surefire-reports/**
             **/target/failsafe-reports/**
           if-no-files-found: ignore
+          include-hidden-files: true
 
   nacos-redis-smoke:
     name: Nacos and Redis integration smoke
@@ -136,6 +137,7 @@ jobs:
             rate-limit-second.json
             redis-failure-response.json
           if-no-files-found: ignore
+          include-hidden-files: true
 
   postgresql-smoke:
     name: PostgreSQL packaged application smoke
@@ -181,6 +183,7 @@ jobs:
             mdm-data-probe-read.json
             mdm-postgresql-failure.json
           if-no-files-found: ignore
+          include-hidden-files: true
 
   seata-verify:
     name: Seata scoped verification
@@ -227,3 +230,4 @@ jobs:
             **/target/surefire-reports/**
             **/target/failsafe-reports/**
           if-no-files-found: ignore
+          include-hidden-files: true
