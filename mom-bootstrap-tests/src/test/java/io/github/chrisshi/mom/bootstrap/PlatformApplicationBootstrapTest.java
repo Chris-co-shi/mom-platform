@@ -1,13 +1,19 @@
 package io.github.chrisshi.mom.bootstrap;
 
 import io.github.chrisshi.mom.iam.MomIamApplication;
+import io.github.chrisshi.mom.iam.security.IamDirectAuthenticationConfiguration;
+import io.github.chrisshi.mom.iam.web.IamDirectAuthenticationController;
 import io.github.chrisshi.mom.integration.MomIntegrationApplication;
 import io.github.chrisshi.mom.mdm.MomMdmApplication;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.annotation.FilterType;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -46,7 +52,10 @@ class PlatformApplicationBootstrapTest {
     private void assertApplicationStarts(
             Class<?> applicationClass,
             boolean explicitlyEnableIamAdmin) {
-        SpringApplicationBuilder builder = new SpringApplicationBuilder(applicationClass)
+        Class<?> bootstrapClass = applicationClass == MomIamApplication.class
+                ? IamWithoutInfrastructureTestApplication.class
+                : applicationClass;
+        SpringApplicationBuilder builder = new SpringApplicationBuilder(bootstrapClass)
                 .web(WebApplicationType.SERVLET)
                 .properties(
                         "server.port=0",
@@ -71,5 +80,26 @@ class PlatformApplicationBootstrapTest {
             assertFalse(context.containsBean("integrationIdempotencyProbeController"));
             assertFalse(context.containsBean("mdmServiceProbeController"));
         }
+    }
+
+    /**
+     * IAM 无外部基础设施启动测试专用入口。
+     *
+     * <p>第一方 JSON 认证控制器及其安全链依赖由 PostgreSQL 和 Redis 支撑的认证服务，不属于本测试的
+     * 无外部基础设施边界，因此仅在该测试上下文中排除。生产 {@link MomIamApplication} 及其组件扫描
+     * 不受影响；IAM 认证链由 IAM 模块自身的定向与真实中间件测试覆盖。</p>
+     */
+    @SpringBootConfiguration(proxyBeanMethods = false)
+    @EnableAutoConfiguration
+    @ComponentScan(
+            basePackageClasses = MomIamApplication.class,
+            excludeFilters = @ComponentScan.Filter(
+                    type = FilterType.ASSIGNABLE_TYPE,
+                    classes = {
+                            MomIamApplication.class,
+                            IamDirectAuthenticationConfiguration.class,
+                            IamDirectAuthenticationController.class
+                    }))
+    static class IamWithoutInfrastructureTestApplication {
     }
 }
