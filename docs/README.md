@@ -2,7 +2,7 @@
 
 本目录是 `mom-platform` 的需求、计划、架构、安全协议和架构决策权威入口。
 
-> P1.5 S00～S12 已完成并合并。P1.6 在长期 Draft PR #33 中执行；S00、S01、S02 已完成，当前仅执行 S03。
+> P1.5 S00～S12 已完成并合并。P1.6 在长期 Draft PR #33 中执行；S00～S03 已完成，S04 尚未开始。
 
 ## 文档使用原则
 
@@ -18,7 +18,7 @@
 
 - Phase 01：基础技术骨架已完成。
 - P1.5：**Completed / Merged**，S00～S12 全部完成。
-- P1.6：S00 **Completed under accepted local-development risk**，S01/S02 **Completed**，S03 **In Progress**，S04～S19 Not Started；PR #33 保持 Draft。
+- P1.6：S00 **Completed under accepted local-development risk**，S01～S03 **Completed**，S04～S19 Not Started；PR #33 保持 Draft。
 - Phase 02：**Not Started**，业务垂直切片未因 P1.6 治理而启动。
 - Android Keystore、HTTPS App Link 与真机强杀恢复：Phase 02 Mobile 正式联调前置验收项。
 

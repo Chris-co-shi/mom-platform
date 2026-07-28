@@ -36,6 +36,7 @@ jobs:
           .github/scripts/validate-engineering-baseline.sh
           .github/scripts/validate-secure-defaults.sh
           .github/scripts/validate-persistence-baseline.sh
+          .github/scripts/validate-runtime-security-baseline.sh
 
       - name: Validate Python syntax
         shell: bash
@@ -44,6 +45,8 @@ jobs:
           scripts/summarize-maven-failure.py
           .github/scripts/validate_persistence_baseline.py
           .github/scripts/test_validate_persistence_baseline.py
+          .github/scripts/validate_runtime_security_baseline.py
+          .github/scripts/test_validate_runtime_security_baseline.py
 
       - name: Validate official engineering baseline
         shell: bash
@@ -71,6 +74,13 @@ jobs:
             bash .github/scripts/validate-persistence-baseline.sh 2>&1 | tee persistence-baseline.log
           fi
 
+      - name: Validate runtime security baseline
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 .github/scripts/test_validate_runtime_security_baseline.py
+          bash .github/scripts/validate-runtime-security-baseline.sh 2>&1 | tee runtime-security-baseline.log
+
       - name: Upload engineering baseline report
         if: always()
         uses: actions/upload-artifact@v4
@@ -80,4 +90,5 @@ jobs:
             engineering-baseline.log
             secure-defaults.log
             persistence-baseline.log
+            runtime-security-baseline.log
           if-no-files-found: error
