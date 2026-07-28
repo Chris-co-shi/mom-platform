@@ -16,7 +16,7 @@
   <img alt="Status" src="https://img.shields.io/badge/Status-Phase%2002%20Ready-2563EB">
 </p>
 
-[文档中心](docs/README.md) · [P1.5 设计基线](docs/security/P1.5-认证与授权设计基线.md) · [P1.5 实施计划](docs/plans/P1.5-认证与授权闭环计划.md) · [V1 路线图](docs/plans/V1路线图.md) · [ADR](docs/adr/README.md)
+[文档中心](docs/README.md) · [P1.6 治理计划](docs/plans/P1.6-IAM与System平台治理计划.md) · [P1.6 实施进度](docs/plans/P1.6-实施进度.md) · [P1.5 设计基线](docs/security/P1.5-认证与授权设计基线.md) · [V1 路线图](docs/plans/V1路线图.md) · [ADR](docs/adr/README.md)
 
 </div>
 
@@ -198,6 +198,8 @@ mvn -B -ntp clean verify
 |---|---|---|
 | 总览 | [文档中心](docs/README.md) | 全部文档导航与维护规则 |
 | 安全 | [P1.5 设计基线](docs/security/P1.5-认证与授权设计基线.md) | 跨仓库认证授权权威协议 |
+| 计划 | [P1.6 治理计划](docs/plans/P1.6-IAM与System平台治理计划.md) | S00～S19、阶段门禁与 Review 边界 |
+| 计划 | [P1.6 实施进度](docs/plans/P1.6-实施进度.md) | 当前 Slice 与动态证据入口 |
 | 计划 | [P1.5 实施计划](docs/plans/P1.5-认证与授权闭环计划.md) | S00～S12、职责矩阵与 DoD |
 | 计划 | [V1 路线图](docs/plans/V1路线图.md) | V1 阶段和交付目标 |
 | 计划 | [Phase 01 技术骨架](docs/plans/Phase-01-技术骨架计划.md) | 已完成基础与明确边界 |
@@ -211,6 +213,7 @@ mvn -B -ntp clean verify
 |---|---|---|
 | Phase 01 | JDK 25 + Boot 4 基础技术骨架与观测闭环 | ✅ 基础完成 |
 | P1.5 | 认证与授权闭环 | ✅ Completed / Merged（S00～S12） |
+| P1.6 | IAM 收敛与 System 平台治理 | ⏳ S00 Awaiting Credential Rotation |
 | Phase 02 | 供应商送货、来料检验、PDA 入库、库存闭环 | ⏳ Pending / Ready after preflight cleanup |
 | Phase 03 | 生产工单、PCS 协同、半成品与成品批次 | ⏳ 计划中 |
 | Phase 04 | 成品放行、WCS 入库、客户发运、追溯和召回 | ⏳ 计划中 |
