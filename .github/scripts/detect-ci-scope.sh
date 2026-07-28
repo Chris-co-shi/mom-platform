@@ -83,6 +83,7 @@ esac
 
 git diff --name-only "$BASE_SHA" "$HEAD_SHA" > changed-files.txt
 git diff --unified=0 "$BASE_SHA" "$HEAD_SHA" > changed-content.diff
+grep '^+' changed-content.diff | grep -v '^+++' > changed-additions.diff || true
 
 path_matches() {
   local pattern="$1"
@@ -91,7 +92,7 @@ path_matches() {
 
 content_matches() {
   local pattern="$1"
-  grep --extended-regexp --ignore-case --quiet "$pattern" changed-content.diff
+  grep --extended-regexp --ignore-case --quiet "$pattern" changed-additions.diff
 }
 
 nacos_redis=false
