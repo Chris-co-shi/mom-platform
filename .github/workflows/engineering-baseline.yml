@@ -21,6 +21,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # 持久化门禁按 PR Base/Head Git 对象验证已发布 Migration 不可变性。
+          fetch-depth: 0
 
       - name: Validate shell syntax
         shell: bash
@@ -32,10 +35,15 @@ jobs:
           .github/scripts/detect-ci-scope.sh
           .github/scripts/validate-engineering-baseline.sh
           .github/scripts/validate-secure-defaults.sh
+          .github/scripts/validate-persistence-baseline.sh
 
       - name: Validate Python syntax
         shell: bash
-        run: python3 -m py_compile scripts/summarize-maven-failure.py
+        run: >-
+          python3 -m py_compile
+          scripts/summarize-maven-failure.py
+          .github/scripts/validate_persistence_baseline.py
+          .github/scripts/test_validate_persistence_baseline.py
 
       - name: Validate official engineering baseline
         shell: bash
@@ -50,6 +58,19 @@ jobs:
           bash .github/scripts/validate-secure-defaults.sh --self-test
           bash .github/scripts/validate-secure-defaults.sh 2>&1 | tee secure-defaults.log
 
+      - name: Validate persistence baseline
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -o pipefail
+          python3 .github/scripts/test_validate_persistence_baseline.py
+          if [[ -n "${BASE_SHA}" ]]; then
+            bash .github/scripts/validate-persistence-baseline.sh --base "${BASE_SHA}" --head HEAD 2>&1 | tee persistence-baseline.log
+          else
+            bash .github/scripts/validate-persistence-baseline.sh 2>&1 | tee persistence-baseline.log
+          fi
+
       - name: Upload engineering baseline report
         if: always()
         uses: actions/upload-artifact@v4
@@ -58,4 +79,5 @@ jobs:
           path: |
             engineering-baseline.log
             secure-defaults.log
+            persistence-baseline.log
           if-no-files-found: error
