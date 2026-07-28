@@ -27,6 +27,10 @@ jobs:
           java-version: "25"
           cache: maven
 
+      - name: Check production configuration security defaults
+        shell: bash
+        run: bash .github/scripts/check-production-config-defaults.sh
+
       - name: Clean verify reactor and architecture boundaries
         shell: bash
         run: |

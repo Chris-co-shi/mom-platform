@@ -12,9 +12,9 @@ spring:
   application:
     name: mom-iam-server
   datasource:
-    url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:100.101.189.22}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:iam}?currentSchema=${POSTGRES_SCHEMA:mom_iam}&tcpKeepAlive=${POSTGRES_TCP_KEEP_ALIVE:true}&ApplicationName=${POSTGRES_APPLICATION_NAME:mom-iam-server}}
-    username: ${POSTGRES_USERNAME:iam_app}
-    password: ${POSTGRES_PASSWORD:mamnan920130.}
+    url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_iam}&tcpKeepAlive=${POSTGRES_TCP_KEEP_ALIVE:true}&ApplicationName=${POSTGRES_APPLICATION_NAME:mom-iam-server}}
+    username: ${POSTGRES_USERNAME:mom}
+    password: ${POSTGRES_PASSWORD:}
     hikari:
       pool-name: ${POSTGRES_POOL_NAME:mom-iam-hikari}
       minimum-idle: ${POSTGRES_MINIMUM_IDLE:1}
@@ -25,9 +25,9 @@ spring:
       connection-init-sql: SET TIME ZONE 'UTC'
   data:
     redis:
-      host: ${REDIS_HOST:100.101.189.22}
+      host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:redis123}
+      password: ${REDIS_PASSWORD:}
       database: ${REDIS_DATABASE:0}
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
       timeout: ${REDIS_COMMAND_TIMEOUT:2s}
@@ -43,10 +43,10 @@ spring:
   cloud:
     nacos:
       discovery:
-        enabled: ${NACOS_DISCOVERY_ENABLED:true}
-        server-addr: ${NACOS_SERVER_ADDR:100.101.189.22:8848}
+        enabled: ${NACOS_DISCOVERY_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:mamnan920130.}
+        password: ${NACOS_PASSWORD:}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
@@ -54,9 +54,9 @@ spring:
 mom:
   iam:
     bootstrap:
-      enabled: ${IAM_BOOTSTRAP_ENABLED:true}
+      enabled: ${IAM_BOOTSTRAP_ENABLED:false}
       username: admin
-      password: ${IAM_BOOTSTRAP_PASSWORD:mamnan920130.}
+      password: ${IAM_BOOTSTRAP_PASSWORD:}
       display-name: ${IAM_BOOTSTRAP_DISPLAY_NAME:Platform Administrator}
     admin:
       enabled: ${IAM_ADMIN_ENABLED:true}
@@ -103,9 +103,9 @@ management:
   otlp:
     metrics:
       export:
-        enabled: ${OTEL_METRICS_EXPORT_ENABLED:true}
+        enabled: ${OTEL_METRICS_EXPORT_ENABLED:false}
         # 注意：必须使用独立的 METRICS 环境变量
-        url: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:http://100.101.189.22:4318/v1/metrics}
+        url: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:http://127.0.0.1:4318/v1/metrics}
         # 建议明确配置，避免远端异常时长时间阻塞
         connect-timeout: ${OTEL_EXPORTER_OTLP_METRICS_CONNECT_TIMEOUT:2s}
         read-timeout: ${OTEL_EXPORTER_OTLP_METRICS_TIMEOUT:5s}
@@ -140,7 +140,7 @@ management:
     tracing:
       export:
         otlp:
-          endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://100.101.189.22:4318/v1/traces}
+          endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://127.0.0.1:4318/v1/traces}
           connect-timeout: ${OTEL_EXPORTER_OTLP_TRACES_CONNECT_TIMEOUT:2s}
           timeout: ${OTEL_EXPORTER_OTLP_TRACES_TIMEOUT:5s}
           transport: http
