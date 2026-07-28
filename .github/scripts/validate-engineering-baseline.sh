@@ -30,6 +30,9 @@ required_files = [
     ".github/scripts/validate-test-baseline.sh",
     ".github/scripts/validate_test_baseline.py",
     ".github/scripts/test_validate_test_baseline.py",
+    ".github/scripts/validate-localization-baseline.sh",
+    ".github/scripts/validate_localization_baseline.py",
+    ".github/scripts/test_validate_localization_baseline.py",
     ".github/scripts/nacos-discovery-smoke.sh",
     ".github/scripts/redis-idempotency-smoke.sh",
     ".github/scripts/redis-rate-limit-smoke.sh",
@@ -53,12 +56,19 @@ required_files = [
     "docs/engineering/standards/maven-test-lifecycle-standard.md",
     "docs/engineering/standards/testcontainers-smoke-acceptance-standard.md",
     "docs/engineering/standards/ci-scope-quality-gate-standard.md",
+    "docs/engineering/standards/localization-locale-standard.md",
+    "docs/engineering/standards/timezone-date-time-standard.md",
+    "docs/engineering/standards/number-money-rounding-standard.md",
+    "docs/engineering/standards/measurement-unit-standard.md",
+    "docs/engineering/standards/user-preference-standard.md",
     "docs/engineering/P1.6-S02-持久化历史例外清单.md",
     "docs/adr/ADR-020-PostgreSQL物理Schema命名空间.md",
     "docs/engineering/P1.6-S03-安全配置历史例外清单.md",
     "docs/adr/ADR-021-运行时配置来源与Secret边界.md",
     "docs/engineering/P1.6-S04-测试与CI历史例外清单.md",
     "docs/adr/ADR-022-测试分层与CI质量门禁.md",
+    "docs/engineering/P1.6-S05-国际化与个性化现状清单.md",
+    "docs/adr/ADR-023-Locale时区与用户偏好边界.md",
     "mom-architecture-tests/pom.xml",
     "mom-architecture-tests/src/test/java/io/github/chrisshi/mom/architecture/MavenModuleDependencyArchitectureTest.java",
     "mom-architecture-tests/src/test/java/io/github/chrisshi/mom/architecture/ServerPackageArchitectureTest.java",
@@ -187,5 +197,5 @@ for note in notes:
 print("- no preview/internal API/module-escape violations")
 print("- no legacy Nacos bootstrap or disabled compatibility checks")
 print("- IAM default tests contain no external data-store integration tests")
-print("- S01/S02/S03/S04 standards and Maven architecture-test module are wired")
+print("- S01/S02/S03/S04/S05 standards and Maven architecture-test module are wired")
 PY

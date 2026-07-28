@@ -38,6 +38,7 @@ jobs:
           .github/scripts/validate-persistence-baseline.sh
           .github/scripts/validate-runtime-security-baseline.sh
           .github/scripts/validate-test-baseline.sh
+          .github/scripts/validate-localization-baseline.sh
           .github/scripts/nacos-discovery-smoke.sh
           .github/scripts/redis-idempotency-smoke.sh
           .github/scripts/redis-rate-limit-smoke.sh
@@ -53,6 +54,8 @@ jobs:
           .github/scripts/test_validate_runtime_security_baseline.py
           .github/scripts/validate_test_baseline.py
           .github/scripts/test_validate_test_baseline.py
+          .github/scripts/validate_localization_baseline.py
+          .github/scripts/test_validate_localization_baseline.py
 
       - name: Validate official engineering baseline
         shell: bash
@@ -94,6 +97,13 @@ jobs:
           python3 .github/scripts/test_validate_test_baseline.py
           bash .github/scripts/validate-test-baseline.sh 2>&1 | tee test-baseline.log
 
+      - name: Validate localization baseline
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 .github/scripts/test_validate_localization_baseline.py
+          bash .github/scripts/validate-localization-baseline.sh 2>&1 | tee localization-baseline.log
+
       - name: Upload engineering baseline report
         if: always()
         uses: actions/upload-artifact@v4
@@ -105,4 +115,5 @@ jobs:
             persistence-baseline.log
             runtime-security-baseline.log
             test-baseline.log
+            localization-baseline.log
           if-no-files-found: error
