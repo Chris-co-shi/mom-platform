@@ -18,7 +18,7 @@
 
 - Phase 01：基础技术骨架已完成。
 - P1.5：**Completed / Merged**，S00～S12 全部完成。
-- P1.6：**S00 Awaiting Credential Rotation**，S01～S19 尚未开始。
+- P1.6：**S00 Completed under accepted local-development risk**，S01～S19 尚未开始。
 - Phase 02：**Pending / Ready after preflight cleanup**，业务垂直切片尚未开始。
 - Android Keystore、HTTPS App Link 与真机强杀恢复：Phase 02 Mobile 正式联调前置验收项。
 

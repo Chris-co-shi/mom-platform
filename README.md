@@ -213,7 +213,7 @@ mvn -B -ntp clean verify
 |---|---|---|
 | Phase 01 | JDK 25 + Boot 4 基础技术骨架与观测闭环 | ✅ 基础完成 |
 | P1.5 | 认证与授权闭环 | ✅ Completed / Merged（S00～S12） |
-| P1.6 | IAM 收敛与 System 平台治理 | ⏳ S00 Awaiting Credential Rotation |
+| P1.6 | IAM 收敛与 System 平台治理 | ✅ S00 Completed under accepted local-development risk；S01 尚未开始 |
 | Phase 02 | 供应商送货、来料检验、PDA 入库、库存闭环 | ⏳ Pending / Ready after preflight cleanup |
 | Phase 03 | 生产工单、PCS 协同、半成品与成品批次 | ⏳ 计划中 |
 | Phase 04 | 成品放行、WCS 入库、客户发运、追溯和召回 | ⏳ 计划中 |
