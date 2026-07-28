@@ -82,8 +82,59 @@ case "$EVENT_NAME" in
 esac
 
 git diff --name-only "$BASE_SHA" "$HEAD_SHA" > changed-files.txt
-git diff --unified=0 "$BASE_SHA" "$HEAD_SHA" > changed-content.diff
-grep '^+' changed-content.diff | grep -v '^+++' > changed-additions.diff || true
+
+# 只从可能影响运行时的源码、配置、POM 和 CI 脚本中提取新增内容。
+# 工程规范、PR 模板和本地 Codex 工具即使提到 Nacos/PostgreSQL/Seata，n# 也不能因此启动重型基础设施验证。
+python3 - "$BASE_SHA" "$HEAD_SHA" > changed-additions.diff <<'PY'
+from __future__ import annotations
+
+import pathlib
+import subprocess
+import sys
+
+base, head = sys.argv[1:3]
+diff = subprocess.check_output(
+    ["git", "diff", "--unified=0", base, head],
+    text=True,
+    errors="replace",
+)
+
+excluded_exact = {
+    "AGENTS.md",
+    ".github/pull_request_template.md",
+    ".github/scripts/detect-ci-scope.sh",
+    ".github/scripts/validate-engineering-baseline.sh",
+    "scripts/codex-doctor.sh",
+    "scripts/codex-verify-changed.sh",
+    "scripts/codex-mvn-test.sh",
+    "scripts/summarize-maven-failure.py",
+}
+relevant_suffixes = {".java", ".xml", ".yml", ".yaml", ".properties", ".sql", ".sh"}
+
+
+def relevant(path: str | None) -> bool:
+    if not path or path == "/dev/null":
+        return False
+    if path in excluded_exact or path.startswith(("docs/", ".codex/")):
+        return False
+    if path == "pom.xml" or path.endswith("/pom.xml"):
+        return True
+    if path.startswith((".github/workflows/", ".github/scripts/")):
+        return True
+    return pathlib.PurePosixPath(path).suffix.lower() in relevant_suffixes
+
+
+current: str | None = None
+for line in diff.splitlines():
+    if line.startswith("+++ b/"):
+        current = line[6:]
+        continue
+    if line.startswith("+++ /dev/null"):
+        current = None
+        continue
+    if line.startswith("+") and not line.startswith("+++") and relevant(current):
+        print(line)
+PY
 
 path_matches() {
   local pattern="$1"
