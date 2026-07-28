@@ -31,6 +31,7 @@ jobs:
           scripts/codex-verify-changed.sh
           .github/scripts/detect-ci-scope.sh
           .github/scripts/validate-engineering-baseline.sh
+          .github/scripts/validate-secure-defaults.sh
 
       - name: Validate Python syntax
         shell: bash
@@ -42,10 +43,19 @@ jobs:
           set -o pipefail
           bash .github/scripts/validate-engineering-baseline.sh 2>&1 | tee engineering-baseline.log
 
+      - name: Validate secure runtime defaults
+        shell: bash
+        run: |
+          set -o pipefail
+          bash .github/scripts/validate-secure-defaults.sh --self-test
+          bash .github/scripts/validate-secure-defaults.sh 2>&1 | tee secure-defaults.log
+
       - name: Upload engineering baseline report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: engineering-baseline-report
-          path: engineering-baseline.log
+          path: |
+            engineering-baseline.log
+            secure-defaults.log
           if-no-files-found: error

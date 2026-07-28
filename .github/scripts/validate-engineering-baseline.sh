@@ -21,6 +21,7 @@ required_files = [
     "scripts/summarize-maven-failure.py",
     "scripts/codex-doctor.sh",
     "scripts/codex-verify-changed.sh",
+    ".github/scripts/validate-secure-defaults.sh",
     "docs/engineering/codex-local-workflow.md",
     "docs/engineering/standards/official-source-policy.md",
     "docs/engineering/standards/jdk-25-engineering-standard.md",

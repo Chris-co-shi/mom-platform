@@ -8,6 +8,7 @@ import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
 import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.core.env.Environment;
 
 import java.net.URI;
 import java.time.Duration;
@@ -17,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/** Gateway 本地启动、路由、关联标识和安全基础配置绑定测试。 */
 class MomGatewayApplicationTest {
 
     @Test
@@ -33,6 +35,14 @@ class MomGatewayApplicationTest {
             assertTrue(context.isActive());
             assertNotNull(context.getBean(HealthEndpoint.class));
             assertNotNull(context.getBean(CorrelationIdGlobalFilter.class));
+
+            Environment environment = context.getEnvironment();
+            assertEquals("127.0.0.1", environment.getProperty("spring.data.redis.host"));
+            assertEquals("", environment.getProperty("spring.data.redis.password"));
+            assertEquals("false", environment.getProperty("spring.cloud.nacos.discovery.enabled"));
+            assertEquals("", environment.getProperty("spring.cloud.nacos.discovery.password"));
+            assertEquals("false", environment.getProperty("management.otlp.metrics.export.enabled"));
+            assertEquals("false", environment.getProperty("management.tracing.export.otlp.enabled"));
 
             RouteDefinitionLocator locator = context.getBean(RouteDefinitionLocator.class);
             List<RouteDefinition> routes = locator.getRouteDefinitions()

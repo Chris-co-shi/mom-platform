@@ -7,7 +7,7 @@ spring:
   datasource:
     url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_integration}&tcpKeepAlive=${POSTGRES_TCP_KEEP_ALIVE:true}&ApplicationName=${POSTGRES_APPLICATION_NAME:mom-integration-server}}
     username: ${POSTGRES_USERNAME:mom}
-    password: ${POSTGRES_PASSWORD:mom}
+    password: ${POSTGRES_PASSWORD:}
     hikari:
       pool-name: ${POSTGRES_POOL_NAME:mom-integration-hikari}
       minimum-idle: ${POSTGRES_MINIMUM_IDLE:1}
@@ -42,7 +42,7 @@ spring:
         enabled: ${NACOS_DISCOVERY_ENABLED:false}
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:nacos}
+        password: ${NACOS_PASSWORD:}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
