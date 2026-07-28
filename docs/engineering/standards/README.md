@@ -17,5 +17,9 @@
 - `security-protocol-runtime-standard.md`：IAM 端点矩阵、FilterChain、Gateway、Resource Server 与 Actuator；
 - `outbound-http-client-standard.md`：OpenFeign 位置、超时、重试、错误映射、凭证与 Fallback；
 - `redis-key-ttl-failure-standard.md`：Redis Key、TTL、序列化、原子性、故障矩阵与低阶幂等边界。
+- `testing-strategy-standard.md`：L0～L6 测试证据、替身、契约和覆盖率边界；
+- `maven-test-lifecycle-standard.md`：Surefire/Failsafe 3.5.4、命名、生命周期与 Codex 日志；
+- `testcontainers-smoke-acceptance-standard.md`：Testcontainers、打包 Smoke 与真实基础设施验收；
+- `ci-scope-quality-gate-standard.md`：增量/完整范围、条件 Job、手动验收与质量门禁。
 
 本索引只负责导航，强制规则以根目录 `AGENTS.md` 和对应规范正文为准。

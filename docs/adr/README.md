@@ -43,6 +43,7 @@ ADR 用于记录重要架构决策的背景、候选方案、最终选择、正�
 | [ADR-019](ADR-019-P1.5认证与授权闭环.md) | P1.5 认证与授权闭环 | Accepted | P1.5 设计基线、实施计划、安全架构 |
 | [ADR-020](ADR-020-PostgreSQL物理Schema命名空间.md) | PostgreSQL 物理 Schema 命名空间 | Accepted | ADR-004、数据架构、持久化规范 |
 | [ADR-021](ADR-021-运行时配置来源与Secret边界.md) | 运行时配置来源与 Secret 边界 | Accepted | 部署架构、安全协议、配置规范 |
+| [ADR-022](ADR-022-测试分层与CI质量门禁.md) | 测试分层与 CI 质量门禁 | Accepted | Maven 生命周期、Smoke、CI Scope |
 
 ## 4. 新建 ADR
 

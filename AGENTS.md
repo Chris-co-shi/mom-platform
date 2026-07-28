@@ -62,6 +62,13 @@
 - `docs/engineering/standards/security-protocol-runtime-standard.md`；
 - `docs/engineering/standards/outbound-http-client-standard.md`；
 - `docs/engineering/standards/redis-key-ttl-failure-standard.md`。
+
+测试分层、Maven 生命周期与 CI 质量门禁的详细权威来源为：
+
+- `docs/engineering/standards/testing-strategy-standard.md`；
+- `docs/engineering/standards/maven-test-lifecycle-standard.md`；
+- `docs/engineering/standards/testcontainers-smoke-acceptance-standard.md`；
+- `docs/engineering/standards/ci-scope-quality-gate-standard.md`。
 - `docs/engineering/standards/persistence-data-modeling-standard.md`；
 - `docs/engineering/standards/transaction-consistency-standard.md`；
 - `docs/engineering/standards/audit-concurrency-lifecycle-standard.md`。
@@ -76,6 +83,10 @@
 Config 分离，Nacos Config 不作为 Secret Manager，2025.1.x 只允许 `spring.config.import`。Gateway 与业务
 Resource Server 都验证 JWT，Gateway 不承担最终授权。Feign 必须有有限超时且写请求默认不自动重试；
 Redis 临时状态必须有 TTL，原始 Idempotency-Key 不 Trim、改大小写、归一化或写入 Redis Key/日志。
+
+测试强制摘要：Surefire 只运行快速 `*Test`/`*Tests`，Failsafe 在 `verify` 运行 `*IT`/`*ITCase`；
+Testcontainers、打包 JAR、真实基础设施和跨仓库 E2E 是不同证据层级。Nacos Discovery、Redis 幂等和
+Redis 限流必须为独立 Job，`skipped` 不得描述为成功，技术探针只有在调用方及等价替代证据齐备后才能删除。
 
 ## 4. 数据访问约束
 
