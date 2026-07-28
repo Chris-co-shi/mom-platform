@@ -5,6 +5,8 @@ OUTPUT_FILE="${GITHUB_OUTPUT:-/dev/stdout}"
 SUMMARY_FILE="${GITHUB_STEP_SUMMARY:-/dev/null}"
 MANUAL_SCOPE="${MANUAL_SCOPE:-auto}"
 EVENT_NAME="${EVENT_NAME:-local}"
+PR_ACTION="${PR_ACTION:-}"
+PR_PREVIOUS_SHA="${PR_PREVIOUS_SHA:-}"
 
 emit() {
   printf '%s=%s\n' "$1" "$2" >>"$OUTPUT_FILE"
@@ -63,10 +65,22 @@ if set_manual_scope "$MANUAL_SCOPE"; then
   exit 0
 fi
 
+AUTO_MODE="auto"
 case "$EVENT_NAME" in
   pull_request)
-    BASE_SHA="${PR_BASE_SHA:?PR_BASE_SHA is required}"
     HEAD_SHA="${PR_HEAD_SHA:?PR_HEAD_SHA is required}"
+    if [[ "$PR_ACTION" == "synchronize" \
+          && -n "$PR_PREVIOUS_SHA" \
+          && ! "$PR_PREVIOUS_SHA" =~ ^0+$ ]] \
+       && git cat-file -e "${PR_PREVIOUS_SHA}^{commit}" 2>/dev/null; then
+      # 长期 PR 后续 push 只验证本次新增差异，避免旧基础设施改动在纯文档提交后反复触发。
+      BASE_SHA="$PR_PREVIOUS_SHA"
+      AUTO_MODE="auto:pull-request-incremental"
+    else
+      # PR 首次创建、重新打开或旧 Head 不可达时，使用完整 PR 差异确保首次基础设施验收不遗漏。
+      BASE_SHA="${PR_BASE_SHA:?PR_BASE_SHA is required}"
+      AUTO_MODE="auto:pull-request-full"
+    fi
     ;;
   push)
     BASE_SHA="${PUSH_BASE_SHA:-}"
@@ -74,10 +88,12 @@ case "$EVENT_NAME" in
     if [[ -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
       BASE_SHA="$(git rev-parse "${HEAD_SHA}^")"
     fi
+    AUTO_MODE="auto:push"
     ;;
   *)
     HEAD_SHA="${PUSH_HEAD_SHA:-HEAD}"
     BASE_SHA="$(git rev-parse "${HEAD_SHA}^")"
+    AUTO_MODE="auto:local"
     ;;
 esac
 
@@ -103,6 +119,7 @@ diff = subprocess.check_output(
 excluded_exact = {
     "AGENTS.md",
     ".github/pull_request_template.md",
+    ".github/workflows/ci.yml",
     ".github/scripts/detect-ci-scope.sh",
     ".github/scripts/validate-engineering-baseline.sh",
     "scripts/codex-doctor.sh",
@@ -175,12 +192,13 @@ fi
 emit nacos_redis "$nacos_redis"
 emit postgresql "$postgresql"
 emit seata "$seata"
-emit mode "auto"
+emit mode "$AUTO_MODE"
 emit changed_count "$(wc -l < changed-files.txt | tr -d ' ')"
 
 emit_summary "### Infrastructure scope"
 emit_summary ""
-emit_summary "- Mode: auto"
+emit_summary "- Mode: ${AUTO_MODE}"
+emit_summary "- Diff range: ${BASE_SHA}..${HEAD_SHA}"
 emit_summary "- Changed files: $(wc -l < changed-files.txt | tr -d ' ')"
 emit_summary "- Nacos/Redis: ${nacos_redis}"
 emit_summary "- PostgreSQL: ${postgresql}"
