@@ -117,12 +117,15 @@ for relative in filter(None, tracked):
     if relative.startswith(iam_test_prefix):
         if relative.endswith("IntegrationTest.java"):
             errors.append(f"IAM default Surefire scope must not contain IntegrationTest: {relative}")
-        data_test_markers = (
+        external_runtime_markers = (
             "@Testcontainers", "PostgreSQLContainer", "GenericContainer<",
-            "JdbcTemplate", "StringRedisTemplate",
+            "DockerImageName", "@DynamicPropertySource",
         )
-        if any(marker in text for marker in data_test_markers):
-            errors.append(f"IAM unit-test scope must not operate external data stores: {relative}")
+        mutating_sql = "JdbcTemplate" in text and re.search(
+            r"\b(?:jdbc|jdbcTemplate)\.(?:update|execute|batchUpdate)\s*\(", text
+        )
+        if any(marker in text for marker in external_runtime_markers) or mutating_sql:
+            errors.append(f"IAM unit-test scope must not start or mutate external data stores: {relative}")
 
 if errors:
     print("ENGINEERING_BASELINE: FAILED")
