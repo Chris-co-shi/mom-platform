@@ -2,7 +2,7 @@
 
 本目录是 `mom-platform` 的需求、计划、架构、安全协议和架构决策权威入口。
 
-> P1.5 S00～S12 已完成并合并。P1.6 在长期 Draft PR #33 中执行；S00～S05 已完成，S06 尚未开始。
+> P1.5 S00～S12 已完成并合并。P1.6 在长期 Draft PR #33 中执行；S00～S05 已完成，S06 `In Progress / Evidence Gap`，S07 未开始。
 
 ## 文档使用原则
 
@@ -18,7 +18,7 @@
 
 - Phase 01：基础技术骨架已完成。
 - P1.5：**Completed / Merged**，S00～S12 全部完成。
-- P1.6：S00 **Completed under accepted local-development risk**，S01～S05 **Completed**，S06～S19 Not Started；PR #33 保持 Draft。
+- P1.6：S00 **Completed under accepted local-development risk**，S01～S05 **Completed**，S06 **In Progress / Evidence Gap**，S07～S19 Not Started；PR #33 保持 Draft。
 - Phase 02：**Not Started**，业务垂直切片未因 P1.6 治理而启动。
 - Android Keystore、HTTPS App Link 与真机强杀恢复：Phase 02 Mobile 正式联调前置验收项。
 
@@ -50,6 +50,7 @@
 - [P1.6 S03：安全配置历史例外清单](engineering/P1.6-S03-安全配置历史例外清单.md)
 - [P1.6 S04：测试与 CI 历史例外清单](engineering/P1.6-S04-测试与CI历史例外清单.md)
 - [P1.6 S05：国际化与个性化现状清单](engineering/P1.6-S05-国际化与个性化现状清单.md)
+- [P1.6 S06：IAM 端点、调用方与职责审计](engineering/P1.6-S06-IAM端点调用方与职责审计.md)
 - [P1.6 S00：配置凭据暴露与轮换清单](security/P1.6-S00-配置凭据暴露与轮换清单.md)
 - [V1 路线图](plans/V1路线图.md)
 - [Phase 01：技术骨架计划](plans/Phase-01-技术骨架计划.md)
