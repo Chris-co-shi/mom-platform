@@ -10,5 +10,8 @@
 - `module-layering-standard.md`：api/client/server/framework 职责、Server 分层、依赖方向与历史例外；
 - `http-api-contract-standard.md`：路径、DTO、校验、错误、状态码、分页、排序与过滤；
 - `api-evolution-idempotency-standard.md`：HTTP 幂等、OpenAPI、兼容、弃用与删除条件。
+- `persistence-data-modeling-standard.md`：数据所有权、命名、类型、Entity、Mapper/Repository、SQL 与 Flyway；
+- `transaction-consistency-standard.md`：本地事务、Outbox/Inbox、Seata 与 SAS JDBC Store 特殊边界；
+- `audit-concurrency-lifecycle-standard.md`：并发控制、三类审计、Actor、删除、归档与保留。
 
 本索引只负责导航，强制规则以根目录 `AGENTS.md` 和对应规范正文为准。

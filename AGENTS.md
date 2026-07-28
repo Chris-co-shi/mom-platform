@@ -55,6 +55,9 @@
 - `docs/engineering/standards/module-layering-standard.md`；
 - `docs/engineering/standards/http-api-contract-standard.md`；
 - `docs/engineering/standards/api-evolution-idempotency-standard.md`。
+- `docs/engineering/standards/persistence-data-modeling-standard.md`；
+- `docs/engineering/standards/transaction-consistency-standard.md`；
+- `docs/engineering/standards/audit-concurrency-lifecycle-standard.md`。
 
 强制摘要：Web 只能适配 HTTP 并调用 Application；Application 负责用例、事务和业务授权；Domain
 不得依赖 Web、Infrastructure、Servlet、MyBatis、JDBC、Feign 或 Redis Template；Infrastructure
@@ -62,6 +65,11 @@
 不得改变 OAuth2/OIDC 标准错误；历史例外必须逐文件登记，不得用宽泛排除规避架构门禁。
 
 ## 4. 数据访问约束
+
+权威物理命名为数据库 `mom_platform`、每服务 `mom_<bounded-context>` Schema；禁止跨 Schema
+JOIN、外键和读写。事务默认位于 Application 公共方法，业务写与 Outbox、消费写与 Inbox 分别共享
+本地事务；自定义 SQL 必须参数化、显式处理审计/版本并检查 affected rows。已发布 Flyway Versioned
+Migration 不得修改或删除。SAS 官方 JDBC Store 保持协议特殊边界，不强制套用 MOM Entity 基类。
 
 - Java 技术主键统一使用 `String`，数据库使用 `varchar(19)`；禁止把 Snowflake 或 64 位整数 ID 作为 JSON Number 暴露给前端；
 - MyBatis-Plus 默认主键策略使用 `ASSIGN_ID`，业务编码、工单号、批次号等领域标识必须独立建模；
