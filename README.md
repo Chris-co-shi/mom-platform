@@ -13,7 +13,7 @@
   <img alt="Java" src="https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white">
   <img alt="Spring Boot" src="https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white">
   <img alt="Spring Cloud" src="https://img.shields.io/badge/Spring%20Cloud-2025.1-6DB33F?logo=spring&logoColor=white">
-  <img alt="Status" src="https://img.shields.io/badge/Status-P1.6%20S04%20In%20Progress-F59E0B">
+  <img alt="Status" src="https://img.shields.io/badge/Status-P1.6%20S05%20Completed-2EA44F">
 </p>
 
 [文档中心](docs/README.md) · [P1.6 治理计划](docs/plans/P1.6-IAM与System平台治理计划.md) · [P1.6 实施进度](docs/plans/P1.6-实施进度.md) · [P1.5 设计基线](docs/security/P1.5-认证与授权设计基线.md) · [V1 路线图](docs/plans/V1路线图.md) · [ADR](docs/adr/README.md)
@@ -23,7 +23,7 @@
 ---
 
 > [!IMPORTANT]
-> Phase 01 与 P1.5 已完成并合并。P1.6 正在长期 Draft PR #33 中执行：S00～S03 已完成，S04 正在执行；Phase 02 业务垂直切片仍未启动。
+> Phase 01 与 P1.5 已完成并合并。P1.6 正在长期 Draft PR #33 中执行：S00～S05 已完成，S06 尚未开始；Phase 02 业务垂直切片仍未启动。
 
 ## 🌟 项目愿景
 
@@ -213,7 +213,7 @@ mvn -B -ntp clean verify
 |---|---|---|
 | Phase 01 | JDK 25 + Boot 4 基础技术骨架与观测闭环 | ✅ 基础完成 |
 | P1.5 | 认证与授权闭环 | ✅ Completed / Merged（S00～S12） |
-| P1.6 | IAM 收敛与 System 平台治理 | 🚧 S00、S01 Completed；S02 In Progress（Draft PR #33） |
+| P1.6 | IAM 收敛与 System 平台治理 | 🚧 S00～S05 Completed；S06 Not Started（Draft PR #33） |
 | Phase 02 | 供应商送货、来料检验、PDA 入库、库存闭环 | ⏳ Not Started；不因 P1.6 治理视为已启动 |
 | Phase 03 | 生产工单、PCS 协同、半成品与成品批次 | ⏳ 计划中 |
 | Phase 04 | 成品放行、WCS 入库、客户发运、追溯和召回 | ⏳ 计划中 |

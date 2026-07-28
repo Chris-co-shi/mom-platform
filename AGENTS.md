@@ -68,10 +68,21 @@
 - `docs/engineering/standards/testing-strategy-standard.md`；
 - `docs/engineering/standards/maven-test-lifecycle-standard.md`；
 - `docs/engineering/standards/testcontainers-smoke-acceptance-standard.md`；
-- `docs/engineering/standards/ci-scope-quality-gate-standard.md`。
+- `docs/engineering/standards/ci-scope-quality-gate-standard.md`；
+
+数据访问、事务与审计生命周期的详细权威来源为：
+
 - `docs/engineering/standards/persistence-data-modeling-standard.md`；
 - `docs/engineering/standards/transaction-consistency-standard.md`；
 - `docs/engineering/standards/audit-concurrency-lifecycle-standard.md`。
+
+Locale、时区、数字金额、计量单位与用户偏好的详细权威来源为：
+
+- `docs/engineering/standards/localization-locale-standard.md`；
+- `docs/engineering/standards/timezone-date-time-standard.md`；
+- `docs/engineering/standards/number-money-rounding-standard.md`；
+- `docs/engineering/standards/measurement-unit-standard.md`；
+- `docs/engineering/standards/user-preference-standard.md`。
 
 强制摘要：Web 只能适配 HTTP 并调用 Application；Application 负责用例、事务和业务授权；Domain
 不得依赖 Web、Infrastructure、Servlet、MyBatis、JDBC、Feign 或 Redis Template；Infrastructure
@@ -87,6 +98,11 @@ Redis 临时状态必须有 TTL，原始 Idempotency-Key 不 Trim、改大小写
 测试强制摘要：Surefire 只运行快速 `*Test`/`*Tests`，Failsafe 在 `verify` 运行 `*IT`/`*ITCase`；
 Testcontainers、打包 JAR、真实基础设施和跨仓库 E2E 是不同证据层级。Nacos Discovery、Redis 幂等和
 Redis 限流必须为独立 Job，`skipped` 不得描述为成功，技术探针只有在调用方及等价替代证据齐备后才能删除。
+
+国际化强制摘要：跨服务 Locale 仅使用 BCP 47 Tag，初始支持 `zh-CN`、`en-US`；技术时间点使用
+`Instant`/`timestamptz`/RFC 3339，Factory 业务日期由 MDM 权威 IANA Zone ID 计算；精度敏感量值使用
+BigDecimal 和 Decimal String，不以 float/double 传输。System 拥有显示偏好，MDM 拥有 Factory 时区和
+单位换算，IAM 不拥有偏好且不得将其放入 Token。Locale、时区和显示单位都不是权限或业务事实。
 
 ## 4. 数据访问约束
 

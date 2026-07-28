@@ -21,5 +21,10 @@
 - `maven-test-lifecycle-standard.md`：Surefire/Failsafe 3.5.4、命名、生命周期与 Codex 日志；
 - `testcontainers-smoke-acceptance-standard.md`：Testcontainers、打包 Smoke 与真实基础设施验收；
 - `ci-scope-quality-gate-standard.md`：增量/完整范围、条件 Job、手动验收与质量门禁。
+- `localization-locale-standard.md`：BCP 47 支持列表、选择回退、资源与错误国际化边界；
+- `timezone-date-time-standard.md`：UTC、用户/Factory/设备时区、业务日期、DST 与 API 时间契约；
+- `number-money-rounding-standard.md`：Decimal String、BigDecimal、金额、比例和舍入边界；
+- `measurement-unit-standard.md`：MDM 单位所有权、UCUM、量纲、换算与历史快照；
+- `user-preference-standard.md`：System 偏好所有权、覆盖层级、授权隔离和 S16 进入条件。
 
 本索引只负责导航，强制规则以根目录 `AGENTS.md` 和对应规范正文为准。
