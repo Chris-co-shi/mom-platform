@@ -84,7 +84,8 @@ esac
 git diff --name-only "$BASE_SHA" "$HEAD_SHA" > changed-files.txt
 
 # 只从可能影响运行时的源码、配置、POM 和 CI 脚本中提取新增内容。
-# 工程规范、PR 模板和本地 Codex 工具即使提到 Nacos/PostgreSQL/Seata，n# 也不能因此启动重型基础设施验证。
+# 工程规范、PR 模板和本地 Codex 工具即使提到 Nacos/PostgreSQL/Seata，
+# 也不能因此启动重型基础设施验证。
 python3 - "$BASE_SHA" "$HEAD_SHA" > changed-additions.diff <<'PY'
 from __future__ import annotations
 
