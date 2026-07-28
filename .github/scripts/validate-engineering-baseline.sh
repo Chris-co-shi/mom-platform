@@ -28,6 +28,12 @@ required_files = [
     "docs/engineering/standards/spring-boot-4.1-engineering-standard.md",
     "docs/engineering/standards/spring-cloud-2025.1-engineering-standard.md",
     "docs/engineering/standards/spring-cloud-alibaba-2025.1-engineering-standard.md",
+    "docs/engineering/standards/module-layering-standard.md",
+    "docs/engineering/standards/http-api-contract-standard.md",
+    "docs/engineering/standards/api-evolution-idempotency-standard.md",
+    "mom-architecture-tests/pom.xml",
+    "mom-architecture-tests/src/test/java/io/github/chrisshi/mom/architecture/MavenModuleDependencyArchitectureTest.java",
+    "mom-architecture-tests/src/test/java/io/github/chrisshi/mom/architecture/ServerPackageArchitectureTest.java",
 ]
 for relative in required_files:
     if not (root / relative).is_file():
@@ -44,6 +50,16 @@ try:
 except Exception as exc:
     errors.append(f"cannot parse root pom.xml: {exc}")
     values = {}
+
+try:
+    modules = {
+        (module.text or "").strip()
+        for module in tree.getroot().findall("m:modules/m:module", ns)
+    }
+    if "mom-architecture-tests" not in modules:
+        errors.append("mom-architecture-tests must be included in the root Maven reactor")
+except Exception as exc:
+    errors.append(f"cannot validate architecture-test reactor wiring: {exc}")
 
 expected_exact = {"java.version": "25"}
 for key, expected in expected_exact.items():
@@ -141,4 +157,5 @@ for note in notes:
 print("- no preview/internal API/module-escape violations")
 print("- no legacy Nacos bootstrap or disabled compatibility checks")
 print("- IAM default tests contain no external data-store integration tests")
+print("- S01 standards and Maven architecture-test module are wired")
 PY

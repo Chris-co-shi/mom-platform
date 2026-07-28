@@ -47,6 +47,7 @@
     <module>mom-eam-platform</module>
     <module>mom-integration-platform</module>
     <module>mom-traceability-platform</module>
+    <module>mom-architecture-tests</module>
   </modules>
 
   <dependencyManagement>
