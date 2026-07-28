@@ -129,3 +129,23 @@
 - 中间件兼容性结论必须来自真实测试，不得仅凭依赖能够编译；
 - PR 描述必须写明范围、架构边界、失败策略、验证结果和未完成项；
 - CI 未通过不得合并。
+
+### 9.1 Maven 与 AI Token 控制
+
+- 本地开发和 AI 编码工具必须优先通过 `bash scripts/codex-mvn-test.sh ...` 执行 Maven；禁止把完整 Maven 输出直接回传给模型；
+- 包装脚本必须把完整日志保存在 `.codex/runtime/logs/`，成功时只输出结果、命令和日志位置，失败时只输出有界诊断摘要；
+- 失败后先读取摘要、失败测试报告和相关源码；只有摘要不足时才能按异常名或测试名读取完整日志中的局部范围；
+- 同一代码状态下，相同失败命令不得无分析地连续重试超过两次；
+- 日常验证顺序为：`test-compile`、相关测试方法或测试类、变更模块测试、当前 Slice 最终 Reactor 验证；
+- 除最终 Slice/Phase 验收、公共框架或依赖管理变更、发布验证以及用户明确要求外，不得在每次局部修改后重复执行根 Reactor 全量测试。
+
+### 9.2 中间件按需验证
+
+- Nacos、Redis、PostgreSQL、Seata、RocketMQ 和可观测性基础设施都不是普通单元测试的默认前置条件；
+- 普通 Java 逻辑、DTO、文档和不相关模块变更不得启动 Nacos 或 Seata；
+- Nacos/Redis 烟测只在服务注册发现、Gateway 服务名路由、OpenFeign、幂等、限流、Redis 配置或相关依赖发生变化时执行；
+- PostgreSQL 烟测只在数据访问、Mapper/Repository、Flyway、SQL、数据库连接配置或相关依赖发生变化时执行；
+- Seata 验证只在 `mom-seata`、`@GlobalTransactional`、DataSourceProxy、XID 传播、`undo_log`、事务组映射或相关依赖发生变化时执行；
+- Seata 模块编译测试不能替代真实 TC 与两个独立 PostgreSQL 数据库的 AT 验收；真实验收必须作为独立、显式的质量门禁；
+- CI 通过 `.github/scripts/detect-ci-scope.sh` 计算基础设施范围；需要完整验收时使用 `workflow_dispatch` 显式选择 `all`；
+- 已健康的本地中间件应复用，只有镜像、Compose、初始化脚本变化、容器异常或测试明确要求全新环境时才允许重建。

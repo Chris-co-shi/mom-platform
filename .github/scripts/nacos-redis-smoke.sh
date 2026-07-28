@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+NACOS_CONTAINER="mom-nacos-ci-${GITHUB_RUN_ID:-local}-$$"
+REDIS_CONTAINER="mom-redis-ci-${GITHUB_RUN_ID:-local}-$$"
+CORRELATION_ID="p01-s03-correlation-001"
+IDEMPOTENCY_KEY="p01-s03-idempotency-001"
+BOOTSTRAP_EXCLUSIONS="org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration,org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration,org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration,org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration,org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration"
+MDM_PID=""
+INTEGRATION_PID=""
+GATEWAY_ONE_PID=""
+GATEWAY_TWO_PID=""
+
+cleanup() {
+  set +e
+  [[ -n "$GATEWAY_TWO_PID" ]] && kill "$GATEWAY_TWO_PID" 2>/dev/null
+  [[ -n "$GATEWAY_ONE_PID" ]] && kill "$GATEWAY_ONE_PID" 2>/dev/null
+  [[ -n "$INTEGRATION_PID" ]] && kill "$INTEGRATION_PID" 2>/dev/null
+  [[ -n "$MDM_PID" ]] && kill "$MDM_PID" 2>/dev/null
+  docker logs "$NACOS_CONTAINER" > nacos-server.log 2>&1
+  docker logs "$REDIS_CONTAINER" > redis-server.log 2>&1
+  docker rm -f "$NACOS_CONTAINER" >/dev/null 2>&1
+  docker rm -f "$REDIS_CONTAINER" >/dev/null 2>&1
+}
+trap cleanup EXIT
+
+docker run --name "$NACOS_CONTAINER" \
+  -e MODE=standalone \
+  -e NACOS_AUTH_ENABLE=false \
+  -e JVM_XMS=256m \
+  -e JVM_XMX=256m \
+  -e JVM_XMN=128m \
+  -p 8848:8848 \
+  -p 9848:9848 \
+  -d nacos/nacos-server:v3.1.0
+
+docker run --name "$REDIS_CONTAINER" \
+  -p 6379:6379 \
+  -d redis:8.4.4-alpine \
+  redis-server --save "" --appendonly no
+
+for attempt in {1..60}; do
+  nacos_ready=false
+  redis_ready=false
+  if curl --fail --silent --show-error \
+    http://127.0.0.1:8848/nacos/v3/admin/core/state/readiness >/dev/null; then
+    nacos_ready=true
+  fi
+  if docker exec "$REDIS_CONTAINER" redis-cli ping | grep --quiet PONG; then
+    redis_ready=true
+  fi
+  if [[ "$nacos_ready" == "true" && "$redis_ready" == "true" ]]; then
+    break
+  fi
+  if [[ "$attempt" == "60" ]]; then
+    echo "Nacos or Redis did not become ready"
+    exit 1
+  fi
+  sleep 2
+done
+
+java -jar mom-mdm-platform/mom-mdm-server/target/mom-mdm-server-0.1.0-SNAPSHOT-exec.jar \
+  --mom.technical-probe.enabled=true \
+  --server.port=20200 \
+  --spring.application.name=mom-mdm-server \
+  --spring.cloud.nacos.discovery.enabled=true \
+  --spring.cloud.nacos.discovery.server-addr=127.0.0.1:8848 \
+  --spring.cloud.nacos.discovery.ip=127.0.0.1 \
+  --spring.autoconfigure.exclude="$BOOTSTRAP_EXCLUSIONS" \
+  > mdm-server.log 2>&1 &
+MDM_PID=$!
+
+REDIS_HOST=127.0.0.1 REDIS_PORT=6379 IDEMPOTENCY_DEFAULT_TTL=30s \
+java -jar mom-integration-platform/mom-integration-server/target/mom-integration-server-0.1.0-SNAPSHOT-exec.jar \
+  --mom.technical-probe.enabled=true \
+  --server.port=20800 \
+  --spring.application.name=mom-integration-server \
+  --spring.cloud.nacos.discovery.enabled=true \
+  --spring.cloud.nacos.discovery.server-addr=127.0.0.1:8848 \
+  --spring.cloud.nacos.discovery.ip=127.0.0.1 \
+  --spring.autoconfigure.exclude="$BOOTSTRAP_EXCLUSIONS" \
+  > integration-server.log 2>&1 &
+INTEGRATION_PID=$!
+
+REDIS_HOST=127.0.0.1 REDIS_PORT=6379 \
+GATEWAY_SECURITY_ENABLED=false \
+MOM_TECHNICAL_PROBE_ENABLED=true \
+GATEWAY_RATE_LIMIT_REPLENISH_RATE=100 \
+GATEWAY_RATE_LIMIT_BURST_CAPACITY=100 \
+GATEWAY_RATE_LIMIT_REQUESTED_TOKENS=1 \
+java -jar mom-gateway/target/mom-gateway-0.1.0-SNAPSHOT-exec.jar \
+  --server.port=20000 \
+  --spring.application.name=mom-gateway \
+  --spring.cloud.nacos.discovery.enabled=true \
+  --spring.cloud.nacos.discovery.server-addr=127.0.0.1:8848 \
+  --spring.cloud.nacos.discovery.ip=127.0.0.1 \
+  > gateway-one.log 2>&1 &
+GATEWAY_ONE_PID=$!
+
+for attempt in {1..60}; do
+  status=$(curl --silent --output nacos-smoke-response.json \
+    --dump-header nacos-smoke-headers.txt \
+    --write-out '%{http_code}' \
+    --header "X-Correlation-Id: ${CORRELATION_ID}" \
+    http://127.0.0.1:20000/api/integration/mdm-probe || true)
+  if [[ "$status" == "200" ]]; then
+    break
+  fi
+  if [[ "$attempt" == "60" ]]; then
+    echo "Gateway service-discovery request failed with HTTP ${status}"
+    cat nacos-smoke-response.json || true
+    exit 1
+  fi
+  sleep 2
+done
+
+grep --ignore-case --quiet \
+  "^X-Correlation-Id: ${CORRELATION_ID}" nacos-smoke-headers.txt
+jq --exit-status --arg correlationId "$CORRELATION_ID" '
+  .service == "mom-integration-server"
+  and .status == "UP"
+  and .correlationId == $correlationId
+  and .mdmService == "mom-mdm-server"
+  and .mdmStatus == "UP"
+  and .mdmCorrelationId == $correlationId
+' nacos-smoke-response.json
+
+first_idempotency_status=$(curl --silent --output idempotency-first.json \
+  --write-out '%{http_code}' \
+  --request POST \
+  --header "X-Correlation-Id: ${CORRELATION_ID}" \
+  --header "Idempotency-Key: ${IDEMPOTENCY_KEY}" \
+  http://127.0.0.1:20000/api/integration/idempotency-probe)
+second_idempotency_status=$(curl --silent --output idempotency-duplicate.json \
+  --write-out '%{http_code}' \
+  --request POST \
+  --header "X-Correlation-Id: ${CORRELATION_ID}" \
+  --header "Idempotency-Key: ${IDEMPOTENCY_KEY}" \
+  http://127.0.0.1:20000/api/integration/idempotency-probe)
+[[ "$first_idempotency_status" == "201" ]]
+[[ "$second_idempotency_status" == "409" ]]
+jq --exit-status '.status == "ACQUIRED" and .mayProceed == true' idempotency-first.json
+jq --exit-status '.status == "DUPLICATE" and .mayProceed == false' idempotency-duplicate.json
+
+kill "$GATEWAY_ONE_PID"
+wait "$GATEWAY_ONE_PID" 2>/dev/null || true
+GATEWAY_ONE_PID=""
+docker exec "$REDIS_CONTAINER" redis-cli FLUSHDB >/dev/null
+
+REDIS_HOST=127.0.0.1 REDIS_PORT=6379 \
+GATEWAY_SECURITY_ENABLED=false \
+MOM_TECHNICAL_PROBE_ENABLED=true \
+GATEWAY_RATE_LIMIT_REPLENISH_RATE=1 \
+GATEWAY_RATE_LIMIT_BURST_CAPACITY=3 \
+GATEWAY_RATE_LIMIT_REQUESTED_TOKENS=3 \
+java -jar mom-gateway/target/mom-gateway-0.1.0-SNAPSHOT-exec.jar \
+  --server.port=20000 \
+  --spring.application.name=mom-gateway \
+  --spring.cloud.nacos.discovery.enabled=true \
+  --spring.cloud.nacos.discovery.server-addr=127.0.0.1:8848 \
+  --spring.cloud.nacos.discovery.ip=127.0.0.1 \
+  > gateway-one-rate-limit.log 2>&1 &
+GATEWAY_ONE_PID=$!
+
+REDIS_HOST=127.0.0.1 REDIS_PORT=6379 \
+GATEWAY_SECURITY_ENABLED=false \
+MOM_TECHNICAL_PROBE_ENABLED=true \
+GATEWAY_RATE_LIMIT_REPLENISH_RATE=1 \
+GATEWAY_RATE_LIMIT_BURST_CAPACITY=3 \
+GATEWAY_RATE_LIMIT_REQUESTED_TOKENS=3 \
+java -jar mom-gateway/target/mom-gateway-0.1.0-SNAPSHOT-exec.jar \
+  --server.port=20001 \
+  --spring.application.name=mom-gateway \
+  --spring.cloud.nacos.discovery.enabled=true \
+  --spring.cloud.nacos.discovery.server-addr=127.0.0.1:8848 \
+  --spring.cloud.nacos.discovery.ip=127.0.0.1 \
+  > gateway-two-rate-limit.log 2>&1 &
+GATEWAY_TWO_PID=$!
+
+for attempt in {1..60}; do
+  first_gateway_status=$(curl --silent --output rate-limit-first.json \
+    --write-out '%{http_code}' \
+    http://127.0.0.1:20000/api/integration/mdm-probe || true)
+  if [[ "$first_gateway_status" == "200" ]]; then
+    break
+  fi
+  if [[ "$attempt" == "60" ]]; then
+    echo "First Gateway did not become ready"
+    exit 1
+  fi
+  sleep 2
+done
+
+second_gateway_status=$(curl --silent --output rate-limit-second.json \
+  --write-out '%{http_code}' \
+  http://127.0.0.1:20001/api/integration/mdm-probe || true)
+[[ "$second_gateway_status" == "429" ]]
+
+docker stop "$REDIS_CONTAINER" >/dev/null
+redis_failure_status=$(curl --silent --output redis-failure-response.json \
+  --write-out '%{http_code}' \
+  --header "X-Correlation-Id: ${CORRELATION_ID}" \
+  http://127.0.0.1:20000/api/integration/mdm-probe || true)
+[[ "$redis_failure_status" == "503" ]]
+jq --exit-status '.code == "REDIS_RATE_LIMIT_UNAVAILABLE"' redis-failure-response.json
