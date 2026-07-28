@@ -149,3 +149,23 @@
 - Seata 模块编译测试不能替代真实 TC 与两个独立 PostgreSQL 数据库的 AT 验收；真实验收必须作为独立、显式的质量门禁；
 - CI 通过 `.github/scripts/detect-ci-scope.sh` 计算基础设施范围；需要完整验收时使用 `workflow_dispatch` 显式选择 `all`；
 - 已健康的本地中间件应复用，只有镜像、Compose、初始化脚本变化、容器异常或测试明确要求全新环境时才允许重建。
+
+## 10. 官方技术基线与本地 Codex
+
+修改 JDK、Spring Boot、Spring Cloud 或 Spring Cloud Alibaba 相关代码、配置和依赖前，必须读取对应版本规范：
+
+- `docs/engineering/standards/official-source-policy.md`；
+- `docs/engineering/standards/jdk-25-engineering-standard.md`；
+- `docs/engineering/standards/spring-boot-4.1-engineering-standard.md`；
+- `docs/engineering/standards/spring-cloud-2025.1-engineering-standard.md`；
+- `docs/engineering/standards/spring-cloud-alibaba-2025.1-engineering-standard.md`。
+
+执行要求：
+
+- 官方参考文档、发布说明、兼容矩阵和官方源码是框架事实来源；MOM 自定义超时、失败策略和门禁必须明确标记为项目决策；
+- 不得关闭 Spring Cloud Compatibility Verifier、Nacos Config Import Check 或其他官方兼容性检查来掩盖版本与配置问题；
+- JDK 25 Preview、Incubator、内部 API、`--add-opens` 和 `--add-exports` 默认禁止，确需使用必须先提交 ADR 和独立验证；
+- Spring Cloud Alibaba 2025.1.x 使用 `spring.config.import`，禁止恢复 `bootstrap.yml`、`bootstrap.yaml`、`bootstrap.properties`；
+- 开始本地工作前执行 `bash scripts/codex-doctor.sh`；默认使用 `bash scripts/codex-verify-changed.sh` 验证变更；
+- 本地完整流程、环境变量和日志读取顺序见 `docs/engineering/codex-local-workflow.md`；
+- `.github/scripts/validate-engineering-baseline.sh` 是轻量静态门禁，不启动 Docker、Nacos、Redis、PostgreSQL、Seata 或 RocketMQ。
