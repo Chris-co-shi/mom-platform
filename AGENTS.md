@@ -55,6 +55,13 @@
 - `docs/engineering/standards/module-layering-standard.md`；
 - `docs/engineering/standards/http-api-contract-standard.md`；
 - `docs/engineering/standards/api-evolution-idempotency-standard.md`。
+
+运行时配置、安全协议、出站 HTTP 与 Redis 规则的详细权威来源为：
+
+- `docs/engineering/standards/configuration-profile-secret-standard.md`；
+- `docs/engineering/standards/security-protocol-runtime-standard.md`；
+- `docs/engineering/standards/outbound-http-client-standard.md`；
+- `docs/engineering/standards/redis-key-ttl-failure-standard.md`。
 - `docs/engineering/standards/persistence-data-modeling-standard.md`；
 - `docs/engineering/standards/transaction-consistency-standard.md`；
 - `docs/engineering/standards/audit-concurrency-lifecycle-standard.md`。
@@ -63,6 +70,12 @@
 不得依赖 Web、Infrastructure、Servlet、MyBatis、JDBC、Feign 或 Redis Template；Infrastructure
 实现 Port 并转换、脱敏底层异常；Configuration 只负责装配。新业务 API 不引入通用成功响应信封，
 不得改变 OAuth2/OIDC 标准错误；历史例外必须逐文件登记，不得用宽泛排除规避架构门禁。
+
+安全配置强制摘要：Base 不激活 Profile、不保存 Secret，正式 `prod`/`production` 对 Bootstrap、测试密钥、
+本地 Pepper、不安全 Cookie、缺失 Issuer/JWK/Refresh Pepper 和技术探针 Fail Fast；Nacos Discovery 与
+Config 分离，Nacos Config 不作为 Secret Manager，2025.1.x 只允许 `spring.config.import`。Gateway 与业务
+Resource Server 都验证 JWT，Gateway 不承担最终授权。Feign 必须有有限超时且写请求默认不自动重试；
+Redis 临时状态必须有 TTL，原始 Idempotency-Key 不 Trim、改大小写、归一化或写入 Redis Key/日志。
 
 ## 4. 数据访问约束
 

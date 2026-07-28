@@ -13,7 +13,7 @@
   <img alt="Java" src="https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white">
   <img alt="Spring Boot" src="https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white">
   <img alt="Spring Cloud" src="https://img.shields.io/badge/Spring%20Cloud-2025.1-6DB33F?logo=spring&logoColor=white">
-  <img alt="Status" src="https://img.shields.io/badge/Status-P1.6%20S02%20In%20Progress-2563EB">
+  <img alt="Status" src="https://img.shields.io/badge/Status-P1.6%20S03%20In%20Progress-2563EB">
 </p>
 
 [文档中心](docs/README.md) · [P1.6 治理计划](docs/plans/P1.6-IAM与System平台治理计划.md) · [P1.6 实施进度](docs/plans/P1.6-实施进度.md) · [P1.5 设计基线](docs/security/P1.5-认证与授权设计基线.md) · [V1 路线图](docs/plans/V1路线图.md) · [ADR](docs/adr/README.md)
@@ -23,7 +23,7 @@
 ---
 
 > [!IMPORTANT]
-> Phase 01 与 P1.5 已完成并合并。P1.6 正在长期 Draft PR #33 中执行：S00、S01 已完成，当前为 S02；Phase 02 业务垂直切片仍未启动。
+> Phase 01 与 P1.5 已完成并合并。P1.6 正在长期 Draft PR #33 中执行：S00、S01、S02 已完成，当前为 S03；Phase 02 业务垂直切片仍未启动。
 
 ## 🌟 项目愿景
 

@@ -13,5 +13,9 @@
 - `persistence-data-modeling-standard.md`：数据所有权、命名、类型、Entity、Mapper/Repository、SQL 与 Flyway；
 - `transaction-consistency-standard.md`：本地事务、Outbox/Inbox、Seata 与 SAS JDBC Store 特殊边界；
 - `audit-concurrency-lifecycle-standard.md`：并发控制、三类审计、Actor、删除、归档与保留。
+- `configuration-profile-secret-standard.md`：配置来源、Profile、Secret、Nacos 与动态刷新边界；
+- `security-protocol-runtime-standard.md`：IAM 端点矩阵、FilterChain、Gateway、Resource Server 与 Actuator；
+- `outbound-http-client-standard.md`：OpenFeign 位置、超时、重试、错误映射、凭证与 Fallback；
+- `redis-key-ttl-failure-standard.md`：Redis Key、TTL、序列化、原子性、故障矩阵与低阶幂等边界。
 
 本索引只负责导航，强制规则以根目录 `AGENTS.md` 和对应规范正文为准。
