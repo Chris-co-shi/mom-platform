@@ -45,6 +45,7 @@ ADR 用于记录重要架构决策的背景、候选方案、最终选择、正�
 | [ADR-021](ADR-021-运行时配置来源与Secret边界.md) | 运行时配置来源与 Secret 边界 | Accepted | 部署架构、安全协议、配置规范 |
 | [ADR-022](ADR-022-测试分层与CI质量门禁.md) | 测试分层与 CI 质量门禁 | Accepted | Maven 生命周期、Smoke、CI Scope |
 | [ADR-023](ADR-023-Locale时区与用户偏好边界.md) | Locale、时区与用户偏好边界 | Accepted | 国际化、时间、量值和偏好规范 |
+| [ADR-024](ADR-024-PC-JSON与Mobile-PKCE-OIDC双通道.md) | PC JSON 与 Mobile PKCE/OIDC 双通道 | Proposed | P1.6 S06 审计、S07 决策草案、安全协议运行规范 |
 
 ## 4. 新建 ADR
 
