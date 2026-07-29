@@ -39,6 +39,7 @@
     <module>mom-framework</module>
     <module>mom-gateway</module>
     <module>mom-iam-platform</module>
+    <module>mom-system-platform</module>
     <module>mom-mdm-platform</module>
     <module>mom-mes-platform</module>
     <module>mom-wms-platform</module>

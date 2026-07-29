@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: mom-system-server
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${NACOS_DISCOVERY_ENABLED:false}

@@ -34,6 +34,12 @@
     </dependency>
     <dependency>
       <groupId>io.github.chrisshi.mom</groupId>
+      <artifactId>mom-system-server</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.github.chrisshi.mom</groupId>
       <artifactId>mom-mdm-client</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>

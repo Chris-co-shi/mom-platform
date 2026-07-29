@@ -41,6 +41,7 @@ class ServerPackageArchitectureTest {
         noClasses()
                 .that().resideInAnyPackage(
                         "io.github.chrisshi.mom.iam.application..",
+                        "io.github.chrisshi.mom.system.application..",
                         "io.github.chrisshi.mom.mdm.application..",
                         "io.github.chrisshi.mom.integration.application..",
                         "io.github.chrisshi.mom.mes.application..",
@@ -65,6 +66,43 @@ class ServerPackageArchitectureTest {
                 .orShould().dependOnClassesThat().haveSimpleNameEndingWith("Mapper")
                 .orShould().dependOnClassesThat().haveSimpleNameEndingWith("Entity")
                 .because("Application 只能通过 Command/Query 与 Port 编排用例")
+                .check(productionClasses);
+    }
+
+    /** System 的 Web 和 Application 不得反向穿透到内部实现。 */
+    @Test
+    void systemWebAndApplicationMustFollowLayerDirection() {
+        noClasses()
+                .that().resideInAnyPackage("io.github.chrisshi.mom.system.web..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "io.github.chrisshi.mom.system.infrastructure..",
+                        "io.github.chrisshi.mom.system.domain..")
+                .because("System Web 只能通过 Application 进入用例")
+                .allowEmptyShould(true)
+                .check(productionClasses);
+
+        noClasses()
+                .that().resideInAnyPackage("io.github.chrisshi.mom.system.application..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "io.github.chrisshi.mom.system.web..",
+                        "io.github.chrisshi.mom.system.infrastructure..")
+                .because("System Application 不得依赖入站 Adapter 或基础设施实现")
+                .allowEmptyShould(true)
+                .check(productionClasses);
+    }
+
+    /** System 不得引用 IAM 的内部 Application、Web、Repository、Mapper 或 Infrastructure。 */
+    @Test
+    void systemMustNotDependOnIamInternalImplementation() {
+        noClasses()
+                .that().resideInAnyPackage("io.github.chrisshi.mom.system..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "io.github.chrisshi.mom.iam.application..",
+                        "io.github.chrisshi.mom.iam.web..",
+                        "io.github.chrisshi.mom.iam.infrastructure..",
+                        "io.github.chrisshi.mom.iam..repository..",
+                        "io.github.chrisshi.mom.iam..mapper..")
+                .because("ADR-025 禁止 System 形成第二 IAM 或访问 IAM 内部实现")
                 .check(productionClasses);
     }
 

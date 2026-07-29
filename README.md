@@ -13,7 +13,7 @@
   <img alt="Java" src="https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white">
   <img alt="Spring Boot" src="https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white">
   <img alt="Spring Cloud" src="https://img.shields.io/badge/Spring%20Cloud-2025.1-6DB33F?logo=spring&logoColor=white">
-  <img alt="Status" src="https://img.shields.io/badge/Status-P1.6%20S05%20Completed-2EA44F">
+  <img alt="Status" src="https://img.shields.io/badge/Status-P1.6%20S12%20Completed-2EA44F">
 </p>
 
 [文档中心](docs/README.md) · [P1.6 治理计划](docs/plans/P1.6-IAM与System平台治理计划.md) · [P1.6 实施进度](docs/plans/P1.6-实施进度.md) · [P1.5 设计基线](docs/security/P1.5-认证与授权设计基线.md) · [V1 路线图](docs/plans/V1路线图.md) · [ADR](docs/adr/README.md)
@@ -23,7 +23,7 @@
 ---
 
 > [!IMPORTANT]
-> Phase 01 与 P1.5 已完成并合并。P1.6 正在长期 Draft PR #33 中执行：S00～S05 已完成，S06 尚未开始；Phase 02 业务垂直切片仍未启动。
+> Phase 01 与 P1.5 已完成并合并。P1.6 正在长期 Draft PR #33 中执行：S00～S12 已完成，ADR-025 保持 Accepted，S13 尚未开始；System 技术骨架与依赖门禁已完成，业务能力尚未开始。Phase 02 业务垂直切片仍未启动。
 
 ## 🌟 项目愿景
 
@@ -115,6 +115,7 @@ flowchart LR
 | 能力域 | V1 关注点 | 权威模块 |
 |---|---|---|
 | 身份与权限 | OAuth/OIDC、PKCE、用户、角色、权限、Factory/Party Scope、Session | `mom-iam-platform` |
+| 平台配置与体验 | S12 仅完成技术骨架；参数、字典、偏好、应用目录与菜单尚未开始 | `mom-system-platform` |
 | 主数据 | 集团、工厂、物料、人员与 Party 核心身份、版本索引；供应商采购关系与客户销售关系分别由未来采购/SRM、销售/CRM 业务域拥有 | `mom-mdm-platform`（Party Core）；业务域 Planned Authority / Not Implemented |
 | 生产执行 | 工单、版本快照、投料、过程记录、报工 | `mom-mes-platform` |
 | 仓储库存 | 库位、容器、批次、预占、流水、余额、对账 | `mom-wms-platform` |
@@ -153,6 +154,7 @@ mom-platform
 │   └── ...
 ├── mom-gateway
 ├── mom-iam-platform
+├── mom-system-platform
 ├── mom-mdm-platform
 ├── mom-mes-platform
 ├── mom-wms-platform
@@ -161,7 +163,7 @@ mom-platform
 ├── mom-eam-platform
 ├── mom-integration-platform
 ├── mom-traceability-platform
-└── mom-bootstrap-tests
+└── mom-architecture-tests
 ```
 
 每个核心领域平台统一分为 `*-api`、`*-client`、`*-server`。
@@ -213,7 +215,7 @@ mvn -B -ntp clean verify
 |---|---|---|
 | Phase 01 | JDK 25 + Boot 4 基础技术骨架与观测闭环 | ✅ 基础完成 |
 | P1.5 | 认证与授权闭环 | ✅ Completed / Merged（S00～S12） |
-| P1.6 | IAM 收敛与 System 平台治理 | 🚧 S00～S11 Completed；ADR-025 Accepted；S12 Not Started（Draft PR #33） |
+| P1.6 | IAM 收敛与 System 平台治理 | 🚧 S00～S12 Completed；ADR-025 Accepted；S13 Not Started（Draft PR #33） |
 | Phase 02 | 供应商送货、来料检验、PDA 入库、库存闭环 | ⏳ Not Started；不因 P1.6 治理视为已启动 |
 | Phase 03 | 生产工单、PCS 协同、半成品与成品批次 | ⏳ 计划中 |
 | Phase 04 | 成品放行、WCS 入库、客户发运、追溯和召回 | ⏳ 计划中 |
