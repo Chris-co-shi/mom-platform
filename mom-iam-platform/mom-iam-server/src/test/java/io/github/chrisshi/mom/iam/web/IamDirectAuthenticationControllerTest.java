@@ -20,6 +20,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.Instant;
 import java.util.List;
@@ -32,6 +34,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** 第一方 JSON 认证控制器的无容器契约测试。 */
 @ExtendWith(MockitoExtension.class)
@@ -44,6 +51,7 @@ class IamDirectAuthenticationControllerTest {
     @Mock IamSessionJwtIssuer jwtIssuer;
 
     private IamDirectAuthenticationController controller;
+    private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
@@ -54,6 +62,9 @@ class IamDirectAuthenticationControllerTest {
                 sessions,
                 jwtIssuer,
                 new AuditContextExecutor());
+        mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new IamDirectAuthenticationExceptionHandler())
+                .build();
     }
 
     @Test
@@ -70,6 +81,30 @@ class IamDirectAuthenticationControllerTest {
         assertEquals("账号或密码错误，或账号当前不可用", error.getMessage());
         verify(accounts).recordBadCredentials("admin");
         verify(clientAccess, never()).requireAuthorization(any(), any());
+        verify(sessions, never()).issueInitial(any(), any(), any(), any(), any());
+    }
+
+    /** 账号锁定或禁用等 Provider 细节必须继续收敛为同一第一方错误，避免账号枚举。 */
+    @Test
+    void unavailableAccountMustNotExposeProviderReason() throws Exception {
+        when(authenticationProvider.authenticate(any()))
+                .thenThrow(new org.springframework.security.authentication.LockedException(
+                        "locked_until=secret-internal-state"));
+
+        mockMvc.perform(post("/api/iam/auth/login")
+                        .contentType("application/json")
+                        .content("""
+                                {"username":"admin","password":"wrong",
+                                "clientId":"mom-admin-web","deviceName":"browser"}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith("application/json"))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.error").value("invalid_credentials"))
+                .andExpect(jsonPath("$.message")
+                        .value("账号或密码错误，或账号当前不可用"));
+
+        verify(accounts, never()).recordBadCredentials("admin");
         verify(sessions, never()).issueInitial(any(), any(), any(), any(), any());
     }
 
@@ -135,6 +170,81 @@ class IamDirectAuthenticationControllerTest {
         assertEquals("session-1", response.sessionId());
         assertEquals(accessExpiresAt, response.accessExpiresAt());
         assertEquals(sessionExpiresAt, response.sessionExpiresAt());
+    }
+
+    /** HTTP Method、Path、Content-Type、字段名称与 JSON 类型属于已发布第一方契约。 */
+    @Test
+    void successfulLoginHttpContractMustRemainStable() throws Exception {
+        when(authenticationProvider.authenticate(any())).thenReturn(authenticated("admin"));
+        when(accounts.requireUser("admin")).thenReturn(user());
+        when(accounts.requiresPasswordChange("admin")).thenReturn(false);
+        Instant issuedAt = Instant.parse("2026-07-26T10:00:00Z");
+        Instant accessExpiresAt = issuedAt.plusSeconds(600);
+        Instant sessionExpiresAt = issuedAt.plusSeconds(8 * 60 * 60);
+        IamAuthorizationContext context = context("admin");
+        when(sessions.issueInitial(
+                "admin", "mom-admin-web", "127.0.0.1", null, "browser"))
+                .thenReturn(new IamSessionTokenService.InitialIssue(
+                        context, "session-1", "refresh-1", issuedAt,
+                        accessExpiresAt, sessionExpiresAt));
+        when(jwtIssuer.issue(
+                context, "session-1", "mom-admin-web", issuedAt, accessExpiresAt,
+                Set.of("openid", "profile")))
+                .thenReturn(new OAuth2AccessToken(
+                        OAuth2AccessToken.TokenType.BEARER, "access-1", issuedAt,
+                        accessExpiresAt, Set.of("openid", "profile")));
+
+        mockMvc.perform(post("/api/iam/auth/login")
+                        .contentType("application/json")
+                        .content("""
+                                {"username":"admin","password":"ValidPassword123!",
+                                "clientId":"mom-admin-web","deviceName":" browser "}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith("application/json"))
+                .andExpect(jsonPath("$.accessToken").isString())
+                .andExpect(jsonPath("$.refreshToken").isString())
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.expiresIn").value(600))
+                .andExpect(jsonPath("$.sessionId").value("session-1"))
+                .andExpect(jsonPath("$.accessExpiresAt").value("2026-07-26T10:10:00Z"))
+                .andExpect(jsonPath("$.sessionExpiresAt").value("2026-07-26T18:00:00Z"));
+    }
+
+    /** 首次改密成功必须保持先修改凭据和记成功，再复用同一 Session/Token 签发路径。 */
+    @Test
+    void requiredPasswordChangeMustIssueThroughAuthoritativeServices() {
+        when(authenticationProvider.authenticate(any())).thenReturn(authenticated("admin"));
+        when(accounts.requireUser("admin")).thenReturn(user());
+        when(accounts.requiresPasswordChange("admin")).thenReturn(true);
+        Instant issuedAt = Instant.parse("2026-07-26T10:00:00Z");
+        Instant accessExpiresAt = issuedAt.plusSeconds(600);
+        IamAuthorizationContext context = context("admin");
+        when(sessions.issueInitial(
+                "admin", "mom-admin-web", "127.0.0.1", "JUnit", "browser"))
+                .thenReturn(new IamSessionTokenService.InitialIssue(
+                        context, "session-1", "refresh-1", issuedAt,
+                        accessExpiresAt, issuedAt.plusSeconds(28800)));
+        when(jwtIssuer.issue(any(), any(), any(), any(), any(), any()))
+                .thenReturn(new OAuth2AccessToken(
+                        OAuth2AccessToken.TokenType.BEARER, "access-1", issuedAt,
+                        accessExpiresAt, Set.of("openid", "profile")));
+
+        IamDirectAuthenticationController.TokenResponse response =
+                controller.changeRequiredPassword(
+                        new IamDirectAuthenticationController.RequiredPasswordChangeRequest(
+                                "admin", "TemporaryPass123!", "NewPassword123!",
+                                "NewPassword123!", "mom-admin-web", "browser"),
+                        request());
+
+        assertEquals("access-1", response.accessToken());
+        var order = org.mockito.Mockito.inOrder(accounts, sessions, jwtIssuer);
+        order.verify(accounts).changeRequiredPassword(
+                "admin", "NewPassword123!", "NewPassword123!");
+        order.verify(accounts).recordSuccessfulLogin("admin");
+        order.verify(sessions).issueInitial(
+                "admin", "mom-admin-web", "127.0.0.1", "JUnit", "browser");
+        order.verify(jwtIssuer).issue(any(), any(), any(), any(), any(), any());
     }
 
     @Test
