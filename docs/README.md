@@ -2,7 +2,7 @@
 
 本目录是 `mom-platform` 的需求、计划、架构、安全协议和架构决策权威入口。
 
-> P1.5 S00～S12 已完成并合并。P1.6 在长期 Draft PR #33 中执行；S00～S10 已完成，S11 为 **In Progress / Awaiting Chris Decision**，S12～S19 尚未开始；S19-A 为最终全栈集成与发布安全验收门禁。
+> P1.5 S00～S12 已完成并合并。P1.6 在长期 Draft PR #33 中执行；S00～S11 已完成，ADR-025 已 Accepted，S12～S19 尚未开始；S19-A 为最终全栈集成与发布安全验收门禁。
 
 ## 文档使用原则
 
@@ -18,8 +18,8 @@
 
 - Phase 01：基础技术骨架已完成。
 - P1.5：**Completed / Merged**，S00～S12 全部完成。
-- P1.6：S00 **Completed under accepted local-development risk**，S01～S10 **Completed**，S11 **In Progress / Awaiting Chris Decision**，S12～S19 Not Started；PR #33 保持 Draft。
-- 当前 Slice：S11 数据所有权 ADR 草案与现状证据已形成；ADR-025 仍为 Proposed，等待 Chris Review，未进入 S12。
+- P1.6：S00 **Completed under accepted local-development risk**，S01～S11 **Completed**，S12～S19 Not Started；PR #33 保持 Draft。
+- 当前 Slice：S11 **Completed**；ADR-025 已 Accepted。下一 Slice S12 **Not Started**，未创建 `mom-system-platform`。
 - S19-A：Mobile 服务端 Logout、正式 Redirect/App Link、mom-mobile 完整检查、L4/L6 和 mom-infra 环境证据统一在最终集成阶段回收；当前仍为 Open/Deferred。
 - Phase 02：**Not Started**，业务垂直切片未因 P1.6 治理而启动。
 - Android Keystore、HTTPS App Link 与真机强杀恢复：S19-A 与 Phase 02 Mobile 正式联调前置验收项。
@@ -90,7 +90,7 @@
 
 - [ADR 索引](adr/README.md)
 - [ADR 模板](adr/ADR-模板.md)
-- [ADR-025：IAM、System、MDM、WMS、EAM 数据所有权边界（Proposed）](adr/ADR-025-IAM-System-MDM-WMS-EAM数据所有权边界.md)
+- [ADR-025：IAM、System、MDM、WMS、EAM 数据所有权边界（Accepted）](adr/ADR-025-IAM-System-MDM-WMS-EAM数据所有权边界.md)
 
 ## 垂直切片
 

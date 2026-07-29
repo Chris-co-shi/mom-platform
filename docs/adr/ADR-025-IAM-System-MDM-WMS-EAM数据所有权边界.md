@@ -1,16 +1,17 @@
 # ADR-025：IAM、System、MDM、WMS、EAM 数据所有权边界
 
-- 状态：Proposed
+- 状态：Accepted
 - 提出日期：2026-07-29
-- 决策 Slice：P1.6 S11-A
-- 决策人：待 Chris Review
+- 接受日期：2026-07-29
+- 决策 Slice：P1.6 S11-A（草案）/ S11-B（接受）
+- 决策人：Chris
 - 关联：[ADR-023](ADR-023-Locale时区与用户偏好边界.md)、[ADR-024](ADR-024-PC-JSON与Mobile-PKCE-OIDC双通道.md)、[S11 现状与迁移边界报告](../engineering/P1.6-S11-数据所有权现状与迁移边界报告.md)
 
-> **Proposed 不代表已接受。** 本 ADR 只形成推荐决策，不创建 `mom-system-platform`，不修改 IAM、API、Schema、Flyway 或运行时行为。S12 不能在 ADR-025 经 Chris 明确批准并标记为 `Accepted` 前开始；System 模块形态仍以最终 Accepted ADR 为准，本 ADR 不自动触发任何 IAM 数据或代码迁移。
+> **Accepted Decision。** Chris 于 2026-07-29 接受方案 C 与本 ADR 第 23 节七项决策，S11 数据所有权边界已经冻结。本次仍只完成文档收口：不创建 `mom-system-platform`，不修改 IAM、API、Schema、Flyway 或运行时行为。Accepted 不会自动实施 S12；S12 只能由独立任务启动，且不得提前实现 S13～S17。
 
 ## 1. Context
 
-P1.6 S01～S10 已建立工程规范并封板 IAM 安全基线。IAM 当前真实存储账号、凭据、RBAC、Factory Scope、Party Binding、Mobile Access、OAuth Client Policy、Session、Refresh Token 和安全审计；未来 System 候选能力包括参数、通用字典、用户偏好、应用目录、菜单与导航。与此同时，现有架构规划把 Factory、组织、供应商、客户和单位放在 MDM，把 Warehouse 放在 WMS，把设备台账放在 EAM。
+P1.6 S01～S10 已建立工程规范并封板 IAM 安全基线。IAM 当前真实存储账号、凭据、RBAC、Factory Scope、Party Binding、Mobile Access、OAuth Client Policy、Session、Refresh Token 和安全审计；未来 System 候选能力包括参数、通用字典、用户偏好、应用目录、菜单与导航。与此同时，现有架构规划把 Factory、组织、人员、Party 核心身份与单位放在 MDM，并把供应商采购关系、客户销售关系分别留给未来采购/SRM 与销售/CRM 业务域，把 Warehouse 放在 WMS，把设备台账放在 EAM。
 
 如果只按“管理页面”或类型名称拆分，会把安全权威、体验配置和业务主数据重新混合。本 ADR 以 Migration、Entity、Repository、Application Service、API 与固定前端调用方为证据，裁决单一写入权威、允许引用、可重建投影、用户偏好和禁止复制的边界。
 
@@ -23,7 +24,7 @@ P1.6 S01～S10 已建立工程规范并封板 IAM 安全基线。IAM 当前真�
 ```text
 IAM Account ≠ Employee/Person Master Data
 MDM Factory Master ≠ IAM Factory Authorization Scope ≠ System Factory Preference
-Party/Supplier/Customer Master ≠ IAM External Identity Binding
+MDM Party Core Identity ≠ Supplier Procurement Relationship ≠ Customer Sales Relationship ≠ IAM Party Binding
 IAM OAuth Client / Permission ≠ System Application Catalog / Menu ≠ Web Router
 ```
 
@@ -63,27 +64,31 @@ IAM OAuth Client / Permission ≠ System Application Catalog / Menu ≠ Web Rout
 
 ## 6. Recommended Decision
 
-采用“按权威领域拆分，System 只承载平台配置与体验数据”：
+采用方案 C：“按权威领域拆分，System 只承载平台配置与体验数据”。
 
 - IAM Own 账号、凭据、账号安全状态、User Type、Role、Permission、用户授权关系、Factory Scope、Party Binding、Mobile Access、OAuth Client/Client Policy、Session、Refresh、revoked sid、JWT Claims 规则和 IAM Security Audit。
-- System 候选 Own GLOBAL/APPLICATION 参数、受限通用字典、用户偏好/视图设置、Application Catalog、Menu、Navigation，以及有真实调用方时的动态国际化资源和可选跨领域审计 Projection。
-- MDM 推荐 Own Factory、Organization、Department、Person/Employee（V1 推荐，是否以后拆 HR/Organization Domain 待决策）、Party/Supplier/Customer（V1 推荐统一 Party 模型，长期形态待决策）、Unit Directory 与 Conversion。
+- System Own 后续独立 Slice 批准的平台配置与体验数据：GLOBAL/APPLICATION 类型化参数、受限通用字典、用户偏好/视图设置、Application Catalog、Menu、Navigation。Dynamic I18n 只有真实调用方时实施；跨领域 Audit Projection 当前暂缓。
+- MDM Own Factory、Organization、Department、Person/Employee、Party 核心身份与主体主数据、Unit Directory 与 Conversion。Party 核心包括 Party ID/Code/Type、名称、基础启停状态、基础联系人身份与通用联系方式，以及 Supplier/Customer 的统一主体身份。
+- 采购/SRM 业务域是供应商准入、评级、采购关系、供货能力、采购结算关系、供应商绩效及采购业务状态的 Recommended Future Owner / Planned Authority；当前 Not Implemented。
+- 销售/CRM 业务域是客户等级、销售关系、信用、价格关系、收款条件及销售业务状态的 Recommended Future Owner / Planned Authority；当前 Not Implemented。
+- IAM 只 Own 账号与 Party 的身份绑定、Party Binding 授权关系，以及由此引起的 Session、Claim 和撤销行为；不保存 Party、Supplier、Customer 完整业务主数据。
 - WMS Own Warehouse、Storage Location/Bin、Warehouse Status 与 Factory-Warehouse 业务关系。
-- EAM Own Equipment Asset、Machine、设备台账状态、设备与 Factory/Location 的资产归属；Device Credential 预留给未来 Device IAM/IoT Security，不进入当前用户 IAM 或 System。
-- MES/制造资源边界推荐 Own Production Line/Work Center 的生产能力与排程语义；EAM 只引用并管理挂接设备，最终对象形态需在相应业务 Slice 决定。
+- EAM Own Equipment Asset、Machine、设备台账状态及 Factory/Location 资产归属；Device Credential 预留给未来 Device IAM/IoT Security。
+- MES/制造资源边界推荐 Own Production Line/Work Center 的生产能力与排程语义；EAM 只引用并管理挂接设备，最终对象形态由相应业务 Slice 决定。
 
+当前 IAM 无生产数据需要迁移，结论为 **No current production migration required**；`IamAdminService` 保留 IAM，不迁移。
 ## 7. Object Ownership Matrix
 
 | 对象 | 当前事实 | 权威领域 | 其他领域分类 | 可保存内容 | 禁止复制 | 一致性方式 | 迁移结论 |
 |---|---|---|---|---|---|---|---|
 | User Account | IAM 已实现 | IAM Own | System/MDM Reference | `userId` | 凭据、锁定、授权关系 | IAM 同步校验/事件失效 | 不迁移 |
 | Username | IAM 已实现且唯一 | IAM Own | 展示 Projection 可选 | 脱敏展示值 | 登录校验副本 | IAM 查询 | 不迁移 |
-| Display Name | IAM 已实现最小身份展示 | IAM Own（最小属性） | 人员域可为来源候选；客户端 Projection | `userId + displayName + updatedAt` | 完整 Person 档案 | 后续受控同步；IAM 不依赖其可用性 | 不迁移；边界待 Chris 确认 |
+| Display Name | IAM 已实现账号显示标签 | IAM Own 独立 `displayName` | MDM `personName` 是不同权威字段；客户端可展示 | `userId + displayName + updatedAt` | 完整 Person 档案、法定姓名权威副本 | 可在明确用例中由 MDM 初始化；不形成持续双向同步；IAM 不依赖 MDM 可用性 | 不迁移 |
 | Credential | IAM 已实现摘要 | IAM Own | Forbidden Copy | 无 | 密码、摘要、Pepper、重置状态 | 仅 IAM 本地事务 | 不迁移 |
 | Account/Lock/First Login | IAM 已实现 | IAM Own | Forbidden Copy/只读结果 | 必要的泛化状态结果 | 失败次数、锁定细节权威副本 | IAM 实时校验 | 不迁移 |
 | User Type/Mobile Access | IAM 已实现 | IAM Own | Reference/只读授权结果 | 当前入口判断结果 | 第二套授权状态 | IAM 实时校验、Session 撤销 | 不迁移 |
-| Person/Employee | 仅 `employee_no` 最小引用；完整档案不存在 | MDM Own（V1 推荐） | IAM Reference | `personId/employeeId` 或过渡期 `employeeNo` | 联系方式、组织岗位全档案 | API/事件；权威不可用不扩大权限 | 未来模型新建；无现有生产迁移 |
-| Organization/Department/Position | 未实现，仅文档规划 | MDM Own（V1 推荐） | Reference/Projection | 稳定 ID/Code、展示投影 | 组织生命周期副本 | API/事件 | 未来新建 |
+| Person/Employee | 仅 `employee_no` 最小引用；完整档案不存在 | MDM Own（V1 Accepted） | IAM Reference | `personId/employeeId` 或过渡期 `employeeNo` | 联系方式、组织岗位全档案 | API/事件；权威不可用不扩大权限 | 未来模型新建；无现有生产迁移 |
+| Organization/Department/Position | 未实现，仅文档规划 | MDM Own（V1 Accepted） | Reference/Projection | 稳定 ID/Code、展示投影 | 组织生命周期副本 | API/事件 | 未来新建 |
 | Role | IAM 已实现 | IAM Own | System Reference | Role ID/Code 仅展示需要时 | Role 定义与分配权威副本 | IAM API | 不迁移 |
 | Permission | IAM 已实现且 Flyway/代码管理 | IAM Own | System Reference | Permission Code | Permission 名单第二权威 | 发布时受控引用校验 | 不迁移 |
 | User Role | IAM 已实现 | IAM Own | Forbidden Copy | 无；调用方只消费结果 | 分配关系 | IAM 实时校验/短期 Token 快照 | 不迁移 |
@@ -91,14 +96,16 @@ IAM OAuth Client / Permission ≠ System Application Catalog / Menu ≠ Web Rout
 | Current Authorization Context/JWT Claims | IAM 已实现 | IAM Own | 客户端短期只读快照 | 已签名 Claims/`/me` 结果 | 客户端自报 Role/Scope/Party | 每次签发与 `/me` 重载；Fail Closed | 不迁移 |
 | OAuth Client/Client Policy | IAM/SAS 已实现 | IAM Own | System Reference | Client ID | Secret、Redirect/Grant 安全策略副本 | IAM 校验 | 不迁移 |
 | Session/Refresh/revoked sid | IAM 已实现 | IAM Own | Forbidden Copy | 客户端仅持协议要求的 Token；System 无副本 | Session 权威、Refresh 明文/摘要、撤销状态 | IAM 本地事务 + Redis revoked sid | 不迁移 |
-| IAM Security Audit | IAM 已实现追加写 | IAM Own | System 可选 Projection | 脱敏事件投影与来源 | 原始事件权威写入 | 事件/只读 API | 不迁移 |
+| IAM Security Audit | IAM 已实现追加写 | IAM Own | 当前无跨域 Projection | 无 | 原始事件权威写入 | IAM 本地追加写 | 不迁移；统一审计暂缓 |
 | Factory | 仅 IAM 引用；主数据未实现 | MDM Own | IAM/System/WMS Reference | `factoryId`；必要展示 Projection | 名称、地址、时区在 IAM/System 的权威副本 | MDM API/事件 | 未来 MDM 新建 |
 | Factory Code/Name/Status/Address/Timezone | 未实现 | MDM Own | Projection/Reference | 展示字段、来源版本、更新时间 | 独立写入 | API/事件；停用事件 | 未来 MDM 新建 |
 | Default/Last Factory | Web 当前本地偏好 | System Preference | 客户端缓存 | `factoryId`、版本、更新时间 | Factory Scope | 读取后 IAM Scope + MDM 状态重校验 | S16 候选；非 IAM 迁移 |
 | Current Request Factory | Web/Mobile 发送 `X-Factory-Id` | 请求上下文；IAM/业务服务校验 | 临时值 | 经校验的 `factoryId` | 持久化为授权权威 | 每请求 Fail Closed | 不迁移 |
-| Party | IAM 仅绑定 ID；主数据未实现 | MDM Own（V1 推荐） | IAM Reference | `partyType + partyId` | 主体名称、地址、联系人、状态副本 | 权威校验/状态事件 | 未来 MDM 新建；Decision Required |
+| Party Core Identity | IAM 仅绑定 ID；主数据未实现 | MDM Own（V1 Accepted） | IAM Reference | `partyType + partyId` | Party 核心身份与主体主数据副本 | 权威校验/状态事件 | 未来 MDM 新建 |
 | Party Binding | IAM 已实现且一账号最多一个 Party | IAM Own | Forbidden Copy | 业务只消费经校验结果 | 绑定关系第二权威 | Party 状态校验 + IAM 事务/撤销 | 不迁移 |
-| Supplier/Customer/Contact | 仅文档规划 | MDM Own（V1 推荐统一 Party） | IAM Reference/展示 Projection | Party ID/Type；必要联系人快照由业务定义 | IAM 内完整主数据 | API/事件 | 未来新建；长期边界待决策 |
+| Supplier Procurement Relationship | Not Implemented | 采购/SRM Planned Authority；Recommended Future Owner | MDM Party Reference；IAM 仅 Party Binding | Party ID 与采购业务事实 | IAM/MDM 中的采购关系第二权威 | API/事件 | 未来采购/SRM Slice 新建 |
+| Customer Sales Relationship | Not Implemented | 销售/CRM Planned Authority；Recommended Future Owner | MDM Party Reference；IAM 仅 Party Binding | Party ID 与销售业务事实 | IAM/MDM 中的销售关系第二权威 | API/事件 | 未来销售/CRM Slice 新建 |
+| Base Contact Identity | 仅文档规划 | MDM Own | 业务域 Reference/业务快照 | 基础联系人身份与通用联系方式 | IAM 内完整联系人主数据 | API/事件 | 未来 MDM 新建 |
 | Warehouse | 未实现 | WMS Own | 其他领域 Reference | Warehouse ID | 通用字典副本 | WMS API/事件 | 未来 WMS 新建 |
 | Storage Location/Bin/Warehouse Status | 未实现 | WMS Own | Reference/Projection | Location ID、业务历史快照 | System/IAM 权威副本 | WMS API/事件 | 未来 WMS 新建 |
 | Factory-Warehouse Relation | 未实现 | WMS Own | MDM Factory Reference | Factory ID + Warehouse ID | IAM Warehouse Scope（无需求时） | WMS 事务，MDM Factory 校验 | 未来 WMS 新建 |
@@ -112,41 +119,43 @@ IAM OAuth Client / Permission ≠ System Application Catalog / Menu ≠ Web Rout
 | Locale/Display Timezone/Theme | Web 本地；Mobile 未实现 | System Preference | 客户端缓存 | 白名单值、Version | 授权 Claim、Factory Timezone | System API；失败回退默认 | S16 候选 |
 | View Setting/Table Columns/Sorting/Saved Filters | Web 框架存在部分本地能力；无服务端模型 | System Preference | 客户端缓存 | 类型化视图键和值 | 任意深层 JSON、权限与业务事实 | System API + 乐观版本 | S16 候选 |
 | Dashboard/Favorites | 未发现业务实现 | System Preference | 客户端缓存 | 稳定对象引用与布局 | 对象权威副本 | System API + 引用校验 | 未来 S16 候选 |
-| Application Catalog | Web 应用入口静态、IAM 有 Client Policy | System Own | IAM Client ID Reference | Application Code、名称、Icon、Entry URL、Sort、Enabled、Client ID 引用 | Client Secret/授权策略 | 发布校验/API/缓存 | S17 新建；应用编码待决策 |
+| Application Catalog | Web 应用入口静态、IAM 有 Client Policy | System Own | IAM Client ID 可选 Reference | 独立稳定 `applicationCode`、名称、Icon、Entry URL、Sort、Enabled；可无 OAuth Client，未来可一应用多 Client | Client Secret、Redirect URI、Grant、Scope、Client Policy、安全协议配置 | 发布校验/API/缓存 | S17 新建；不与 IAM OAuth Client 等同 |
 | Menu/Navigation | Web IAM 菜单静态 | System Own（动态目录）；Web Own 路由组件 | Permission Code Reference | 树、Route Key、排序、Feature Flag、Permission Code | Permission 权威列表 | System API；服务端仍授权 | S17 候选，静态回退兼容 |
 | Dynamic I18n | 无真实调用方 | System Own（条件性） | 客户端缓存 | Key、Locale、Version | 领域主数据多语言字段 | API/缓存；不可用回退静态资源 | S15 保持条件性 |
-| Business Audit | 各业务域尚待实现 | 对应业务领域 Own | System 可选 Projection | 脱敏聚合视图 | 原始审计跨域写入 | 事件/查询投影 | 不迁移；按业务 Slice 新建 |
+| Business Audit | 各业务域尚待实现 | 对应业务领域 Own | 当前无跨域 Projection | 无 | 原始审计跨域写入 | 对应业务域本地写入 | 不迁移；统一审计暂缓 |
 
 ## 8. IAM Boundary
 
-IAM 保留 User Account、Username、最小 Display Name、Credential、账号状态/锁定/首次改密、User Type、Mobile Access、Role、Permission、User Role、Factory Scope、Party Binding、Client Policy、OAuth Client、Session、Refresh、revoked sid、JWT Claims、`/api/iam/me` 和 Security Audit。
+IAM 保留 User Account、Username、独立账号显示标签 `displayName`、Credential、账号状态/锁定/首次改密、User Type、Mobile Access、Role、Permission、User Role、Factory Scope、Party Binding、Client Policy、OAuth Client、Session、Refresh、revoked sid、JWT Claims、`/api/iam/me` 和 Security Audit。
 
-`displayName` 推荐保留为协议和安全界面所需的最小身份展示属性，使 IAM 在人员域不可用时仍能认证并显示主体；它不能演变为包含生日、联系方式、组织、岗位等的 Person Profile。账号没有完整员工档案时，IAM 仍可按账号安全规则工作；需要员工业务事实的用例由相应主数据域拒绝或提示补档，不能让 IAM 伪造档案。
+`IAM displayName` 是账号显示标签/安全界面显示名称；`MDM personName` 是人员主数据中的正式姓名、首选姓名或业务姓名。两者不是同一个权威字段。IAM `displayName` 不是 Person Profile，不代表法定姓名或完整员工姓名。它可以在账号创建等明确用例中由 MDM 人员主数据初始化，但初始化不形成持续双向同步；IAM 登录和安全页面不依赖 MDM 实时可用。未来若需要同步，必须通过独立方案定义来源、冲突处理、更新时间和失败语义；本任务不实施同步。
 
-`employee_no` 当前是最小过渡标识。未来优先改为稳定 `personId/employeeId` Reference，但必须在权威模型和兼容迁移获批后另行实施。当前不修改或迁移。
+`employee_no` 当前是最小过渡标识。未来优先改为稳定 `personId/employeeId` Reference，但必须在权威模型和兼容迁移获批后另行实施。当前不修改字段、不迁移数据。IAM 不保存完整人员档案。
 
 `IamAdminService` 及其六个应用服务不迁移：其真实职责全是 IAM 安全对象。“Admin 页面”是交互入口，不是 System 数据所有权证据。
 
+P1.6 保持一个账号最多绑定一个 Party，不通过数组字段或隐藏配置提前放开。真实多 Party 需求出现时必须新建 ADR，重新设计 Claims、Session Context、Current Party、UI 切换、数据权限、Offline Command、Refresh 恢复、审计主体和撤销语义。
 ## 9. System Boundary
 
 System 未来只承载：
 
-1. GLOBAL/APPLICATION 类型化参数：Key、类型、Scope、Version、默认值、环境覆盖规则、审计、缓存策略和 Sensitive 标记。`Sensitive` 只用于禁止回显/提示治理，不授权保存 Secret。
+1. GLOBAL/APPLICATION 类型化参数：Key、类型、Scope、Version、默认值、环境覆盖规则、审计、缓存策略和 Sensitive 标记。Sensitive 只用于禁止回显/提示治理，不授权保存 Secret。
 2. 非权威、跨业务、低变化通用字典。领域枚举继续由代码/领域模型拥有；MDM 主数据和配置参数不是字典。
-3. 用户 Preference：Locale、显示时区、Theme、Density、Page Size、默认应用、Default/Last Factory、视图、表格列、排序、过滤器、Dashboard 和 Favorites。
-4. Application Catalog/Menu/Navigation；只引用 IAM Client ID 和 Permission Code。菜单隐藏从不代替 Gateway 或业务服务权限校验。
-5. 有真实调用方时的 Dynamic I18n，以及经单独批准的跨领域只读 Audit Projection。
+3. 用户 Preference：Locale、显示时区、Theme、Density、Page Size、默认应用、Default/Last Factory、视图、表格列、排序、过滤器、Dashboard 和 Favorites。Preference 不参与 Authorization。
+4. Application Catalog/Menu/Navigation。System Application 使用独立稳定 `applicationCode`，不等同 IAM OAuth Client；可选引用 `clientId`，允许没有 OAuth Client 的应用，并为未来一应用多 Client 保留模型空间。System 只引用 Permission Code。
+5. Dynamic I18n 仅在存在真实调用方时实施；不存在调用方则 S15 Deferred，不创建表、API、缓存或后台页面。Web/Mobile 静态语言资源由客户端拥有，业务主数据多语言名称由对应业务域拥有。
+6. 跨领域 Audit Projection 当前暂缓。System 不接管 IAM Security Audit 或业务域原始审计写入，不创建统一 Audit Center 或跨域 Projection 表；真实合规/跨域查询出现后另立 ADR。
 
-System 参数禁止承载数据库密码、私钥、Token、Client Secret、Refresh Pepper 或 IAM OAuth Client 安全配置。System 不拥有 Factory、Warehouse、Equipment、Supplier、Customer、Unit、Role、Permission、Account/Session Status。
-
+IAM 继续权威拥有 OAuth Client、Client Secret、Redirect URI、Grant、Scope、Client Policy 和安全协议配置，System 不复制。System 参数禁止承载数据库密码、私钥、Token、Client Secret、Refresh Pepper 或任何 Secret。System 不拥有 Factory、Warehouse、Equipment、Party 交易关系、Role、Permission、Account/Session Status。
 ## 10. MDM Boundary
 
-MDM 已规划且推荐拥有 Factory（ID、Code、Name、Status、Timezone、Address）、Organization、Department、Person/Employee、Party/Supplier/Customer、联系人、Unit Directory 与 Conversion。当前尚无这些生产模型，ADR 不能把规划写成实现。
+MDM 是 V1 中 Factory、Organization、Department、Person/Employee、Party 核心身份与主体主数据、基础联系人身份和通用联系方式、Unit Directory 与 Conversion 的唯一权威。当前尚无这些生产模型，状态必须记为 Planned Authority / Not Implemented，不能写成已实现能力。
 
-Factory ID 由 MDM 生成。Factory Code 是否允许修改由 MDM 决定；跨域引用必须使用 ID，Code 仅作稳定业务标识或展示。停用后 IAM 不再新增/签发包含无效 Factory 的授权上下文；已有 Preference 自动失效并回退。删除优先采用停用/保留引用，物理删除需先完成引用影响分析。
+Person/Employee：IAM 只保存稳定 `personId`、`employeeId` 或过渡期 `employeeNo` Reference，不保存完整档案；System 不拥有人员主数据。未来出现招聘、入转调离、合同、考勤、薪酬等独立 HR 生命周期时，通过新 ADR 拆分 HR Domain。
 
-Person/Employee 与 Party 的长期限界上下文仍列为 Open Decision；本 ADR 推荐 V1 先由 MDM 唯一拥有，避免在权威域尚未出现前制造同步服务。
+Party：MDM 只 Own Party ID/Code/Type、名称、基础启停状态、基础联系人身份与通用联系方式，以及 Supplier/Customer 统一主体身份。供应商准入、评级、采购关系、供货能力、采购结算关系、绩效和采购业务状态由未来采购/SRM 业务域 Own；客户等级、销售关系、信用、价格关系、收款条件和销售业务状态由未来销售/CRM 业务域 Own。上述业务域当前均为 Recommended Future Owner / Planned Authority / Not Implemented。IAM 只 Own Party Binding 及其安全后果。
 
+Factory ID 由 MDM 生成。Factory Code 是否允许修改由 MDM 决定；跨域引用必须使用 ID。停用后 IAM 不再新增/签发包含无效 Factory 的授权上下文，已有 Preference 自动失效并回退。物理删除前必须完成引用影响分析。
 ## 11. WMS Boundary
 
 Warehouse 权威固定属于 WMS。WMS 定义 Warehouse、Storage Location/Bin、状态、层级、Factory-Warehouse 关系及其生命周期。其他领域只引用 Warehouse/Location ID，必要时保存业务发生时的不可变快照。
@@ -256,38 +265,52 @@ IAM 现有字段均为安全权威或必要 Reference。`displayName` 是最小�
 - 将设备账号建成当前 `iam_user` 并据此拥有设备台账：混淆人类账号与设备身份，已拒绝。
 - 为过渡同时让 IAM/System 或 MDM/System 双写：没有单一失败恢复点，已拒绝。
 
-## 23. Open Decisions
+## 23. Accepted Decisions
 
-以下事项需要 Chris 决策；每项已有推荐，不把全部细节上抛：
+Chris 于 2026-07-29 接受方案 C，并批准以下七项决策：
 
-| 决策点 | 当前事实 | 候选方案 | 推荐 | 兼容/实现影响 | 不决策后果 |
-|---|---|---|---|---|---|
-| Person/Employee 长期权威 | 仅 IAM `employee_no`；MDM 文档规划 | MDM；HR Domain；独立 Organization Domain | V1 先 MDM，出现独立 HR 生命周期再用新 ADR 拆分 | IAM 未来改存稳定 ID；拆分需事件/兼容 | 无法冻结人员 API 与引用 ID |
-| Supplier/Customer/Party | IAM 仅 ID Binding；MDM 文档规划 | MDM 统一 Party；供应商/客户业务域分别拥有 | V1 MDM 统一 Party 核心，业务域拥有交易关系 | 决定 Party ID、状态事件和联系人模型 | IAM Party 有效性校验无稳定上游 |
-| Application Code 与 Client ID | Web 应用与 IAM Client 一一对应但语义不同 | 直接用 Client ID；System 独立 Code + 可选 Client ID 引用 | 独立 Application Code | 需发布引用校验；支持非 OAuth 应用 | Catalog 被安全协议标识绑死 |
-| IAM Display Name 边界 | Token/`/me` 已使用 | IAM 独立最小值；人员域 Projection；完全迁出 | IAM 保留最小值，可受控同步但不依赖人员域可用性 | 避免协议破坏；需明确冲突处理 | 人员域建设时易双主 |
-| 多 Party 绑定 | 当前唯一约束一账号一个 Party | 保持单一；允许多 Party + 当前选择 | P1.6 保持单一，真实业务证明后另立 ADR | 多绑定会改变 Claims、Session 与 UI | 贸然放开会扩大授权模型 |
-| S15 Dynamic I18n | 无真实动态调用方 | 现在实现；保持条件性；永久不做 | 保持条件性 | 无调用方则不建表/API | 过早建设闲置平台能力 |
-| 跨领域 Audit Projection | IAM 有安全审计，业务审计未实现 | System 聚合；独立 Compliance；暂缓 | 暂缓，真实合规查询出现后再选 | 需要脱敏事件、保留期、访问控制 | 现在建设会猜测需求和数据合同 |
+1. **Person / Employee**：V1 由 MDM 唯一 Own Person、Employee、Organization、Department；IAM 仅保存稳定 ID 或过渡期 `employeeNo` Reference，System 不 Own 人员主数据。未来独立 HR 生命周期通过新 ADR 拆分；当前不修改 `employee_no`、不迁移数据。
+2. **Party / Supplier / Customer**：MDM Own Party 核心身份与统一主体主数据；采购/SRM 是供应商采购关系的 Recommended Future Owner / Planned Authority，销售/CRM 是客户销售关系的 Recommended Future Owner / Planned Authority，当前均 Not Implemented；IAM 只 Own Party Binding 与相关 Session/Claim/撤销行为。
+3. **Application Catalog**：`System Application ≠ IAM OAuth Client`。System 使用独立稳定 `applicationCode`，可选引用 `clientId`，可支持无 OAuth Client 的应用及未来一应用多 Client；IAM 继续 Own 全部 OAuth 安全配置。
+4. **Display Name**：`IAM displayName` 是独立账号显示标签，`MDM personName` 是人员主数据姓名，两者不是同一个权威字段。允许明确用例中的一次性初始化，不形成持续双向同步；本任务不实施同步。
+5. **多 Party Binding**：P1.6 保持一账号最多一个 Party；未来真实需求必须新增 ADR 并重新设计完整授权、会话、离线、审计和撤销语义。
+6. **Dynamic I18n**：S15 保持条件性；有真实调用方才执行，无调用方则 Deferred，且不创建表/API/缓存/后台页面。
+7. **跨领域 Audit Projection**：暂缓建设；IAM Security Audit 与各业务域 Business Audit 保持各自权威，System 不接管原始写入。真实合规/跨域查询出现后再以新 ADR 选择 System Projection、独立 Compliance/Audit 服务、数据仓库或可观测平台。
 
+以上决策冻结 S11 数据所有权边界。
 ## 24. Acceptance Gate
 
-ADR-025 只有在 Chris 明确批准以下内容后才能从 Proposed 改为 Accepted：
+Acceptance Gate 已于 2026-07-29 由 Chris 通过：
 
-1. IAM/System/MDM/WMS/EAM 推荐边界与 Open Decisions 的取舍；
-2. Permission 继续由 IAM Own，Warehouse 由 WMS Own，设备台账由 EAM Own；
-3. Preference 不参与授权，System 参数不保存 Secret；
-4. 当前 IAM 无生产数据迁移、`IamAdminService` 不迁移；
-5. S12 的模块候选边界与禁止依赖。
+- 方案 C 与七项决策已接受；
+- Permission 继续由 IAM Own，Warehouse 由 WMS Own，Equipment Ledger 由 EAM Own；
+- Preference 不参与 Authorization，System 参数禁止 Secret；
+- IAM 结论为 **No current production migration required**，`IamAdminService` 不迁移；
+- S11 状态可收口为 Completed，S12 仍为 Not Started。
 
-未通过 Gate 时，S11 状态保持 `In Progress / Awaiting Chris Decision`，S12 保持 `Not Started`。
-
+Accepted 只表示决策边界冻结，不表示自动创建模块、迁移数据或启动后续 Slice。
 ## 25. S12 Input
 
-若本 ADR Accepted，S12 仅可依据最终批准范围设计 `mom-system-platform` 技术骨架和依赖门禁；不得在骨架 Slice 提前实现参数、字典、偏好、菜单或动态国际化。API/Client/Server 形态、Schema 创建和依赖方向仍需以 Chris 批准后的 ADR 文本及 S12 独立指令为准。
+S12 只能由独立任务启动，并且只允许创建 `mom-system-platform` 技术骨架、确定 api/client/server 或最终批准结构、建立依赖方向与 ArchUnit 门禁、建立空模块/基础配置/测试骨架。
 
-建议 S12 架构门禁至少禁止：System 依赖 `mom-iam-server`、跨 Schema Repository、保存 Permission/Scope/Session、以及任何 Secret 参数能力。
+S12 不得提前实现参数、字典、Preference、Application Catalog、Menu、Navigation、Dynamic I18n、Audit Projection、业务 API、数据同步或 IAM 数据迁移；不得提前实现 S13～S17。
 
+冻结依赖门禁：
+
+```text
+mom-system-platform
+不得依赖 mom-iam-server
+不得访问 IAM Repository
+不得访问 IAM Schema
+不得保存 Permission
+不得保存 Factory Scope
+不得保存 Party Binding
+不得保存 Session / Refresh / revoked sid
+不得保存 Secret
+不得跨 Schema FK / JOIN
+```
 ## 26. Rollback / Supersession Strategy
 
-本 ADR 为纯文档 Proposed 草案，无生产回滚、数据库迁移或 Token 失效。Chris 不接受时可修改或标记 Rejected，S12 继续阻塞。若 Accepted 后边界变化，创建新的 ADR 并将 ADR-025 标记为 Superseded，不直接改写历史决策；对应实现和数据迁移必须使用独立扩展—迁移—收缩方案。
+本 ADR 已 Accepted，但本次仍是纯文档决策收口，没有生产回滚、数据库迁移或 Token 失效。S11-A 两个已推送文档 Commit 与 S11-B 新文档收口 Commit 均保留，不改写历史。
+
+若未来边界变化，创建新的 ADR 并将 ADR-025 标记为 Superseded，不静默改写本决策；对应实现和数据迁移必须使用独立扩展—迁移—收缩方案。

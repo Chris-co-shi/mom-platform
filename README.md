@@ -115,7 +115,7 @@ flowchart LR
 | 能力域 | V1 关注点 | 权威模块 |
 |---|---|---|
 | 身份与权限 | OAuth/OIDC、PKCE、用户、角色、权限、Factory/Party Scope、Session | `mom-iam-platform` |
-| 主数据 | 集团、工厂、物料、供应商、客户、版本索引 | `mom-mdm-platform` |
+| 主数据 | 集团、工厂、物料、人员与 Party 核心身份、版本索引；供应商采购关系与客户销售关系分别由未来采购/SRM、销售/CRM 业务域拥有 | `mom-mdm-platform`（Party Core）；业务域 Planned Authority / Not Implemented |
 | 生产执行 | 工单、版本快照、投料、过程记录、报工 | `mom-mes-platform` |
 | 仓储库存 | 库位、容器、批次、预占、流水、余额、对账 | `mom-wms-platform` |
 | 质量管理 | 检验、放行、不合格处置、偏差、CAPA | `mom-qms-platform` |
@@ -213,7 +213,7 @@ mvn -B -ntp clean verify
 |---|---|---|
 | Phase 01 | JDK 25 + Boot 4 基础技术骨架与观测闭环 | ✅ 基础完成 |
 | P1.5 | 认证与授权闭环 | ✅ Completed / Merged（S00～S12） |
-| P1.6 | IAM 收敛与 System 平台治理 | 🚧 S00～S05 Completed；S06 Not Started（Draft PR #33） |
+| P1.6 | IAM 收敛与 System 平台治理 | 🚧 S00～S11 Completed；ADR-025 Accepted；S12 Not Started（Draft PR #33） |
 | Phase 02 | 供应商送货、来料检验、PDA 入库、库存闭环 | ⏳ Not Started；不因 P1.6 治理视为已启动 |
 | Phase 03 | 生产工单、PCS 协同、半成品与成品批次 | ⏳ 计划中 |
 | Phase 04 | 成品放行、WCS 入库、客户发运、追溯和召回 | ⏳ 计划中 |
