@@ -2,7 +2,7 @@
 
 本目录是 `mom-platform` 的需求、计划、架构、安全协议和架构决策权威入口。
 
-> P1.5 S00～S12 已完成并合并。P1.6 在长期 Draft PR #33 中执行；S00～S06 已完成，S07 `In Progress / Awaiting Chris Approval`，S08～S19 未开始。
+> P1.5 S00～S12 已完成并合并。P1.6 在长期 Draft PR #33 中执行；S00～S07 已完成，S08～S19 未开始。
 
 ## 文档使用原则
 
@@ -18,9 +18,16 @@
 
 - Phase 01：基础技术骨架已完成。
 - P1.5：**Completed / Merged**，S00～S12 全部完成。
-- P1.6：S00 **Completed under accepted local-development risk**，S01～S06 **Completed**，S07 **In Progress / Awaiting Chris Approval**，S08～S19 Not Started；PR #33 保持 Draft。
+- P1.6：S00 **Completed under accepted local-development risk**，S01～S07 **Completed**，S08～S19 Not Started；PR #33 保持 Draft。
+- 当前 Slice：S07 已收口；下一步等待独立启动 S08。
 - Phase 02：**Not Started**，业务垂直切片未因 P1.6 治理而启动。
 - Android Keystore、HTTPS App Link 与真机强杀恢复：Phase 02 Mobile 正式联调前置验收项。
+
+## 当前认证协议权威
+
+- [ADR-024：PC JSON 与 Mobile PKCE/OIDC 双通道（Accepted）](adr/ADR-024-PC-JSON与Mobile-PKCE-OIDC双通道.md) 是当前认证协议、内部认证权威和 Token 签发职责的最高决策来源。
+- [ADR-019：P1.5 认证与授权闭环](adr/ADR-019-P1.5认证与授权闭环.md) 已被 ADR-024 替代，继续保留历史设计与实施价值。
+- [P1.5 认证与授权设计基线](security/P1.5-认证与授权设计基线.md) 继续保留 P1.5 历史实施证据；与 PC Runtime 冲突的统一 PKCE、Web Token 恢复和页面跳转条款以 ADR-024 为准。
 
 ## P1.5 认证与授权
 
@@ -30,8 +37,8 @@
 - [CurrentActor 与数据审计基础](architecture/CurrentActor与数据审计.md)
 - [IAM 数据库与领域模型](architecture/IAM数据库与领域模型.md)
 - [安全架构](architecture/安全架构.md)
-- [ADR-019：P1.5 认证与授权闭环](adr/ADR-019-P1.5认证与授权闭环.md)
-- [ADR-024：PC JSON 与 Mobile PKCE/OIDC 双通道（Proposed）](adr/ADR-024-PC-JSON与Mobile-PKCE-OIDC双通道.md)
+- [ADR-019：P1.5 认证与授权闭环（Superseded by ADR-024）](adr/ADR-019-P1.5认证与授权闭环.md)
+- [ADR-024：PC JSON 与 Mobile PKCE/OIDC 双通道（Accepted）](adr/ADR-024-PC-JSON与Mobile-PKCE-OIDC双通道.md)
 
 ## 需求文档
 
