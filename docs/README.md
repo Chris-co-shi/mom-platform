@@ -2,7 +2,7 @@
 
 本目录是 `mom-platform` 的需求、计划、架构、安全协议和架构决策权威入口。
 
-> P1.5 S00～S12 已完成并合并。P1.6 在长期 Draft PR #33 中执行；S00～S10 已完成，S11～S19 尚未开始；S19-A 为最终全栈集成与发布安全验收门禁。
+> P1.5 S00～S12 已完成并合并。P1.6 在长期 Draft PR #33 中执行；S00～S10 已完成，S11 为 **In Progress / Awaiting Chris Decision**，S12～S19 尚未开始；S19-A 为最终全栈集成与发布安全验收门禁。
 
 ## 文档使用原则
 
@@ -18,8 +18,8 @@
 
 - Phase 01：基础技术骨架已完成。
 - P1.5：**Completed / Merged**，S00～S12 全部完成。
-- P1.6：S00 **Completed under accepted local-development risk**，S01～S10 **Completed**，S11～S19 Not Started；PR #33 保持 Draft。
-- 当前 Slice：S10 IAM 平台安全基线已完成；下一 Slice 为 S11 数据所有权 ADR，尚未开始。
+- P1.6：S00 **Completed under accepted local-development risk**，S01～S10 **Completed**，S11 **In Progress / Awaiting Chris Decision**，S12～S19 Not Started；PR #33 保持 Draft。
+- 当前 Slice：S11 数据所有权 ADR 草案与现状证据已形成；ADR-025 仍为 Proposed，等待 Chris Review，未进入 S12。
 - S19-A：Mobile 服务端 Logout、正式 Redirect/App Link、mom-mobile 完整检查、L4/L6 和 mom-infra 环境证据统一在最终集成阶段回收；当前仍为 Open/Deferred。
 - Phase 02：**Not Started**，业务垂直切片未因 P1.6 治理而启动。
 - Android Keystore、HTTPS App Link 与真机强杀恢复：S19-A 与 Phase 02 Mobile 正式联调前置验收项。
@@ -63,6 +63,7 @@
 - [P1.6 S08：IAM 配置与第一方认证核心重构报告](engineering/P1.6-S08-IAM配置与第一方认证核心重构报告.md)
 - [P1.6 S09：IAM 管理、错误模型与 Token Adapter 整理报告](engineering/P1.6-S09-IAM管理错误模型与TokenAdapter整理报告.md)
 - [P1.6 S10：IAM 全协议与跨仓库安全回归封板报告](engineering/P1.6-S10-IAM全协议与跨仓库安全回归封板报告.md)
+- [P1.6 S11：数据所有权现状与迁移边界报告](engineering/P1.6-S11-数据所有权现状与迁移边界报告.md)
 - [P1.6 S00：配置凭据暴露与轮换清单](security/P1.6-S00-配置凭据暴露与轮换清单.md)
 - [V1 路线图](plans/V1路线图.md)
 - [Phase 01：技术骨架计划](plans/Phase-01-技术骨架计划.md)
@@ -89,6 +90,7 @@
 
 - [ADR 索引](adr/README.md)
 - [ADR 模板](adr/ADR-模板.md)
+- [ADR-025：IAM、System、MDM、WMS、EAM 数据所有权边界（Proposed）](adr/ADR-025-IAM-System-MDM-WMS-EAM数据所有权边界.md)
 
 ## 垂直切片
 
