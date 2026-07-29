@@ -2,7 +2,7 @@ package io.github.chrisshi.mom.iam.web;
 
 import io.github.chrisshi.mom.iam.domain.type.UserType;
 import io.github.chrisshi.mom.iam.security.IamAuthorizationContext;
-import io.github.chrisshi.mom.iam.security.IamAuthorizationContextService;
+import io.github.chrisshi.mom.iam.security.IamAuthorizationContextLoader;
 import io.github.chrisshi.mom.iam.security.IamClientAccessPolicyService;
 import io.github.chrisshi.mom.iam.security.IamScopeGuard;
 import org.junit.jupiter.api.Test;
@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
 /** `/api/iam/me` 权威上下文、Client 与当前工厂行为特征测试。 */
 @ExtendWith(MockitoExtension.class)
 class IamMeControllerTest {
-    @Mock IamAuthorizationContextService contexts;
+    @Mock IamAuthorizationContextLoader contexts;
     @Mock IamClientAccessPolicyService clientAccess;
     @Mock IamScopeGuard scopeGuard;
 

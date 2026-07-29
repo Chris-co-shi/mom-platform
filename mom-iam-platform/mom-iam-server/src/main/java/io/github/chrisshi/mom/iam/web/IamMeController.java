@@ -1,7 +1,7 @@
 package io.github.chrisshi.mom.iam.web;
 
 import io.github.chrisshi.mom.iam.security.IamAuthorizationContext;
-import io.github.chrisshi.mom.iam.security.IamAuthorizationContextService;
+import io.github.chrisshi.mom.iam.security.IamAuthorizationContextLoader;
 import io.github.chrisshi.mom.iam.security.IamClientAccessPolicyService;
 import io.github.chrisshi.mom.iam.security.IamScopeGuard;
 import org.springframework.security.access.AccessDeniedException;
@@ -14,7 +14,7 @@ import java.util.List;
 public final class IamMeController {
     public static final String CURRENT_FACTORY_HEADER = "X-Factory-Id";
 
-    private final IamAuthorizationContextService contexts;
+    private final IamAuthorizationContextLoader contexts;
     private final IamClientAccessPolicyService clientAccess;
     private final IamScopeGuard scopeGuard;
 
@@ -26,7 +26,7 @@ public final class IamMeController {
      * @param scopeGuard 当前 Factory 校验器
      */
     public IamMeController(
-            IamAuthorizationContextService contexts,
+            IamAuthorizationContextLoader contexts,
             IamClientAccessPolicyService clientAccess,
             IamScopeGuard scopeGuard) {
         this.contexts = contexts;

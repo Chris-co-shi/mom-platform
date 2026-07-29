@@ -22,7 +22,7 @@ public class IamSessionTokenService {
     public static final String REQUEST_SESSION_ID_ATTRIBUTE =
             IamSessionTokenService.class.getName() + ".sessionId";
 
-    private final IamAuthorizationContextService contexts;
+    private final IamAuthorizationContextLoader contexts;
     private final IamAuthorizationCatalogRepository catalog;
     private final IamSessionRefreshRepository repository;
     private final IamRefreshTokenCodec codec;
@@ -32,7 +32,7 @@ public class IamSessionTokenService {
     private final Clock clock;
 
     public IamSessionTokenService(
-            IamAuthorizationContextService contexts,
+            IamAuthorizationContextLoader contexts,
             IamAuthorizationCatalogRepository catalog,
             IamSessionRefreshRepository repository,
             IamRefreshTokenCodec codec,

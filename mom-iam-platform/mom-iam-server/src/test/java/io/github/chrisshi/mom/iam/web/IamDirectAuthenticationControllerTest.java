@@ -1,12 +1,12 @@
 package io.github.chrisshi.mom.iam.web;
 
 import io.github.chrisshi.mom.core.security.AuditContextExecutor;
+import io.github.chrisshi.mom.iam.application.authentication.IamFirstPartyLoginApplicationService;
 import io.github.chrisshi.mom.iam.domain.type.UserType;
-import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserEntity;
 import io.github.chrisshi.mom.iam.security.IamAccountAuthenticationService;
 import io.github.chrisshi.mom.iam.security.IamAuthorizationContext;
 import io.github.chrisshi.mom.iam.security.IamClientAccessPolicyService;
-import io.github.chrisshi.mom.iam.security.IamSessionJwtIssuer;
+import io.github.chrisshi.mom.iam.security.IamAccessTokenIssuer;
 import io.github.chrisshi.mom.iam.security.IamSessionTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,7 +17,6 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
@@ -48,20 +47,22 @@ class IamDirectAuthenticationControllerTest {
     @Mock IamAccountAuthenticationService accounts;
     @Mock IamClientAccessPolicyService clientAccess;
     @Mock IamSessionTokenService sessions;
-    @Mock IamSessionJwtIssuer jwtIssuer;
+    @Mock IamAccessTokenIssuer tokenIssuer;
 
     private IamDirectAuthenticationController controller;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        controller = new IamDirectAuthenticationController(
+        IamFirstPartyLoginApplicationService loginService =
+                new IamFirstPartyLoginApplicationService(
                 authenticationProvider,
                 accounts,
                 clientAccess,
                 sessions,
-                jwtIssuer,
+                tokenIssuer,
                 new AuditContextExecutor());
+        controller = new IamDirectAuthenticationController(loginService, sessions, tokenIssuer);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new IamDirectAuthenticationExceptionHandler())
                 .build();
@@ -73,8 +74,8 @@ class IamDirectAuthenticationControllerTest {
                 .thenThrow(new BadCredentialsException("provider detail must not escape"));
         MockHttpServletRequest request = new MockHttpServletRequest();
 
-        IamDirectAuthenticationController.InvalidCredentialsException error = assertThrows(
-                IamDirectAuthenticationController.InvalidCredentialsException.class,
+        IamFirstPartyLoginApplicationService.InvalidCredentialsException error = assertThrows(
+                IamFirstPartyLoginApplicationService.InvalidCredentialsException.class,
                 () -> controller.login(new IamDirectAuthenticationController.LoginRequest(
                         "admin", "wrong-password", "mom-admin-web", "browser"), request));
 
@@ -111,25 +112,25 @@ class IamDirectAuthenticationControllerTest {
     @Test
     void requiredPasswordChangeMustNotIssueSessionOrToken() {
         when(authenticationProvider.authenticate(any())).thenReturn(authenticated("admin"));
-        when(accounts.requireUser("admin")).thenReturn(user());
+        when(accounts.requireAuditIdentity("admin")).thenReturn(auditIdentity());
         when(accounts.requiresPasswordChange("admin")).thenReturn(true);
         MockHttpServletRequest request = request();
 
         assertThrows(
-                IamDirectAuthenticationController.PasswordChangeRequiredException.class,
+                IamFirstPartyLoginApplicationService.PasswordChangeRequiredException.class,
                 () -> controller.login(new IamDirectAuthenticationController.LoginRequest(
                         "admin", "TemporaryPass123!", "mom-admin-web", "browser"), request));
 
         verify(clientAccess).requireAuthorization("admin", "mom-admin-web");
         verify(accounts).recordSuccessfulLogin("admin");
         verify(sessions, never()).issueInitial(any(), any(), any(), any(), any());
-        verify(jwtIssuer, never()).issue(any(), any(), any(), any(), any(), any());
+        verify(tokenIssuer, never()).issue(any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void successfulLoginMustReuseAuthoritativeSessionAndJwtServices() {
         when(authenticationProvider.authenticate(any())).thenReturn(authenticated("admin"));
-        when(accounts.requireUser("admin")).thenReturn(user());
+        when(accounts.requireAuditIdentity("admin")).thenReturn(auditIdentity());
         when(accounts.requiresPasswordChange("admin")).thenReturn(false);
         Instant issuedAt = Instant.parse("2026-07-26T10:00:00Z");
         Instant accessExpiresAt = issuedAt.plusSeconds(600);
@@ -144,19 +145,15 @@ class IamDirectAuthenticationControllerTest {
                         issuedAt,
                         accessExpiresAt,
                         sessionExpiresAt));
-        when(jwtIssuer.issue(
+        when(tokenIssuer.issue(
                 context,
                 "session-1",
                 "mom-admin-web",
                 issuedAt,
                 accessExpiresAt,
                 Set.of("openid", "profile")))
-                .thenReturn(new OAuth2AccessToken(
-                        OAuth2AccessToken.TokenType.BEARER,
-                        "access-1",
-                        issuedAt,
-                        accessExpiresAt,
-                        Set.of("openid", "profile")));
+                .thenReturn(new IamAccessTokenIssuer.IssuedAccessToken(
+                        "access-1", issuedAt, accessExpiresAt, Set.of("openid", "profile")));
 
         IamDirectAuthenticationController.TokenResponse response = controller.login(
                 new IamDirectAuthenticationController.LoginRequest(
@@ -176,7 +173,7 @@ class IamDirectAuthenticationControllerTest {
     @Test
     void successfulLoginHttpContractMustRemainStable() throws Exception {
         when(authenticationProvider.authenticate(any())).thenReturn(authenticated("admin"));
-        when(accounts.requireUser("admin")).thenReturn(user());
+        when(accounts.requireAuditIdentity("admin")).thenReturn(auditIdentity());
         when(accounts.requiresPasswordChange("admin")).thenReturn(false);
         Instant issuedAt = Instant.parse("2026-07-26T10:00:00Z");
         Instant accessExpiresAt = issuedAt.plusSeconds(600);
@@ -187,12 +184,11 @@ class IamDirectAuthenticationControllerTest {
                 .thenReturn(new IamSessionTokenService.InitialIssue(
                         context, "session-1", "refresh-1", issuedAt,
                         accessExpiresAt, sessionExpiresAt));
-        when(jwtIssuer.issue(
+        when(tokenIssuer.issue(
                 context, "session-1", "mom-admin-web", issuedAt, accessExpiresAt,
                 Set.of("openid", "profile")))
-                .thenReturn(new OAuth2AccessToken(
-                        OAuth2AccessToken.TokenType.BEARER, "access-1", issuedAt,
-                        accessExpiresAt, Set.of("openid", "profile")));
+                .thenReturn(new IamAccessTokenIssuer.IssuedAccessToken(
+                        "access-1", issuedAt, accessExpiresAt, Set.of("openid", "profile")));
 
         mockMvc.perform(post("/api/iam/auth/login")
                         .contentType("application/json")
@@ -215,7 +211,7 @@ class IamDirectAuthenticationControllerTest {
     @Test
     void requiredPasswordChangeMustIssueThroughAuthoritativeServices() {
         when(authenticationProvider.authenticate(any())).thenReturn(authenticated("admin"));
-        when(accounts.requireUser("admin")).thenReturn(user());
+        when(accounts.requireAuditIdentity("admin")).thenReturn(auditIdentity());
         when(accounts.requiresPasswordChange("admin")).thenReturn(true);
         Instant issuedAt = Instant.parse("2026-07-26T10:00:00Z");
         Instant accessExpiresAt = issuedAt.plusSeconds(600);
@@ -225,10 +221,9 @@ class IamDirectAuthenticationControllerTest {
                 .thenReturn(new IamSessionTokenService.InitialIssue(
                         context, "session-1", "refresh-1", issuedAt,
                         accessExpiresAt, issuedAt.plusSeconds(28800)));
-        when(jwtIssuer.issue(any(), any(), any(), any(), any(), any()))
-                .thenReturn(new OAuth2AccessToken(
-                        OAuth2AccessToken.TokenType.BEARER, "access-1", issuedAt,
-                        accessExpiresAt, Set.of("openid", "profile")));
+        when(tokenIssuer.issue(any(), any(), any(), any(), any(), any()))
+                .thenReturn(new IamAccessTokenIssuer.IssuedAccessToken(
+                        "access-1", issuedAt, accessExpiresAt, Set.of("openid", "profile")));
 
         IamDirectAuthenticationController.TokenResponse response =
                 controller.changeRequiredPassword(
@@ -238,13 +233,13 @@ class IamDirectAuthenticationControllerTest {
                         request());
 
         assertEquals("access-1", response.accessToken());
-        var order = org.mockito.Mockito.inOrder(accounts, sessions, jwtIssuer);
+        var order = org.mockito.Mockito.inOrder(accounts, sessions, tokenIssuer);
         order.verify(accounts).changeRequiredPassword(
                 "admin", "NewPassword123!", "NewPassword123!");
         order.verify(accounts).recordSuccessfulLogin("admin");
         order.verify(sessions).issueInitial(
                 "admin", "mom-admin-web", "127.0.0.1", "JUnit", "browser");
-        order.verify(jwtIssuer).issue(any(), any(), any(), any(), any(), any());
+        order.verify(tokenIssuer).issue(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -262,19 +257,15 @@ class IamDirectAuthenticationControllerTest {
                         accessExpiresAt,
                         sessionExpiresAt,
                         2L));
-        when(jwtIssuer.issue(
+        when(tokenIssuer.issue(
                 context,
                 "session-1",
                 "mom-admin-web",
                 issuedAt,
                 accessExpiresAt,
                 Set.of("openid", "profile")))
-                .thenReturn(new OAuth2AccessToken(
-                        OAuth2AccessToken.TokenType.BEARER,
-                        "access-2",
-                        issuedAt,
-                        accessExpiresAt,
-                        Set.of("openid", "profile")));
+                .thenReturn(new IamAccessTokenIssuer.IssuedAccessToken(
+                        "access-2", issuedAt, accessExpiresAt, Set.of("openid", "profile")));
 
         IamDirectAuthenticationController.TokenResponse response = controller.refresh(
                 new IamDirectAuthenticationController.RefreshRequest(
@@ -327,11 +318,7 @@ class IamDirectAuthenticationControllerTest {
                 null);
     }
 
-    private static IamUserEntity user() {
-        IamUserEntity user = new IamUserEntity();
-        user.setId("user-1");
-        user.setUsername("admin");
-        user.setUserType(UserType.INTERNAL);
-        return user;
+    private static IamAccountAuthenticationService.AuditIdentity auditIdentity() {
+        return new IamAccountAuthenticationService.AuditIdentity("user-1", UserType.INTERNAL);
     }
 }

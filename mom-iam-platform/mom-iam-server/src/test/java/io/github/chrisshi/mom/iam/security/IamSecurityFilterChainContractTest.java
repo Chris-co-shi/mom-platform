@@ -35,11 +35,11 @@ class IamSecurityFilterChainContractTest {
     /** SAS、JSON 与页面/API Chain 必须保持 HIGHEST、1、2 的顺序。 */
     @Test
     void securityFilterChainOrderMustRemainStable() throws Exception {
-        assertThat(order(IamAuthorizationServerConfiguration.class,
+        assertThat(order(IamAuthorizationServerProtocolConfiguration.class,
                 "iamAuthorizationServerSecurityFilterChain")).isEqualTo(Ordered.HIGHEST_PRECEDENCE);
         assertThat(order(IamDirectAuthenticationConfiguration.class,
                 "iamDirectAuthenticationSecurityFilterChain")).isEqualTo(1);
-        assertThat(order(IamAuthorizationServerConfiguration.class,
+        assertThat(order(IamLoginPageSecurityConfiguration.class,
                 "iamLoginAndApiSecurityFilterChain")).isEqualTo(2);
     }
 

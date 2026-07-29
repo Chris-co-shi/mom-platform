@@ -12,13 +12,19 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import java.time.Clock;
 import java.time.Instant;
 
-/** 从 IAM 权威数据计算 JWT 与 /api/iam/me 共用的当前有效授权上下文。 */
-public final class IamAuthorizationContextService {
+/**
+ * 从 IAM 权威数据加载当前账号、Role、Permission、Factory 与 Party 的不可变授权快照。
+ *
+ * <p>该组件位于 IAM 安全应用边界，只依赖既有 Repository，不接收 Controller DTO、不签发 Token、
+ * 不创建 Session，也不信任客户端 Claims。数据库不可用或账号状态不允许授权时异常向上传播并失败关闭。</p>
+ */
+public final class IamAuthorizationContextLoader {
     private final IamUserRepository users;
     private final IamAuthorizationContextRepository contexts;
     private final Clock clock;
 
-    public IamAuthorizationContextService(
+    /** 创建权威授权上下文加载器。 */
+    public IamAuthorizationContextLoader(
             IamUserRepository users,
             IamAuthorizationContextRepository contexts,
             Clock clock) {
@@ -27,14 +33,24 @@ public final class IamAuthorizationContextService {
         this.clock = clock;
     }
 
-    /** 按认证用户名加载授权上下文，供 Authorization Server 签发 Token。 */
+    /**
+     * 按认证用户名加载当前有效授权上下文。
+     *
+     * @param username 已通过认证的用户名
+     * @return IAM 权威授权快照
+     */
     public IamAuthorizationContext loadByUsername(String username) {
         IamUserEntity user = users.findByUsername(normalize(username))
                 .orElseThrow(() -> new UsernameNotFoundException("账号不存在"));
         return calculate(user);
     }
 
-    /** 按 JWT subject 用户 ID 加载授权上下文，供 /api/iam/me 和后续管理能力使用。 */
+    /**
+     * 按 JWT subject 用户 ID 重新加载当前有效授权上下文。
+     *
+     * @param userId IAM 技术主键
+     * @return IAM 权威授权快照
+     */
     public IamAuthorizationContext loadByUserId(String userId) {
         IamUserEntity user = users.findById(requireText(userId, "userId"))
                 .orElseThrow(() -> new UsernameNotFoundException("账号不存在"));

@@ -15,13 +15,13 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 /** 使用 MOM Session/Refresh 权威状态处理标准 refresh_token Grant。 */
 public final class IamRefreshGrantAuthenticationProvider implements AuthenticationProvider {
     private final IamSessionTokenService sessions;
-    private final IamSessionJwtIssuer jwtIssuer;
+    private final IamAccessTokenIssuer tokenIssuer;
 
     public IamRefreshGrantAuthenticationProvider(
             IamSessionTokenService sessions,
-            IamSessionJwtIssuer jwtIssuer) {
+            IamAccessTokenIssuer tokenIssuer) {
         this.sessions = sessions;
-        this.jwtIssuer = jwtIssuer;
+        this.tokenIssuer = tokenIssuer;
     }
 
     @Override
@@ -37,13 +37,19 @@ public final class IamRefreshGrantAuthenticationProvider implements Authenticati
 
         IamSessionTokenService.Rotation rotation = sessions.rotate(
                 refreshGrant.getRefreshToken(), client.getClientId());
-        OAuth2AccessToken accessToken = jwtIssuer.issue(
+        IamAccessTokenIssuer.IssuedAccessToken issuedAccessToken = tokenIssuer.issue(
                 rotation.authorization(),
                 rotation.sessionId(),
                 client.getClientId(),
                 rotation.issuedAt(),
                 rotation.accessExpiresAt(),
                 client.getScopes());
+        OAuth2AccessToken accessToken = new OAuth2AccessToken(
+                OAuth2AccessToken.TokenType.BEARER,
+                issuedAccessToken.tokenValue(),
+                issuedAccessToken.issuedAt(),
+                issuedAccessToken.expiresAt(),
+                issuedAccessToken.scopes());
         OAuth2RefreshToken refreshToken = new OAuth2RefreshToken(
                 rotation.refreshToken(),
                 rotation.issuedAt(),

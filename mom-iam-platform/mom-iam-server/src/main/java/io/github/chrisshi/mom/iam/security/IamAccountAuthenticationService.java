@@ -1,6 +1,7 @@
 package io.github.chrisshi.mom.iam.security;
 
 import io.github.chrisshi.mom.iam.domain.type.IamRecordStatus;
+import io.github.chrisshi.mom.iam.domain.type.UserType;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserEntity;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserRepository;
 import org.springframework.security.core.authority.FactorGrantedAuthority;
@@ -107,6 +108,21 @@ public final class IamAccountAuthenticationService implements UserDetailsService
     public IamUserEntity requireUser(String username) {
         return users.findByUsername(normalizeUsername(username))
                 .orElseThrow(() -> new UsernameNotFoundException("账号或密码错误"));
+    }
+
+    /**
+     * 返回建立安全审计上下文所需的最小账号身份，不向 Application 暴露持久化 Entity。
+     *
+     * @param username 已通过认证的用户名
+     * @return 稳定用户 ID 与用户类型
+     */
+    public AuditIdentity requireAuditIdentity(String username) {
+        IamUserEntity user = requireUser(username);
+        return new AuditIdentity(user.getId(), user.getUserType());
+    }
+
+    /** 第一方认证用例建立 AuditActor 所需的不可变最小身份。 */
+    public record AuditIdentity(String userId, UserType userType) {
     }
 
     private static String normalizeUsername(String username) {

@@ -40,7 +40,7 @@ import static org.mockito.Mockito.when;
 class IamSessionTokenServiceTest {
     private static final Instant NOW = Instant.parse("2026-07-29T03:00:00Z");
 
-    @Mock IamAuthorizationContextService contexts;
+    @Mock IamAuthorizationContextLoader contexts;
     @Mock IamAuthorizationCatalogRepository catalog;
     @Mock IamSessionRefreshRepository repository;
     @Mock IamRefreshTokenCodec codec;

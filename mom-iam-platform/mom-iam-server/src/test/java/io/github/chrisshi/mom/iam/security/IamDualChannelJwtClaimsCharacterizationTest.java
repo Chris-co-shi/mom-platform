@@ -10,7 +10,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -42,7 +41,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class IamDualChannelJwtClaimsCharacterizationTest {
 
-    @Mock IamAuthorizationContextService contexts;
+    @Mock IamAuthorizationContextLoader contexts;
     @Mock IamSessionTokenService sessions;
 
     @AfterEach
@@ -88,24 +87,27 @@ class IamDualChannelJwtClaimsCharacterizationTest {
         when(sasContext.getAuthorizationGrantType()).thenReturn(AuthorizationGrantType.AUTHORIZATION_CODE);
         when(sasContext.getClaims()).thenReturn(sasClaims);
 
+        IamJwtClaimsAssembler claimsAssembler = new IamJwtClaimsAssembler();
         OAuth2TokenCustomizer<JwtEncodingContext> customizer =
-                new IamAuthorizationServerConfiguration().iamJwtCustomizer(contexts, sessions);
+                new IamTokenInfrastructureConfiguration().iamJwtCustomizer(
+                        contexts, sessions, claimsAssembler);
         customizer.customize(sasContext);
         Map<String, Object> mobileClaims = sasClaims.build().getClaims();
 
         CapturingJwtEncoder encoder = new CapturingJwtEncoder();
         IamAuthorizationProperties properties = new IamAuthorizationProperties();
         properties.getKey().setKeyId("kid-1");
-        IamSessionJwtIssuer issuer = new IamSessionJwtIssuer(
+        IamAccessTokenIssuer issuer = new IamAccessTokenIssuer(
                 encoder,
                 AuthorizationServerSettings.builder().issuer("https://iam.example.test").build(),
-                properties);
-        OAuth2AccessToken pcToken = issuer.issue(
+                properties,
+                claimsAssembler);
+        IamAccessTokenIssuer.IssuedAccessToken pcToken = issuer.issue(
                 authorization, "session-1", "mom-supplier-web", issuedAt, expiresAt,
                 Set.of("openid", "profile"));
         Map<String, Object> pcClaims = encoder.claims;
 
-        assertThat(pcToken.getTokenValue()).isEqualTo("encoded-token");
+        assertThat(pcToken.tokenValue()).isEqualTo("encoded-token");
         assertThat(selectCoreClaims(mobileClaims)).isEqualTo(selectCoreClaims(pcClaims));
         assertThat(pcClaims.get("iss")).hasToString("https://iam.example.test");
         assertThat(pcClaims.get("aud")).isEqualTo(List.of("mom-supplier-web"));
