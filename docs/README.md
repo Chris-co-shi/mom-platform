@@ -2,7 +2,7 @@
 
 本目录是 `mom-platform` 的需求、计划、架构、安全协议和架构决策权威入口。
 
-> P1.5 S00～S12 已完成并合并。P1.6 在长期 Draft PR #33 中执行；S00～S09 已完成，S10～S19 未开始。
+> P1.5 S00～S12 已完成并合并。P1.6 在长期 Draft PR #33 中执行；S00～S09 已完成，S10 因跨仓库安全证据不完整处于 In Progress / Blocked，S11～S19 未开始。
 
 ## 文档使用原则
 
@@ -18,8 +18,8 @@
 
 - Phase 01：基础技术骨架已完成。
 - P1.5：**Completed / Merged**，S00～S12 全部完成。
-- P1.6：S00 **Completed under accepted local-development risk**，S01～S09 **Completed**，S10～S19 Not Started；PR #33 保持 Draft。
-- 当前 Slice：S09 已完成并停止；S10 未开始。
+- P1.6：S00 **Completed under accepted local-development risk**，S01～S09 **Completed**，S10 **In Progress / Blocked**，S11～S19 Not Started；PR #33 保持 Draft。
+- 当前 Slice：S10 已完成平台侧 EG-02 修复，但被 Mobile Logout、正式 Redirect/App Link 和高层级跨仓库证据阻塞；S11 未开始。
 - Phase 02：**Not Started**，业务垂直切片未因 P1.6 治理而启动。
 - Android Keystore、HTTPS App Link 与真机强杀恢复：Phase 02 Mobile 正式联调前置验收项。
 
@@ -61,6 +61,7 @@
 - [P1.6 S06：IAM 端点、调用方与职责审计](engineering/P1.6-S06-IAM端点调用方与职责审计.md)
 - [P1.6 S08：IAM 配置与第一方认证核心重构报告](engineering/P1.6-S08-IAM配置与第一方认证核心重构报告.md)
 - [P1.6 S09：IAM 管理、错误模型与 Token Adapter 整理报告](engineering/P1.6-S09-IAM管理错误模型与TokenAdapter整理报告.md)
+- [P1.6 S10：IAM 全协议与跨仓库安全回归封板报告](engineering/P1.6-S10-IAM全协议与跨仓库安全回归封板报告.md)
 - [P1.6 S00：配置凭据暴露与轮换清单](security/P1.6-S00-配置凭据暴露与轮换清单.md)
 - [V1 路线图](plans/V1路线图.md)
 - [Phase 01：技术骨架计划](plans/Phase-01-技术骨架计划.md)
