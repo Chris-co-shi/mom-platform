@@ -146,30 +146,98 @@ public class IamAdminConfiguration {
         return IamExternalFactoryScopeVerifier.failClosed();
     }
 
-    /** 注册管理端应用事务服务。 */
+    /** 组装管理用例共享的安全守卫、Session 撤销和审计支撑。 */
     @Bean
     @ConditionalOnMissingBean
-    IamAdminService iamAdminService(
+    IamAdminOperationSupport iamAdminOperationSupport(
             IamUserAdminRepository users,
+            IamSessionAdminRepository sessionQueries,
+            IamBuiltInAdministratorRepository builtInAdministrators,
+            MomAuthorizationService authorization,
+            IamSessionTokenService sessions,
+            IamSecurityAuditEventAppender auditEvents,
+            IamSecureIdGenerator ids,
+            Clock clock) {
+        return new IamAdminOperationSupport(
+                users, sessionQueries, builtInAdministrators, authorization,
+                sessions, auditEvents, ids, clock);
+    }
+
+    /** 注册用户管理应用服务。 */
+    @Bean
+    @ConditionalOnMissingBean
+    IamUserAdminApplicationService iamUserAdminApplicationService(
+            IamUserAdminRepository users,
+            IamUserAccessAdminRepository access,
+            PasswordEncoder passwordEncoder,
+            IamAdminOperationSupport support) {
+        return new IamUserAdminApplicationService(users, access, passwordEncoder, support);
+    }
+
+    /** 注册用户授权关系应用服务。 */
+    @Bean
+    @ConditionalOnMissingBean
+    IamUserAuthorizationApplicationService iamUserAuthorizationApplicationService(
             IamRoleAdminRepository roles,
             IamAuthorizationAssignmentRepository assignments,
             IamUserAccessAdminRepository access,
-            IamSessionAdminRepository sessionQueries,
-            IamClientPolicyAdminRepository clients,
-            IamSecurityAuditQueryRepository auditQueries,
             IamAdminReadModelRepository readModels,
-            IamBuiltInAdministratorRepository builtInAdministrators,
-            MomAuthorizationService authorization,
-            PasswordEncoder passwordEncoder,
-            IamSessionTokenService sessions,
-            IamSecurityAuditEventAppender auditEvents,
             IamExternalFactoryScopeVerifier externalFactoryVerifier,
-            IamSecureIdGenerator ids,
-            Clock clock) {
-        return new IamAdminService(
-                users, roles, assignments, access, sessionQueries, clients, auditQueries,
-                readModels, builtInAdministrators, authorization, passwordEncoder, sessions, auditEvents,
-                externalFactoryVerifier, ids, clock);
+            IamAdminOperationSupport support) {
+        return new IamUserAuthorizationApplicationService(
+                roles, assignments, access, readModels, externalFactoryVerifier, support);
+    }
+
+    /** 注册角色和 Permission 管理应用服务。 */
+    @Bean
+    @ConditionalOnMissingBean
+    IamRoleAdminApplicationService iamRoleAdminApplicationService(
+            IamRoleAdminRepository roles,
+            IamAuthorizationAssignmentRepository assignments,
+            IamAdminReadModelRepository readModels,
+            IamAdminOperationSupport support) {
+        return new IamRoleAdminApplicationService(roles, assignments, readModels, support);
+    }
+
+    /** 注册 Session 管理应用服务。 */
+    @Bean
+    @ConditionalOnMissingBean
+    IamSessionAdminApplicationService iamSessionAdminApplicationService(
+            IamSessionAdminRepository sessionQueries,
+            IamAdminOperationSupport support) {
+        return new IamSessionAdminApplicationService(sessionQueries, support);
+    }
+
+    /** 注册 Client Policy 管理应用服务。 */
+    @Bean
+    @ConditionalOnMissingBean
+    IamClientAdminApplicationService iamClientAdminApplicationService(
+            IamClientPolicyAdminRepository clients,
+            IamSessionAdminRepository sessionQueries,
+            IamAdminOperationSupport support) {
+        return new IamClientAdminApplicationService(clients, sessionQueries, support);
+    }
+
+    /** 注册追加型安全审计查询服务。 */
+    @Bean
+    @ConditionalOnMissingBean
+    IamSecurityAuditQueryService iamSecurityAuditQueryService(
+            IamSecurityAuditQueryRepository auditQueries,
+            IamAdminOperationSupport support) {
+        return new IamSecurityAuditQueryService(auditQueries, support);
+    }
+
+    /** 注册 Controller 继续依赖的兼容 Facade。 */
+    @Bean
+    @ConditionalOnMissingBean
+    IamAdminService iamAdminService(
+            IamUserAdminApplicationService users,
+            IamUserAuthorizationApplicationService userAuthorizations,
+            IamRoleAdminApplicationService roles,
+            IamSessionAdminApplicationService sessions,
+            IamClientAdminApplicationService clients,
+            IamSecurityAuditQueryService audits) {
+        return new IamAdminService(users, userAuthorizations, roles, sessions, clients, audits);
     }
 
     /** 注册管理 REST Controller。 */

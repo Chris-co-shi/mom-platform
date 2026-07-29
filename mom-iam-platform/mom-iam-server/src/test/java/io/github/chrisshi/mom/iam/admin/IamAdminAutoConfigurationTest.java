@@ -62,6 +62,12 @@ class IamAdminAutoConfigurationTest {
                     assertThat(context).hasNotFailed();
                     assertThat(context).hasSingleBean(IamUserAdminRepository.class);
                     assertThat(context).hasSingleBean(IamAdminReadModelRepository.class);
+                    assertThat(context).hasSingleBean(IamUserAdminApplicationService.class);
+                    assertThat(context).hasSingleBean(IamUserAuthorizationApplicationService.class);
+                    assertThat(context).hasSingleBean(IamRoleAdminApplicationService.class);
+                    assertThat(context).hasSingleBean(IamSessionAdminApplicationService.class);
+                    assertThat(context).hasSingleBean(IamClientAdminApplicationService.class);
+                    assertThat(context).hasSingleBean(IamSecurityAuditQueryService.class);
                     assertThat(context).hasSingleBean(IamAdminService.class);
                     assertThat(context).hasSingleBean(IamAdminController.class);
                     assertThat(context).hasSingleBean(IamAdminExceptionHandler.class);
@@ -101,6 +107,12 @@ class IamAdminAutoConfigurationTest {
         assertThat(context).hasNotFailed();
         assertThat(context).doesNotHaveBean(IamUserAdminRepository.class);
         assertThat(context).doesNotHaveBean(IamAdminReadModelRepository.class);
+        assertThat(context).doesNotHaveBean(IamUserAdminApplicationService.class);
+        assertThat(context).doesNotHaveBean(IamUserAuthorizationApplicationService.class);
+        assertThat(context).doesNotHaveBean(IamRoleAdminApplicationService.class);
+        assertThat(context).doesNotHaveBean(IamSessionAdminApplicationService.class);
+        assertThat(context).doesNotHaveBean(IamClientAdminApplicationService.class);
+        assertThat(context).doesNotHaveBean(IamSecurityAuditQueryService.class);
         assertThat(context).doesNotHaveBean(IamAdminService.class);
         assertThat(context).doesNotHaveBean(IamAdminController.class);
         assertThat(context).doesNotHaveBean(IamAdminExceptionHandler.class);

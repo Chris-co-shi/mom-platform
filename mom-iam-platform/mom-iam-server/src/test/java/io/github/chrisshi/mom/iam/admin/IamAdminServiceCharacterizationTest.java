@@ -80,10 +80,17 @@ class IamAdminServiceCharacterizationTest {
         actor = new MomJwtAuthorization(
                 "100", "900", "mom-admin-web", "INTERNAL",
                 Set.of("MOM_ADMIN"), Set.of("iam:user:disable"), Set.of(), null, null);
+        IamAdminOperationSupport support = new IamAdminOperationSupport(
+                users, sessionQueries, builtInAdministrators, authorization, sessions,
+                auditEvents, ids, Clock.fixed(NOW, ZoneOffset.UTC));
         service = new IamAdminService(
-                users, roles, assignments, access, sessionQueries, clients, auditQueries,
-                readModels, builtInAdministrators, authorization, passwordEncoder, sessions,
-                auditEvents, externalFactoryVerifier, ids, Clock.fixed(NOW, ZoneOffset.UTC));
+                new IamUserAdminApplicationService(users, access, passwordEncoder, support),
+                new IamUserAuthorizationApplicationService(
+                        roles, assignments, access, readModels, externalFactoryVerifier, support),
+                new IamRoleAdminApplicationService(roles, assignments, readModels, support),
+                new IamSessionAdminApplicationService(sessionQueries, support),
+                new IamClientAdminApplicationService(clients, sessionQueries, support),
+                new IamSecurityAuditQueryService(auditQueries, support));
         when(authorization.current(authentication)).thenReturn(actor);
     }
 
