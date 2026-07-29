@@ -2,6 +2,8 @@ package io.github.chrisshi.mom.security.autoconfigure;
 
 import io.github.chrisshi.mom.security.authorization.MomAuthorizationService;
 import io.github.chrisshi.mom.security.authorization.MomScopedResourceNotFoundException;
+import io.github.chrisshi.mom.security.revocation.MomRevocationStoreUnavailableException;
+import io.github.chrisshi.mom.security.revocation.MomRevokedSessionChecker;
 import io.github.chrisshi.mom.security.token.MomSecurityClaims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** S06 业务服务二次验证、Permission、Factory/Party 与 404 防枚举集成测试。 */
@@ -43,14 +46,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 "spring.main.banner-mode=off",
                 "mom.security.resource-server.enabled=true",
                 "mom.security.resource-server.issuer-uri=https://iam.mom.example",
-                "mom.security.resource-server.jwk-set-uri=https://iam.mom.example/oauth2/jwks"
+                "mom.security.resource-server.jwk-set-uri=https://iam.mom.example/oauth2/jwks",
+                "mom.security.resource-server.public-paths=/public,/actuator/health/**,/error"
         })
 class MomServletResourceServerTest {
     @Autowired WebApplicationContext applicationContext;
+    @Autowired TestRevokedSessionChecker revokedSessions;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
+        revokedSessions.mode = RevocationMode.ACTIVE;
+        revokedSessions.checks = 0;
         mockMvc = MockMvcBuilders.webAppContextSetup(applicationContext)
                 .apply(springSecurity())
                 .build();
@@ -60,6 +67,69 @@ class MomServletResourceServerTest {
     void protectedApiWithoutBearerMustReturnUnauthorized() throws Exception {
         mockMvc.perform(get("/api/protected"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void activeSidMustAllowDirectBusinessServiceRequest() throws Exception {
+        mockMvc.perform(get("/api/protected")
+                        .header("X-Factory-Id", "factory-1")
+                        .with(internalJwt("mdm:material:read")))
+                .andExpect(status().isOk());
+
+        org.assertj.core.api.Assertions.assertThat(revokedSessions.checks).isEqualTo(1);
+    }
+
+    @Test
+    void revokedOrMissingSidMustReturnUnauthorized() throws Exception {
+        revokedSessions.mode = RevocationMode.REVOKED;
+        mockMvc.perform(get("/api/protected")
+                        .header("X-Factory-Id", "factory-1")
+                        .with(internalJwt("mdm:material:read")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("WWW-Authenticate", org.hamcrest.Matchers.containsString("invalid_token")));
+
+        mockMvc.perform(get("/api/protected")
+                        .header("X-Factory-Id", "factory-1")
+                        .with(jwt().jwt(jwt -> jwt
+                                .subject("user-1")
+                                .audience(List.of("mom-admin-web"))
+                                .claim(MomSecurityClaims.CLIENT_ID, "mom-admin-web"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("WWW-Authenticate", org.hamcrest.Matchers.containsString("invalid_token")));
+    }
+
+    @Test
+    void revocationStoreFailureMustFailClosedWithServiceUnavailable() throws Exception {
+        revokedSessions.mode = RevocationMode.UNAVAILABLE;
+
+        mockMvc.perform(get("/api/protected")
+                        .header("X-Factory-Id", "factory-1")
+                        .with(internalJwt("mdm:material:read")))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.error").value("revocation_store_unavailable"));
+    }
+
+    @Test
+    void publicPathMustNotDependOnRevocationStore() throws Exception {
+        revokedSessions.mode = RevocationMode.UNAVAILABLE;
+
+        mockMvc.perform(get("/public"))
+                .andExpect(status().isOk());
+
+        org.assertj.core.api.Assertions.assertThat(revokedSessions.checks).isZero();
+    }
+
+    @Test
+    void forgedIdentityHeaderMustNotReplaceJwtSubjectOnDirectRequest() throws Exception {
+        mockMvc.perform(get("/api/protected")
+                        .header("X-Factory-Id", "factory-1")
+                        .header("X-MOM-USER-ID", "attacker")
+                        .with(internalJwt("mdm:material:read")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value("user-1"));
     }
 
     @Test
@@ -144,6 +214,11 @@ class MomServletResourceServerTest {
                 throw new IllegalStateException("测试不应调用真实 JwtDecoder");
             };
         }
+
+        @Bean
+        TestRevokedSessionChecker revokedSessionChecker() {
+            return new TestRevokedSessionChecker();
+        }
     }
 
     @RestController
@@ -174,6 +249,11 @@ class MomServletResourceServerTest {
             authorization.requireObjectVisible(authentication, factoryId, partyType, partyId);
             return Map.of("status", "visible");
         }
+
+        @GetMapping("/public")
+        Map<String, String> publicEndpoint() {
+            return Map.of("status", "ok");
+        }
     }
 
     @RestControllerAdvice
@@ -182,6 +262,23 @@ class MomServletResourceServerTest {
         @ResponseStatus(HttpStatus.NOT_FOUND)
         Map<String, String> notFound() {
             return Map.of("error", "not_found");
+        }
+    }
+
+    enum RevocationMode { ACTIVE, REVOKED, UNAVAILABLE }
+
+    /** 可控的协议中立撤销检查器，仅用于验证 Resource Server 失败语义。 */
+    static final class TestRevokedSessionChecker implements MomRevokedSessionChecker {
+        private RevocationMode mode = RevocationMode.ACTIVE;
+        private int checks;
+
+        @Override
+        public boolean isRevoked(String sessionId) {
+            checks++;
+            if (mode == RevocationMode.UNAVAILABLE) {
+                throw new MomRevocationStoreUnavailableException("测试撤销存储不可用");
+            }
+            return mode == RevocationMode.REVOKED;
         }
     }
 }

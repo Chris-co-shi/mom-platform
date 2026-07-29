@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.iam.security;
 
+import io.github.chrisshi.mom.security.revocation.MomRevokedSessionKeys;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
@@ -19,7 +20,7 @@ public class IamSessionProperties {
     private Duration accessTokenTtl = Duration.ofMinutes(10);
     private int refreshTokenBytes = 48;
     private String hmacPepper = "";
-    private String revokedKeyPrefix = "mom:iam:revoked:sid:";
+    private String revokedKeyPrefix = MomRevokedSessionKeys.DEFAULT_PREFIX;
     private boolean allowLocalPepper;
 
     /** 返回 Web 用户授权 Session 的绝对有效期。 */

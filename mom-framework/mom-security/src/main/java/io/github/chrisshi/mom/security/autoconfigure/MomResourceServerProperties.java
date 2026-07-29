@@ -1,6 +1,7 @@
 package io.github.chrisshi.mom.security.autoconfigure;
 
 import io.github.chrisshi.mom.security.token.MomSecurityClaims;
+import io.github.chrisshi.mom.security.revocation.MomRevokedSessionKeys;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.LinkedHashSet;
@@ -14,6 +15,7 @@ public class MomResourceServerProperties {
     private String issuerUri = "http://127.0.0.1:20100";
     private String jwkSetUri = "http://127.0.0.1:20100/oauth2/jwks";
     private Set<String> acceptedAudiences = new LinkedHashSet<>(MomSecurityClaims.publicClientIds());
+    private String revokedSidKeyPrefix = MomRevokedSessionKeys.DEFAULT_PREFIX;
     private List<String> publicPaths = List.of("/actuator/health/**", "/actuator/info", "/error");
 
     public boolean isEnabled() { return enabled; }
@@ -30,6 +32,10 @@ public class MomResourceServerProperties {
     public void setPublicPaths(List<String> publicPaths) {
         this.publicPaths = publicPaths == null ? List.of() : List.copyOf(publicPaths);
     }
+    public String getRevokedSidKeyPrefix() { return revokedSidKeyPrefix; }
+    public void setRevokedSidKeyPrefix(String revokedSidKeyPrefix) {
+        this.revokedSidKeyPrefix = revokedSidKeyPrefix;
+    }
 
     public void validate() {
         if (issuerUri == null || issuerUri.isBlank()) {
@@ -40,6 +46,9 @@ public class MomResourceServerProperties {
         }
         if (acceptedAudiences == null || acceptedAudiences.isEmpty()) {
             throw new IllegalStateException("Resource Server accepted-audiences 不能为空");
+        }
+        if (revokedSidKeyPrefix == null || revokedSidKeyPrefix.isBlank()) {
+            throw new IllegalStateException("Resource Server revoked sid Key 前缀不能为空");
         }
     }
 }
