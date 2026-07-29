@@ -2,7 +2,7 @@
 
 本目录是 `mom-platform` 的需求、计划、架构、安全协议和架构决策权威入口。
 
-> P1.5 S00～S12 已完成并合并。P1.6 在长期 Draft PR #33 中执行；S00～S09 已完成，S10 因跨仓库安全证据不完整处于 In Progress / Blocked，S11～S19 未开始。
+> P1.5 S00～S12 已完成并合并。P1.6 在长期 Draft PR #33 中执行；S00～S10 已完成，S11～S19 尚未开始；S19-A 为最终全栈集成与发布安全验收门禁。
 
 ## 文档使用原则
 
@@ -18,10 +18,11 @@
 
 - Phase 01：基础技术骨架已完成。
 - P1.5：**Completed / Merged**，S00～S12 全部完成。
-- P1.6：S00 **Completed under accepted local-development risk**，S01～S09 **Completed**，S10 **In Progress / Blocked**，S11～S19 Not Started；PR #33 保持 Draft。
-- 当前 Slice：S10 已完成平台侧 EG-02 修复，但被 Mobile Logout、正式 Redirect/App Link 和高层级跨仓库证据阻塞；S11 未开始。
+- P1.6：S00 **Completed under accepted local-development risk**，S01～S10 **Completed**，S11～S19 Not Started；PR #33 保持 Draft。
+- 当前 Slice：S10 IAM 平台安全基线已完成；下一 Slice 为 S11 数据所有权 ADR，尚未开始。
+- S19-A：Mobile 服务端 Logout、正式 Redirect/App Link、mom-mobile 完整检查、L4/L6 和 mom-infra 环境证据统一在最终集成阶段回收；当前仍为 Open/Deferred。
 - Phase 02：**Not Started**，业务垂直切片未因 P1.6 治理而启动。
-- Android Keystore、HTTPS App Link 与真机强杀恢复：Phase 02 Mobile 正式联调前置验收项。
+- Android Keystore、HTTPS App Link 与真机强杀恢复：S19-A 与 Phase 02 Mobile 正式联调前置验收项。
 
 ## 当前认证协议权威
 
