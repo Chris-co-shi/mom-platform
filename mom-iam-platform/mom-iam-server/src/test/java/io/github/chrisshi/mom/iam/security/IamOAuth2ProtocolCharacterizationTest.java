@@ -18,6 +18,7 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
 
@@ -95,6 +96,35 @@ class IamOAuth2ProtocolCharacterizationTest {
                 .contains("\"scope\":\"")
                 .contains("openid", "profile")
                 .doesNotContain("accessToken", "refreshToken", "sessionId");
+    }
+
+    /** 标准字段不得被附加参数覆盖，未知对象类型必须失败关闭。 */
+    @Test
+    void tokenEndpointAdditionalParametersMustNotOverrideStandards() throws Exception {
+        Instant issuedAt = Instant.now();
+        RegisteredClient client = RegisteredClient.withId("client-row-1")
+                .clientId("mom-mobile-pda")
+                .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                .build();
+        OAuth2ClientAuthenticationToken principal = new OAuth2ClientAuthenticationToken(
+                client, ClientAuthenticationMethod.NONE, null);
+        OAuth2AccessToken accessToken = new OAuth2AccessToken(
+                OAuth2AccessToken.TokenType.BEARER, "access-1", issuedAt,
+                issuedAt.plusSeconds(600), Set.of("openid"));
+        OAuth2AccessTokenAuthenticationToken authentication =
+                new OAuth2AccessTokenAuthenticationToken(
+                        client, principal, accessToken, null,
+                        Map.of("access_token", "must-not-win", "custom_number", 7));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        new IamTokenResponseHandler().onAuthenticationSuccess(
+                new MockHttpServletRequest(), response, authentication);
+
+        assertThat(response.getContentAsString())
+                .contains("\"access_token\":\"access-1\"")
+                .contains("\"custom_number\":7")
+                .doesNotContain("must-not-win");
     }
 
     private static IamAuthorizationProperties properties() {
