@@ -25,7 +25,13 @@ public interface IamRefreshTokenMapper extends MomBaseMapper<IamRefreshTokenEnti
     int insertAuthenticationRefresh(IamRefreshTokenEntity refresh);
 
     /** @return 按摘要持有 {@code FOR UPDATE} 行锁的 Refresh 状态 */
-    @Select("SELECT * FROM iam_refresh_token WHERE token_digest=#{digest} FOR UPDATE")
+    @Select("""
+            SELECT id, session_id, token_digest, sequence_no, status, issued_at, expires_at,
+                   consumed_at, replaced_by_token_id, revoked_at, created_at
+              FROM iam_refresh_token
+             WHERE token_digest = #{digest}
+             FOR UPDATE
+            """)
     IamRefreshTokenEntity selectForUpdateByDigest(@Param("digest") String digest);
 
     /** 先把旧 ACTIVE Token 改为 ROTATED，释放每个 Session 的 ACTIVE 唯一槽位。 */
