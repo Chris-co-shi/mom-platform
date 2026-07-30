@@ -49,6 +49,9 @@ POSTGRES_SCHEMA="$POSTGRES_SCHEMA" \
 POSTGRES_USERNAME="$POSTGRES_USERNAME" \
 POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
 NACOS_DISCOVERY_ENABLED=false \
+MANAGEMENT_HEALTH_REDIS_ENABLED=false \
+MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED=false \
+MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED=false \
 java -jar mom-mdm-platform/mom-mdm-server/target/mom-mdm-server-0.1.0-SNAPSHOT-exec.jar \
   --server.port="$MDM_PORT" \
   --spring.application.name=mom-mdm-server \
@@ -60,7 +63,7 @@ MDM_PID=$!
 for attempt in {1..60}; do
   health_status=$(curl --silent --output mdm-postgresql-health.json \
     --write-out '%{http_code}' \
-    "http://127.0.0.1:${MDM_PORT}/actuator/health" || true)
+    "http://127.0.0.1:${MDM_PORT}/actuator/health/readiness" || true)
   if [[ "$health_status" == "200" ]]; then
     break
   fi

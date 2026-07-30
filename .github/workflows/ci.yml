@@ -259,16 +259,20 @@ jobs:
           java-version: "25"
           cache: maven
 
-      - name: Package MDM application
+      - name: Package PostgreSQL applications
         shell: bash
         run: >-
           bash scripts/codex-mvn-test.sh
-          -pl mom-mdm-platform/mom-mdm-server
+          -pl mom-mdm-platform/mom-mdm-server,mom-system-platform/mom-system-server
           -am -DskipTests package
 
-      - name: Run PostgreSQL packaged application smoke test
+      - name: Run MDM PostgreSQL packaged smoke
         shell: bash
         run: bash .github/scripts/p01-s04-postgresql-smoke.sh
+
+      - name: Run System PostgreSQL packaged smoke
+        shell: bash
+        run: bash .github/scripts/system-postgresql-smoke.sh
 
       - name: Upload PostgreSQL diagnostics on failure
         if: failure()
@@ -285,6 +289,11 @@ jobs:
             mdm-data-probe-create.json
             mdm-data-probe-read.json
             mdm-postgresql-failure.json
+            system-postgresql-container.log
+            system-postgresql-server.log
+            system-postgresql-health.json
+            system-postgresql-schema.txt
+            system-postgresql-failure.json
           if-no-files-found: ignore
           include-hidden-files: true
 
