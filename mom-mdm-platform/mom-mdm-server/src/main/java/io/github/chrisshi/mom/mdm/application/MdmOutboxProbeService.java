@@ -1,6 +1,6 @@
 package io.github.chrisshi.mom.mdm.application;
 
-import io.github.chrisshi.mom.mdm.infrastructure.persistence.MdmDataProbeEntity;
+import io.github.chrisshi.mom.mdm.infrastructure.persistence.entity.MdmDataProbeEntity;
 import io.github.chrisshi.mom.messaging.event.EventEnvelope;
 import io.github.chrisshi.mom.outbox.application.OutboxAppender;
 import org.springframework.transaction.annotation.Transactional;

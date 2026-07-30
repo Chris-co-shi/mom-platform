@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.integration.messaging;
+package io.github.chrisshi.mom.integration.infrastructure.messaging;
 
 import io.github.chrisshi.mom.messaging.event.EventEnvelope;
 import io.github.chrisshi.mom.outbox.application.InboxDeduplicator;

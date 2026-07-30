@@ -106,7 +106,7 @@ class PersistenceArchitectureTest {
                 .and().doNotHaveFullyQualifiedName(
                         "io.github.chrisshi.mom.integration.application.IntegrationSeataAtParticipantService")
                 .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.integration.messaging.IntegrationDomainEventConsumerConfiguration")
+                        "io.github.chrisshi.mom.integration.infrastructure.messaging.IntegrationDomainEventConsumerConfiguration")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "org.springframework.jdbc..", "java.sql..")
                 .because("正式业务表统一使用 MyBatis-Plus；直接 JDBC 必须先登记精确协议或技术例外")

@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.mdm.infrastructure.persistence;
+package io.github.chrisshi.mom.mdm.infrastructure.persistence.entity;
 
 import com.baomidou.mybatisplus.annotation.TableName;
 import io.github.chrisshi.mom.data.entity.BaseEntity;

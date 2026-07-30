@@ -1,8 +1,8 @@
 package io.github.chrisshi.mom.mdm.application;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import io.github.chrisshi.mom.mdm.infrastructure.persistence.MdmDataProbeEntity;
-import io.github.chrisshi.mom.mdm.infrastructure.persistence.MdmDataProbeMapper;
+import io.github.chrisshi.mom.mdm.infrastructure.persistence.entity.MdmDataProbeEntity;
+import io.github.chrisshi.mom.mdm.infrastructure.persistence.mapper.MdmDataProbeMapper;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;

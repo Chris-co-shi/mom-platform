@@ -28,7 +28,7 @@ DIRECT_JDBC_EXCEPTIONS = {
     "mom-integration-platform/mom-integration-server/src/main/java/"
     "io/github/chrisshi/mom/integration/application/IntegrationSeataAtParticipantService.java",
     "mom-integration-platform/mom-integration-server/src/main/java/"
-    "io/github/chrisshi/mom/integration/messaging/IntegrationDomainEventConsumerConfiguration.java",
+    "io/github/chrisshi/mom/integration/infrastructure/messaging/IntegrationDomainEventConsumerConfiguration.java",
 }
 
 @dataclass

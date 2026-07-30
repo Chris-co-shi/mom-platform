@@ -1,6 +1,7 @@
-package io.github.chrisshi.mom.mdm.infrastructure.persistence;
+package io.github.chrisshi.mom.mdm.infrastructure.persistence.mapper;
 
 import io.github.chrisshi.mom.data.mapper.MomBaseMapper;
+import io.github.chrisshi.mom.mdm.infrastructure.persistence.entity.MdmDataProbeEntity;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;

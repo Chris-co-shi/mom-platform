@@ -1,8 +1,8 @@
-package io.github.chrisshi.mom.mdm.autoconfigure;
+package io.github.chrisshi.mom.mdm.configuration;
 
 import io.github.chrisshi.mom.mdm.application.MdmDataProbeService;
 import io.github.chrisshi.mom.mdm.application.MdmOutboxProbeService;
-import io.github.chrisshi.mom.mdm.infrastructure.persistence.MdmDataProbeMapper;
+import io.github.chrisshi.mom.mdm.infrastructure.persistence.mapper.MdmDataProbeMapper;
 import io.github.chrisshi.mom.outbox.application.OutboxAppender;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;

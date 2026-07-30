@@ -1,6 +1,6 @@
 package io.github.chrisshi.mom.mdm.interfaces.rest.internal;
 
-import io.github.chrisshi.mom.mdm.infrastructure.persistence.MdmDataProbeEntity;
+import io.github.chrisshi.mom.mdm.infrastructure.persistence.entity.MdmDataProbeEntity;
 
 import java.time.Instant;
 

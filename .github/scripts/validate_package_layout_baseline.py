@@ -22,8 +22,6 @@ ALLOWED_PERSISTENCE = {"entity", "mapper", "repository", "query", "converter", "
 
 # S15-E 阶段一只允许这些逐文件存量；阶段二移动完成后必须删除，禁止新增条目。
 LEGACY_LAYOUT_EXCEPTIONS = {
-    "mom-mdm-platform/mom-mdm-server/src/main/java/io/github/chrisshi/mom/mdm/infrastructure/persistence/MdmDataProbeEntity.java",
-    "mom-mdm-platform/mom-mdm-server/src/main/java/io/github/chrisshi/mom/mdm/infrastructure/persistence/MdmDataProbeMapper.java",
 }
 
 

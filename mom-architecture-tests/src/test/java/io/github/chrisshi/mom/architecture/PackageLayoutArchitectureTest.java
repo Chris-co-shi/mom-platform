@@ -30,8 +30,6 @@ class PackageLayoutArchitectureTest {
         classes()
                 .that().haveSimpleNameEndingWith("Entity")
                 .and().resideOutsideOfPackage("io.github.chrisshi.mom.data.entity..")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.mdm.infrastructure.persistence.MdmDataProbeEntity")
                 .should().resideInAnyPackage("..infrastructure.persistence.entity")
                 .because("数据库行模型必须集中在 Entity 技术职责包")
                 .check(productionClasses);
@@ -43,8 +41,6 @@ class PackageLayoutArchitectureTest {
         classes()
                 .that().areAssignableTo(MomBaseMapper.class)
                 .and().doNotHaveFullyQualifiedName(MomBaseMapper.class.getName())
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.mdm.infrastructure.persistence.MdmDataProbeMapper")
                 .should().resideInAnyPackage("..infrastructure.persistence.mapper")
                 .because("普通 Entity Mapper 必须集中在 Mapper 技术职责包")
                 .check(productionClasses);
