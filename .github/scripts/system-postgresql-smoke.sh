@@ -161,7 +161,7 @@ docker exec "$POSTGRES_CONTAINER" \
   " > system-postgresql-schema.txt
 
 grep --fixed-strings --quiet 'schema=1' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'flyway_version=5' system-postgresql-schema.txt
+grep --fixed-strings --quiet 'flyway_version=6' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_parameter=1' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_dictionary_tables=2' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_i18n_tables=3' system-postgresql-schema.txt
