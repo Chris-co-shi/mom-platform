@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.iam.autoconfigure;
+package io.github.chrisshi.mom.iam.configuration;
 
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamExternalUserBindingMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamInternalUserProfileMapper;

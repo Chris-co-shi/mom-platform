@@ -20,9 +20,8 @@ FQCN = re.compile(r"^(?:[a-zA-Z_$][\w$]*\.)+[A-Za-z_$][\w$]*$")
 ALLOWED_INFRASTRUCTURE = {"persistence", "client", "messaging", "cache", "storage"}
 ALLOWED_PERSISTENCE = {"entity", "mapper", "repository", "query", "converter", "typehandler"}
 
-# S15-E 阶段一只允许这些逐文件存量；阶段二移动完成后必须删除，禁止新增条目。
-LEGACY_LAYOUT_EXCEPTIONS = {
-}
+# S15-E 阶段二已清空逐文件迁移例外；新增条目必须先有 Accepted ADR。
+LEGACY_LAYOUT_EXCEPTIONS: frozenset[str] = frozenset()
 
 
 @dataclass

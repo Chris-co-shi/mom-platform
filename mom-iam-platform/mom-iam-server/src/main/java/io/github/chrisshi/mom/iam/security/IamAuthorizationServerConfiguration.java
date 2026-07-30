@@ -20,7 +20,7 @@ import javax.sql.DataSource;
 @AutoConfiguration(afterName = {
         "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
         "com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration",
-        "io.github.chrisshi.mom.iam.autoconfigure.IamPersistenceRepositoryAutoConfiguration"
+        "io.github.chrisshi.mom.iam.configuration.IamPersistenceRepositoryAutoConfiguration"
 })
 @EnableWebSecurity
 @EnableConfigurationProperties({IamAuthorizationProperties.class, IamSessionProperties.class})

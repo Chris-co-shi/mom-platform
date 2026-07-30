@@ -1,6 +1,6 @@
 package io.github.chrisshi.mom.iam.admin;
 
-import io.github.chrisshi.mom.iam.autoconfigure.IamPersistenceRepositoryAutoConfiguration;
+import io.github.chrisshi.mom.iam.configuration.IamPersistenceRepositoryAutoConfiguration;
 import io.github.chrisshi.mom.iam.bootstrap.IamAdministratorBootstrapConfiguration;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamExternalUserBindingMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamOauthClientPolicyMapper;
