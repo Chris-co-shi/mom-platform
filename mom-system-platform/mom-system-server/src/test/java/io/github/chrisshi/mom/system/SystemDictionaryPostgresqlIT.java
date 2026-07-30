@@ -31,11 +31,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * System Dictionary 的真实 PostgreSQL 17.7、Flyway V1→V3、MyBatis、审计与乐观锁集成测试。
+ * System Dictionary 的真实 PostgreSQL 17.7、Flyway V1→V4、MyBatis-Plus、审计与乐观锁集成测试。
  *
  * <p>测试使用动态端口和独立 mom_system Schema，每例清理字典数据，不依赖本机数据库。它验证同 Schema
- * Restrict FK、数据库 Check/Unique、Active/Compatibility、分页和 Parameter V1 兼容；Docker 不可用时
- * Testcontainers 明确跳过，不能描述为专项成功。</p>
+ * Restrict FK、数据库 Check/Unique、BaseEntity 逻辑删除列、Active/Compatibility、分页和 Parameter V1
+ * 兼容；Docker 不可用时 Testcontainers 明确跳过，不能描述为专项成功。</p>
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
@@ -91,11 +91,11 @@ class SystemDictionaryPostgresqlIT {
     }
 
     @Test
-    void freshDatabaseMustApplyV1V2V3AndPreserveParameterTable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("3");
+    void freshDatabaseMustApplyV1ThroughV4AndPreserveParameterTable() {
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("4");
         assertThat(jdbcTemplate.queryForObject(
-                "select count(*) from flyway_schema_history where success and version in ('1','2','3')", Long.class))
-                .isEqualTo(3L);
+                "select count(*) from flyway_schema_history where success and version in ('1','2','3','4')",
+                Long.class)).isEqualTo(4L);
         assertThat(jdbcTemplate.queryForList("""
                 select table_name from information_schema.tables
                  where table_schema=? and table_name in (
@@ -107,17 +107,27 @@ class SystemDictionaryPostgresqlIT {
                 "select character_maximum_length from information_schema.columns "
                         + "where table_schema=? and table_name='system_dictionary' and column_name='id'",
                 Integer.class, SCHEMA)).isEqualTo(19);
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*) from information_schema.columns
+                 where table_schema=?
+                   and table_name in ('system_parameter','system_dictionary','system_dictionary_item')
+                   and column_name='deleted' and data_type='boolean' and is_nullable='NO'
+                """, Long.class, SCHEMA)).isEqualTo(3L);
     }
 
     @Test
-    void existingV1SchemaMustUpgradeThroughV3WithoutChangingParameterTable() {
+    void existingV1SchemaMustUpgradeThroughV4WithoutChangingParameterData() {
         Flyway v1 = Flyway.configure().dataSource(dataSource).createSchemas(true)
                 .schemas(UPGRADE_SCHEMA).defaultSchema(UPGRADE_SCHEMA)
                 .locations("classpath:db/migration/system").target("1").load();
         v1.migrate();
-        assertThat(jdbcTemplate.queryForObject(
-                "select count(*) from information_schema.tables where table_schema=? and table_name='system_parameter'",
-                Long.class, UPGRADE_SCHEMA)).isEqualTo(1L);
+        jdbcTemplate.update("""
+                insert into mom_system_upgrade.system_parameter (
+                    id, scope_type, scope_code, parameter_key, value_type, parameter_value,
+                    enabled, version, created_by, created_at, updated_by, updated_at)
+                values ('upgrade-param', 'GLOBAL', '', 'upgrade.key', 'STRING', 'kept',
+                    true, 0, 'test', now(), 'test', now())
+                """);
         assertThat(jdbcTemplate.queryForObject(
                 "select count(*) from information_schema.tables where table_schema=? and table_name='system_dictionary'",
                 Long.class, UPGRADE_SCHEMA)).isZero();
@@ -126,10 +136,16 @@ class SystemDictionaryPostgresqlIT {
                 .schemas(UPGRADE_SCHEMA).defaultSchema(UPGRADE_SCHEMA)
                 .locations("classpath:db/migration/system").load();
         latest.migrate();
-        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("3");
+        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("4");
         assertThat(jdbcTemplate.queryForObject(
                 "select count(*) from information_schema.tables where table_schema=? and table_name='system_dictionary'",
                 Long.class, UPGRADE_SCHEMA)).isEqualTo(1L);
+        assertThat(jdbcTemplate.queryForObject(
+                "select parameter_value from mom_system_upgrade.system_parameter where id='upgrade-param'",
+                String.class)).isEqualTo("kept");
+        assertThat(jdbcTemplate.queryForObject(
+                "select deleted from mom_system_upgrade.system_parameter where id='upgrade-param'",
+                Boolean.class)).isFalse();
     }
 
     @Test
@@ -154,7 +170,7 @@ class SystemDictionaryPostgresqlIT {
     }
 
     @Test
-    void mybatisMustFillAuditLockVersionsAndSupportActiveCompatibilityAndPages() {
+    void mybatisPlusMustFillAuditLockVersionsAndSupportActiveCompatibilityAndPages() {
         var dictionary = service.createDictionary(
                 new CreateDictionaryCommand("System.Common.State", "State", null, true));
         var zeta = service.createItem(dictionary.id(), item("zeta", "Zeta", 10, true));
@@ -234,5 +250,4 @@ class SystemDictionaryPostgresqlIT {
     private static CreateItemCommand item(String code, String label, int sortOrder, boolean enabled) {
         return new CreateItemCommand(code, label, sortOrder, null, enabled);
     }
-
 }

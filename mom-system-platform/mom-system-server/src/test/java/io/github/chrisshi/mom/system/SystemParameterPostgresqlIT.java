@@ -37,11 +37,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * System Parameter 的真实 PostgreSQL、Flyway、MyBatis 与并发集成测试。
+ * System Parameter 的真实 PostgreSQL、Flyway V1～V4、MyBatis-Plus 与并发集成测试。
  *
  * <p>测试固定 PostgreSQL 17.7 官方镜像、动态端口和容器 Wait Strategy，不使用本机数据库或 H2。每个
- * 测试前清理参数表；验证独立 mom_system Schema、约束、审计、String ID、乐观锁、分页及无跨 Schema FK。
- * Docker 不可用时由 Testcontainers 明确标记跳过，不能描述为专项成功。</p>
+ * 测试前清理参数表；验证独立 mom_system Schema、BaseEntity 列、约束、审计、String ID、乐观锁、分页及
+ * 无跨 Schema FK。Docker 不可用时由 Testcontainers 明确标记跳过，不能描述为专项成功。</p>
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
@@ -106,14 +106,19 @@ class SystemParameterPostgresqlIT {
         assertThat(hikari.getConnectionInitSql()).isEqualTo("SET TIME ZONE 'UTC'");
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("show timezone", String.class)).isEqualTo("UTC");
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("3");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("4");
         assertThat(jdbcTemplate.queryForObject(
-                "select count(*) from flyway_schema_history where success and version in ('1','2','3')", Long.class))
-                .isEqualTo(3L);
+                "select count(*) from flyway_schema_history where success and version in ('1','2','3','4')",
+                Long.class)).isEqualTo(4L);
         assertThat(jdbcTemplate.queryForObject(
                 "select character_maximum_length from information_schema.columns "
                         + "where table_schema=? and table_name='system_parameter' and column_name='id'",
                 Integer.class, SCHEMA)).isEqualTo(19);
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*) from information_schema.columns
+                 where table_schema=? and table_name='system_parameter'
+                   and column_name='deleted' and data_type='boolean' and is_nullable='NO'
+                """, Long.class, SCHEMA)).isEqualTo(1L);
     }
 
     @Test
@@ -130,13 +135,15 @@ class SystemParameterPostgresqlIT {
     }
 
     @Test
-    void mybatisMustFillAuditGenerateStringIdAndResolveOverrides() {
+    void mybatisPlusMustFillAuditGenerateStringIdAndResolveOverrides() {
         var global = service.create(command(ParameterScopeType.GLOBAL, null, "feature.timeout", "00012"));
         var override = service.create(command(ParameterScopeType.APPLICATION, "MOM-WEB", "feature.timeout", "20"));
 
         assertThat(global.id()).matches("[0-9]{1,19}");
         assertThat(global.createdBy()).isEqualTo("s13-test-actor");
         assertThat(global.updatedAt()).isNotNull();
+        assertThat(jdbcTemplate.queryForObject(
+                "select deleted from system_parameter where id=?", Boolean.class, global.id())).isFalse();
         assertThat(service.resolve("feature.timeout", "mom-web").parameterValue()).isEqualTo("20");
 
         var disabled = service.changeStatus(override.id(), new StatusCommand(false, override.version()));
