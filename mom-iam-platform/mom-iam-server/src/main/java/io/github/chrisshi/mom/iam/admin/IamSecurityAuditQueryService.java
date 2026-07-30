@@ -1,7 +1,7 @@
 package io.github.chrisshi.mom.iam.admin;
 
 import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
-import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamSecurityAuditQueryRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.query.IamSecurityAuditQueryRepository;
 import org.springframework.security.core.Authentication;
 
 import java.util.List;

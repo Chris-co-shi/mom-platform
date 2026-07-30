@@ -1,5 +1,7 @@
 package io.github.chrisshi.mom.iam.admin;
 
+import io.github.chrisshi.mom.iam.infrastructure.persistence.query.IamAdminReadModelRepository;
+
 import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
 import io.github.chrisshi.mom.iam.domain.type.IamRecordStatus;
 import io.github.chrisshi.mom.iam.domain.type.PartyType;
@@ -7,13 +9,13 @@ import io.github.chrisshi.mom.iam.domain.type.UserType;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamSecurityAuditEventEntity;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamBuiltInAdministratorRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSecurityAuditEventAppender;
-import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamAuthorizationAssignmentRepository;
-import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamClientPolicyAdminRepository;
-import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamRoleAdminRepository;
-import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamSecurityAuditQueryRepository;
-import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamSessionAdminRepository;
-import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamUserAccessAdminRepository;
-import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamUserAdminRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamAuthorizationAssignmentRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamClientPolicyAdminRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamRoleAdminRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.query.IamSecurityAuditQueryRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSessionAdminRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserAccessAdminRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserAdminRepository;
 import io.github.chrisshi.mom.iam.security.IamSecureIdGenerator;
 import io.github.chrisshi.mom.iam.security.IamSessionTokenService;
 import io.github.chrisshi.mom.security.authorization.MomAuthorizationService;

@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin;
+package io.github.chrisshi.mom.iam.infrastructure.persistence.repository;
 
 import io.github.chrisshi.mom.iam.admin.IamAdminExceptions;
 import io.github.chrisshi.mom.iam.domain.type.IamRecordStatus;

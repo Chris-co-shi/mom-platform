@@ -3,7 +3,7 @@ package io.github.chrisshi.mom.iam.admin;
 import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
 import io.github.chrisshi.mom.iam.domain.type.PermissionRiskLevel;
 import io.github.chrisshi.mom.iam.domain.type.SecurityEventCategory;
-import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamSessionAdminRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSessionAdminRepository;
 import io.github.chrisshi.mom.security.token.MomJwtAuthorization;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;

@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin;
+package io.github.chrisshi.mom.iam.infrastructure.persistence.repository;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;

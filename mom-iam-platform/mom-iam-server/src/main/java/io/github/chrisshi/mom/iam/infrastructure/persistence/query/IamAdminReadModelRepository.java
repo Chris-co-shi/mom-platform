@@ -1,6 +1,7 @@
-package io.github.chrisshi.mom.iam.admin;
+package io.github.chrisshi.mom.iam.infrastructure.persistence.query;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import io.github.chrisshi.mom.iam.admin.IamAdminExceptions;
 import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
 import io.github.chrisshi.mom.iam.domain.type.ApplicationCode;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamExternalUserBindingEntity;

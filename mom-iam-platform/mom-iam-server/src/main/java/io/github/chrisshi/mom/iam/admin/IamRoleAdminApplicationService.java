@@ -1,12 +1,14 @@
 package io.github.chrisshi.mom.iam.admin;
 
+import io.github.chrisshi.mom.iam.infrastructure.persistence.query.IamAdminReadModelRepository;
+
 import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
 import io.github.chrisshi.mom.iam.domain.model.IamDomainRules;
 import io.github.chrisshi.mom.iam.domain.type.PermissionRiskLevel;
 import io.github.chrisshi.mom.iam.domain.type.SecurityEventCategory;
 import io.github.chrisshi.mom.iam.domain.type.UserType;
-import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamAuthorizationAssignmentRepository;
-import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamRoleAdminRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamAuthorizationAssignmentRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamRoleAdminRepository;
 import io.github.chrisshi.mom.security.token.MomJwtAuthorization;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;

@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin;
+package io.github.chrisshi.mom.iam.infrastructure.persistence.query;
 
 import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamSecurityAuditEventMapper;

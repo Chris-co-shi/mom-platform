@@ -1,5 +1,7 @@
 package io.github.chrisshi.mom.iam.admin;
 
+import io.github.chrisshi.mom.iam.infrastructure.persistence.query.IamAdminReadModelRepository;
+
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamExternalUserBindingMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamOauthClientPolicyMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamPermissionMapper;
@@ -13,7 +15,7 @@ import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserRoleM
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserSessionMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamBuiltInAdministratorRepository;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamSecurityAuditEventAppender;
-import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin.IamUserAdminRepository;
+import io.github.chrisshi.mom.iam.infrastructure.persistence.repository.IamUserAdminRepository;
 import io.github.chrisshi.mom.iam.security.IamSecureIdGenerator;
 import io.github.chrisshi.mom.iam.security.IamSessionTokenService;
 import org.apache.ibatis.session.SqlSessionFactory;

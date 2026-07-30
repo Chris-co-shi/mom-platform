@@ -22,16 +22,8 @@ ALLOWED_PERSISTENCE = {"entity", "mapper", "repository", "query", "converter", "
 
 # S15-E 阶段一只允许这些逐文件存量；阶段二移动完成后必须删除，禁止新增条目。
 LEGACY_LAYOUT_EXCEPTIONS = {
-    "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/admin/IamAdminReadModelRepository.java",
     "mom-mdm-platform/mom-mdm-server/src/main/java/io/github/chrisshi/mom/mdm/infrastructure/persistence/MdmDataProbeEntity.java",
     "mom-mdm-platform/mom-mdm-server/src/main/java/io/github/chrisshi/mom/mdm/infrastructure/persistence/MdmDataProbeMapper.java",
-    "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/infrastructure/persistence/repository/admin/IamAuthorizationAssignmentRepository.java",
-    "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/infrastructure/persistence/repository/admin/IamClientPolicyAdminRepository.java",
-    "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/infrastructure/persistence/repository/admin/IamRoleAdminRepository.java",
-    "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/infrastructure/persistence/repository/admin/IamSecurityAuditQueryRepository.java",
-    "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/infrastructure/persistence/repository/admin/IamSessionAdminRepository.java",
-    "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/infrastructure/persistence/repository/admin/IamUserAccessAdminRepository.java",
-    "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/infrastructure/persistence/repository/admin/IamUserAdminRepository.java",
 }
 
 
