@@ -13,7 +13,7 @@
   <img alt="Java" src="https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white">
   <img alt="Spring Boot" src="https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white">
   <img alt="Spring Cloud" src="https://img.shields.io/badge/Spring%20Cloud-2025.1-6DB33F?logo=spring&logoColor=white">
-  <img alt="Status" src="https://img.shields.io/badge/Status-P1.6%20S15--D%20Governance-0969DA">
+  <img alt="Status" src="https://img.shields.io/badge/Status-P1.6%20S15--E%20Governance-0969DA">
 </p>
 
 [文档中心](docs/README.md) · [P1.6 治理计划](docs/plans/P1.6-IAM与System平台治理计划.md) · [P1.6 实施进度](docs/plans/P1.6-实施进度.md) · [P1.5 设计基线](docs/security/P1.5-认证与授权设计基线.md) · [V1 路线图](docs/plans/V1路线图.md) · [ADR](docs/adr/README.md)
@@ -23,7 +23,7 @@
 ---
 
 > [!IMPORTANT]
-> Phase 01 与 P1.5 已完成并合并。P1.6 S00～S15-D 已完成当前治理工作，ADR-025/ADR-026 保持 Accepted；S15-B Dynamic I18n 后端与 S15-D 持久化治理已收口，Factory/Party 权威引用校验精确 Deferred，S16 未开始。Phase 02 业务垂直切片未启动。
+> Phase 01 与 P1.5 已完成并合并。P1.6 S00～S15-E 已完成当前治理工作，ADR-025/ADR-026/ADR-027 保持 Accepted；S15-E 已完成服务端 Package 门禁和 30 个文件的行为保持重构，S16 未开始。Phase 02 业务垂直切片未启动。
 
 ## 🌟 项目愿景
 
@@ -115,7 +115,7 @@ flowchart LR
 | 能力域 | V1 关注点 | 权威模块 |
 |---|---|---|
 | 身份与权限 | OAuth/OIDC、PKCE、用户、角色、权限、Factory/Party Scope、Session | `mom-iam-platform` |
-| 平台配置与体验 | S13 参数、S14 字典与 S15-B Dynamic I18n 后端已完成；S15-D 已建立 CRUD/关联/Schema/无 FK 治理；偏好、应用目录与菜单未实现 | `mom-system-platform` |
+| 平台配置与体验 | S13 参数、S14 字典与 S15-B Dynamic I18n 后端已完成；S15-D 持久化治理、S15-E Package 治理已收口；偏好、应用目录与菜单未实现 | `mom-system-platform` |
 | 主数据 | 集团、工厂、物料、人员与 Party 核心身份、版本索引；供应商采购关系与客户销售关系分别由未来采购/SRM、销售/CRM 业务域拥有 | `mom-mdm-platform`（Party Core）；业务域 Planned Authority / Not Implemented |
 | 生产执行 | 工单、版本快照、投料、过程记录、报工 | `mom-mes-platform` |
 | 仓储库存 | 库位、容器、批次、预占、流水、余额、对账 | `mom-wms-platform` |
@@ -216,7 +216,7 @@ mvn -B -ntp clean verify
 |---|---|---|
 | Phase 01 | JDK 25 + Boot 4 基础技术骨架与观测闭环 | ✅ 基础完成 |
 | P1.5 | 认证与授权闭环 | ✅ Completed / Merged（S00～S12） |
-| P1.6 | IAM 收敛与 System 平台治理 | 🚧 S00～S14 Completed；ADR-025 Accepted；S15 Deferred；S16 Not Started |
+| P1.6 | IAM 收敛与 System 平台治理 | 🚧 S00～S15 Completed；S15-E Completed with accepted exceptions；S16 Not Started |
 | Phase 02 | 供应商送货、来料检验、PDA 入库、库存闭环 | ⏳ Not Started；不因 P1.6 治理视为已启动 |
 | Phase 03 | 生产工单、PCS 协同、半成品与成品批次 | ⏳ 计划中 |
 | Phase 04 | 成品放行、WCS 入库、客户发运、追溯和召回 | ⏳ 计划中 |
