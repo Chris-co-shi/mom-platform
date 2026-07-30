@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.chrisshi.mom.system.infrastructure.persistence.dictionary.SystemDictionaryMapper">
+  <sql id="pageConditions">
+    <where>
+      <if test="dictionaryCode != null">AND dictionary_code = #{dictionaryCode}</if>
+      <if test="enabled != null">AND enabled = #{enabled}</if>
+    </where>
+  </sql>
+
+  <select id="selectPage"
+          resultType="io.github.chrisshi.mom.system.infrastructure.persistence.dictionary.SystemDictionaryEntity">
+    SELECT id, dictionary_code, dictionary_name, enabled, version, description,
+           created_by, created_at, updated_by, updated_at
+      FROM system_dictionary
+    <include refid="pageConditions"/>
+     ORDER BY dictionary_code, id
+     LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <select id="countPage" resultType="long">
+    SELECT count(*)
+      FROM system_dictionary
+    <include refid="pageConditions"/>
+  </select>
+</mapper>

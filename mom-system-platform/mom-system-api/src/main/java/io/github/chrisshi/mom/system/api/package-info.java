@@ -1,7 +1,7 @@
 /**
  * System Platform 的跨模块稳定契约边界。
  *
- * <p>S12 只建立包边界，不定义参数、字典、偏好、应用目录、菜单或其他业务契约。后续只有在存在真实
- * 调用方并由对应 Slice 批准后，才允许在此包中增加与传输、持久化实现无关的契约。</p>
+ * <p>S13 参数与 S14 字典只暴露跨服务读取所需的稳定枚举和 DTO，不包含数据库 ID、Web Request、Entity、
+ * Mapper 或 Repository。Client 尚无真实调用方，契约本身不代表已提供 Feign 适配器。</p>
  */
 package io.github.chrisshi.mom.system.api;

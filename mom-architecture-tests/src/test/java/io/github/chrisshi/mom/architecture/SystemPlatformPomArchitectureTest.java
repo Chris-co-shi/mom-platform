@@ -17,10 +17,10 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * System Platform S13 的 POM 语义与类型化参数能力白名单门禁。
+ * System Platform S14 的 POM 语义与参数/字典精确白名单门禁。
  *
  * <p>测试通过 XML DOM 读取实际 POM，不使用字符串 grep 推断依赖。它同时检查 Reactor 注册、聚合模块、
- * API/Client/Server 直接依赖白名单和 S14+ 禁止资源。测试只读工作区，无网络、数据库或中间件副作用；
+ * API/Client/Server 直接依赖白名单和 S15+ 禁止资源。测试只读工作区，无网络、数据库或中间件副作用；
  * XML 不可解析、目录缺失或白名单外依赖均直接失败。</p>
  */
 class SystemPlatformPomArchitectureTest {
@@ -41,11 +41,13 @@ class SystemPlatformPomArchitectureTest {
             "org.springframework.security:spring-security-test",
             MOM_GROUP + ":mom-test");
     private static final Pattern FORBIDDEN_JAVA_TYPE = Pattern.compile(
-            ".*(Dictionary|Preference|Catalog|Menu|Navigation|DynamicI18n|AuditProjection|Permission|Role|"
-                    + "Session|Refresh|Credential|FactoryScope|PartyBinding).*\\.java");
+            ".*(Preference|Catalog|Menu|Navigation|DynamicI18n|AuditProjection|Permission|Role|"
+                    + "Session|Refresh|Credential|FactoryScope|PartyBinding|Factory|Warehouse|Equipment|"
+                    + "Person|Party).*\\.java");
     private static final Set<String> API_TYPES = Set.of(
             "package-info.java", "ParameterScopeType.java", "ParameterValueType.java",
-            "ResolvedSystemParameter.java");
+            "ResolvedSystemParameter.java", "SystemDictionaryItemOption.java",
+            "ResolvedSystemDictionaryItem.java");
 
     /**
      * 验证根 Reactor 精确注册一次 System 聚合模块。
@@ -78,7 +80,7 @@ class SystemPlatformPomArchitectureTest {
     }
 
     /**
-     * 验证 API 只暴露 S13 稳定只读契约，Client 仍仅依赖自身 API 与统一调用基础设施。
+     * 验证 API 只暴露 S13 参数与 S14 字典稳定只读契约，Client 仍保持空调用骨架。
      *
      * @throws Exception POM 或文件读取失败
      */
@@ -97,12 +99,12 @@ class SystemPlatformPomArchitectureTest {
     }
 
     /**
-     * 验证 Server 仅使用 S13 参数、安全和数据实际依赖，并要求测试依赖保持 test scope。
+     * 验证 Server 仅使用参数/字典、安全和数据实际依赖，并要求测试依赖保持 test scope。
      *
      * @throws Exception POM 读取或解析失败
      */
     @Test
-    void serverMustUseOnlyApprovedParameterDependencies() throws Exception {
+    void serverMustUseOnlyApprovedSystemDependencies() throws Exception {
         Element server = parse(systemRoot().resolve("mom-system-server/pom.xml")).getDocumentElement();
         List<Dependency> dependencies = dependencies(server);
 
@@ -149,12 +151,12 @@ class SystemPlatformPomArchitectureTest {
     }
 
     /**
-     * 验证 S13 只增加参数能力及其单一 Migration/Mapper，继续禁止后续 System 业务。
+     * 验证 S14 只增加参数与受限字典及其精确 Migration/Mapper，继续禁止后续 System 业务。
      *
      * @throws Exception 文件遍历失败
      */
     @Test
-    void s13MustContainOnlyParameterCapabilityAndApprovedPersistenceResources() throws Exception {
+    void s14MustContainOnlyParameterDictionaryAndApprovedPersistenceResources() throws Exception {
         Path server = systemRoot().resolve("mom-system-server");
         Path packageRoot = server.resolve("src/main/java/io/github/chrisshi/mom/system");
 
@@ -170,14 +172,22 @@ class SystemPlatformPomArchitectureTest {
                     .filteredOn(path -> normalized(path).contains("/src/"))
                     .filteredOn(path -> path.getFileName().toString().endsWith(".sql"))
                     .extracting(SystemPlatformPomArchitectureTest::normalized)
-                    .containsExactly(normalized(server.resolve(
-                            "src/main/resources/db/migration/system/V1__create_system_parameter.sql")));
+                    .containsExactlyInAnyOrder(
+                            normalized(server.resolve(
+                                    "src/main/resources/db/migration/system/V1__create_system_parameter.sql")),
+                            normalized(server.resolve(
+                                    "src/main/resources/db/migration/system/V2__create_system_dictionary.sql")));
             assertThat(files)
                     .filteredOn(path -> normalized(path).contains("/src/"))
                     .filteredOn(path -> normalized(path).contains("/src/main/resources/mapper/"))
                     .extracting(SystemPlatformPomArchitectureTest::normalized)
-                    .containsExactly(normalized(server.resolve(
-                            "src/main/resources/mapper/system/SystemParameterMapper.xml")));
+                    .containsExactlyInAnyOrder(
+                            normalized(server.resolve(
+                                    "src/main/resources/mapper/system/SystemParameterMapper.xml")),
+                            normalized(server.resolve(
+                                    "src/main/resources/mapper/system/SystemDictionaryMapper.xml")),
+                            normalized(server.resolve(
+                                    "src/main/resources/mapper/system/SystemDictionaryItemMapper.xml")));
         }
     }
 

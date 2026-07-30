@@ -24,14 +24,15 @@ gateway and bootstrap tests
 
 ## System Platform
 
-`mom-system-platform` 自 P1.6 S12 起登记为 `api/client/server` 三模块；S13 在该骨架上增加类型化非敏感参数：
+`mom-system-platform` 自 P1.6 S12 起登记为 `api/client/server` 三模块；S13 增加类型化非敏感参数，S14 增加非权威受限字典：
 
-- API 只暴露 Parameter Scope/Value Type 与有效值只读契约；
+- API 只暴露 Parameter Scope/Value Type/有效值，以及 Dictionary Active Option/Compatibility 只读契约；
 - Client 仅依赖自身 API 与 `mom-openfeign`，没有真实 Feign 接口；
 - Server 精确依赖自身 API、WebMVC、Data、Security、Tracing/Metrics、Nacos Discovery 与测试基础设施；
-- PostgreSQL `mom_system.system_parameter` 是参数唯一写入权威；禁止跨 Schema FK/JOIN；
-- Security 传递的 Redis 只检查 revoked sid，不是参数存储或缓存；Server 不依赖 IAM Server、其他领域 Server、MQ、Outbox 或 Seata；
+- PostgreSQL `mom_system.system_parameter` 以及 V2 Dictionary 两表是各自唯一权威；Item 只允许同 Schema Restrict FK，禁止跨 Schema FK/JOIN；
+- Dictionary 只承载低频、无独立生命周期的稳定 Code 与 fallback Label，不得复制 IAM/MDM/WMS/EAM 权威对象；
+- Security 传递的 Redis 只检查 revoked sid，不是参数/字典存储或缓存；Server 不依赖 IAM Server、其他领域 Server、MQ、Outbox 或 Seata；
 - System 包不得访问 IAM Application、Web、Repository、Mapper、Infrastructure 或 Schema；
-- 当前只有 GLOBAL/APPLICATION 参数；没有字典、Preference、Application Catalog、Menu、Dynamic I18n 或 Audit Projection。
+- 当前有 GLOBAL/APPLICATION 参数和受限 Dictionary/Item；没有 Preference、Application Catalog、Menu、Dynamic I18n、Audit Projection、Tree、Metadata 或 Alias。
 
 POM XML 语义门禁与 ArchUnit 规则位于 `mom-architecture-tests`。ADR-025 仍是数据所有权的权威决策。

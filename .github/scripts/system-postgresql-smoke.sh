@@ -93,12 +93,16 @@ docker exec "$POSTGRES_CONTAINER" \
     SELECT 'schema=' || count(*)
       FROM information_schema.schemata
      WHERE schema_name = '${POSTGRES_SCHEMA}';
-    SELECT 'migration_v1=' || count(*)
+    SELECT 'migrations_v1_v2=' || count(*)
       FROM ${POSTGRES_SCHEMA}.flyway_schema_history
-     WHERE version = '1' AND success = true;
+     WHERE version IN ('1', '2') AND success = true;
     SELECT 'system_parameter=' || count(*)
       FROM information_schema.tables
      WHERE table_schema = '${POSTGRES_SCHEMA}' AND table_name = 'system_parameter';
+    SELECT 'system_dictionary_tables=' || count(*)
+      FROM information_schema.tables
+     WHERE table_schema = '${POSTGRES_SCHEMA}'
+       AND table_name IN ('system_dictionary', 'system_dictionary_item');
     SELECT 'cross_schema_fk=' || count(*)
       FROM pg_constraint constraint_row
       JOIN pg_class source_table ON source_table.oid = constraint_row.conrelid
@@ -111,8 +115,9 @@ docker exec "$POSTGRES_CONTAINER" \
   " > system-postgresql-schema.txt
 
 grep --fixed-strings --quiet 'schema=1' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'migration_v1=1' system-postgresql-schema.txt
+grep --fixed-strings --quiet 'migrations_v1_v2=2' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_parameter=1' system-postgresql-schema.txt
+grep --fixed-strings --quiet 'system_dictionary_tables=2' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'cross_schema_fk=0' system-postgresql-schema.txt
 
 application_connection_count=$(docker exec "$POSTGRES_CONTAINER" \

@@ -117,19 +117,64 @@ class ServerPackageArchitectureTest {
                 .check(productionClasses);
     }
 
-    /** System 不得提前定义 IAM 对象或后续 Slice 的业务类型。 */
+    /** Dictionary Domain Port 与规则不得出现 Spring 或 MyBatis 技术依赖。 */
+    @Test
+    void systemDictionaryDomainMustRemainSpringAndMybatisIndependent() {
+        noClasses()
+                .that().resideInAnyPackage("io.github.chrisshi.mom.system.domain.dictionary..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "org.springframework..", "com.baomidou.mybatisplus..", "org.apache.ibatis..")
+                .because("Dictionary Domain 聚合、规则和 Repository Port 必须保持技术无关")
+                .check(productionClasses);
+    }
+
+    /** Dictionary Controller 只能通过对应 Application 用例进入业务。 */
+    @Test
+    void systemDictionaryControllerMustOnlyEnterThroughDictionaryApplication() {
+        noClasses()
+                .that().resideInAnyPackage("io.github.chrisshi.mom.system.web.dictionary..")
+                .and().haveSimpleNameEndingWith("Controller")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "io.github.chrisshi.mom.system.domain..",
+                        "io.github.chrisshi.mom.system.infrastructure..",
+                        "io.github.chrisshi.mom.system.application.parameter..")
+                .because("Dictionary Controller 只能依赖 Dictionary Application 与稳定 API 契约")
+                .check(productionClasses);
+    }
+
+    /** Parameter 与 Dictionary 的领域边界不得反向引用对方实现层。 */
+    @Test
+    void systemParameterAndDictionaryDomainsMustRemainMutuallyBounded() {
+        noClasses()
+                .that().resideInAnyPackage("io.github.chrisshi.mom.system.domain.dictionary..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "io.github.chrisshi.mom.system.application.parameter..",
+                        "io.github.chrisshi.mom.system.infrastructure.persistence.parameter..")
+                .because("Dictionary Domain 不引用 Parameter Application 或持久化实现")
+                .check(productionClasses);
+        noClasses()
+                .that().resideInAnyPackage("io.github.chrisshi.mom.system.domain.parameter..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "io.github.chrisshi.mom.system.application.dictionary..",
+                        "io.github.chrisshi.mom.system.infrastructure.persistence.dictionary..")
+                .because("Parameter Domain 不引用 Dictionary Application 或持久化实现")
+                .check(productionClasses);
+    }
+
+    /** System 不得定义 IAM、权威主数据对象或后续 Slice 的业务类型。 */
     @Test
     void systemMustNotDefineIamOrFutureSystemObjects() {
         Set<String> forbidden = Set.of(
-                "Permission", "Role", "Session", "Refresh", "Credential", "Dictionary", "Preference",
-                "Catalog", "Menu", "Navigation", "FactoryScope", "PartyBinding");
+                "Permission", "Role", "Session", "Refresh", "Credential", "Preference",
+                "Catalog", "Menu", "Navigation", "FactoryScope", "PartyBinding",
+                "Factory", "Warehouse", "Equipment", "Person", "Party");
         var violations = productionClasses.stream()
                 .filter(javaClass -> javaClass.getPackageName().startsWith("io.github.chrisshi.mom.system"))
                 .filter(javaClass -> forbidden.stream().anyMatch(javaClass.getSimpleName()::contains))
                 .map(javaClass -> javaClass.getName())
                 .toList();
         org.assertj.core.api.Assertions.assertThat(violations)
-                .as("System 不得定义 IAM 权威对象或 S14+ 类型")
+                .as("System 不得定义 IAM/主数据权威对象或 S15+ 类型")
                 .isEmpty();
     }
 

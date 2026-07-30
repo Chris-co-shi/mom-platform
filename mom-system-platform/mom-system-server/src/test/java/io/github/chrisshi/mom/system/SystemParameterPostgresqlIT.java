@@ -106,10 +106,10 @@ class SystemParameterPostgresqlIT {
         assertThat(hikari.getConnectionInitSql()).isEqualTo("SET TIME ZONE 'UTC'");
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("show timezone", String.class)).isEqualTo("UTC");
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("1");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
         assertThat(jdbcTemplate.queryForObject(
-                "select count(*) from flyway_schema_history where success and version = '1'", Long.class))
-                .isEqualTo(1L);
+                "select count(*) from flyway_schema_history where success and version in ('1','2')", Long.class))
+                .isEqualTo(2L);
         assertThat(jdbcTemplate.queryForObject(
                 "select character_maximum_length from information_schema.columns "
                         + "where table_schema=? and table_name='system_parameter' and column_name='id'",
