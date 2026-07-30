@@ -42,6 +42,9 @@ required_files = [
     ".github/scripts/validate-no-business-foreign-key.sh",
     ".github/scripts/validate_no_business_foreign_key.py",
     ".github/scripts/test_validate_no_business_foreign_key.py",
+    ".github/scripts/validate-package-layout-baseline.sh",
+    ".github/scripts/validate_package_layout_baseline.py",
+    ".github/scripts/test_validate_package_layout_baseline.py",
     ".github/scripts/nacos-discovery-smoke.sh",
     ".github/scripts/redis-idempotency-smoke.sh",
     ".github/scripts/redis-rate-limit-smoke.sh",
@@ -58,10 +61,13 @@ required_files = [
     "docs/engineering/standards/crud-application-standard.md",
     "docs/engineering/standards/multi-table-association-query-standard.md",
     "docs/engineering/standards/database-schema-design-standard.md",
+    "docs/engineering/standards/package-directory-architecture-standard.md",
     "docs/engineering/templates/table-design-record-template.md",
     "docs/engineering/templates/multi-table-query-design-template.md",
     "docs/engineering/templates/crud-slice-acceptance-template.md",
+    "docs/engineering/templates/package-layout-acceptance-template.md",
     "docs/adr/ADR-026-MOM业务表禁止物理外键与关联完整性策略.md",
+    "docs/adr/ADR-027-服务端包结构与基础设施适配器分层.md",
     "docs/engineering/standards/transaction-consistency-standard.md",
     "docs/engineering/standards/audit-concurrency-lifecycle-standard.md",
     "docs/engineering/standards/configuration-profile-secret-standard.md",
@@ -89,6 +95,7 @@ required_files = [
     "mom-architecture-tests/src/test/java/io/github/chrisshi/mom/architecture/MavenModuleDependencyArchitectureTest.java",
     "mom-architecture-tests/src/test/java/io/github/chrisshi/mom/architecture/ServerPackageArchitectureTest.java",
     "mom-architecture-tests/src/test/java/io/github/chrisshi/mom/architecture/PersistenceArchitectureTest.java",
+    "mom-architecture-tests/src/test/java/io/github/chrisshi/mom/architecture/PackageLayoutArchitectureTest.java",
     "mom-architecture-tests/src/test/java/io/github/chrisshi/mom/architecture/RuntimeSecurityArchitectureTest.java",
 ]
 for relative in required_files:
@@ -215,9 +222,10 @@ for note in notes:
 print("- no preview/internal API/module-escape violations")
 print("- no legacy Nacos bootstrap or disabled compatibility checks")
 print("- IAM Surefire tests contain no external data-store integration tests; Failsafe *IT/*ITCase remains allowed")
-print("- S01/S02/S03/S04/S05 standards and Maven architecture-test module are wired")
+print("- S01-S15-E standards, package layout gate and Maven architecture-test module are wired")
 PY
 
 bash .github/scripts/validate-crud-baseline.sh
 bash .github/scripts/validate-schema-design-baseline.sh
 bash .github/scripts/validate-no-business-foreign-key.sh
+bash .github/scripts/validate-package-layout-baseline.sh

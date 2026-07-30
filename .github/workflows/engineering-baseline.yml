@@ -42,6 +42,7 @@ jobs:
           .github/scripts/validate-crud-baseline.sh
           .github/scripts/validate-schema-design-baseline.sh
           .github/scripts/validate-no-business-foreign-key.sh
+          .github/scripts/validate-package-layout-baseline.sh
           .github/scripts/nacos-discovery-smoke.sh
           .github/scripts/redis-idempotency-smoke.sh
           .github/scripts/redis-rate-limit-smoke.sh
@@ -67,6 +68,8 @@ jobs:
           .github/scripts/test_validate_schema_design_baseline.py
           .github/scripts/validate_no_business_foreign_key.py
           .github/scripts/test_validate_no_business_foreign_key.py
+          .github/scripts/validate_package_layout_baseline.py
+          .github/scripts/test_validate_package_layout_baseline.py
 
       - name: Validate official engineering baseline
         shell: bash
@@ -127,6 +130,13 @@ jobs:
           bash .github/scripts/validate-schema-design-baseline.sh 2>&1 | tee schema-design-baseline.log
           bash .github/scripts/validate-no-business-foreign-key.sh 2>&1 | tee no-business-foreign-key.log
 
+      - name: Validate server package layout baseline
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 .github/scripts/test_validate_package_layout_baseline.py
+          bash .github/scripts/validate-package-layout-baseline.sh 2>&1 | tee package-layout-baseline.log
+
       - name: Upload engineering baseline report
         if: always()
         uses: actions/upload-artifact@v4
@@ -142,4 +152,5 @@ jobs:
             crud-baseline.log
             schema-design-baseline.log
             no-business-foreign-key.log
+            package-layout-baseline.log
           if-no-files-found: error

@@ -14,6 +14,7 @@
 - `crud-application-standard.md`：CRUD 生命周期、分层、事务、幂等、MyBatis-Plus 与验收证据；
 - `multi-table-association-query-standard.md`：关系类型、多表写入、聚合加载、Projection、JOIN 与一对多分页；
 - `database-schema-design-standard.md`：表类型、字段/约束/索引、无物理 FK、注释、归档与 Migration 风险；
+- `package-directory-architecture-standard.md`：Server 混合 Package 组织、Adapter-first Infrastructure、Persistence 职责包与 XML 引用；
 - `transaction-consistency-standard.md`：本地事务、Outbox/Inbox、Seata 与 SAS JDBC Store 特殊边界；
 - `audit-concurrency-lifecycle-standard.md`：并发控制、三类审计、Actor、删除、归档与保留。
 - `configuration-profile-secret-standard.md`：配置来源、Profile、Secret、Nacos 与动态刷新边界；
@@ -34,3 +35,5 @@
 
 持久化改动前使用 `../templates/table-design-record-template.md`、
 `../templates/multi-table-query-design-template.md` 和 `../templates/crud-slice-acceptance-template.md`；模板完成不替代实现验收。
+Package 移动前使用 `../templates/package-layout-acceptance-template.md`，并同步验证 Java 路径、XML Namespace、
+扫描配置、可见性和行为保持证据。

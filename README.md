@@ -207,6 +207,7 @@ mvn -B -ntp clean verify
 | 计划 | [Phase 01 技术骨架](docs/plans/Phase-01-技术骨架计划.md) | 已完成基础与明确边界 |
 | 架构 | [安全架构](docs/architecture/安全架构.md) | 安全架构导航 |
 | 架构 | [系统上下文](docs/architecture/系统上下文.md) | MOM 与用户、ERP、PCS、WCS 的关系 |
+| 架构 | [服务端 Package 与目录架构规范](docs/engineering/standards/package-directory-architecture-standard.md) | bounded context Server 的业务能力分包与 Adapter-first 基线 |
 | 决策 | [ADR 索引](docs/adr/README.md) | 所有关键架构决策及状态 |
 
 ## 🗺️ 当前路线图

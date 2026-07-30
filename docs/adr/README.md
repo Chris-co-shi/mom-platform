@@ -48,6 +48,7 @@ ADR 用于记录重要架构决策的背景、候选方案、最终选择、正�
 | [ADR-024](ADR-024-PC-JSON与Mobile-PKCE-OIDC双通道.md) | PC JSON 与 Mobile PKCE/OIDC 双通道 | Accepted | P1.6 S06 审计、S07 决策、安全协议运行规范 |
 | [ADR-025](ADR-025-IAM-System-MDM-WMS-EAM数据所有权边界.md) | IAM、System、MDM、WMS、EAM 数据所有权边界 | Accepted | 2026-07-29；方案 C 与七项决策已冻结 |
 | [ADR-026](ADR-026-MOM业务表禁止物理外键与关联完整性策略.md) | MOM 业务表禁止物理外键与关联完整性策略 | Accepted | CRUD、多表关联与表结构规范 |
+| [ADR-027](ADR-027-服务端包结构与基础设施适配器分层.md) | 服务端包结构与基础设施适配器分层 | Accepted | Package 与目录架构规范 |
 
 ## 4. 新建 ADR
 

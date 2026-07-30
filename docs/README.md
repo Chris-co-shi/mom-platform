@@ -2,7 +2,7 @@
 
 本目录是 `mom-platform` 的需求、计划、架构、安全协议和架构决策权威入口。
 
-> P1.5 S00～S12 已完成并合并。P1.6 S00～S15-D 已完成治理工作，ADR-025/ADR-026 保持 Accepted；S15-D 已建立 CRUD/关联/Schema/无 FK 基线并完成全仓安全修复，Factory/Party 权威引用校验精确 Deferred；S16～S19 尚未开始。
+> P1.5 S00～S12 已完成并合并。P1.6 S00～S15-D 已完成治理工作，ADR-025/ADR-026/ADR-027 保持 Accepted；S15-E 正在建立服务端 Package 布局规范与门禁，尚未开始 S16。
 
 ## 文档使用原则
 
@@ -83,6 +83,7 @@
 - [CRUD 与应用服务规范](engineering/standards/crud-application-standard.md)
 - [多表关联与查询规范](engineering/standards/multi-table-association-query-standard.md)
 - [数据库表结构设计规范](engineering/standards/database-schema-design-standard.md)
+- [服务端 Package 与目录架构规范](engineering/standards/package-directory-architecture-standard.md)
 
 - [系统上下文](architecture/系统上下文.md)
 - [服务与容器架构](architecture/服务与容器架构.md)
@@ -102,6 +103,7 @@
 - [ADR 模板](adr/ADR-模板.md)
 - [ADR-025：IAM、System、MDM、WMS、EAM 数据所有权边界（Accepted）](adr/ADR-025-IAM-System-MDM-WMS-EAM数据所有权边界.md)
 - [ADR-026：MOM 业务表禁止物理外键与关联完整性策略（Accepted）](adr/ADR-026-MOM业务表禁止物理外键与关联完整性策略.md)
+- [ADR-027：服务端包结构与基础设施适配器分层（Accepted）](adr/ADR-027-服务端包结构与基础设施适配器分层.md)
 
 ## 垂直切片
 

@@ -152,6 +152,25 @@ Service 或 Controller CRUD 前，AI 必须先输出并确认：
 MOM 自主业务表、关系表、流水表、快照表和平台表禁止物理外键与物理级联；精确协议例外必须落实到
 具体文件和具体表。规范文件存在不等于验收完成；必须检查最终实现是否实际采用规范要求的技术路径。
 
+### 4.2 Package 与目录前置协议
+
+任何新增或移动 Entity、Mapper、QueryMapper、Row、Projection、Repository Adapter、Client Adapter、
+Messaging Adapter、Cache Adapter 或 Configuration 前，AI 必须先明确：
+
+1. 类型属于 Web、Application、Domain 还是 Infrastructure；
+2. 如果属于 Infrastructure，适配的是哪种外部技术；
+3. 如果属于 Persistence，职责是 Entity、Mapper、Repository 还是 Query；
+4. 为什么不能放入已有标准职责包；
+5. 是否会形成 `persistence.<feature>`；
+6. 是否存在类名冲突；
+7. 是否存在 XML、反射或配置字符串引用；
+8. 是否需要精确例外。
+
+不得因为某个业务能力需要 Entity、Mapper 和 Repository，就在 `infrastructure.persistence` 下为该业务能力
+创建独立 Feature 子包。Domain、Application、Web 按业务能力分包；Infrastructure 按 Adapter 类型分包；
+Persistence 只按 Entity、Mapper、Repository、Query、Converter、TypeHandler 技术职责分包。详细权威规则见
+`docs/engineering/standards/package-directory-architecture-standard.md`。
+
 ## 5. 消息与最终一致性约束
 
 - Spring Cloud Stream 只作为 Binding、消息转换和 Broker 适配层；不得把 Binder 抽象当作本地事务、可靠状态或业务幂等实现；
