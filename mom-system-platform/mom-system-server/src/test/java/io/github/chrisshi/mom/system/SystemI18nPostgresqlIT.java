@@ -15,7 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessException;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -33,10 +32,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Dynamic I18n 的真实 PostgreSQL 17.7、V1～V4、事务、并发、JSONB 与不可变 Release 集成测试。
+ * Dynamic I18n 的真实 PostgreSQL 17.7、V1～V5、事务、并发、JSONB 与不可变 Release 集成测试。
  *
  * <p>测试使用独立容器和 mom_system Schema，覆盖六类 System Entity 的 BaseEntity 列、三张 I18n 表、
- * 同 Schema FK、Draft 与 Published 隔离、两 Locale 原子发布、fallback、No-op、行锁并发、Runtime Kill
+ * 无物理外键完整性、Draft 与 Published 隔离、两 Locale 原子发布、fallback、No-op、行锁并发、Runtime Kill
  * Switch、回滚新版本与历史。Docker 不可用时 Testcontainers 明确跳过，不能描述为专项成功。</p>
  */
 @Testcontainers(disabledWithoutDocker = true)
@@ -82,11 +81,11 @@ class SystemI18nPostgresqlIT {
     }
 
     @Test
-    void v4MustAlignAllSystemEntitiesAndKeepI18nJsonbConstraints() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("4");
+    void v5MustAlignEntitiesRemoveForeignKeysAndKeepI18nJsonbConstraints() {
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("5");
         assertThat(jdbc.queryForObject(
-                "select count(*) from flyway_schema_history where success and version in ('1','2','3','4')",
-                Long.class)).isEqualTo(4L);
+                "select count(*) from flyway_schema_history where success and version in ('1','2','3','4','5')",
+                Long.class)).isEqualTo(5L);
         assertThat(jdbc.queryForList("""
                 SELECT table_name FROM information_schema.tables
                  WHERE table_schema=? AND table_name LIKE 'system_i18n_%'
@@ -135,22 +134,17 @@ class SystemI18nPostgresqlIT {
                   FROM information_schema.table_constraints tc
                   JOIN information_schema.constraint_column_usage ccu
                     ON ccu.constraint_name=tc.constraint_name AND ccu.constraint_schema=tc.constraint_schema
-                 WHERE tc.table_schema=? AND tc.constraint_type='FOREIGN KEY' AND ccu.table_schema<>?
-                """, Long.class, SCHEMA, SCHEMA)).isZero();
+                 WHERE tc.table_schema=? AND tc.constraint_type='FOREIGN KEY'
+                """, Long.class, SCHEMA)).isZero();
     }
 
     @Test
-    void databaseMustEnforceUniqueChecksForeignKeysAndReleaseImmutability() {
+    void databaseMustEnforceUniqueChecksAndReleaseImmutabilityWhileApplicationRejectsMissingResource() {
         var resource = resource("mom-web", "common");
         assertThatThrownBy(() -> resource("mom-web", "common"))
                 .isInstanceOf(SystemI18nException.Conflict.class);
-        assertThatThrownBy(() -> jdbc.update("""
-                INSERT INTO system_i18n_message (
-                    id, resource_id, message_key, locale, message_value, enabled, version,
-                    created_by, created_at, updated_by, updated_at)
-                VALUES ('orphan', 'missing', 'hello', 'zh-CN', 'x', true, 0, 't', now(), 't', now())
-                """))
-                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> service.createMessage("missing", message("hello", "zh-CN", "x", true)))
+                .isInstanceOf(SystemI18nException.NotFound.class);
         service.createMessage(resource.id(), message("hello", "zh-CN", "你好", true));
         service.publish(resource.id(), new PublishCommand(resource.version(), "initial"));
         assertThatThrownBy(() -> jdbc.update("""
@@ -159,6 +153,11 @@ class SystemI18nPostgresqlIT {
         assertThatThrownBy(() -> jdbc.update(
                 "DELETE FROM system_i18n_release WHERE resource_id=?", resource.id()))
                 .isInstanceOf(DataAccessException.class);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM system_i18n_message message
+                  LEFT JOIN system_i18n_resource resource ON resource.id=message.resource_id
+                 WHERE resource.id IS NULL
+                """, Long.class)).isZero();
     }
 
     @Test

@@ -152,10 +152,16 @@ docker exec "$POSTGRES_CONTAINER" \
      WHERE constraint_row.contype = 'f'
        AND source_schema.nspname = '${POSTGRES_SCHEMA}'
        AND target_schema.nspname <> '${POSTGRES_SCHEMA}';
+    SELECT 'business_fk=' || count(*)
+      FROM pg_constraint constraint_row
+      JOIN pg_class source_table ON source_table.oid = constraint_row.conrelid
+      JOIN pg_namespace source_schema ON source_schema.oid = source_table.relnamespace
+     WHERE constraint_row.contype = 'f'
+       AND source_schema.nspname = '${POSTGRES_SCHEMA}';
   " > system-postgresql-schema.txt
 
 grep --fixed-strings --quiet 'schema=1' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'flyway_version=4' system-postgresql-schema.txt
+grep --fixed-strings --quiet 'flyway_version=5' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_parameter=1' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_dictionary_tables=2' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_i18n_tables=3' system-postgresql-schema.txt
@@ -165,6 +171,7 @@ grep --fixed-strings --quiet 'system_i18n_jsonb=1' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_i18n_release_pk=1' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_i18n_release_business_unique=1' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'cross_schema_fk=0' system-postgresql-schema.txt
+grep --fixed-strings --quiet 'business_fk=0' system-postgresql-schema.txt
 
 application_connection_count=$(docker exec "$POSTGRES_CONTAINER" \
   psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -tAc \

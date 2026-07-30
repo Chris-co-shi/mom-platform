@@ -31,10 +31,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * System Dictionary 的真实 PostgreSQL 17.7、Flyway V1→V4、MyBatis-Plus、审计与乐观锁集成测试。
+ * System Dictionary 的真实 PostgreSQL 17.7、Flyway V1→V5、MyBatis-Plus、审计与乐观锁集成测试。
  *
  * <p>测试使用动态端口和独立 mom_system Schema，每例清理字典数据，不依赖本机数据库。它验证同 Schema
- * Restrict FK、数据库 Check/Unique、BaseEntity 逻辑删除列、Active/Compatibility、分页和 Parameter V1
+ * 无物理外键完整性、数据库 Check/Unique、BaseEntity 逻辑删除列、Active/Compatibility、分页和 Parameter V1
  * 兼容；Docker 不可用时 Testcontainers 明确跳过，不能描述为专项成功。</p>
  */
 @Testcontainers(disabledWithoutDocker = true)
@@ -91,11 +91,11 @@ class SystemDictionaryPostgresqlIT {
     }
 
     @Test
-    void freshDatabaseMustApplyV1ThroughV4AndPreserveParameterTable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("4");
+    void freshDatabaseMustApplyV1ThroughV5AndPreserveParameterTable() {
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("5");
         assertThat(jdbcTemplate.queryForObject(
-                "select count(*) from flyway_schema_history where success and version in ('1','2','3','4')",
-                Long.class)).isEqualTo(4L);
+                "select count(*) from flyway_schema_history where success and version in ('1','2','3','4','5')",
+                Long.class)).isEqualTo(5L);
         assertThat(jdbcTemplate.queryForList("""
                 select table_name from information_schema.tables
                  where table_schema=? and table_name in (
@@ -116,7 +116,7 @@ class SystemDictionaryPostgresqlIT {
     }
 
     @Test
-    void existingV1SchemaMustUpgradeThroughV4WithoutChangingParameterData() {
+    void existingV1SchemaMustUpgradeThroughV5WithoutChangingParameterData() {
         Flyway v1 = Flyway.configure().dataSource(dataSource).createSchemas(true)
                 .schemas(UPGRADE_SCHEMA).defaultSchema(UPGRADE_SCHEMA)
                 .locations("classpath:db/migration/system").target("1").load();
@@ -136,7 +136,7 @@ class SystemDictionaryPostgresqlIT {
                 .schemas(UPGRADE_SCHEMA).defaultSchema(UPGRADE_SCHEMA)
                 .locations("classpath:db/migration/system").load();
         latest.migrate();
-        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("4");
+        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("5");
         assertThat(jdbcTemplate.queryForObject(
                 "select count(*) from information_schema.tables where table_schema=? and table_name='system_dictionary'",
                 Long.class, UPGRADE_SCHEMA)).isEqualTo(1L);
@@ -149,14 +149,14 @@ class SystemDictionaryPostgresqlIT {
     }
 
     @Test
-    void databaseMustEnforceCodeUniqueSortAndRestrictForeignKeyConstraints() {
+    void databaseMustEnforceCodeUniqueAndSortWhileApplicationRejectsMissingParent() {
         insertDictionary("dictionary-one", "system.common.state");
         assertThatThrownBy(() -> insertDictionary("dictionary-two", "system.common.state"))
                 .isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> insertDictionary("dictionary-bad", "single"))
                 .isInstanceOf(DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> insertItem("item-orphan", "missing", "ready", 0))
-                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> service.createItem("missing", item("ready", "Ready", 0, true)))
+                .isInstanceOf(SystemDictionaryException.NotFound.class);
 
         insertItem("item-one", "dictionary-one", "ready", 10);
         assertThatThrownBy(() -> insertItem("item-two", "dictionary-one", "ready", 20))
@@ -164,8 +164,6 @@ class SystemDictionaryPostgresqlIT {
         assertThatThrownBy(() -> insertItem("item-bad", "dictionary-one", "1ready", 20))
                 .isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> insertItem("item-sort", "dictionary-one", "later", 1_000_001))
-                .isInstanceOf(DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> jdbcTemplate.update("delete from system_dictionary where id='dictionary-one'"))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -209,24 +207,22 @@ class SystemDictionaryPostgresqlIT {
     }
 
     @Test
-    void itemForeignKeyMustStayInsideSystemSchemaWithoutCascadeDelete() {
-        Long crossSchemaForeignKeys = jdbcTemplate.queryForObject("""
-                SELECT count(*)
-                  FROM information_schema.table_constraints tc
-                  JOIN information_schema.constraint_column_usage ccu
-                    ON ccu.constraint_name = tc.constraint_name
-                   AND ccu.constraint_schema = tc.constraint_schema
-                 WHERE tc.table_schema = ?
-                   AND tc.constraint_type = 'FOREIGN KEY'
-                   AND ccu.table_schema <> ?
-                """, Long.class, SCHEMA, SCHEMA);
-        assertThat(crossSchemaForeignKeys).isZero();
+    void businessForeignKeysMustBeAbsentAndAssociationIndexMustRemain() {
         assertThat(jdbcTemplate.queryForObject("""
-                SELECT delete_rule
-                  FROM information_schema.referential_constraints
-                 WHERE constraint_schema=?
-                   AND constraint_name='fk_system_dictionary_item_dictionary'
-                """, String.class, SCHEMA)).isEqualTo("RESTRICT");
+                SELECT count(*) FROM information_schema.table_constraints
+                 WHERE table_schema=? AND constraint_type='FOREIGN KEY'
+                   AND table_name IN ('system_dictionary_item','system_i18n_message','system_i18n_release')
+                """, Long.class, SCHEMA)).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT count(*) FROM pg_indexes
+                 WHERE schemaname=? AND tablename='system_dictionary_item'
+                   AND indexname='ix_system_dictionary_item_active'
+                """, Long.class, SCHEMA)).isEqualTo(1L);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT count(*) FROM system_dictionary_item item
+                  LEFT JOIN system_dictionary dictionary ON dictionary.id=item.dictionary_id
+                 WHERE dictionary.id IS NULL
+                """, Long.class)).isZero();
     }
 
     private void insertDictionary(String id, String code) {

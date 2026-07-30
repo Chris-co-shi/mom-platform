@@ -43,7 +43,7 @@ infrastructure → domain/application ports
 - Active List 只返回字典和 Item 均启用的记录，固定按 `sortOrder`、`itemCode`、ID 排序。
 - 兼容单项读取即使禁用也返回，并显式提供 `dictionaryEnabled`、`itemEnabled` 与 `effectiveEnabled`。
 - 禁用字典不级联写 Item；重新启用后恢复原 Item 状态。字典与 Item 都不提供物理/逻辑删除 API。
-- `mom_system.system_dictionary_item` 仅通过同 Schema Restrict FK 关联字典；V2 不插入样例或业务状态。
+- `mom_system.system_dictionary_item` 通过 Application 引用校验、同事务写入、唯一约束与关联索引维护完整性；V5 已移除历史 Restrict FK，V2 不插入样例或业务状态。
 - 字典禁止表达 IAM/MDM/WMS/EAM 权威对象、业务状态机、Tree、Metadata、Alias、多语言资源或任意扩展属性。
 - `system:dictionary:read/write` 只作为 IAM Permission Reference；Redis 不用于字典缓存，PostgreSQL 是唯一权威。
 
