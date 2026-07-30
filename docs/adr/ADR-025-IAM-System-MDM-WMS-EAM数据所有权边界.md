@@ -314,3 +314,11 @@ mom-system-platform
 本 ADR 已 Accepted，但本次仍是纯文档决策收口，没有生产回滚、数据库迁移或 Token 失效。S11-A 两个已推送文档 Commit 与 S11-B 新文档收口 Commit 均保留，不改写历史。
 
 若未来边界变化，创建新的 ADR 并将 ADR-025 标记为 Superseded，不静默改写本决策；对应实现和数据迁移必须使用独立扩展—迁移—收缩方案。
+
+## 27. S15-B 后续批准记录
+
+Chris 于 2026-07-30 明确批准建设 Dynamic I18n 后端能力。该批准不改写 S15-A 在审计时点“没有已经接入生产的远程动态国际化调用链”的历史事实，而是以明确产品决策满足 ADR-025 的独立实施授权。
+
+S15-B 的目标消费者为 `mom-web`、`mom-mobile` 和未来 System 管理端；当前客户端尚未接入。本 Slice 仅建设 System 自有的后端存储、草稿、显式发布、不可变发布快照、认证运行时读取、ETag/304 与创建新单调版本的回滚能力。它不修改客户端、不进入 S16 Preference 或 S17 Catalog/Menu，不保存 IAM Permission/Role，也不引入缓存、消息、Seata 或跨 Schema 访问。
+
+实施期间状态为：S15-A `Completed`、S15-B `In Progress`、S15 `In Progress`、S16 `Not Started`。只有 S15-B 全部实现与门禁通过后，才可将 S15-B 和 S15 标记为 `Completed`。
