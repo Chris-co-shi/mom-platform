@@ -17,10 +17,10 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * System Platform S12 的 POM 语义与空骨架门禁。
+ * System Platform S13 的 POM 语义与类型化参数能力白名单门禁。
  *
  * <p>测试通过 XML DOM 读取实际 POM，不使用字符串 grep 推断依赖。它同时检查 Reactor 注册、聚合模块、
- * API/Client/Server 直接依赖白名单和 S12 禁止资源。测试只读工作区，无网络、数据库或中间件副作用；
+ * API/Client/Server 直接依赖白名单和 S14+ 禁止资源。测试只读工作区，无网络、数据库或中间件副作用；
  * XML 不可解析、目录缺失或白名单外依赖均直接失败。</p>
  */
 class SystemPlatformPomArchitectureTest {
@@ -32,13 +32,20 @@ class SystemPlatformPomArchitectureTest {
     private static final Set<String> SERVER_DEPENDENCIES = Set.of(
             MOM_GROUP + ":mom-system-api",
             MOM_GROUP + ":mom-webmvc",
+            MOM_GROUP + ":mom-security",
+            MOM_GROUP + ":mom-data",
             MOM_GROUP + ":mom-tracing",
             MOM_GROUP + ":mom-metrics",
             "com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery",
+            "org.projectlombok:lombok",
+            "org.springframework.security:spring-security-test",
             MOM_GROUP + ":mom-test");
     private static final Pattern FORBIDDEN_JAVA_TYPE = Pattern.compile(
-            ".*(Parameter|Dictionary|Preference|Catalog|Menu|Navigation|Permission|Role|Session|"
-                    + "Refresh|Credential|Secret|Entity|Mapper|Repository|Controller).*\\.java");
+            ".*(Dictionary|Preference|Catalog|Menu|Navigation|DynamicI18n|AuditProjection|Permission|Role|"
+                    + "Session|Refresh|Credential|FactoryScope|PartyBinding).*\\.java");
+    private static final Set<String> API_TYPES = Set.of(
+            "package-info.java", "ParameterScopeType.java", "ParameterValueType.java",
+            "ResolvedSystemParameter.java");
 
     /**
      * 验证根 Reactor 精确注册一次 System 聚合模块。
@@ -71,39 +78,45 @@ class SystemPlatformPomArchitectureTest {
     }
 
     /**
-     * 验证 API 为空契约骨架，Client 仅依赖自身 API 与统一调用基础设施。
+     * 验证 API 只暴露 S13 稳定只读契约，Client 仍仅依赖自身 API 与统一调用基础设施。
      *
      * @throws Exception POM 或文件读取失败
      */
     @Test
-    void apiAndClientMustRemainEmptyAndTransportBounded() throws Exception {
+    void apiAndClientMustExposeOnlyApprovedContractsAndRemainTransportBounded() throws Exception {
         Element api = parse(systemRoot().resolve("mom-system-api/pom.xml")).getDocumentElement();
         Element client = parse(systemRoot().resolve("mom-system-client/pom.xml")).getDocumentElement();
 
         assertThat(dependencies(api)).isEmpty();
         assertThat(coordinates(dependencies(client))).containsExactlyInAnyOrderElementsOf(CLIENT_DEPENDENCIES);
         assertThat(javaFiles(systemRoot().resolve("mom-system-api/src/main/java")))
-                .allMatch(path -> path.getFileName().toString().equals("package-info.java"));
+                .extracting(path -> path.getFileName().toString())
+                .containsExactlyInAnyOrderElementsOf(API_TYPES);
         assertThat(javaFiles(systemRoot().resolve("mom-system-client/src/main/java")))
                 .allMatch(path -> path.getFileName().toString().equals("package-info.java"));
     }
 
     /**
-     * 验证 Server 仅使用 S12 最小运行依赖，并要求测试依赖保持 test scope。
+     * 验证 Server 仅使用 S13 参数、安全和数据实际依赖，并要求测试依赖保持 test scope。
      *
      * @throws Exception POM 读取或解析失败
      */
     @Test
-    void serverMustUseOnlyApprovedSkeletonDependencies() throws Exception {
+    void serverMustUseOnlyApprovedParameterDependencies() throws Exception {
         Element server = parse(systemRoot().resolve("mom-system-server/pom.xml")).getDocumentElement();
         List<Dependency> dependencies = dependencies(server);
 
         assertThat(coordinates(dependencies)).containsExactlyInAnyOrderElementsOf(SERVER_DEPENDENCIES);
         assertThat(dependencies)
-                .filteredOn(dependency -> "mom-test".equals(dependency.artifactId()))
+                .filteredOn(dependency -> Set.of("mom-test", "spring-security-test")
+                        .contains(dependency.artifactId()))
+                .hasSize(2)
+                .allSatisfy(dependency -> assertThat(dependency.scope()).isEqualTo("test"));
+        assertThat(dependencies)
+                .filteredOn(dependency -> "lombok".equals(dependency.artifactId()))
                 .singleElement()
                 .extracting(Dependency::scope)
-                .isEqualTo("test");
+                .isEqualTo("provided");
         assertThat(validateServerDependencies(dependencies)).isEmpty();
     }
 
@@ -123,13 +136,25 @@ class SystemPlatformPomArchitectureTest {
                 .containsExactly("System Server 禁止依赖 io.github.chrisshi.mom:mom-iam-server");
     }
 
+    /** 未经批准的其他业务 API 依赖也必须被同一精确白名单拒绝。 */
+    @Test
+    void unapprovedBusinessDependencyFixtureMustBeRejected() throws Exception {
+        Path fixture = reactorRoot().resolve(
+                "mom-architecture-tests/src/test/resources/fixtures/invalid-system-business-dependency.xml");
+        List<String> violations = validateServerDependencies(
+                dependencies(parse(fixture).getDocumentElement()));
+
+        assertThat(violations)
+                .containsExactly("System Server 禁止依赖 io.github.chrisshi.mom:mom-mdm-api");
+    }
+
     /**
-     * 验证分层包均已登记，且 S12 没有业务类型、Schema、Flyway 或 SQL。
+     * 验证 S13 只增加参数能力及其单一 Migration/Mapper，继续禁止后续 System 业务。
      *
      * @throws Exception 文件遍历失败
      */
     @Test
-    void skeletonMustContainLayersButNoBusinessOrPersistenceResources() throws Exception {
+    void s13MustContainOnlyParameterCapabilityAndApprovedPersistenceResources() throws Exception {
         Path server = systemRoot().resolve("mom-system-server");
         Path packageRoot = server.resolve("src/main/java/io/github/chrisshi/mom/system");
 
@@ -142,9 +167,17 @@ class SystemPlatformPomArchitectureTest {
             List<Path> files = paths.filter(Files::isRegularFile).toList();
             assertThat(files)
                     .noneMatch(path -> FORBIDDEN_JAVA_TYPE.matcher(path.getFileName().toString()).matches())
-                    .noneMatch(path -> path.getFileName().toString().endsWith(".sql"))
-                    .noneMatch(path -> normalized(path).contains("/db/migration/"))
-                    .noneMatch(path -> normalized(path).contains("/mapper/"));
+                    .filteredOn(path -> normalized(path).contains("/src/"))
+                    .filteredOn(path -> path.getFileName().toString().endsWith(".sql"))
+                    .extracting(SystemPlatformPomArchitectureTest::normalized)
+                    .containsExactly(normalized(server.resolve(
+                            "src/main/resources/db/migration/system/V1__create_system_parameter.sql")));
+            assertThat(files)
+                    .filteredOn(path -> normalized(path).contains("/src/"))
+                    .filteredOn(path -> normalized(path).contains("/src/main/resources/mapper/"))
+                    .extracting(SystemPlatformPomArchitectureTest::normalized)
+                    .containsExactly(normalized(server.resolve(
+                            "src/main/resources/mapper/system/SystemParameterMapper.xml")));
         }
     }
 

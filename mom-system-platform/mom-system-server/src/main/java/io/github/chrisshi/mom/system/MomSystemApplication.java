@@ -4,11 +4,11 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
- * MOM System Platform 的最小运行时入口。
+ * MOM System Platform 的运行时入口。
  *
- * <p>S12 仅建立独立可部署宿主和分层边界，不包含任何参数、字典、偏好、应用目录或菜单能力。该入口不
- * 启用数据源、Redis、消息、Seata、Feign Client 或定时任务；外部发现服务默认关闭，因此空骨架启动
- * 不依赖外部基础设施。后续能力必须由独立 Slice 增加，并继续遵守 ADR-025 的数据所有权边界。</p>
+ * <p>S13 在 S12 宿主上启用独立 mom_system PostgreSQL、类型化非敏感参数与统一 JWT Resource Server。
+ * Redis 仅由既有安全组件检查 revoked sid，不参与参数存储或缓存；未启用消息、Seata、Feign Client 或
+ * 定时任务。数据库、JWT 或安全撤销基础设施不可用时对应请求 Fail Closed，不返回伪造默认参数。</p>
  */
 @SpringBootApplication
 public class MomSystemApplication {
@@ -16,7 +16,7 @@ public class MomSystemApplication {
     /**
      * 启动 System Platform。
      *
-     * @param args 命令行配置参数；当前方法不修改参数且无额外副作用
+     * @param args 命令行配置参数；方法只委托 Spring Boot 启动，不修改参数
      */
     public static void main(String[] args) {
         SpringApplication.run(MomSystemApplication.class, args);

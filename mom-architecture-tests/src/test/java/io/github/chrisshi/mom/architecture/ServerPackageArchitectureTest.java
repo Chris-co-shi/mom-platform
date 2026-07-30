@@ -5,6 +5,8 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
@@ -89,6 +91,46 @@ class ServerPackageArchitectureTest {
                 .because("System Application 不得依赖入站 Adapter 或基础设施实现")
                 .allowEmptyShould(true)
                 .check(productionClasses);
+    }
+
+    /** System Parameter Domain Port 与规则不得出现 Spring 或 MyBatis 技术依赖。 */
+    @Test
+    void systemParameterDomainMustRemainSpringAndMybatisIndependent() {
+        noClasses()
+                .that().resideInAnyPackage("io.github.chrisshi.mom.system.domain.parameter..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "org.springframework..", "com.baomidou.mybatisplus..", "org.apache.ibatis..")
+                .because("Parameter Domain 聚合、规则和 Repository Port 必须保持技术无关")
+                .check(productionClasses);
+    }
+
+    /** Parameter Controller 只能通过 Application 用例进入业务，不得直接接触 Domain 或持久化。 */
+    @Test
+    void systemParameterControllerMustOnlyEnterThroughApplication() {
+        noClasses()
+                .that().resideInAnyPackage("io.github.chrisshi.mom.system.web.parameter..")
+                .and().haveSimpleNameEndingWith("Controller")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "io.github.chrisshi.mom.system.domain..",
+                        "io.github.chrisshi.mom.system.infrastructure..")
+                .because("Parameter Controller 只负责 HTTP、安全注解与 Application DTO 映射")
+                .check(productionClasses);
+    }
+
+    /** System 不得提前定义 IAM 对象或后续 Slice 的业务类型。 */
+    @Test
+    void systemMustNotDefineIamOrFutureSystemObjects() {
+        Set<String> forbidden = Set.of(
+                "Permission", "Role", "Session", "Refresh", "Credential", "Dictionary", "Preference",
+                "Catalog", "Menu", "Navigation", "FactoryScope", "PartyBinding");
+        var violations = productionClasses.stream()
+                .filter(javaClass -> javaClass.getPackageName().startsWith("io.github.chrisshi.mom.system"))
+                .filter(javaClass -> forbidden.stream().anyMatch(javaClass.getSimpleName()::contains))
+                .map(javaClass -> javaClass.getName())
+                .toList();
+        org.assertj.core.api.Assertions.assertThat(violations)
+                .as("System 不得定义 IAM 权威对象或 S14+ 类型")
+                .isEmpty();
     }
 
     /** System 不得引用 IAM 的内部 Application、Web、Repository、Mapper 或 Infrastructure。 */

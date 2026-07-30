@@ -1,14 +1,14 @@
 # MOM System Platform
 
-`mom-system-platform` 在 P1.6 S12 中只提供 System Platform 技术骨架与依赖门禁。技术骨架与依赖门禁已完成，业务能力尚未开始。
+`mom-system-platform` 已完成 S12 技术骨架与 P1.6 S13 GLOBAL/APPLICATION 类型化非敏感参数。S14 字典及后续偏好、目录、菜单能力仍为 Not Started。
 
 ## 模块职责
 
-| 模块 | 当前职责 | S12 内容 |
-|---|---|---|
-| `mom-system-api` | 未来跨模块稳定契约 | 只有 `package-info.java`，无 DTO、枚举或 Spring Bean |
-| `mom-system-client` | 未来同步调用 Adapter | 只有包边界；依赖自身 API 与 `mom-openfeign`，无 Feign 接口 |
-| `mom-system-server` | System 独立运行时宿主 | 最小启动类、环境中立配置、分层包和轻量启动测试 |
+| 模块 | S13 职责 |
+|---|---|
+| `mom-system-api` | `ParameterScopeType`、`ParameterValueType` 与 `ResolvedSystemParameter` 稳定只读契约 |
+| `mom-system-client` | 仅保留调用边界；当前无真实调用方，不提前创建 Feign Client |
+| `mom-system-server` | 参数领域规则、事务用例、`mom_system` 持久化、管理/解析 API 与 JWT 安全 |
 
 依赖方向固定为：
 
@@ -19,41 +19,36 @@ web → application → domain
 infrastructure → domain/application ports
 ```
 
-## Server 允许依赖
+## 参数能力
 
-- `mom-system-api`：System 自身契约边界；
-- `mom-webmvc`：统一 Servlet/Spring Boot 运行宿主；
-- `mom-tracing`、`mom-metrics`：现有服务公共可观测性基线；
-- Nacos Discovery Starter：统一服务发现能力，默认关闭且空骨架不依赖 Nacos 可用；
-- `mom-test`：只在 test scope 提供测试与 ArchUnit 能力。
+- Scope 仅允许 `GLOBAL`、`APPLICATION`；GLOBAL 使用空 `scopeCode`，APPLICATION 使用小写 kebab-case `applicationCode`。
+- Value Type 仅允许 `STRING`、`INTEGER`、`DECIMAL`、`BOOLEAN`、`JSON`；跨服务继续返回类型与规范字符串。
+- 同一 Key 的 GLOBAL 与 APPLICATION 必须保持相同 Value Type；同 Key 写事务由 PostgreSQL 事务级锁串行化。
+- enabled APPLICATION 优先；禁用或不存在时回退 enabled GLOBAL；均不存在返回 404。
+- 创建、更新与启停使用本地事务；更新与启停都必须携带 Version，冲突返回 409。
+- 不提供 DELETE；不实现历史版本表。
 
-`mom-security` 在 S12 未引入：当前 Framework 安全模块会传递引入 Redis，而空骨架没有业务端点，S12 又明确禁止 Redis。真实业务 API 出现后必须在对应 Slice 同时设计安全与 Redis 失败边界，不能在空骨架中预埋。
+## 安全与数据边界
 
-## 禁止依赖与 ADR-025 边界
+- `mom_system.system_parameter` 是参数唯一写入权威，不访问 IAM/MDM 或其他 Schema，不建立跨 Schema FK/JOIN。
+- `system:parameter:read` 保护管理查询与有效值解析；`system:parameter:write` 保护创建、更新和启停。这些 Code 仅引用 IAM Permission，不在 System 保存定义或分配。
+- Key 按 Segment 拒绝 password、secret、token、credential、private-key、client-secret、access-key、api-key 等明显敏感语义；System Parameter 不允许保存 Secret 或 Credential。
+- `mom-security` 传递的 Redis 仅用于现有 revoked sid 检查；Parameter Domain 不依赖 Redis，PostgreSQL 仍是唯一参数权威，S13 不实现参数缓存。
+- 不依赖 `mom-iam-server` 或其他领域 Server，不引入 MQ、Outbox、Inbox 或 Seata。
 
-- 不依赖 `mom-iam-server` 或任何其他领域 `*-server`；
-- 不访问 IAM Application、Web、Repository、Mapper、Entity、Infrastructure 或 `mom_iam` Schema；
-- 不保存或定义 Role、Permission、Factory Scope、Party Binding、Credential、Session、Refresh Token、revoked sid、OAuth Client Secret 或其他 Secret；
-- 不引入 Data、MyBatis、JPA、JDBC、数据库驱动、Flyway、Redis、MQ、Outbox、Inbox、Seata；
-- 不创建跨 Schema FK/JOIN，也不共享数据库读写；
-- API 不暴露 Entity、Mapper、Repository、Controller 或自动配置实现；
-- Client 不包含业务 Feign 接口，也不伪造本地成功。
+## 精确门禁
 
-以上规则由 `mom-architecture-tests` 的 XML 语义测试和 ArchUnit 规则自动验证，并包含 `mom-iam-server` 违规依赖负例 Fixture。
+POM XML 白名单只允许 System API、WebMVC、Security、Data、Tracing、Metrics、Nacos、Lombok 与测试基础设施；`mom-iam-server` 和 `mom-mdm-api` 负例必须失败。ArchUnit 验证 Domain 无 Spring/MyBatis、Application 无 Mapper/Entity、Web 无 Domain/Infrastructure、持久化类型只在 Infrastructure，并继续禁止 Dictionary、Preference、Catalog、Menu、Navigation 及 IAM 对象。
 
 ## 当前未实现
 
-S12 没有参数、字典、用户偏好、视图设置、Application Catalog、Menu、Navigation、Dynamic I18n、Audit Projection 或业务 API；没有 Entity、Mapper、Repository、Schema、SQL 或 Flyway。
-
-后续职责仍按独立 Slice 执行：
-
-- S13：GLOBAL/APPLICATION 类型化参数；
-- S14：非权威通用字典；
-- S15：仅在存在真实调用方时实现动态国际化；
-- S16：用户偏好与视图设置；
-- S17：应用目录、菜单、导航与 IAM Permission Code 引用。
-
-S12 完成不授权进入上述 Slice。
+- Dictionary、Dictionary Item；
+- User Preference、Locale/Timezone/Theme 与视图设置；
+- Application Catalog、Menu、Navigation；
+- Dynamic I18n、Audit Projection；
+- Secret 管理、配置中心替代、跨服务推送；
+- Redis 参数缓存、MQ 参数广播；
+- IAM 数据迁移或 Permission 存储。
 
 ## 本地验证
 
@@ -61,14 +56,14 @@ S12 完成不授权进入上述 Slice。
 
 ```bash
 bash scripts/codex-mvn-test.sh \
-  -pl mom-system-platform/mom-system-server,mom-architecture-tests \
-  -am test
-
-bash scripts/codex-mvn-test.sh \
-  -pl mom-system-platform \
+  -pl mom-system-platform/mom-system-server \
   -am clean verify
 
-BASE_REF=8b079eafaac52848bfaae68305d3bd4818b612fb \
+bash scripts/codex-mvn-test.sh \
+  -pl mom-architecture-tests \
+  -am test
+
+BASE_REF=c8ffa6a68d93f3471bc2d85bdab4aa80950dbd0a \
   bash scripts/codex-verify-changed.sh
 
 bash scripts/codex-mvn-test.sh clean verify
@@ -76,4 +71,4 @@ bash scripts/codex-mvn-test.sh clean verify
 
 ## 回滚
 
-S12 没有数据或运行时迁移。需要整体撤销时，在独立 Review 后对集中提交执行普通 `git revert`，同时回退根 Reactor 注册、三模块、架构门禁和阶段文档；不得 reset、rebase 或 force-push 改写长期分支历史。
+需要整体撤销时，在独立 Review 后对 S13 本地集中提交执行普通 `git revert`，同时回退参数代码、`mom_system` V1 Migration、门禁与阶段文档；已执行的数据库回滚必须另行评估数据保留，禁止修改历史 Migration 或使用 reset/rebase 改写阶段历史。

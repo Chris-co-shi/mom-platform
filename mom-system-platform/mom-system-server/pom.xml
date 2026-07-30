@@ -25,6 +25,16 @@
     </dependency>
     <dependency>
       <groupId>io.github.chrisshi.mom</groupId>
+      <artifactId>mom-security</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.chrisshi.mom</groupId>
+      <artifactId>mom-data</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.chrisshi.mom</groupId>
       <artifactId>mom-tracing</artifactId>
       <version>${project.version}</version>
     </dependency>
@@ -36,6 +46,16 @@
     <dependency>
       <groupId>com.alibaba.cloud</groupId>
       <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-test</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.github.chrisshi.mom</groupId>
