@@ -109,6 +109,7 @@ java -jar mom-mdm-platform/mom-mdm-server/target/mom-mdm-server-0.1.0-SNAPSHOT-e
   --server.port=$MDM_MIGRATION_PORT \
   --spring.application.name=mom-mdm-server \
   --spring.cloud.nacos.discovery.enabled=false \
+  --management.health.redis.enabled=false \
   --seata.enabled=false \
   --spring.autoconfigure.exclude="$SECURITY_EXCLUSIONS" \
   > p01-s06-mdm-migration.log 2>&1 &
@@ -184,6 +185,7 @@ java -jar mom-mdm-platform/mom-mdm-server/target/mom-mdm-server-0.1.0-SNAPSHOT-e
   --server.port=$MDM_PORT \
   --spring.application.name=mom-mdm-server \
   --spring.cloud.nacos.discovery.enabled=false \
+  --management.health.redis.enabled=false \
   --seata.enabled=true \
   --spring.cloud.openfeign.client.config.integrationSeataAtParticipantClient.url=http://127.0.0.1:$INTEGRATION_PORT \
   --spring.cloud.openfeign.client.config.mom-integration-server.url=http://127.0.0.1:$INTEGRATION_PORT \
