@@ -5,7 +5,7 @@
 本规范冻结 MOM 新增和实质修改数据访问代码的工程边界。当前事实基线是 PostgreSQL 17、Flyway
 12.4.0、MyBatis-Plus 3.5.17、Spring Framework 7 / Spring Boot 4.1 与 Spring Authorization Server
 7.1.0；其行为以对应官方资料为事实来源，本文中的命名、失败策略和分层是 MOM 项目决策。
-历史实现差异见 [S02 历史例外清单](../P1.6-S02-持久化历史例外清单.md)，不得据此批量重构。
+历史实现差异见 [S02 历史例外清单](../P1.6-S02-持久化历史例外清单.md)，不得据此批量重构或复制例外。
 
 权威决策优先级为 ADR-020、ADR-004、ADR-014 及本文；消息与事务决策由 ADR-005、ADR-009、
 ADR-015、ADR-016 和事务一致性规范补充。
@@ -89,6 +89,19 @@ MOM 的 `MomBaseMapper` 因此拒绝该形式，自定义 SQL 必须显式处理
 - 禁止把 MyBatis-Plus `IService`/`ServiceImpl` 当作 MOM 领域服务或 Repository 契约。
 - 查询投影可使用专用 Row/View，但不能伪装成领域聚合或公开 HTTP DTO。
 
+### 5.1 数据访问技术栈选择
+
+1. MOM 正式业务表默认且强制使用 MyBatis/MyBatis-Plus Mapper 体系。简单写入优先使用
+   `MomBaseMapper` Entity 路径；复杂查询、行锁、JSONB、聚合和受控批量使用 MyBatis 注解 SQL 或 Mapper XML。
+2. 除精确登记的协议存储、Framework 基础设施与默认关闭的技术验证设施外，正式 bounded context
+   生产代码禁止直接依赖 `JdbcTemplate`、`JdbcClient`、`NamedParameterJdbcTemplate`、`SimpleJdbcInsert`
+   或 `java.sql` API，不得通过改类名、封装 Helper 或自行实现 RowMapper 建立第二套持久化体系。
+3. Spring Authorization Server 官方 JDBC Store 是协议特例；Outbox/Inbox 等 Framework 基础设施按其独立
+   规范治理。技术探针只能使用精确类名例外，必须记录责任范围、默认关闭条件和退出 Slice。
+4. 新增直接 JDBC 例外必须先有 Accepted ADR、精确类名、技术必要性、事务/审计/失败语义、测试证据和
+   删除条件。不得以“SQL 复杂”“性能更高”“实现方便”或“位于 Infrastructure”为理由直接获得例外。
+5. 例外不得使用包级、模块级或通配符白名单；历史例外只冻结事实，不授予新代码复制权限。
+
 ## 6. MyBatis 与自定义 SQL
 
 1. SQL 必须参数化；禁止将用户输入放入 `${}`。固定内部表达式只有经逐语句审查并进入精确白名单才允许。
@@ -98,9 +111,12 @@ MOM 的 `MomBaseMapper` 因此拒绝该形式，自定义 SQL 必须显式处理
 5. 自定义 SQL 显式维护审计和版本；Update/Delete 必须有可证明的限定条件并检查 affected rows。
 6. SQL 日志、异常和候选报告不得输出密码、Token、Secret、完整 SQL 参数或原始约束文本。
 7. 复杂 XML SQL 使用中文说明解释非显然的一致性、锁和并发语义。
+8. Mapper XML、MyBatis Java 注解 SQL 和精确 JDBC 例外都必须进入静态检查；不得利用 Java Text Block
+   绕过 `${}`、`SELECT *`、跨 Schema 或无条件写入审查。
 
-静态门禁解析 XML 元素并可识别 `${}`、跨 Schema 引用及显然无条件写入；它不宣称证明运行时 SQL
-完整语义。Java 注解 SQL、Wrapper 条件完整性、索引选择和 N+1 仍需 Review 与测试。
+静态门禁解析 XML 元素，并扫描正式 Server Java 的技术栈和可证明 SQL 候选；它能识别 `${}`、`SELECT *`、
+跨 Schema 引用及显然无条件写入的一部分，但不宣称证明运行时 SQL 完整语义。Wrapper 条件完整性、索引选择、
+事务竞争和 N+1 仍需 Review 与测试。
 
 ## 7. Flyway
 

@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="io.github.chrisshi.mom.system.infrastructure.persistence.parameter.SystemParameterMapper">
+  <sql id="parameterColumns">
+    id, scope_type, scope_code, parameter_key, value_type, parameter_value,
+    enabled, version, description, created_by, created_at, updated_by, updated_at
+  </sql>
+
   <sql id="pageConditions">
     <where>
       <if test="scopeType != null">AND scope_type = #{scopeType}</if>
@@ -12,7 +17,7 @@
 
   <select id="selectPage"
           resultType="io.github.chrisshi.mom.system.infrastructure.persistence.parameter.SystemParameterEntity">
-    SELECT *
+    SELECT <include refid="parameterColumns"/>
       FROM system_parameter
     <include refid="pageConditions"/>
      ORDER BY parameter_key, scope_type, scope_code, id

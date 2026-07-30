@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nMessageMapper">
+  <sql id="messageColumns">
+    id, resource_id, message_key, locale, message_value, enabled, version, description,
+    created_by, created_at, updated_by, updated_at
+  </sql>
+
+  <sql id="pageConditions">
+    <where>
+      resource_id = #{resourceId}
+      <if test="messageKey != null">AND message_key = #{messageKey}</if>
+      <if test="locale != null">AND locale = #{locale}</if>
+      <if test="enabled != null">AND enabled = #{enabled}</if>
+    </where>
+  </sql>
+
+  <select id="selectByResourceAndId"
+          resultType="io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nMessageEntity">
+    SELECT <include refid="messageColumns"/>
+      FROM system_i18n_message
+     WHERE resource_id = #{resourceId}
+       AND id = #{messageId}
+  </select>
+
+  <select id="selectEnabledByResource"
+          resultType="io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nMessageEntity">
+    SELECT <include refid="messageColumns"/>
+      FROM system_i18n_message
+     WHERE resource_id = #{resourceId}
+       AND enabled = true
+     ORDER BY message_key, locale, id
+  </select>
+
+  <select id="selectPage"
+          resultType="io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nMessageEntity">
+    SELECT <include refid="messageColumns"/>
+      FROM system_i18n_message
+    <include refid="pageConditions"/>
+     ORDER BY message_key, locale, id
+     LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <select id="countPage" resultType="long">
+    SELECT count(*)
+      FROM system_i18n_message
+    <include refid="pageConditions"/>
+  </select>
+</mapper>

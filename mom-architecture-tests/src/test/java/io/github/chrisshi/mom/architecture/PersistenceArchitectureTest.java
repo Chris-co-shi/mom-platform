@@ -17,14 +17,15 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * MOM 持久化类型位置与基础 Entity 能力的渐进式架构门禁。
+ * MOM 持久化类型位置、技术栈选择与基础 Entity 能力的渐进式架构门禁。
  *
- * <p>本测试分析 Reactor 已编译字节码，不解析 Java import。它只自动判断稳定且可证明的事实：业务 Mapper
- * 和 Entity 的包位置、MyBatis-Plus 通用 Service 禁区、实体时间点类型及公共基类字段类型。Repository
- * 语义、索引有效性和 Entity 应选哪个能力基类仍由逐文件 Review 决定。</p>
+ * <p>本测试分析 Reactor 已编译字节码，不解析 Java import。它自动判断稳定且可证明的事实：业务 Mapper
+ * 和 Entity 的包位置、MyBatis-Plus 通用 Service 禁区、正式 bounded context 对 Spring JDBC/java.sql 的
+ * 直接依赖、实体时间点类型及公共基类字段类型。Repository 语义、索引有效性和 Entity 应选哪个能力基类
+ * 仍由逐文件 Review 决定。</p>
  *
- * <p>测试不连接数据库，不改变事务或持久化行为；违反规则时 fail closed，并要求以单类迁移或精确历史
- * 基线处理，禁止扩大为包级排除。</p>
+ * <p>直接 JDBC 只允许四个已经登记的精确历史/协议例外；不得新增包级排除。System Parameter、Dictionary、
+ * Dynamic I18n 及后续正式业务能力必须统一通过 MyBatis/MyBatis-Plus Mapper 体系访问 PostgreSQL。</p>
  */
 class PersistenceArchitectureTest {
 
@@ -63,6 +64,37 @@ class PersistenceArchitectureTest {
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "com.baomidou.mybatisplus.extension.service..")
                 .because("IService/ServiceImpl 泄漏 ORM CRUD，不表达 MOM 用例或持久化语义")
+                .check(productionClasses);
+    }
+
+    /**
+     * 正式 bounded context 默认且强制使用 MyBatis/MyBatis-Plus；精确例外只覆盖 SAS 官方 Store 与既有技术探针。
+     */
+    @Test
+    void boundedContextsMustNotIntroduceDirectJdbcAccess() {
+        noClasses()
+                .that().resideInAnyPackage(
+                        "io.github.chrisshi.mom.iam..",
+                        "io.github.chrisshi.mom.mdm..",
+                        "io.github.chrisshi.mom.integration..",
+                        "io.github.chrisshi.mom.system..",
+                        "io.github.chrisshi.mom.mes..",
+                        "io.github.chrisshi.mom.wms..",
+                        "io.github.chrisshi.mom.qms..",
+                        "io.github.chrisshi.mom.ems..",
+                        "io.github.chrisshi.mom.eam..",
+                        "io.github.chrisshi.mom.traceability..")
+                .and().doNotHaveFullyQualifiedName(
+                        "io.github.chrisshi.mom.iam.security.IamAuthorizationServerProtocolConfiguration")
+                .and().doNotHaveFullyQualifiedName(
+                        "io.github.chrisshi.mom.mdm.application.MdmSeataAtLocalParticipantService")
+                .and().doNotHaveFullyQualifiedName(
+                        "io.github.chrisshi.mom.integration.application.IntegrationSeataAtParticipantService")
+                .and().doNotHaveFullyQualifiedName(
+                        "io.github.chrisshi.mom.integration.messaging.IntegrationDomainEventConsumerConfiguration")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "org.springframework.jdbc..", "java.sql..")
+                .because("正式业务表统一使用 MyBatis/MyBatis-Plus；直接 JDBC 必须先登记精确协议或技术例外")
                 .check(productionClasses);
     }
 

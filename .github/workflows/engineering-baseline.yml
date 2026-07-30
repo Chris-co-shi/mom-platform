@@ -50,6 +50,8 @@ jobs:
           scripts/summarize-maven-failure.py
           .github/scripts/validate_persistence_baseline.py
           .github/scripts/test_validate_persistence_baseline.py
+          .github/scripts/validate_java_persistence_baseline.py
+          .github/scripts/test_validate_java_persistence_baseline.py
           .github/scripts/validate_runtime_security_baseline.py
           .github/scripts/test_validate_runtime_security_baseline.py
           .github/scripts/validate_test_baseline.py
@@ -77,6 +79,7 @@ jobs:
         run: |
           set -o pipefail
           python3 .github/scripts/test_validate_persistence_baseline.py
+          python3 .github/scripts/test_validate_java_persistence_baseline.py
           if [[ -n "${BASE_SHA}" ]]; then
             bash .github/scripts/validate-persistence-baseline.sh --base "${BASE_SHA}" --head HEAD 2>&1 | tee persistence-baseline.log
           else

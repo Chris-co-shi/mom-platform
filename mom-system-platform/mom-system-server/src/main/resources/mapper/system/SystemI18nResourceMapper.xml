@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nResourceMapper">
+  <sql id="resourceColumns">
+    id, application_code, resource_code, resource_name, default_locale, enabled,
+    published_version, published_by, published_at, version, description,
+    created_by, created_at, updated_by, updated_at
+  </sql>
+
+  <sql id="pageConditions">
+    <where>
+      <if test="applicationCode != null">AND application_code = #{applicationCode}</if>
+      <if test="enabled != null">AND enabled = #{enabled}</if>
+    </where>
+  </sql>
+
+  <select id="selectByCodes"
+          resultType="io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nResourceEntity">
+    SELECT <include refid="resourceColumns"/>
+      FROM system_i18n_resource
+     WHERE application_code = #{applicationCode}
+       AND resource_code = #{resourceCode}
+  </select>
+
+  <select id="selectPage"
+          resultType="io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nResourceEntity">
+    SELECT <include refid="resourceColumns"/>
+      FROM system_i18n_resource
+    <include refid="pageConditions"/>
+     ORDER BY application_code, resource_code, id
+     LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <select id="countPage" resultType="long">
+    SELECT count(*)
+      FROM system_i18n_resource
+    <include refid="pageConditions"/>
+  </select>
+</mapper>

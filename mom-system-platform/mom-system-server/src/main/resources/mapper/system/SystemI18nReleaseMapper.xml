@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nReleaseMapper">
+  <select id="selectNextVersion" resultType="long">
+    SELECT coalesce(max(release_version), 0) + 1
+      FROM system_i18n_release
+     WHERE resource_id = #{resourceId}
+  </select>
+
+  <insert id="insertRelease"
+          parameterType="io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nReleaseEntity">
+    INSERT INTO system_i18n_release (
+      resource_id, release_version, locale, messages_json, message_count, fallback_count,
+      checksum, source_release_version, change_note, published_by, published_at
+    ) VALUES (
+      #{resourceId}, #{releaseVersion}, #{locale}, CAST(#{messagesJson} AS jsonb),
+      #{messageCount}, #{fallbackCount}, #{checksum}, #{sourceReleaseVersion},
+      #{changeNote}, #{publishedBy}, #{publishedAt}
+    )
+  </insert>
+
+  <select id="selectRelease"
+          resultType="io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nReleaseEntity">
+    SELECT resource_id, release_version, locale, messages_json::text AS messages_json,
+           message_count, fallback_count, checksum, source_release_version, change_note,
+           published_by, published_at
+      FROM system_i18n_release
+     WHERE resource_id = #{resourceId}
+       AND release_version = #{releaseVersion}
+     ORDER BY locale
+  </select>
+
+  <select id="selectHistory"
+          resultType="io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nReleaseHistoryRow">
+    SELECT release_version,
+           max(source_release_version) AS source_release_version,
+           max(change_note) AS change_note,
+           max(published_by) AS published_by,
+           max(published_at) AS published_at,
+           count(*) AS locale_count
+      FROM system_i18n_release
+     WHERE resource_id = #{resourceId}
+     GROUP BY release_version
+     ORDER BY release_version DESC
+     LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <select id="countHistory" resultType="long">
+    SELECT count(DISTINCT release_version)
+      FROM system_i18n_release
+     WHERE resource_id = #{resourceId}
+  </select>
+</mapper>
