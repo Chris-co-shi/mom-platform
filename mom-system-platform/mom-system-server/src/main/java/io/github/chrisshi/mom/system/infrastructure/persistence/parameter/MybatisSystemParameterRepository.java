@@ -1,5 +1,7 @@
 package io.github.chrisshi.mom.system.infrastructure.persistence.parameter;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.system.api.ParameterScopeType;
 import io.github.chrisshi.mom.system.application.parameter.SystemParameterException;
 import io.github.chrisshi.mom.system.domain.parameter.SystemParameter;
@@ -13,8 +15,8 @@ import java.util.Optional;
 /**
  * 基于 MyBatis-Plus 的 System Parameter Repository Adapter。
  *
- * <p>Adapter 负责领域聚合与行模型转换、参数化分页和数据库异常脱敏。所有操作共享服务唯一 DataSource；
- * 不创建连接池、缓存或跨 Schema 查询。唯一约束冲突转换为稳定 Conflict，其他基础设施错误保持失败。</p>
+ * <p>普通 CRUD、精确读取、列表、计数、固定排序和分页全部使用 MomBaseMapper 与 Lambda Wrapper。
+ * 唯一数据库专用语义是 Mapper 中固定的事务级 advisory lock；System 不维护 Mapper XML。</p>
  */
 @Repository
 public class MybatisSystemParameterRepository implements SystemParameterRepository {
@@ -37,13 +39,22 @@ public class MybatisSystemParameterRepository implements SystemParameterReposito
     @Override
     public Optional<SystemParameter> findByScopeAndKey(
             ParameterScopeType scopeType, String scopeCode, String parameterKey) {
-        return Optional.ofNullable(mapper.selectByScopeAndKey(scopeType, scopeCode, parameterKey))
-                .map(MybatisSystemParameterRepository::toDomain);
+        var query = Wrappers.<SystemParameterEntity>lambdaQuery()
+                .eq(SystemParameterEntity::getScopeType, scopeType)
+                .eq(SystemParameterEntity::getScopeCode, scopeCode)
+                .eq(SystemParameterEntity::getParameterKey, parameterKey);
+        return Optional.ofNullable(mapper.selectOne(query)).map(MybatisSystemParameterRepository::toDomain);
     }
 
     @Override
     public List<SystemParameter> findAllByKey(String parameterKey) {
-        return mapper.selectAllByKey(parameterKey).stream()
+        return mapper.selectList(
+                        Wrappers.<SystemParameterEntity>lambdaQuery()
+                                .eq(SystemParameterEntity::getParameterKey, parameterKey)
+                                .orderByAsc(SystemParameterEntity::getScopeType)
+                                .orderByAsc(SystemParameterEntity::getScopeCode)
+                                .orderByAsc(SystemParameterEntity::getId))
+                .stream()
                 .map(MybatisSystemParameterRepository::toDomain)
                 .toList();
     }
@@ -83,11 +94,30 @@ public class MybatisSystemParameterRepository implements SystemParameterReposito
     @Override
     public ParameterPage findPage(ParameterQuery query) {
         long offset = Math.multiplyExact((long) query.page(), query.size());
-        List<SystemParameter> items = mapper.selectPage(query.scopeType(), query.scopeCode(),
-                        query.parameterKey(), query.enabled(), query.size(), offset)
-                .stream().map(MybatisSystemParameterRepository::toDomain).toList();
-        long total = mapper.countPage(query.scopeType(), query.scopeCode(), query.parameterKey(), query.enabled());
+        long total = mapper.selectCount(parameterFilter(query));
+        List<SystemParameter> items = total == 0 ? List.of() : mapper.selectList(
+                        parameterFilter(query)
+                                .orderByAsc(SystemParameterEntity::getParameterKey)
+                                .orderByAsc(SystemParameterEntity::getScopeType)
+                                .orderByAsc(SystemParameterEntity::getScopeCode)
+                                .orderByAsc(SystemParameterEntity::getId)
+                                .last(limitOffset(query.size(), offset)))
+                .stream()
+                .map(MybatisSystemParameterRepository::toDomain)
+                .toList();
         return new ParameterPage(items, total, query.page(), query.size());
+    }
+
+    private static LambdaQueryWrapper<SystemParameterEntity> parameterFilter(ParameterQuery query) {
+        return Wrappers.<SystemParameterEntity>lambdaQuery()
+                .eq(query.scopeType() != null, SystemParameterEntity::getScopeType, query.scopeType())
+                .eq(query.scopeCode() != null, SystemParameterEntity::getScopeCode, query.scopeCode())
+                .eq(query.parameterKey() != null, SystemParameterEntity::getParameterKey, query.parameterKey())
+                .eq(query.enabled() != null, SystemParameterEntity::getEnabled, query.enabled());
+    }
+
+    private static String limitOffset(int size, long offset) {
+        return "LIMIT " + size + " OFFSET " + offset;
     }
 
     private static SystemParameterEntity toNewEntity(SystemParameter parameter) {

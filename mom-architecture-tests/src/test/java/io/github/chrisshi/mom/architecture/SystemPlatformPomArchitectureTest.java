@@ -20,8 +20,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * System Platform S15-C 的 POM 语义与 Parameter/Dictionary/Dynamic I18n 精确白名单门禁。
  *
  * <p>测试通过 XML DOM 读取实际 POM，不使用字符串 grep 推断依赖。它同时检查 Reactor 注册、聚合模块、
- * API/Client/Server 直接依赖白名单和 S16+ 禁止资源。持久化资源白名单遵循 MyBatis-Plus 优先：
- * 单表 CRUD/过滤/分页不得为形式统一新增 XML，只有 Release JSONB/聚合投影保留专用 XML。</p>
+ * API/Client/Server 直接依赖白名单和 S16+ 禁止资源。System 正式持久化统一使用 MyBatis-Plus，
+ * {@code src/main/resources/mapper} 必须保持为空。</p>
  */
 class SystemPlatformPomArchitectureTest {
 
@@ -131,13 +131,10 @@ class SystemPlatformPomArchitectureTest {
     }
 
     /**
-     * 验证 S15-C 只包含 Parameter、Dictionary、Dynamic I18n 的精确 Migration/Mapper 资源。
-     *
-     * <p>Resource 与 Message 的单表查询必须使用 MyBatis-Plus Wrapper，不允许重新增加同名 XML；
-     * Release XML 仅承载 JSONB CAST、版本聚合与历史投影。</p>
+     * 验证 S15-C 只包含 Parameter、Dictionary、Dynamic I18n 的精确 Migration，且 System Mapper XML 为零。
      */
     @Test
-    void s15CMustPreferMybatisPlusAndKeepOnlyNecessaryMapperXml() throws Exception {
+    void s15CMustUseBaseEntityAndMybatisPlusWithoutMapperXml() throws Exception {
         Path server = systemRoot().resolve("mom-system-server");
         Path packageRoot = server.resolve("src/main/java/io/github/chrisshi/mom/system");
 
@@ -159,20 +156,13 @@ class SystemPlatformPomArchitectureTest {
                             normalized(server.resolve(
                                     "src/main/resources/db/migration/system/V2__create_system_dictionary.sql")),
                             normalized(server.resolve(
-                                    "src/main/resources/db/migration/system/V3__create_system_i18n.sql")));
+                                    "src/main/resources/db/migration/system/V3__create_system_i18n.sql")),
+                            normalized(server.resolve(
+                                    "src/main/resources/db/migration/system/"
+                                            + "V4__align_system_entities_with_base_entity.sql")));
             assertThat(files)
-                    .filteredOn(path -> normalized(path).contains("/src/"))
                     .filteredOn(path -> normalized(path).contains("/src/main/resources/mapper/"))
-                    .extracting(SystemPlatformPomArchitectureTest::normalized)
-                    .containsExactlyInAnyOrder(
-                            normalized(server.resolve(
-                                    "src/main/resources/mapper/system/SystemParameterMapper.xml")),
-                            normalized(server.resolve(
-                                    "src/main/resources/mapper/system/SystemDictionaryMapper.xml")),
-                            normalized(server.resolve(
-                                    "src/main/resources/mapper/system/SystemDictionaryItemMapper.xml")),
-                            normalized(server.resolve(
-                                    "src/main/resources/mapper/system/SystemI18nReleaseMapper.xml")));
+                    .isEmpty();
         }
     }
 

@@ -1,5 +1,7 @@
 package io.github.chrisshi.mom.system.infrastructure.persistence.dictionary;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.system.application.dictionary.SystemDictionaryException;
 import io.github.chrisshi.mom.system.domain.dictionary.SystemDictionary;
 import io.github.chrisshi.mom.system.domain.dictionary.SystemDictionaryRepository;
@@ -12,8 +14,8 @@ import java.util.Optional;
 /**
  * 基于 MyBatis-Plus 的 System Dictionary Repository Adapter。
  *
- * <p>Adapter 转换领域对象与行模型，隐藏 Mapper、分页 SQL 和 affected rows。唯一约束冲突被脱敏为稳定
- * Conflict；其他数据库故障直接传播。所有操作共享 System 唯一 DataSource，不创建缓存或跨 Schema 查询。</p>
+ * <p>普通 CRUD、稳定 Code 查询、计数、固定排序和分页全部由 MomBaseMapper 与 Lambda Wrapper 表达；
+ * 不维护 Mapper XML，也不暴露 Mapper、Entity 或 Wrapper 到 Domain/Web。</p>
  */
 @Repository
 public class MybatisSystemDictionaryRepository implements SystemDictionaryRepository {
@@ -30,8 +32,9 @@ public class MybatisSystemDictionaryRepository implements SystemDictionaryReposi
 
     @Override
     public Optional<SystemDictionary> findByCode(String dictionaryCode) {
-        return Optional.ofNullable(mapper.selectByCode(dictionaryCode))
-                .map(MybatisSystemDictionaryRepository::toDomain);
+        var query = Wrappers.<SystemDictionaryEntity>lambdaQuery()
+                .eq(SystemDictionaryEntity::getDictionaryCode, dictionaryCode);
+        return Optional.ofNullable(mapper.selectOne(query)).map(MybatisSystemDictionaryRepository::toDomain);
     }
 
     @Override
@@ -71,11 +74,27 @@ public class MybatisSystemDictionaryRepository implements SystemDictionaryReposi
     @Override
     public DictionaryPage findPage(DictionaryQuery query) {
         long offset = Math.multiplyExact((long) query.page(), query.size());
-        List<SystemDictionary> items = mapper.selectPage(query.dictionaryCode(), query.enabled(),
-                        query.size(), offset).stream()
-                .map(MybatisSystemDictionaryRepository::toDomain).toList();
-        long total = mapper.countPage(query.dictionaryCode(), query.enabled());
+        long total = mapper.selectCount(dictionaryFilter(query));
+        List<SystemDictionary> items = total == 0 ? List.of() : mapper.selectList(
+                        dictionaryFilter(query)
+                                .orderByAsc(SystemDictionaryEntity::getDictionaryCode)
+                                .orderByAsc(SystemDictionaryEntity::getId)
+                                .last(limitOffset(query.size(), offset)))
+                .stream()
+                .map(MybatisSystemDictionaryRepository::toDomain)
+                .toList();
         return new DictionaryPage(items, total, query.page(), query.size());
+    }
+
+    private static LambdaQueryWrapper<SystemDictionaryEntity> dictionaryFilter(DictionaryQuery query) {
+        return Wrappers.<SystemDictionaryEntity>lambdaQuery()
+                .eq(query.dictionaryCode() != null,
+                        SystemDictionaryEntity::getDictionaryCode, query.dictionaryCode())
+                .eq(query.enabled() != null, SystemDictionaryEntity::getEnabled, query.enabled());
+    }
+
+    private static String limitOffset(int size, long offset) {
+        return "LIMIT " + size + " OFFSET " + offset;
     }
 
     private static SystemDictionary toDomain(SystemDictionaryEntity entity) {

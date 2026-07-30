@@ -3,21 +3,20 @@ package io.github.chrisshi.mom.system.infrastructure.persistence.dictionary;
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.annotation.Version;
-import io.github.chrisshi.mom.data.entity.BaseAuditEntity;
+import io.github.chrisshi.mom.data.entity.BaseEntity;
 import lombok.Getter;
 import lombok.Setter;
 
 /**
  * System Dictionary 的 MyBatis-Plus 行模型。
  *
- * <p>Entity 仅位于 Infrastructure，继承 String ID 与统一审计并独立声明乐观锁。字典没有删除 API，
- * 因而不继承逻辑删除基类；Code 格式和唯一性由 V2 数据库约束最终兜底。</p>
+ * <p>System 自有普通业务表统一继承 {@link BaseEntity}。当前字典没有删除 API，逻辑删除能力只作为统一
+ * 持久化基线存在，正常业务路径不会把 {@code deleted} 改为 true。</p>
  */
 @Getter
 @Setter
 @TableName("system_dictionary")
-public class SystemDictionaryEntity extends BaseAuditEntity {
+public class SystemDictionaryEntity extends BaseEntity {
     @TableField("dictionary_code")
     private String dictionaryCode;
 
@@ -26,10 +25,6 @@ public class SystemDictionaryEntity extends BaseAuditEntity {
 
     @TableField("enabled")
     private Boolean enabled;
-
-    @Version
-    @TableField("version")
-    private Long version = 0L;
 
     /** 允许更新时显式清空可选说明。 */
     @TableField(value = "description", updateStrategy = FieldStrategy.ALWAYS)

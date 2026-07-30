@@ -21,11 +21,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>本测试分析 Reactor 已编译字节码，不解析 Java import。它自动判断稳定且可证明的事实：业务 Mapper
  * 和 Entity 的包位置、MyBatis-Plus 通用 Service 禁区、正式 bounded context 对 Spring JDBC/java.sql 的
- * 直接依赖、实体时间点类型及公共基类字段类型。Repository 语义、索引有效性和 Entity 应选哪个能力基类
- * 仍由逐文件 Review 决定。</p>
+ * 直接依赖、System 自有业务 Entity 的统一 BaseEntity 能力以及公共基类字段类型。</p>
  *
  * <p>直接 JDBC 只允许四个已经登记的精确历史/协议例外；不得新增包级排除。System Parameter、Dictionary、
- * Dynamic I18n 及后续正式业务能力必须统一通过 MyBatis/MyBatis-Plus Mapper 体系访问 PostgreSQL。</p>
+ * Dynamic I18n 及后续正式业务能力必须统一通过 MyBatis-Plus Mapper 体系访问 PostgreSQL。</p>
  */
 class PersistenceArchitectureTest {
 
@@ -56,6 +55,17 @@ class PersistenceArchitectureTest {
                 .check(productionClasses);
     }
 
+    /** System 自有正式业务表统一使用完整 BaseEntity，不再分散声明 version/deleted/audit。 */
+    @Test
+    void systemBusinessEntitiesMustUseBaseEntity() {
+        classes()
+                .that().resideInAnyPackage("io.github.chrisshi.mom.system.infrastructure.persistence..")
+                .and().haveSimpleNameEndingWith("Entity")
+                .should().beAssignableTo(BaseEntity.class)
+                .because("System 自有 Parameter、Dictionary 与 Dynamic I18n 表统一继承 BaseEntity")
+                .check(productionClasses);
+    }
+
     /** MOM 业务代码不得把 MyBatis-Plus 通用 Service 当作领域或 Repository 契约。 */
     @Test
     void businessCodeMustNotUseMybatisPlusGenericServices() {
@@ -68,7 +78,7 @@ class PersistenceArchitectureTest {
     }
 
     /**
-     * 正式 bounded context 默认且强制使用 MyBatis/MyBatis-Plus；精确例外只覆盖 SAS 官方 Store 与既有技术探针。
+     * 正式 bounded context 默认且强制使用 MyBatis-Plus；精确例外只覆盖 SAS 官方 Store 与既有技术探针。
      */
     @Test
     void boundedContextsMustNotIntroduceDirectJdbcAccess() {
@@ -94,7 +104,7 @@ class PersistenceArchitectureTest {
                         "io.github.chrisshi.mom.integration.messaging.IntegrationDomainEventConsumerConfiguration")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "org.springframework.jdbc..", "java.sql..")
-                .because("正式业务表统一使用 MyBatis/MyBatis-Plus；直接 JDBC 必须先登记精确协议或技术例外")
+                .because("正式业务表统一使用 MyBatis-Plus；直接 JDBC 必须先登记精确协议或技术例外")
                 .check(productionClasses);
     }
 

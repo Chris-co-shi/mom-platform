@@ -3,8 +3,7 @@ package io.github.chrisshi.mom.system.infrastructure.persistence.parameter;
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.annotation.Version;
-import io.github.chrisshi.mom.data.entity.BaseAuditEntity;
+import io.github.chrisshi.mom.data.entity.BaseEntity;
 import io.github.chrisshi.mom.system.api.ParameterScopeType;
 import io.github.chrisshi.mom.system.api.ParameterValueType;
 import lombok.Getter;
@@ -13,13 +12,13 @@ import lombok.Setter;
 /**
  * System Parameter 的 MyBatis-Plus 行模型。
  *
- * <p>该 Entity 仅位于 Infrastructure，继承 String ID 与审计能力并独立声明乐观锁；参数禁止物理删除且
- * 没有删除接口，因此不继承带逻辑删除的 BaseEntity。数据库约束是 Scope、类型与唯一性的最终兜底。</p>
+ * <p>System 自有普通业务表统一继承 {@link BaseEntity}，获得 String ASSIGN_ID、创建/更新审计、
+ * 乐观锁与逻辑删除字段。当前参数能力没有删除 API，{@code deleted} 在正常业务路径始终保持 false。</p>
  */
 @Getter
 @Setter
 @TableName("system_parameter")
-public class SystemParameterEntity extends BaseAuditEntity {
+public class SystemParameterEntity extends BaseEntity {
     @TableField("scope_type")
     private ParameterScopeType scopeType;
 
@@ -37,10 +36,6 @@ public class SystemParameterEntity extends BaseAuditEntity {
 
     @TableField("enabled")
     private Boolean enabled;
-
-    @Version
-    @TableField("version")
-    private Long version = 0L;
 
     /** 允许更新时显式清空可选描述。 */
     @TableField(value = "description", updateStrategy = FieldStrategy.ALWAYS)

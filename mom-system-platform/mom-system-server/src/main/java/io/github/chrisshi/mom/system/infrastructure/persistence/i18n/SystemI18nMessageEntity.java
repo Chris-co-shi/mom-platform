@@ -3,21 +3,20 @@ package io.github.chrisshi.mom.system.infrastructure.persistence.i18n;
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.annotation.Version;
-import io.github.chrisshi.mom.data.entity.BaseAuditEntity;
+import io.github.chrisshi.mom.data.entity.BaseEntity;
 import lombok.Getter;
 import lombok.Setter;
 
 /**
  * Dynamic I18n Draft Message 的 MyBatis-Plus 行模型。
  *
- * <p>resourceId、messageKey 与 locale 创建后保持稳定；文本、启停状态和说明使用乐观锁更新。Draft 没有
- * 删除 API，且修改只影响下一次显式发布，不会回写已经生成的不可变 Release。</p>
+ * <p>resourceId、messageKey 与 locale 创建后保持稳定；文本、启停状态和说明使用 BaseEntity 乐观锁更新。
+ * 当前 Draft 没有删除 API，逻辑删除字段在正常业务路径保持 false。</p>
  */
 @Getter
 @Setter
 @TableName("system_i18n_message")
-public class SystemI18nMessageEntity extends BaseAuditEntity {
+public class SystemI18nMessageEntity extends BaseEntity {
     @TableField("resource_id")
     private String resourceId;
 
@@ -32,10 +31,6 @@ public class SystemI18nMessageEntity extends BaseAuditEntity {
 
     @TableField("enabled")
     private Boolean enabled;
-
-    @Version
-    @TableField("version")
-    private Long version = 0L;
 
     /** 允许管理更新显式清空可选说明。 */
     @TableField(value = "description", updateStrategy = FieldStrategy.ALWAYS)

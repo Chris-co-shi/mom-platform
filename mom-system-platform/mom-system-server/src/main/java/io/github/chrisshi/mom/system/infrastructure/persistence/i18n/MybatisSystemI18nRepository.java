@@ -12,18 +12,22 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * 基于 MyBatis-Plus 的 Dynamic I18n Repository Adapter。
  *
- * <p>Resource 与 Draft 的普通写入、单表条件查询、计数、固定排序和分页统一使用
- * {@code MomBaseMapper + LambdaQueryWrapper}，不为 MyBatis-Plus 已能清晰表达的查询重复创建 Mapper XML。
- * Resource 行锁通过服务端固定 {@code FOR UPDATE} 尾句表达；只有 JSONB 转换、版本聚合和历史投影继续保留
- * 在 Release 专用 Mapper XML。该 Adapter 不依赖 Spring JDBC 或 java.sql，也不创建第二套数据访问基础设施。</p>
+ * <p>Resource、Message 与 Release 全部使用 BaseEntity、MomBaseMapper 和 Wrapper。JSONB 通过字段级
+ * TypeHandler 映射；版本聚合、Distinct 历史版本与固定分页通过 QueryWrapper 的受控服务端表达式完成。
+ * System Dynamic I18n 不维护 Mapper XML，也不依赖 Spring JDBC 或 java.sql。</p>
  */
 @Repository
 public class MybatisSystemI18nRepository implements SystemI18nRepository {
+    private static final String RELEASE_VERSION_COLUMN = "release_version";
+    private static final String RESOURCE_ID_COLUMN = "resource_id";
+
     private final SystemI18nResourceMapper resourceMapper;
     private final SystemI18nMessageMapper messageMapper;
     private final SystemI18nReleaseMapper releaseMapper;
@@ -40,7 +44,6 @@ public class MybatisSystemI18nRepository implements SystemI18nRepository {
         this.objectMapper = objectMapper;
     }
 
-    /** 使用统一主键与审计填充插入 Resource，并重新读取数据库状态。 */
     @Override
     public Resource insertResource(Resource resource) {
         SystemI18nResourceEntity entity = toNewResourceEntity(resource);
@@ -53,7 +56,6 @@ public class MybatisSystemI18nRepository implements SystemI18nRepository {
                 .orElseThrow(() -> new IllegalStateException("资源插入后无法读取"));
     }
 
-    /** 使用 MyBatis-Plus @Version 和统一更新审计修改 Resource。 */
     @Override
     public boolean updateResource(Resource resource) {
         SystemI18nResourceEntity entity = new SystemI18nResourceEntity();
@@ -108,7 +110,6 @@ public class MybatisSystemI18nRepository implements SystemI18nRepository {
         return new Page<>(items, total, page, size);
     }
 
-    /** 使用统一主键与审计填充插入 Draft，并重新读取父资源限定后的数据库状态。 */
     @Override
     public Message insertMessage(Message message) {
         SystemI18nMessageEntity entity = toNewMessageEntity(message);
@@ -121,7 +122,6 @@ public class MybatisSystemI18nRepository implements SystemI18nRepository {
                 .orElseThrow(() -> new IllegalStateException("草稿插入后无法读取"));
     }
 
-    /** 使用 MyBatis-Plus @Version 和统一更新审计修改 Draft。 */
     @Override
     public boolean updateMessage(Message message) {
         SystemI18nMessageEntity entity = new SystemI18nMessageEntity();
@@ -175,14 +175,16 @@ public class MybatisSystemI18nRepository implements SystemI18nRepository {
 
     @Override
     public long nextReleaseVersion(String resourceId) {
-        return releaseMapper.selectNextVersion(resourceId);
+        var query = Wrappers.<SystemI18nReleaseEntity>query()
+                .select("COALESCE(MAX(" + RELEASE_VERSION_COLUMN + "), 0) + 1")
+                .eq(RESOURCE_ID_COLUMN, resourceId);
+        return singleLong(releaseMapper.selectObjs(query), "无法分配下一发布版本");
     }
 
-    /** 追加单 Locale Release，并将复合主键/FK冲突转换为稳定 409。 */
     @Override
     public void insertRelease(Release release) {
         try {
-            if (releaseMapper.insertRelease(toReleaseEntity(release)) != 1) {
+            if (releaseMapper.insert(toReleaseEntity(release)) != 1) {
                 throw new IllegalStateException("发布版本未插入预期的一行记录");
             }
         } catch (DataIntegrityViolationException exception) {
@@ -192,7 +194,12 @@ public class MybatisSystemI18nRepository implements SystemI18nRepository {
 
     @Override
     public List<Release> findRelease(String resourceId, long releaseVersion) {
-        return releaseMapper.selectRelease(resourceId, releaseVersion).stream()
+        return releaseMapper.selectList(
+                        Wrappers.<SystemI18nReleaseEntity>lambdaQuery()
+                                .eq(SystemI18nReleaseEntity::getResourceId, resourceId)
+                                .eq(SystemI18nReleaseEntity::getReleaseVersion, releaseVersion)
+                                .orderByAsc(SystemI18nReleaseEntity::getLocale))
+                .stream()
                 .map(this::toRelease)
                 .toList();
     }
@@ -200,11 +207,72 @@ public class MybatisSystemI18nRepository implements SystemI18nRepository {
     @Override
     public Page<ReleaseSummary> findReleaseHistory(String resourceId, int page, int size) {
         long offset = Math.multiplyExact((long) page, size);
-        List<ReleaseSummary> items = releaseMapper.selectHistory(resourceId, size, offset).stream()
-                .map(row -> new ReleaseSummary(row.getReleaseVersion(), row.getSourceReleaseVersion(),
-                        row.getChangeNote(), row.getPublishedBy(), row.getPublishedAt(), row.getLocaleCount()))
+        var countQuery = Wrappers.<SystemI18nReleaseEntity>query()
+                .select("COUNT(DISTINCT " + RELEASE_VERSION_COLUMN + ")")
+                .eq(RESOURCE_ID_COLUMN, resourceId);
+        long total = singleLong(releaseMapper.selectObjs(countQuery), "无法统计发布历史");
+        if (total == 0) {
+            return new Page<>(List.of(), 0, page, size);
+        }
+
+        var versionQuery = Wrappers.<SystemI18nReleaseEntity>query()
+                .select("DISTINCT " + RELEASE_VERSION_COLUMN)
+                .eq(RESOURCE_ID_COLUMN, resourceId)
+                .orderByDesc(RELEASE_VERSION_COLUMN)
+                .last(limitOffset(size, offset));
+        List<Long> versions = releaseMapper.selectObjs(versionQuery).stream()
+                .map(value -> number(value, "发布历史版本类型无效").longValue())
                 .toList();
-        return new Page<>(items, releaseMapper.countHistory(resourceId), page, size);
+        if (versions.isEmpty()) {
+            return new Page<>(List.of(), total, page, size);
+        }
+
+        List<SystemI18nReleaseEntity> rows = releaseMapper.selectList(
+                Wrappers.<SystemI18nReleaseEntity>lambdaQuery()
+                        .eq(SystemI18nReleaseEntity::getResourceId, resourceId)
+                        .in(SystemI18nReleaseEntity::getReleaseVersion, versions)
+                        .orderByDesc(SystemI18nReleaseEntity::getReleaseVersion)
+                        .orderByAsc(SystemI18nReleaseEntity::getLocale));
+        Map<Long, List<SystemI18nReleaseEntity>> rowsByVersion = rows.stream()
+                .collect(Collectors.groupingBy(
+                        SystemI18nReleaseEntity::getReleaseVersion,
+                        LinkedHashMap::new,
+                        Collectors.toList()));
+        List<ReleaseSummary> items = versions.stream()
+                .map(version -> toReleaseSummary(rowsByVersion.get(version)))
+                .toList();
+        return new Page<>(items, total, page, size);
+    }
+
+    private static ReleaseSummary toReleaseSummary(List<SystemI18nReleaseEntity> rows) {
+        if (rows == null || rows.isEmpty()) {
+            throw new IllegalStateException("发布历史版本缺少 Locale 快照");
+        }
+        SystemI18nReleaseEntity first = rows.getFirst();
+        boolean consistent = rows.stream().allMatch(row ->
+                Objects.equals(row.getSourceReleaseVersion(), first.getSourceReleaseVersion())
+                        && Objects.equals(row.getChangeNote(), first.getChangeNote())
+                        && Objects.equals(row.getPublishedBy(), first.getPublishedBy())
+                        && Objects.equals(row.getPublishedAt(), first.getPublishedAt()));
+        if (!consistent) {
+            throw new IllegalStateException("同一发布版本的审计元数据不一致");
+        }
+        return new ReleaseSummary(first.getReleaseVersion(), first.getSourceReleaseVersion(),
+                first.getChangeNote(), first.getPublishedBy(), first.getPublishedAt(), rows.size());
+    }
+
+    private static long singleLong(List<Object> values, String message) {
+        if (values.size() != 1) {
+            throw new IllegalStateException(message);
+        }
+        return number(values.getFirst(), message).longValue();
+    }
+
+    private static Number number(Object value, String message) {
+        if (value instanceof Number number) {
+            return number;
+        }
+        throw new IllegalStateException(message);
     }
 
     private static LambdaQueryWrapper<SystemI18nResourceEntity> resourceFilter(
@@ -223,11 +291,6 @@ public class MybatisSystemI18nRepository implements SystemI18nRepository {
                 .eq(enabled != null, SystemI18nMessageEntity::getEnabled, enabled);
     }
 
-    /**
-     * 生成只包含服务端校验后非负数字的固定分页尾句。
-     *
-     * <p>该方法不接受客户端 SQL 标识符或表达式；page/size 已在 Application 层限制，因此不会形成动态 SQL 注入。</p>
-     */
     private static String limitOffset(int size, long offset) {
         return "LIMIT " + size + " OFFSET " + offset;
     }

@@ -2,6 +2,8 @@ package io.github.chrisshi.mom.system.infrastructure.persistence.i18n;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import io.github.chrisshi.mom.data.entity.BaseEntity;
+import io.github.chrisshi.mom.data.typehandler.PostgresqlJsonbStringTypeHandler;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -10,14 +12,14 @@ import java.time.Instant;
 /**
  * Dynamic I18n 单 Locale 不可变发布快照行模型。
  *
- * <p>数据库主键是 resourceId、releaseVersion、locale 的复合键，因此该追加型快照不继承通用单主键 Entity。
- * Mapper 只提供显式 INSERT 与 SELECT；数据库触发器继续拒绝 UPDATE/DELETE。messagesJson 在 Mapper XML
- * 中显式转换为 PostgreSQL jsonb，读取时转回文本后由 Repository 做 Fail Closed 解析。</p>
+ * <p>Release 统一继承 {@link BaseEntity} 并使用独立 String 技术主键；resourceId、releaseVersion、locale
+ * 继续由数据库 Unique Constraint 保证业务唯一。生产路径只 Insert/Read，数据库触发器继续拒绝
+ * Update/Delete；{@code deleted} 始终保持 false。</p>
  */
 @Getter
 @Setter
-@TableName("system_i18n_release")
-public class SystemI18nReleaseEntity {
+@TableName(value = "system_i18n_release", autoResultMap = true)
+public class SystemI18nReleaseEntity extends BaseEntity {
     @TableField("resource_id")
     private String resourceId;
 
@@ -27,7 +29,7 @@ public class SystemI18nReleaseEntity {
     @TableField("locale")
     private String locale;
 
-    @TableField("messages_json")
+    @TableField(value = "messages_json", typeHandler = PostgresqlJsonbStringTypeHandler.class)
     private String messagesJson;
 
     @TableField("message_count")

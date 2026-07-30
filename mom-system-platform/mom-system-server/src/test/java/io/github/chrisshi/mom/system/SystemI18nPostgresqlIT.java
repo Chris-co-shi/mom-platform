@@ -33,10 +33,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Dynamic I18n 的真实 PostgreSQL 17.7、V1+V2+V3、事务、并发、JSONB 与不可变 Release 集成测试。
+ * Dynamic I18n 的真实 PostgreSQL 17.7、V1～V4、事务、并发、JSONB 与不可变 Release 集成测试。
  *
- * <p>测试使用独立容器和 mom_system Schema，覆盖 Parameter/Dictionary 向前兼容、三张 I18n 表、同
- * Schema FK、Draft 与 Published 隔离、两 Locale 原子发布、fallback、No-op、行锁并发、Runtime Kill
+ * <p>测试使用独立容器和 mom_system Schema，覆盖六类 System Entity 的 BaseEntity 列、三张 I18n 表、
+ * 同 Schema FK、Draft 与 Published 隔离、两 Locale 原子发布、fallback、No-op、行锁并发、Runtime Kill
  * Switch、回滚新版本与历史。Docker 不可用时 Testcontainers 明确跳过，不能描述为专项成功。</p>
  */
 @Testcontainers(disabledWithoutDocker = true)
@@ -65,7 +65,6 @@ class SystemI18nPostgresqlIT {
     @Autowired
     private SystemI18nApplicationService service;
 
-    /** 注入动态 PostgreSQL 地址和单一 mom_system search_path。 */
     @DynamicPropertySource
     static void databaseProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", () -> POSTGRESQL.getJdbcUrl()
@@ -83,11 +82,11 @@ class SystemI18nPostgresqlIT {
     }
 
     @Test
-    void v3MustCreateThreeConstrainedJsonbTablesInSameSchema() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("3");
+    void v4MustAlignAllSystemEntitiesAndKeepI18nJsonbConstraints() {
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("4");
         assertThat(jdbc.queryForObject(
-                "select count(*) from flyway_schema_history where success and version in ('1','2','3')",
-                Long.class)).isEqualTo(3L);
+                "select count(*) from flyway_schema_history where success and version in ('1','2','3','4')",
+                Long.class)).isEqualTo(4L);
         assertThat(jdbc.queryForList("""
                 SELECT table_name FROM information_schema.tables
                  WHERE table_schema=? AND table_name LIKE 'system_i18n_%'
@@ -98,6 +97,39 @@ class SystemI18nPostgresqlIT {
                 SELECT data_type FROM information_schema.columns
                  WHERE table_schema=? AND table_name='system_i18n_release' AND column_name='messages_json'
                 """, String.class, SCHEMA)).isEqualTo("jsonb");
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*)
+                  FROM information_schema.columns
+                 WHERE table_schema=?
+                   AND table_name IN (
+                       'system_parameter','system_dictionary','system_dictionary_item',
+                       'system_i18n_resource','system_i18n_message','system_i18n_release')
+                   AND column_name='deleted'
+                   AND data_type='boolean'
+                   AND is_nullable='NO'
+                """, Long.class, SCHEMA)).isEqualTo(6L);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*)
+                  FROM information_schema.columns
+                 WHERE table_schema=?
+                   AND table_name='system_i18n_release'
+                   AND column_name IN (
+                       'id','created_by','created_at','updated_by','updated_at','version','deleted')
+                """, Long.class, SCHEMA)).isEqualTo(7L);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*)
+                  FROM information_schema.table_constraints
+                 WHERE table_schema=? AND table_name='system_i18n_release'
+                   AND constraint_type='PRIMARY KEY'
+                   AND constraint_name='pk_system_i18n_release'
+                """, Long.class, SCHEMA)).isEqualTo(1L);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*)
+                  FROM information_schema.table_constraints
+                 WHERE table_schema=? AND table_name='system_i18n_release'
+                   AND constraint_type='UNIQUE'
+                   AND constraint_name='uk_system_i18n_release_version_locale'
+                """, Long.class, SCHEMA)).isEqualTo(1L);
         assertThat(jdbc.queryForObject("""
                 SELECT count(*)
                   FROM information_schema.table_constraints tc
@@ -141,6 +173,10 @@ class SystemI18nPostgresqlIT {
         assertThat(first.releaseVersion()).isEqualTo(1L);
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM system_i18n_release WHERE resource_id=? AND release_version=1
+                """, Long.class, resource.id())).isEqualTo(2L);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM system_i18n_release
+                 WHERE resource_id=? AND id IS NOT NULL AND deleted=false AND version=0
                 """, Long.class, resource.id())).isEqualTo(2L);
         var english = service.runtime("mom-web", "common", "en-US");
         assertThat(english.messages()).containsEntry("only.zh", "仅中文");

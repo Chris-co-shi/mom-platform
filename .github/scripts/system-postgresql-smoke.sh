@@ -107,19 +107,42 @@ docker exec "$POSTGRES_CONTAINER" \
       FROM information_schema.tables
      WHERE table_schema = '${POSTGRES_SCHEMA}'
        AND table_name IN ('system_i18n_resource', 'system_i18n_message', 'system_i18n_release');
+    SELECT 'system_base_entity_deleted=' || count(*)
+      FROM information_schema.columns
+     WHERE table_schema = '${POSTGRES_SCHEMA}'
+       AND table_name IN (
+         'system_parameter', 'system_dictionary', 'system_dictionary_item',
+         'system_i18n_resource', 'system_i18n_message', 'system_i18n_release')
+       AND column_name = 'deleted'
+       AND data_type = 'boolean'
+       AND is_nullable = 'NO';
+    SELECT 'system_i18n_release_base_columns=' || count(*)
+      FROM information_schema.columns
+     WHERE table_schema = '${POSTGRES_SCHEMA}'
+       AND table_name = 'system_i18n_release'
+       AND column_name IN ('id','created_by','created_at','updated_by','updated_at','version','deleted');
     SELECT 'system_i18n_jsonb=' || count(*)
       FROM information_schema.columns
      WHERE table_schema = '${POSTGRES_SCHEMA}'
        AND table_name = 'system_i18n_release'
        AND column_name = 'messages_json'
        AND data_type = 'jsonb';
-    SELECT 'system_i18n_release_unique=' || count(*)
+    SELECT 'system_i18n_release_pk=' || count(*)
       FROM pg_constraint constraint_row
       JOIN pg_class table_row ON table_row.oid = constraint_row.conrelid
       JOIN pg_namespace schema_row ON schema_row.oid = table_row.relnamespace
      WHERE schema_row.nspname = '${POSTGRES_SCHEMA}'
        AND table_row.relname = 'system_i18n_release'
+       AND constraint_row.conname = 'pk_system_i18n_release'
        AND constraint_row.contype = 'p';
+    SELECT 'system_i18n_release_business_unique=' || count(*)
+      FROM pg_constraint constraint_row
+      JOIN pg_class table_row ON table_row.oid = constraint_row.conrelid
+      JOIN pg_namespace schema_row ON schema_row.oid = table_row.relnamespace
+     WHERE schema_row.nspname = '${POSTGRES_SCHEMA}'
+       AND table_row.relname = 'system_i18n_release'
+       AND constraint_row.conname = 'uk_system_i18n_release_version_locale'
+       AND constraint_row.contype = 'u';
     SELECT 'cross_schema_fk=' || count(*)
       FROM pg_constraint constraint_row
       JOIN pg_class source_table ON source_table.oid = constraint_row.conrelid
@@ -132,12 +155,15 @@ docker exec "$POSTGRES_CONTAINER" \
   " > system-postgresql-schema.txt
 
 grep --fixed-strings --quiet 'schema=1' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'flyway_version=3' system-postgresql-schema.txt
+grep --fixed-strings --quiet 'flyway_version=4' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_parameter=1' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_dictionary_tables=2' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_i18n_tables=3' system-postgresql-schema.txt
+grep --fixed-strings --quiet 'system_base_entity_deleted=6' system-postgresql-schema.txt
+grep --fixed-strings --quiet 'system_i18n_release_base_columns=7' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_i18n_jsonb=1' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'system_i18n_release_unique=1' system-postgresql-schema.txt
+grep --fixed-strings --quiet 'system_i18n_release_pk=1' system-postgresql-schema.txt
+grep --fixed-strings --quiet 'system_i18n_release_business_unique=1' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'cross_schema_fk=0' system-postgresql-schema.txt
 
 application_connection_count=$(docker exec "$POSTGRES_CONTAINER" \
