@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * System Platform S15-B 的 POM 语义与 Parameter/Dictionary/Dynamic I18n 精确白名单门禁。
+ * System Platform S15-C 的 POM 语义与 Parameter/Dictionary/Dynamic I18n 精确白名单门禁。
  *
  * <p>测试通过 XML DOM 读取实际 POM，不使用字符串 grep 推断依赖。它同时检查 Reactor 注册、聚合模块、
  * API/Client/Server 直接依赖白名单和 S16+ 禁止资源。测试只读工作区，无网络、数据库或中间件副作用；
@@ -151,7 +151,7 @@ class SystemPlatformPomArchitectureTest {
     }
 
     /**
-     * 验证 S15-B 只增加 Parameter、Dictionary、Dynamic I18n 及精确 Migration/Mapper。
+     * 验证 S15-C 只保留 Parameter、Dictionary、Dynamic I18n 及六份精确 Mapper 资源。
      *
      * @throws Exception 文件遍历失败
      */
@@ -189,7 +189,13 @@ class SystemPlatformPomArchitectureTest {
                             normalized(server.resolve(
                                     "src/main/resources/mapper/system/SystemDictionaryMapper.xml")),
                             normalized(server.resolve(
-                                    "src/main/resources/mapper/system/SystemDictionaryItemMapper.xml")));
+                                    "src/main/resources/mapper/system/SystemDictionaryItemMapper.xml")),
+                            normalized(server.resolve(
+                                    "src/main/resources/mapper/system/SystemI18nResourceMapper.xml")),
+                            normalized(server.resolve(
+                                    "src/main/resources/mapper/system/SystemI18nMessageMapper.xml")),
+                            normalized(server.resolve(
+                                    "src/main/resources/mapper/system/SystemI18nReleaseMapper.xml")));
         }
     }
 
