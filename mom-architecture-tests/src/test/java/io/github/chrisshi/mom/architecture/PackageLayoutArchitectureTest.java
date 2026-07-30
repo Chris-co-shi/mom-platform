@@ -32,18 +32,6 @@ class PackageLayoutArchitectureTest {
                 .and().resideOutsideOfPackage("io.github.chrisshi.mom.data.entity..")
                 .and().doNotHaveFullyQualifiedName(
                         "io.github.chrisshi.mom.mdm.infrastructure.persistence.MdmDataProbeEntity")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.parameter.SystemParameterEntity")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.dictionary.SystemDictionaryEntity")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.dictionary.SystemDictionaryItemEntity")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nResourceEntity")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nMessageEntity")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nReleaseEntity")
                 .should().resideInAnyPackage("..infrastructure.persistence.entity")
                 .because("数据库行模型必须集中在 Entity 技术职责包")
                 .check(productionClasses);
@@ -57,18 +45,6 @@ class PackageLayoutArchitectureTest {
                 .and().doNotHaveFullyQualifiedName(MomBaseMapper.class.getName())
                 .and().doNotHaveFullyQualifiedName(
                         "io.github.chrisshi.mom.mdm.infrastructure.persistence.MdmDataProbeMapper")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.parameter.SystemParameterMapper")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.dictionary.SystemDictionaryMapper")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.dictionary.SystemDictionaryItemMapper")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nResourceMapper")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nMessageMapper")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nReleaseMapper")
                 .should().resideInAnyPackage("..infrastructure.persistence.mapper")
                 .because("普通 Entity Mapper 必须集中在 Mapper 技术职责包")
                 .check(productionClasses);
@@ -91,14 +67,6 @@ class PackageLayoutArchitectureTest {
         classes()
                 .that().haveSimpleNameStartingWith("Mybatis")
                 .and().haveSimpleNameEndingWith("Repository")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.parameter.MybatisSystemParameterRepository")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.dictionary.MybatisSystemDictionaryRepository")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.dictionary.MybatisSystemDictionaryItemRepository")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.i18n.MybatisSystemI18nRepository")
                 .should().resideInAnyPackage("..infrastructure.persistence.repository")
                 .because("Repository Adapter 必须隐藏 Mapper 与 ORM 细节")
                 .allowEmptyShould(true)
@@ -109,10 +77,6 @@ class PackageLayoutArchitectureTest {
     @Test
     void persistenceMustNotUseFeatureFirstPackagesForNewCode() {
         noClasses()
-                .that().resideOutsideOfPackages(
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.parameter..",
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.dictionary..",
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.i18n..")
                 .should().resideInAnyPackage(
                         "..infrastructure.persistence.parameter..",
                         "..infrastructure.persistence.dictionary..",

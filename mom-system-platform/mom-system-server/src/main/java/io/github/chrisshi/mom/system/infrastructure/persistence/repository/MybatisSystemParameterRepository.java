@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.system.infrastructure.persistence.parameter;
+package io.github.chrisshi.mom.system.infrastructure.persistence.repository;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -6,6 +6,8 @@ import io.github.chrisshi.mom.system.api.ParameterScopeType;
 import io.github.chrisshi.mom.system.application.parameter.SystemParameterException;
 import io.github.chrisshi.mom.system.domain.parameter.SystemParameter;
 import io.github.chrisshi.mom.system.domain.parameter.SystemParameterRepository;
+import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemParameterEntity;
+import io.github.chrisshi.mom.system.infrastructure.persistence.mapper.SystemParameterMapper;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 

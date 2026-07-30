@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.system.infrastructure.persistence.i18n;
+package io.github.chrisshi.mom.system.infrastructure.persistence.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;

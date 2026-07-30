@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.system.infrastructure.persistence.dictionary;
+package io.github.chrisshi.mom.system.infrastructure.persistence.entity;
 
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;

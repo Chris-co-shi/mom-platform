@@ -9,7 +9,7 @@ import io.github.chrisshi.mom.data.entity.BaseAuditEntity;
 import io.github.chrisshi.mom.data.entity.BaseEntity;
 import io.github.chrisshi.mom.data.entity.BaseIdEntity;
 import io.github.chrisshi.mom.data.mapper.MomBaseMapper;
-import io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nReleaseEntity;
+import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemI18nReleaseEntity;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;

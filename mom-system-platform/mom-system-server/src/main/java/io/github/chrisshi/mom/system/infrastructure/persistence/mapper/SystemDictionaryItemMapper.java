@@ -1,6 +1,7 @@
-package io.github.chrisshi.mom.system.infrastructure.persistence.dictionary;
+package io.github.chrisshi.mom.system.infrastructure.persistence.mapper;
 
 import io.github.chrisshi.mom.data.mapper.MomBaseMapper;
+import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemDictionaryItemEntity;
 import org.apache.ibatis.annotations.Mapper;
 
 /**

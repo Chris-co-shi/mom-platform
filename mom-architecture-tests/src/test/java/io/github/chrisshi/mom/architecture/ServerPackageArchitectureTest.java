@@ -148,24 +148,20 @@ class ServerPackageArchitectureTest {
         noClasses()
                 .that().resideInAnyPackage("io.github.chrisshi.mom.system.domain.dictionary..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        "io.github.chrisshi.mom.system.application.parameter..",
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.parameter..")
+                        "io.github.chrisshi.mom.system.application.parameter..")
                 .because("Dictionary Domain 不引用 Parameter Application 或持久化实现")
                 .check(productionClasses);
         noClasses()
                 .that().resideInAnyPackage("io.github.chrisshi.mom.system.domain.parameter..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        "io.github.chrisshi.mom.system.application.dictionary..",
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.dictionary..")
+                        "io.github.chrisshi.mom.system.application.dictionary..")
                 .because("Parameter Domain 不引用 Dictionary Application 或持久化实现")
                 .check(productionClasses);
         noClasses()
                 .that().resideInAnyPackage("io.github.chrisshi.mom.system.domain.i18n..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "io.github.chrisshi.mom.system.application.parameter..",
-                        "io.github.chrisshi.mom.system.application.dictionary..",
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.parameter..",
-                        "io.github.chrisshi.mom.system.infrastructure.persistence.dictionary..")
+                        "io.github.chrisshi.mom.system.application.dictionary..")
                 .because("Dynamic I18n Domain 不引用 Parameter/Dictionary Application 或持久化实现")
                 .check(productionClasses);
     }

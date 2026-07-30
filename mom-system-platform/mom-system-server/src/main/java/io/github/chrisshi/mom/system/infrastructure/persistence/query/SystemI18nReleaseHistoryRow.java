@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.system.infrastructure.persistence.i18n;
+package io.github.chrisshi.mom.system.infrastructure.persistence.query;
 
 import lombok.Getter;
 import lombok.Setter;

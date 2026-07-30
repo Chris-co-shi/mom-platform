@@ -1,6 +1,7 @@
-package io.github.chrisshi.mom.system.infrastructure.persistence.parameter;
+package io.github.chrisshi.mom.system.infrastructure.persistence.mapper;
 
 import io.github.chrisshi.mom.data.mapper.MomBaseMapper;
+import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemParameterEntity;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;

@@ -1,9 +1,16 @@
-package io.github.chrisshi.mom.system.infrastructure.persistence.i18n;
+package io.github.chrisshi.mom.system.infrastructure.persistence.repository;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.system.application.i18n.SystemI18nException;
 import io.github.chrisshi.mom.system.domain.i18n.SystemI18nRepository;
+import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemI18nMessageEntity;
+import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemI18nReleaseEntity;
+import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemI18nResourceEntity;
+import io.github.chrisshi.mom.system.infrastructure.persistence.mapper.SystemI18nMessageMapper;
+import io.github.chrisshi.mom.system.infrastructure.persistence.mapper.SystemI18nReleaseMapper;
+import io.github.chrisshi.mom.system.infrastructure.persistence.mapper.SystemI18nResourceMapper;
+import io.github.chrisshi.mom.system.infrastructure.persistence.query.SystemI18nReleaseHistoryRow;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 import tools.jackson.core.JacksonException;

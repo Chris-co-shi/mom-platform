@@ -1,10 +1,12 @@
-package io.github.chrisshi.mom.system.infrastructure.persistence.dictionary;
+package io.github.chrisshi.mom.system.infrastructure.persistence.repository;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.system.application.dictionary.SystemDictionaryException;
 import io.github.chrisshi.mom.system.domain.dictionary.SystemDictionaryItem;
 import io.github.chrisshi.mom.system.domain.dictionary.SystemDictionaryItemRepository;
+import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemDictionaryItemEntity;
+import io.github.chrisshi.mom.system.infrastructure.persistence.mapper.SystemDictionaryItemMapper;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
