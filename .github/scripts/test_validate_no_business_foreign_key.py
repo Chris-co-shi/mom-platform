@@ -55,6 +55,18 @@ class NoBusinessForeignKeyTest(unittest.TestCase):
         module.check_sql(official, sql, wrong_table, {(official, "other")}, set())
         self.assertTrue(wrong_table.errors)
 
+    def test_historical_source_requires_exact_removal_resolution(self):
+        historical = {(self.path, "child")}
+        sql = "CREATE TABLE child (parent_id varchar(19) REFERENCES parent(id));"
+        unresolved = module.Report()
+        module.check_sql(self.path, sql, unresolved, set(), historical)
+        self.assertTrue(unresolved.errors)
+
+        resolved = module.Report()
+        module.check_sql(self.path, sql, resolved, set(), historical, historical)
+        self.assertEqual([], resolved.errors)
+        self.assertIn("已由指定更高版本删除", resolved.reviews[0])
+
 
 if __name__ == "__main__":
     unittest.main()

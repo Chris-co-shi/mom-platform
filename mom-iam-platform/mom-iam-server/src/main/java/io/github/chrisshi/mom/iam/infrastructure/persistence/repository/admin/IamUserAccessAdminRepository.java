@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.iam.infrastructure.persistence.repository.admin;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
 import io.github.chrisshi.mom.iam.domain.type.ApplicationCode;
 import io.github.chrisshi.mom.iam.domain.type.IamRecordStatus;
@@ -18,7 +19,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 
-/** Factory Scope、Mobile Access 与 Party Binding 管理仓储。 */
+/**
+ * Factory Scope、Mobile Access 与 Party Binding 的 IAM 基础设施仓储。
+ *
+ * <p>该类型只编排 IAM 自有表 Mapper，父用户锁定、引用校验、事务和安全审计由调用它的 Application
+ * Service 负责。关系替换最多接收已校验的 200 项，写入逐项检查 affected rows；任一步失败时异常向上
+ * 传播并触发同一 PostgreSQL 本地事务回滚。它不查询 MDM Schema，也不把本地引用当作外部主数据权威。</p>
+ */
 public final class IamUserAccessAdminRepository {
     private final IamUserFactoryScopeMapper factoryScopeMapper;
     private final IamUserApplicationMapper applicationMapper;
@@ -87,17 +94,41 @@ public final class IamUserAccessAdminRepository {
 
     /** @return 用户当前 Party Binding 管理投影 */
     public Optional<IamAdminViews.PartyBindingView> partyBinding(String userId) {
-        return Optional.ofNullable(bindingMapper.selectByUserId(userId)).map(binding ->
+        return Optional.ofNullable(bindingMapper.selectOne(
+                Wrappers.<IamExternalUserBindingEntity>lambdaQuery()
+                        .eq(IamExternalUserBindingEntity::getUserId, userId))).map(binding ->
                 new IamAdminViews.PartyBindingView(
                         binding.getId(), binding.getPartyType(), binding.getPartyId(),
                         binding.getStatus(), binding.getVersion()));
     }
 
-    /** 重绑外部 Party；已有记录更新，不存在时插入。 */
+    /**
+     * 重绑外部 Party；已有记录原子更新并推进版本，不存在时插入。
+     *
+     * @param userId 已由应用层锁定并验证存在的 IAM 用户 ID
+     * @param partyType 已按用户类型验证的外部主体类型
+     * @param partyId 稳定的外部主体引用 ID
+     * @param actor 审计主体
+     * @param now 统一事务时间点
+     * @param idSupplier 仅在首次绑定时生成技术主键
+     * @throws IllegalStateException 插入未影响恰好一行
+     */
     public void rebindParty(
             String userId, PartyType partyType, String partyId, String actor,
             Instant now, Supplier<String> idSupplier) {
-        if (bindingMapper.rebind(userId, partyType, partyId, now, actor) > 0) {
+        IamExternalUserBindingEntity changed = new IamExternalUserBindingEntity();
+        changed.setPartyType(partyType);
+        changed.setPartyId(partyId);
+        changed.setStatus(IamRecordStatus.ENABLED);
+        changed.setValidFrom(now);
+        changed.setValidUntil(null);
+        changed.setUpdatedAt(now);
+        changed.setUpdatedBy(actor);
+        if (bindingMapper.update(changed,
+                Wrappers.<IamExternalUserBindingEntity>lambdaUpdate()
+                        .eq(IamExternalUserBindingEntity::getUserId, userId)
+                        .set(IamExternalUserBindingEntity::getValidUntil, null)
+                        .setSql("version = version + 1")) > 0) {
             return;
         }
         IamExternalUserBindingEntity binding = new IamExternalUserBindingEntity();

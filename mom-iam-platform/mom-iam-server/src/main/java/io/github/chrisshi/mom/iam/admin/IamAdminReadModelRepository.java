@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.iam.admin;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
 import io.github.chrisshi.mom.iam.domain.type.ApplicationCode;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamExternalUserBindingEntity;
@@ -58,7 +59,9 @@ public final class IamAdminReadModelRepository {
         IamAdminViews.UserView user = java.util.Optional.ofNullable(
                 userMapper.selectAdminById(userId))
                 .orElseThrow(() -> new IamAdminExceptions.NotFound("用户不存在"));
-        IamExternalUserBindingEntity binding = bindingMapper.selectByUserId(userId);
+        IamExternalUserBindingEntity binding = bindingMapper.selectOne(
+                Wrappers.<IamExternalUserBindingEntity>lambdaQuery()
+                        .eq(IamExternalUserBindingEntity::getUserId, userId));
         IamAdminViews.PartyBindingView bindingView = binding == null ? null
                 : new IamAdminViews.PartyBindingView(
                         binding.getId(), binding.getPartyType(), binding.getPartyId(),

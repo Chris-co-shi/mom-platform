@@ -21,11 +21,6 @@ FORBIDDEN_DOMAIN_IMPORT = re.compile(
 )
 QUERY_MAPPER_NAME = re.compile(r"\binterface\s+\w+QueryMapper\b")
 
-# 阶段一发现的精确历史语句；阶段二修复后必须删除，禁止增加文件或通配符。
-SELECT_STAR_HISTORY = {
-    ("mom-iam-platform/mom-iam-server/src/main/resources/mapper/iam/IamExternalUserBindingMapper.xml", "selectEffectiveByUserId"),
-}
-
 APPLICATION_EXCEPTIONS = {
     "mom-mdm-platform/mom-mdm-server/src/main/java/io/github/chrisshi/mom/mdm/application/MdmDataProbeService.java",
     "mom-mdm-platform/mom-mdm-server/src/main/java/io/github/chrisshi/mom/mdm/application/MdmOutboxProbeService.java",
@@ -118,10 +113,8 @@ def check_mapper_xml(path: str, text: str, report: Report) -> None:
             continue
         statement_id = node.attrib.get("id", "<missing-id>")
         sql = " ".join(node.itertext())
-        if re.search(r"\bSELECT\s+\*(?:\s+|$)", sql, re.I | re.S) and (path, statement_id) not in SELECT_STAR_HISTORY:
+        if re.search(r"\bSELECT\s+\*(?:\s+|$)", sql, re.I | re.S):
             report.errors.append(f"多表/自定义查询禁止 SELECT *: {path}#{statement_id}")
-        elif re.search(r"\bSELECT\s+\*(?:\s+|$)", sql, re.I | re.S):
-            report.reviews.append(f"精确历史 SELECT *，阶段二必须修复: {path}#{statement_id}")
         if "${" in sql:
             report.errors.append(f"多表/自定义查询禁止客户端动态 SQL: {path}#{statement_id}")
         if re.search(r"\bmom_[a-z][a-z0-9_]*\s*\.", sql, re.I):

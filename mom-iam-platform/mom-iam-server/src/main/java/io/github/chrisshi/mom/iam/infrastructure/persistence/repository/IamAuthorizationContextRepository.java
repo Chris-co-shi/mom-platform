@@ -1,5 +1,7 @@
 package io.github.chrisshi.mom.iam.infrastructure.persistence.repository;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import io.github.chrisshi.mom.iam.domain.type.IamRecordStatus;
 import io.github.chrisshi.mom.iam.domain.type.PartyType;
 import io.github.chrisshi.mom.iam.domain.type.UserType;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamExternalUserBindingEntity;
@@ -49,7 +51,14 @@ public final class IamAuthorizationContextRepository {
 
     /** @return 供应商或客户用户当前唯一且有效的 Party Scope */
     public Optional<PartyScope> findEffectivePartyScope(String userId, Instant now) {
-        IamExternalUserBindingEntity binding = bindingMapper.selectEffectiveByUserId(userId, now);
+        IamExternalUserBindingEntity binding = bindingMapper.selectOne(
+                Wrappers.<IamExternalUserBindingEntity>lambdaQuery()
+                        .eq(IamExternalUserBindingEntity::getUserId, userId)
+                        .eq(IamExternalUserBindingEntity::getStatus, IamRecordStatus.ENABLED)
+                        .and(wrapper -> wrapper.isNull(IamExternalUserBindingEntity::getValidFrom)
+                                .or().le(IamExternalUserBindingEntity::getValidFrom, now))
+                        .and(wrapper -> wrapper.isNull(IamExternalUserBindingEntity::getValidUntil)
+                                .or().gt(IamExternalUserBindingEntity::getValidUntil, now)));
         return Optional.ofNullable(binding)
                 .map(value -> new PartyScope(value.getPartyType(), value.getPartyId()));
     }

@@ -15,6 +15,7 @@ final class IamAdminCommandValidator {
     private static final Pattern USERNAME = Pattern.compile("[A-Za-z][A-Za-z0-9._@-]{2,119}");
     private static final Pattern MOM_ID = Pattern.compile("[1-9][0-9]{0,18}");
     private static final int MAX_PAGE_SIZE = 200;
+    private static final int MAX_BATCH_IDS = 200;
 
     private IamAdminCommandValidator() {
     }
@@ -64,6 +65,9 @@ final class IamAdminCommandValidator {
 
     static Set<String> normalizedIds(Set<String> values, String name) {
         if (values == null) return Set.of();
+        if (values.size() > MAX_BATCH_IDS) {
+            throw new IllegalArgumentException(name + " 最多允许 " + MAX_BATCH_IDS + " 项");
+        }
         LinkedHashSet<String> result = new LinkedHashSet<>();
         for (String value : values) result.add(requireId(value, name));
         return Set.copyOf(result);

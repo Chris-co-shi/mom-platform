@@ -31,13 +31,6 @@ DIRECT_JDBC_EXCEPTIONS = {
     "io/github/chrisshi/mom/integration/messaging/IntegrationDomainEventConsumerConfiguration.java",
 }
 
-# S02 已登记且尚未完成迁移的两个精确历史注解 SQL；不得增加新文件名。
-SELECT_STAR_EXCEPTION_NAMES = {
-    "IamExternalUserBindingMapper.java",
-    "IamUserSessionMapper.java",
-}
-
-
 @dataclass
 class Report:
     """保存阻断错误。"""
@@ -57,7 +50,7 @@ def check_java_file(relative: str, text: str, report: Report) -> None:
     if not SQL_ADAPTER_IMPORT.search(text):
         return
 
-    if SELECT_STAR.search(text) and pathlib.PurePosixPath(relative).name not in SELECT_STAR_EXCEPTION_NAMES:
+    if SELECT_STAR.search(text):
         report.errors.append(f"正式 Java SQL 必须显式列名，禁止 SELECT *: {relative}")
     if DYNAMIC_SQL_TEXT.search(text):
         report.errors.append(f"Java SQL 禁止 ${{}} 动态文本: {relative}")
