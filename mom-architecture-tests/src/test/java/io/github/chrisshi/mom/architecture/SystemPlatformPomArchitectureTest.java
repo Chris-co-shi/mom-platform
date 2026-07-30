@@ -131,7 +131,7 @@ class SystemPlatformPomArchitectureTest {
     }
 
     /**
-     * 验证 S15-C 只包含 Parameter、Dictionary、Dynamic I18n 的精确 Migration，且 System Mapper XML 为零。
+     * 验证 System 只包含已登记的 Parameter、Dictionary、Dynamic I18n 与治理 Migration，且 Mapper XML 为零。
      */
     @Test
     void s15CMustUseBaseEntityAndMybatisPlusWithoutMapperXml() throws Exception {
@@ -159,7 +159,13 @@ class SystemPlatformPomArchitectureTest {
                                     "src/main/resources/db/migration/system/V3__create_system_i18n.sql")),
                             normalized(server.resolve(
                                     "src/main/resources/db/migration/system/"
-                                            + "V4__align_system_entities_with_base_entity.sql")));
+                                            + "V4__align_system_entities_with_base_entity.sql")),
+                            normalized(server.resolve(
+                                    "src/main/resources/db/migration/system/"
+                                            + "V5__remove_business_foreign_keys.sql")),
+                            normalized(server.resolve(
+                                    "src/main/resources/db/migration/system/"
+                                            + "V6__clarify_i18n_release_snapshot_columns.sql")));
             assertThat(files)
                     .filteredOn(path -> normalized(path).contains("/src/main/resources/mapper/"))
                     .isEmpty();

@@ -198,7 +198,7 @@ UNIQUE (session_id) WHERE status = 'ACTIVE'
 
 普通可更新 IAM Entity 复用 S01 `MomMetaObjectHandler`、CurrentActor、UTC Clock、乐观锁和 `MomBaseMapper`。Wrapper-only Update 继续被拒绝。
 
-## 12. 数据库注释与外键
+## 12. 数据库注释与关联完整性
 
 每张正式表和每个字段均提供完整中文 `COMMENT`。PostgreSQL Catalog 集成测试自动验证：
 
@@ -207,7 +207,7 @@ UNIQUE (session_id) WHERE status = 'ACTIVE'
 数据库字段注释缺失：0
 ```
 
-IAM 内部外键使用 `ON DELETE RESTRICT`，避免用户、角色、Permission、Session 历史引用被物理级联删除。Factory 与 Party 只保存跨服务 ID，不建立跨 Schema 外键。
+IAM V9 已在孤儿检查通过后删除 V1～V3 的全部自主业务物理外键。用户、角色、Permission、Client Policy、Session 与 Refresh 的关联完整性由 Application 引用校验、行锁、Unique/Check、affected rows、本地事务、索引和 PostgreSQL IT 共同维护；不得物理级联删除。Factory 与 Party 只保存跨服务稳定 ID，不建立跨 Schema 外键，其尚缺的权威引用校验记录在 S15-D 审计报告。
 
 ## 13. 后续 Slice 使用方式
 

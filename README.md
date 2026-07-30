@@ -13,7 +13,7 @@
   <img alt="Java" src="https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white">
   <img alt="Spring Boot" src="https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white">
   <img alt="Spring Cloud" src="https://img.shields.io/badge/Spring%20Cloud-2025.1-6DB33F?logo=spring&logoColor=white">
-  <img alt="Status" src="https://img.shields.io/badge/Status-P1.6%20S15%20Deferred-6E7781">
+  <img alt="Status" src="https://img.shields.io/badge/Status-P1.6%20S15--D%20Governance-0969DA">
 </p>
 
 [文档中心](docs/README.md) · [P1.6 治理计划](docs/plans/P1.6-IAM与System平台治理计划.md) · [P1.6 实施进度](docs/plans/P1.6-实施进度.md) · [P1.5 设计基线](docs/security/P1.5-认证与授权设计基线.md) · [V1 路线图](docs/plans/V1路线图.md) · [ADR](docs/adr/README.md)
@@ -23,7 +23,7 @@
 ---
 
 > [!IMPORTANT]
-> Phase 01 与 P1.5 已完成并合并。P1.6 S00～S14 已完成，ADR-025 保持 Accepted；S15-A 未发现 Dynamic I18n 真实调用方，S15 状态为 `Deferred — No Real Caller`，S16 未开始。Phase 02 业务垂直切片未启动。
+> Phase 01 与 P1.5 已完成并合并。P1.6 S00～S15-D 已完成当前治理工作，ADR-025/ADR-026 保持 Accepted；S15-B Dynamic I18n 后端与 S15-D 持久化治理已收口，Factory/Party 权威引用校验精确 Deferred，S16 未开始。Phase 02 业务垂直切片未启动。
 
 ## 🌟 项目愿景
 
@@ -115,7 +115,7 @@ flowchart LR
 | 能力域 | V1 关注点 | 权威模块 |
 |---|---|---|
 | 身份与权限 | OAuth/OIDC、PKCE、用户、角色、权限、Factory/Party Scope、Session | `mom-iam-platform` |
-| 平台配置与体验 | S13 类型化非敏感参数与 S14 非权威受限字典已完成；动态国际化、偏好、应用目录与菜单未实现 | `mom-system-platform` |
+| 平台配置与体验 | S13 参数、S14 字典与 S15-B Dynamic I18n 后端已完成；S15-D 已建立 CRUD/关联/Schema/无 FK 治理；偏好、应用目录与菜单未实现 | `mom-system-platform` |
 | 主数据 | 集团、工厂、物料、人员与 Party 核心身份、版本索引；供应商采购关系与客户销售关系分别由未来采购/SRM、销售/CRM 业务域拥有 | `mom-mdm-platform`（Party Core）；业务域 Planned Authority / Not Implemented |
 | 生产执行 | 工单、版本快照、投料、过程记录、报工 | `mom-mes-platform` |
 | 仓储库存 | 库位、容器、批次、预占、流水、余额、对账 | `mom-wms-platform` |

@@ -5,9 +5,11 @@ import com.baomidou.mybatisplus.annotation.Version;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import io.github.chrisshi.mom.data.entity.BaseAuditEntity;
 import io.github.chrisshi.mom.data.entity.BaseEntity;
 import io.github.chrisshi.mom.data.entity.BaseIdEntity;
 import io.github.chrisshi.mom.data.mapper.MomBaseMapper;
+import io.github.chrisshi.mom.system.infrastructure.persistence.i18n.SystemI18nReleaseEntity;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -21,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>本测试分析 Reactor 已编译字节码，不解析 Java import。它自动判断稳定且可证明的事实：业务 Mapper
  * 和 Entity 的包位置、MyBatis-Plus 通用 Service 禁区、正式 bounded context 对 Spring JDBC/java.sql 的
- * 直接依赖、System 自有业务 Entity 的统一 BaseEntity 能力以及公共基类字段类型。</p>
+ * 直接依赖、System Entity 按生命周期选择的基类能力以及公共基类字段类型。</p>
  *
  * <p>直接 JDBC 只允许四个已经登记的精确历史/协议例外；不得新增包级排除。System Parameter、Dictionary、
  * Dynamic I18n 及后续正式业务能力必须统一通过 MyBatis-Plus Mapper 体系访问 PostgreSQL。</p>
@@ -55,15 +57,18 @@ class PersistenceArchitectureTest {
                 .check(productionClasses);
     }
 
-    /** System 自有正式业务表统一使用完整 BaseEntity，不再分散声明 version/deleted/audit。 */
+    /** System 普通可变业务表使用完整 BaseEntity，不可变发布快照精确使用审计基类。 */
     @Test
-    void systemBusinessEntitiesMustUseBaseEntity() {
+    void systemEntitiesMustSelectBaseClassByCapability() {
         classes()
                 .that().resideInAnyPackage("io.github.chrisshi.mom.system.infrastructure.persistence..")
                 .and().haveSimpleNameEndingWith("Entity")
+                .and().doNotHaveFullyQualifiedName(SystemI18nReleaseEntity.class.getName())
                 .should().beAssignableTo(BaseEntity.class)
-                .because("System 自有 Parameter、Dictionary 与 Dynamic I18n 表统一继承 BaseEntity")
+                .because("System 可更新且支持乐观锁/逻辑删除的普通业务表使用 BaseEntity")
                 .check(productionClasses);
+        assertThat(BaseAuditEntity.class.isAssignableFrom(SystemI18nReleaseEntity.class)).isTrue();
+        assertThat(BaseEntity.class.isAssignableFrom(SystemI18nReleaseEntity.class)).isFalse();
     }
 
     /** MOM 业务代码不得把 MyBatis-Plus 通用 Service 当作领域或 Repository 契约。 */

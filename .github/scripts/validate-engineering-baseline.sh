@@ -190,6 +190,7 @@ for relative in filter(None, tracked):
     if relative.startswith(iam_test_prefix):
         if relative.endswith("IntegrationTest.java"):
             errors.append(f"IAM default Surefire scope must not contain IntegrationTest: {relative}")
+        is_failsafe_test = relative.endswith(("IT.java", "ITCase.java"))
         external_runtime_markers = (
             "@Testcontainers", "PostgreSQLContainer", "GenericContainer<",
             "DockerImageName", "@DynamicPropertySource",
@@ -197,7 +198,8 @@ for relative in filter(None, tracked):
         mutating_sql = "JdbcTemplate" in text and re.search(
             r"\b(?:jdbc|jdbcTemplate)\.(?:update|execute|batchUpdate)\s*\(", text
         )
-        if any(marker in text for marker in external_runtime_markers) or mutating_sql:
+        if not is_failsafe_test and (
+                any(marker in text for marker in external_runtime_markers) or mutating_sql):
             errors.append(f"IAM unit-test scope must not start or mutate external data stores: {relative}")
 
 if errors:
@@ -212,7 +214,7 @@ for note in notes:
     print(f"- {note}")
 print("- no preview/internal API/module-escape violations")
 print("- no legacy Nacos bootstrap or disabled compatibility checks")
-print("- IAM default tests contain no external data-store integration tests")
+print("- IAM Surefire tests contain no external data-store integration tests; Failsafe *IT/*ITCase remains allowed")
 print("- S01/S02/S03/S04/S05 standards and Maven architecture-test module are wired")
 PY
 

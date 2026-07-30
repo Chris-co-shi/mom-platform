@@ -29,7 +29,7 @@ gateway and bootstrap tests
 - API 只暴露 Parameter Scope/Value Type/有效值，以及 Dictionary Active Option/Compatibility 只读契约；
 - Client 仅依赖自身 API 与 `mom-openfeign`，没有真实 Feign 接口；
 - Server 精确依赖自身 API、WebMVC、Data、Security、Tracing/Metrics、Nacos Discovery 与测试基础设施；
-- PostgreSQL `mom_system` 中 V1 Parameter、V2 Dictionary 两表与 V3 I18n 三表是各自唯一权威；FK 只允许同 Schema Restrict，禁止跨 Schema FK/JOIN；
+- PostgreSQL `mom_system` 中 V1 Parameter、V2 Dictionary 两表与 V3 I18n 三表是各自唯一权威；V5 已移除历史业务 FK，关联完整性由 Application 校验、约束、索引、事务、孤儿诊断和 PostgreSQL IT 共同保证，禁止任何跨 Schema FK/JOIN；
 - Dictionary 只承载低频、无独立生命周期的稳定 Code 与 fallback Label，不得复制 IAM/MDM/WMS/EAM 权威对象；
 - Dynamic I18n 使用 Draft → 显式 Publish → 双 Locale 不可变 Release；Runtime 只读当前完整版本并支持 ETag/304，回滚创建新版本；
 - Security 传递的 Redis 只检查 revoked sid，不是 System 业务存储或缓存；Server 不依赖 IAM Server、其他领域 Server、MQ、Outbox 或 Seata；
