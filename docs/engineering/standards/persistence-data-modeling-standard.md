@@ -81,8 +81,8 @@ MOM 的 `MomBaseMapper` 因此拒绝该形式，自定义 SQL 必须显式处理
 
 ## 5. Mapper、Repository 与 Application
 
-- Mapper 属于 Infrastructure Persistence，可使用 `BaseMapper`、明确 XML SQL、条件更新、查询投影和
-  有界批量操作；不得进入 Domain、api/client、Controller 或跨服务契约，也不编排业务用例。
+- Mapper 属于 Infrastructure Persistence，默认只继承 `MomBaseMapper`；普通单表查询由 Repository 使用
+  `LambdaQueryWrapper`、`LambdaUpdateWrapper`、`Page` 或受控 `last` 表达，不为框架已支持的能力重复建 XML。
 - Repository 是领域/应用所需的持久化语义边界，不是 Mapper 机械别名。它隐藏 SQL、Wrapper、Page、
   Entity 和 affected rows，并把不存在、唯一冲突、版本/锁冲突转换为稳定语义。
 - Application Service 的公共方法定义业务事务边界、授权和用例编排；不得把 Mapper Entity 返回 Web。
@@ -91,26 +91,34 @@ MOM 的 `MomBaseMapper` 因此拒绝该形式，自定义 SQL 必须显式处理
 
 ### 5.1 数据访问技术栈选择
 
-1. MOM 正式业务表默认且强制使用 MyBatis/MyBatis-Plus Mapper 体系。简单写入优先使用
-   `MomBaseMapper` Entity 路径；复杂查询、行锁、JSONB、聚合和受控批量使用 MyBatis 注解 SQL 或 Mapper XML。
-2. 除精确登记的协议存储、Framework 基础设施与默认关闭的技术验证设施外，正式 bounded context
+1. MOM 正式业务表默认且强制使用 **MyBatis-Plus 优先** 的持久化体系。普通 Insert/Update/Delete、
+   主键查询、单表等值/范围过滤、计数、固定排序和分页必须优先使用 `MomBaseMapper`、Entity、
+   `LambdaQueryWrapper`/`LambdaUpdateWrapper` 与 MyBatis-Plus 插件。
+2. 对 MyBatis-Plus 已能清晰表达的单表 CRUD 或查询，禁止为了“SQL 可见”“格式统一”或复制既有模式
+   新增 Mapper XML、注解 SQL 或重复 Mapper 方法。XML 数量不是治理质量，重复 SQL 会扩大维护和审计面。
+3. 只有在 MyBatis-Plus DSL 无法清晰、稳定地表达数据库语义时，才允许自定义 SQL，例如 JSONB 类型转换、
+   CTE、窗口函数、复杂聚合投影、批量 Upsert、`SKIP LOCKED` 等。短且固定的语句可使用注解；结构复杂、
+   需要复用片段或专用投影时才使用 XML，并在 Mapper Javadoc 中说明不能使用 MP 的具体原因。
+4. `FOR UPDATE` 等固定尾句可通过受控 Wrapper 表达时，不应单独创建 XML；`last` 只能拼接服务端固定文本或
+   已验证的非负数字，不得接收客户端标识符、表达式或原始字符串。
+5. 除精确登记的协议存储、Framework 基础设施与默认关闭的技术验证设施外，正式 bounded context
    生产代码禁止直接依赖 `JdbcTemplate`、`JdbcClient`、`NamedParameterJdbcTemplate`、`SimpleJdbcInsert`
    或 `java.sql` API，不得通过改类名、封装 Helper 或自行实现 RowMapper 建立第二套持久化体系。
-3. Spring Authorization Server 官方 JDBC Store 是协议特例；Outbox/Inbox 等 Framework 基础设施按其独立
+6. Spring Authorization Server 官方 JDBC Store 是协议特例；Outbox/Inbox 等 Framework 基础设施按其独立
    规范治理。技术探针只能使用精确类名例外，必须记录责任范围、默认关闭条件和退出 Slice。
-4. 新增直接 JDBC 例外必须先有 Accepted ADR、精确类名、技术必要性、事务/审计/失败语义、测试证据和
+7. 新增直接 JDBC 例外必须先有 Accepted ADR、精确类名、技术必要性、事务/审计/失败语义、测试证据和
    删除条件。不得以“SQL 复杂”“性能更高”“实现方便”或“位于 Infrastructure”为理由直接获得例外。
-5. 例外不得使用包级、模块级或通配符白名单；历史例外只冻结事实，不授予新代码复制权限。
+8. 例外不得使用包级、模块级或通配符白名单；历史例外只冻结事实，不授予新代码复制权限。
 
-## 6. MyBatis 与自定义 SQL
+## 6. MyBatis-Plus 与自定义 SQL
 
-1. SQL 必须参数化；禁止将用户输入放入 `${}`。固定内部表达式只有经逐语句审查并进入精确白名单才允许。
+1. Wrapper 条件必须由服务端字段和类型安全方法引用构建；禁止将用户输入放入 `${}` 或 SQL 尾句。
 2. 动态排序先映射到服务端列白名单；客户端字段名或表达式不得直接成为 SQL 标识符。
-3. 正式业务查询显式列名；大结果分页、Cursor、流式或分批处理，禁止无界加载和 N+1。
-4. 批量查询、批量写入均定义上限。动态 `IN` 列表不得无限增长。
+3. MyBatis-Plus 自动生成的列映射可用于 Entity 单表查询；自定义 SQL 必须显式列名，禁止 `SELECT *`。
+4. 大结果必须分页、Cursor、流式或分批处理，禁止无界加载和 N+1；批量查询/写入均定义上限。
 5. 自定义 SQL 显式维护审计和版本；Update/Delete 必须有可证明的限定条件并检查 affected rows。
 6. SQL 日志、异常和候选报告不得输出密码、Token、Secret、完整 SQL 参数或原始约束文本。
-7. 复杂 XML SQL 使用中文说明解释非显然的一致性、锁和并发语义。
+7. 复杂 XML SQL 使用中文说明解释非显然的一致性、锁、数据库特性和为何不能使用 MyBatis-Plus Wrapper。
 8. Mapper XML、MyBatis Java 注解 SQL 和精确 JDBC 例外都必须进入静态检查；不得利用 Java Text Block
    绕过 `${}`、`SELECT *`、跨 Schema 或无条件写入审查。
 

@@ -20,8 +20,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * System Platform S15-C 的 POM 语义与 Parameter/Dictionary/Dynamic I18n 精确白名单门禁。
  *
  * <p>测试通过 XML DOM 读取实际 POM，不使用字符串 grep 推断依赖。它同时检查 Reactor 注册、聚合模块、
- * API/Client/Server 直接依赖白名单和 S16+ 禁止资源。测试只读工作区，无网络、数据库或中间件副作用；
- * XML 不可解析、目录缺失或白名单外依赖均直接失败。</p>
+ * API/Client/Server 直接依赖白名单和 S16+ 禁止资源。持久化资源白名单遵循 MyBatis-Plus 优先：
+ * 单表 CRUD/过滤/分页不得为形式统一新增 XML，只有 Release JSONB/聚合投影保留专用 XML。</p>
  */
 class SystemPlatformPomArchitectureTest {
 
@@ -49,11 +49,7 @@ class SystemPlatformPomArchitectureTest {
             "ResolvedSystemParameter.java", "SystemDictionaryItemOption.java",
             "ResolvedSystemDictionaryItem.java");
 
-    /**
-     * 验证根 Reactor 精确注册一次 System 聚合模块。
-     *
-     * @throws Exception POM 读取或解析失败
-     */
+    /** 验证根 Reactor 精确注册一次 System 聚合模块。 */
     @Test
     void rootReactorMustRegisterSystemPlatformExactlyOnce() throws Exception {
         Path root = reactorRoot();
@@ -63,11 +59,7 @@ class SystemPlatformPomArchitectureTest {
         assertThat(root.resolve("mom-system-platform")).isDirectory();
     }
 
-    /**
-     * 验证聚合 POM 只包含 api/client/server，且不声明业务依赖。
-     *
-     * @throws Exception POM 读取或解析失败
-     */
+    /** 验证聚合 POM 只包含 api/client/server，且不声明业务依赖。 */
     @Test
     void aggregateMustContainOnlyApprovedModulesAndNoDependencies() throws Exception {
         Document document = parse(systemRoot().resolve("pom.xml"));
@@ -79,11 +71,7 @@ class SystemPlatformPomArchitectureTest {
         assertThat(dependencies(project)).isEmpty();
     }
 
-    /**
-     * 验证 API 只暴露 S13 参数与 S14 字典稳定只读契约，Client 仍保持空调用骨架。
-     *
-     * @throws Exception POM 或文件读取失败
-     */
+    /** 验证 API 只暴露 S13 参数与 S14 字典稳定只读契约，Client 仍保持空调用骨架。 */
     @Test
     void apiAndClientMustExposeOnlyApprovedContractsAndRemainTransportBounded() throws Exception {
         Element api = parse(systemRoot().resolve("mom-system-api/pom.xml")).getDocumentElement();
@@ -98,11 +86,7 @@ class SystemPlatformPomArchitectureTest {
                 .allMatch(path -> path.getFileName().toString().equals("package-info.java"));
     }
 
-    /**
-     * 验证 Server 仅使用三项已批准能力、安全和数据实际依赖，并要求测试依赖保持 test scope。
-     *
-     * @throws Exception POM 读取或解析失败
-     */
+    /** 验证 Server 仅使用三项已批准能力、安全和数据实际依赖，并要求测试依赖保持 test scope。 */
     @Test
     void serverMustUseOnlyApprovedSystemDependencies() throws Exception {
         Element server = parse(systemRoot().resolve("mom-system-server/pom.xml")).getDocumentElement();
@@ -122,11 +106,7 @@ class SystemPlatformPomArchitectureTest {
         assertThat(validateServerDependencies(dependencies)).isEmpty();
     }
 
-    /**
-     * 负例 Fixture 必须证明 IAM Server 依赖会被同一语义校验拒绝。
-     *
-     * @throws Exception Fixture 读取或解析失败
-     */
+    /** 负例 Fixture 必须证明 IAM Server 依赖会被同一语义校验拒绝。 */
     @Test
     void invalidServerDependencyFixtureMustBeRejected() throws Exception {
         Path fixture = reactorRoot().resolve(
@@ -151,12 +131,13 @@ class SystemPlatformPomArchitectureTest {
     }
 
     /**
-     * 验证 S15-C 只保留 Parameter、Dictionary、Dynamic I18n 及六份精确 Mapper 资源。
+     * 验证 S15-C 只包含 Parameter、Dictionary、Dynamic I18n 的精确 Migration/Mapper 资源。
      *
-     * @throws Exception 文件遍历失败
+     * <p>Resource 与 Message 的单表查询必须使用 MyBatis-Plus Wrapper，不允许重新增加同名 XML；
+     * Release XML 仅承载 JSONB CAST、版本聚合与历史投影。</p>
      */
     @Test
-    void s15BMustContainOnlyThreeApprovedCapabilitiesAndPersistenceResources() throws Exception {
+    void s15CMustPreferMybatisPlusAndKeepOnlyNecessaryMapperXml() throws Exception {
         Path server = systemRoot().resolve("mom-system-server");
         Path packageRoot = server.resolve("src/main/java/io/github/chrisshi/mom/system");
 
@@ -190,10 +171,6 @@ class SystemPlatformPomArchitectureTest {
                                     "src/main/resources/mapper/system/SystemDictionaryMapper.xml")),
                             normalized(server.resolve(
                                     "src/main/resources/mapper/system/SystemDictionaryItemMapper.xml")),
-                            normalized(server.resolve(
-                                    "src/main/resources/mapper/system/SystemI18nResourceMapper.xml")),
-                            normalized(server.resolve(
-                                    "src/main/resources/mapper/system/SystemI18nMessageMapper.xml")),
                             normalized(server.resolve(
                                     "src/main/resources/mapper/system/SystemI18nReleaseMapper.xml")));
         }

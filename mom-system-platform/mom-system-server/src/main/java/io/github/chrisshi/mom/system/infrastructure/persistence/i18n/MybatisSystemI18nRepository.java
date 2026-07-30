@@ -1,5 +1,7 @@
 package io.github.chrisshi.mom.system.infrastructure.persistence.i18n;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.system.application.i18n.SystemI18nException;
 import io.github.chrisshi.mom.system.domain.i18n.SystemI18nRepository;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -15,9 +17,10 @@ import java.util.Optional;
 /**
  * 基于 MyBatis-Plus 的 Dynamic I18n Repository Adapter。
  *
- * <p>Resource 与 Draft 的普通写入使用 MomBaseMapper Entity 路径，统一获得 String ASSIGN_ID、Actor 审计和
- * 乐观锁；行锁、JSONB、不可变 Release 与聚合历史通过参数化 Mapper SQL 实现。该 Adapter 不依赖 Spring JDBC
- * 或 java.sql，不创建第二套数据访问基础设施。数据库或 JSON 损坏时 Fail Closed，不返回 Draft、缓存或跨版本拼接。</p>
+ * <p>Resource 与 Draft 的普通写入、单表条件查询、计数、固定排序和分页统一使用
+ * {@code MomBaseMapper + LambdaQueryWrapper}，不为 MyBatis-Plus 已能清晰表达的查询重复创建 Mapper XML。
+ * Resource 行锁通过服务端固定 {@code FOR UPDATE} 尾句表达；只有 JSONB 转换、版本聚合和历史投影继续保留
+ * 在 Release 专用 Mapper XML。该 Adapter 不依赖 Spring JDBC 或 java.sql，也不创建第二套数据访问基础设施。</p>
  */
 @Repository
 public class MybatisSystemI18nRepository implements SystemI18nRepository {
@@ -67,27 +70,41 @@ public class MybatisSystemI18nRepository implements SystemI18nRepository {
 
     @Override
     public Optional<Resource> findResourceById(String id) {
-        return Optional.ofNullable(resourceMapper.selectById(id)).map(MybatisSystemI18nRepository::toResource);
+        return Optional.ofNullable(resourceMapper.selectById(id))
+                .map(MybatisSystemI18nRepository::toResource);
     }
 
     @Override
     public Optional<Resource> findResourceByCodes(String applicationCode, String resourceCode) {
-        return Optional.ofNullable(resourceMapper.selectByCodes(applicationCode, resourceCode))
+        var query = Wrappers.<SystemI18nResourceEntity>lambdaQuery()
+                .eq(SystemI18nResourceEntity::getApplicationCode, applicationCode)
+                .eq(SystemI18nResourceEntity::getResourceCode, resourceCode);
+        return Optional.ofNullable(resourceMapper.selectOne(query))
                 .map(MybatisSystemI18nRepository::toResource);
     }
 
     @Override
     public Optional<Resource> lockResource(String id) {
-        return Optional.ofNullable(resourceMapper.selectForUpdate(id)).map(MybatisSystemI18nRepository::toResource);
+        var query = Wrappers.<SystemI18nResourceEntity>lambdaQuery()
+                .eq(SystemI18nResourceEntity::getId, id)
+                .last("FOR UPDATE");
+        return Optional.ofNullable(resourceMapper.selectOne(query))
+                .map(MybatisSystemI18nRepository::toResource);
     }
 
     @Override
     public Page<Resource> findResources(String applicationCode, Boolean enabled, int page, int size) {
         long offset = Math.multiplyExact((long) page, size);
-        List<Resource> items = resourceMapper.selectPage(applicationCode, enabled, size, offset).stream()
+        long total = resourceMapper.selectCount(resourceFilter(applicationCode, enabled));
+        List<Resource> items = total == 0 ? List.of() : resourceMapper.selectList(
+                        resourceFilter(applicationCode, enabled)
+                                .orderByAsc(SystemI18nResourceEntity::getApplicationCode)
+                                .orderByAsc(SystemI18nResourceEntity::getResourceCode)
+                                .orderByAsc(SystemI18nResourceEntity::getId)
+                                .last(limitOffset(size, offset)))
+                .stream()
                 .map(MybatisSystemI18nRepository::toResource)
                 .toList();
-        long total = resourceMapper.countPage(applicationCode, enabled);
         return new Page<>(items, total, page, size);
     }
 
@@ -118,13 +135,23 @@ public class MybatisSystemI18nRepository implements SystemI18nRepository {
 
     @Override
     public Optional<Message> findMessage(String resourceId, String messageId) {
-        return Optional.ofNullable(messageMapper.selectByResourceAndId(resourceId, messageId))
+        var query = Wrappers.<SystemI18nMessageEntity>lambdaQuery()
+                .eq(SystemI18nMessageEntity::getResourceId, resourceId)
+                .eq(SystemI18nMessageEntity::getId, messageId);
+        return Optional.ofNullable(messageMapper.selectOne(query))
                 .map(MybatisSystemI18nRepository::toMessage);
     }
 
     @Override
     public List<Message> findEnabledMessages(String resourceId) {
-        return messageMapper.selectEnabledByResource(resourceId).stream()
+        return messageMapper.selectList(
+                        Wrappers.<SystemI18nMessageEntity>lambdaQuery()
+                                .eq(SystemI18nMessageEntity::getResourceId, resourceId)
+                                .eq(SystemI18nMessageEntity::getEnabled, true)
+                                .orderByAsc(SystemI18nMessageEntity::getMessageKey)
+                                .orderByAsc(SystemI18nMessageEntity::getLocale)
+                                .orderByAsc(SystemI18nMessageEntity::getId))
+                .stream()
                 .map(MybatisSystemI18nRepository::toMessage)
                 .toList();
     }
@@ -133,11 +160,16 @@ public class MybatisSystemI18nRepository implements SystemI18nRepository {
     public Page<Message> findMessages(
             String resourceId, String messageKey, String locale, Boolean enabled, int page, int size) {
         long offset = Math.multiplyExact((long) page, size);
-        List<Message> items = messageMapper.selectPage(
-                        resourceId, messageKey, locale, enabled, size, offset).stream()
+        long total = messageMapper.selectCount(messageFilter(resourceId, messageKey, locale, enabled));
+        List<Message> items = total == 0 ? List.of() : messageMapper.selectList(
+                        messageFilter(resourceId, messageKey, locale, enabled)
+                                .orderByAsc(SystemI18nMessageEntity::getMessageKey)
+                                .orderByAsc(SystemI18nMessageEntity::getLocale)
+                                .orderByAsc(SystemI18nMessageEntity::getId)
+                                .last(limitOffset(size, offset)))
+                .stream()
                 .map(MybatisSystemI18nRepository::toMessage)
                 .toList();
-        long total = messageMapper.countPage(resourceId, messageKey, locale, enabled);
         return new Page<>(items, total, page, size);
     }
 
@@ -173,6 +205,31 @@ public class MybatisSystemI18nRepository implements SystemI18nRepository {
                         row.getChangeNote(), row.getPublishedBy(), row.getPublishedAt(), row.getLocaleCount()))
                 .toList();
         return new Page<>(items, releaseMapper.countHistory(resourceId), page, size);
+    }
+
+    private static LambdaQueryWrapper<SystemI18nResourceEntity> resourceFilter(
+            String applicationCode, Boolean enabled) {
+        return Wrappers.<SystemI18nResourceEntity>lambdaQuery()
+                .eq(applicationCode != null, SystemI18nResourceEntity::getApplicationCode, applicationCode)
+                .eq(enabled != null, SystemI18nResourceEntity::getEnabled, enabled);
+    }
+
+    private static LambdaQueryWrapper<SystemI18nMessageEntity> messageFilter(
+            String resourceId, String messageKey, String locale, Boolean enabled) {
+        return Wrappers.<SystemI18nMessageEntity>lambdaQuery()
+                .eq(SystemI18nMessageEntity::getResourceId, resourceId)
+                .eq(messageKey != null, SystemI18nMessageEntity::getMessageKey, messageKey)
+                .eq(locale != null, SystemI18nMessageEntity::getLocale, locale)
+                .eq(enabled != null, SystemI18nMessageEntity::getEnabled, enabled);
+    }
+
+    /**
+     * 生成只包含服务端校验后非负数字的固定分页尾句。
+     *
+     * <p>该方法不接受客户端 SQL 标识符或表达式；page/size 已在 Application 层限制，因此不会形成动态 SQL 注入。</p>
+     */
+    private static String limitOffset(int size, long offset) {
+        return "LIMIT " + size + " OFFSET " + offset;
     }
 
     private Release toRelease(SystemI18nReleaseEntity entity) {
