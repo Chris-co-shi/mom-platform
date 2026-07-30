@@ -73,6 +73,9 @@
 数据访问、事务与审计生命周期的详细权威来源为：
 
 - `docs/engineering/standards/persistence-data-modeling-standard.md`；
+- `docs/engineering/standards/crud-application-standard.md`；
+- `docs/engineering/standards/multi-table-association-query-standard.md`；
+- `docs/engineering/standards/database-schema-design-standard.md`；
 - `docs/engineering/standards/transaction-consistency-standard.md`；
 - `docs/engineering/standards/audit-concurrency-lifecycle-standard.md`。
 
@@ -126,6 +129,28 @@ Migration 不得修改或删除。SAS 官方 JDBC Store 保持协议特殊边界
 - Mapper 不得通过 `IService/ServiceImpl` 直接升级为领域服务契约，事务边界应由显式 Application Service 定义；
 - Lombok 仅用于消除 getter、setter、构造器等机械代码，不得使用 `@Data` 自动生成实体 `equals/hashCode/toString`，避免触发懒加载、递归引用或错误身份语义；
 - 新增 Flyway 迁移后不得修改已经合并执行过的历史迁移文件，结构变更必须增加新版本迁移。
+
+### 4.1 持久化改动前置协议
+
+任何新增或修改 Migration、Table、Entity、Mapper、Mapper XML、Repository、Query Mapper、Application
+Service 或 Controller CRUD 前，AI 必须先输出并确认：
+
+1. 数据所有权；
+2. 表类型和生命周期；
+3. Entity 基类选择；
+4. 单表数据访问操作清单；
+5. MyBatis-Plus 可覆盖范围；
+6. 每条自定义 SQL 的技术必要性；
+7. 多表关系类型；
+8. 多表分页方式；
+9. 删除、禁用、归档策略；
+10. 无物理外键完整性方案；
+11. 事务和并发策略；
+12. 查询和索引映射；
+13. 测试证据。
+
+MOM 自主业务表、关系表、流水表、快照表和平台表禁止物理外键与物理级联；精确协议例外必须落实到
+具体文件和具体表。规范文件存在不等于验收完成；必须检查最终实现是否实际采用规范要求的技术路径。
 
 ## 5. 消息与最终一致性约束
 

@@ -39,6 +39,9 @@ jobs:
           .github/scripts/validate-runtime-security-baseline.sh
           .github/scripts/validate-test-baseline.sh
           .github/scripts/validate-localization-baseline.sh
+          .github/scripts/validate-crud-baseline.sh
+          .github/scripts/validate-schema-design-baseline.sh
+          .github/scripts/validate-no-business-foreign-key.sh
           .github/scripts/nacos-discovery-smoke.sh
           .github/scripts/redis-idempotency-smoke.sh
           .github/scripts/redis-rate-limit-smoke.sh
@@ -58,6 +61,12 @@ jobs:
           .github/scripts/test_validate_test_baseline.py
           .github/scripts/validate_localization_baseline.py
           .github/scripts/test_validate_localization_baseline.py
+          .github/scripts/validate_crud_baseline.py
+          .github/scripts/test_validate_crud_baseline.py
+          .github/scripts/validate_schema_design_baseline.py
+          .github/scripts/test_validate_schema_design_baseline.py
+          .github/scripts/validate_no_business_foreign_key.py
+          .github/scripts/test_validate_no_business_foreign_key.py
 
       - name: Validate official engineering baseline
         shell: bash
@@ -107,6 +116,17 @@ jobs:
           python3 .github/scripts/test_validate_localization_baseline.py
           bash .github/scripts/validate-localization-baseline.sh 2>&1 | tee localization-baseline.log
 
+      - name: Validate CRUD association and schema baselines
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 .github/scripts/test_validate_crud_baseline.py
+          python3 .github/scripts/test_validate_schema_design_baseline.py
+          python3 .github/scripts/test_validate_no_business_foreign_key.py
+          bash .github/scripts/validate-crud-baseline.sh 2>&1 | tee crud-baseline.log
+          bash .github/scripts/validate-schema-design-baseline.sh 2>&1 | tee schema-design-baseline.log
+          bash .github/scripts/validate-no-business-foreign-key.sh 2>&1 | tee no-business-foreign-key.log
+
       - name: Upload engineering baseline report
         if: always()
         uses: actions/upload-artifact@v4
@@ -119,4 +139,7 @@ jobs:
             runtime-security-baseline.log
             test-baseline.log
             localization-baseline.log
+            crud-baseline.log
+            schema-design-baseline.log
+            no-business-foreign-key.log
           if-no-files-found: error

@@ -79,6 +79,10 @@
 
 ## 技术架构
 
+- [CRUD 与应用服务规范](engineering/standards/crud-application-standard.md)
+- [多表关联与查询规范](engineering/standards/multi-table-association-query-standard.md)
+- [数据库表结构设计规范](engineering/standards/database-schema-design-standard.md)
+
 - [系统上下文](architecture/系统上下文.md)
 - [服务与容器架构](architecture/服务与容器架构.md)
 - [模块边界](architecture/module-boundaries.md)
@@ -96,6 +100,7 @@
 - [ADR 索引](adr/README.md)
 - [ADR 模板](adr/ADR-模板.md)
 - [ADR-025：IAM、System、MDM、WMS、EAM 数据所有权边界（Accepted）](adr/ADR-025-IAM-System-MDM-WMS-EAM数据所有权边界.md)
+- [ADR-026：MOM 业务表禁止物理外键与关联完整性策略（Accepted）](adr/ADR-026-MOM业务表禁止物理外键与关联完整性策略.md)
 
 ## 垂直切片
 

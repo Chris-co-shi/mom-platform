@@ -33,7 +33,8 @@
 - 技术主键与可变业务编码分离，不以业务编码作为跨服务技术引用。
 - 业务唯一性最终由数据库 Unique Constraint/Unique Index 保护；Application 预检查只改善错误信息。
 - 逻辑删除后是否允许复用业务键必须显式决定；未批准复用时保留永久唯一约束。
-- 同一 bounded context 内的 FK 按生命周期、写序、删除、性能和历史保留逐项决定。
+- MOM 自主业务表、关系表、流水表、快照表和平台表全面禁止物理 FK 与物理级联，同一 bounded context、
+  Schema 或聚合也不例外；完整性由 Application 校验、受控删除、Unique/Check、索引、事务、测试和对账共同保证。
 - 稳定、简单且适合数据库兜底的不变量应评估 Check Constraint。
 
 ### 3.3 Java/PostgreSQL 类型
@@ -53,17 +54,10 @@ JSONB 只用于真正半结构化且检索需求明确的数据，不能替代�
 
 ### 4.1 默认规则
 
-MOM 自有、进入正式业务读写路径的关系型 Entity **必须继承 `BaseEntity`**。`BaseEntity` 统一提供：
-
-- `String id` + `ASSIGN_ID`；
-- `createdAt/createdBy`；
-- `updatedAt/updatedBy`；
-- `Long version` + `@Version`；
-- `Boolean deleted` + `@TableLogic`。
-
-业务 Entity 不得重复声明上述字段，也不得通过继承 `BaseAuditEntity` 后自行复制 `version` 的方式制造局部变体。
-数据库表必须与 `BaseEntity` 字段完整对齐；既有表缺列时使用新的 Flyway Versioned Migration 向前补齐，
-不得修改已经发布的 Migration。
+MOM 关系型 Entity 必须按表能力选择最小充分基类：仅需技术主键使用 `BaseIdEntity`；需要创建和修改
+审计使用 `BaseAuditEntity`；同时需要乐观锁与逻辑删除的普通可变业务表使用 `BaseEntity`。业务 Entity
+不得重复声明基类已经提供的字段。数据库表必须与所选能力完整对齐；既有表缺列时使用新的 Flyway
+Versioned Migration 向前补齐，不得修改已经发布的 Migration。
 
 ### 4.2 精确例外
 
@@ -74,9 +68,9 @@ MOM 自有、进入正式业务读写路径的关系型 Entity **必须继承 `B
 - 无单列技术主键或由外部协议强制定义键结构的表；
 - Framework 内部技术租约、锁和基础设施状态表。
 
-**System Platform 的 Parameter、Dictionary、Dictionary Item、I18n Resource、I18n Message、I18n Release
-不属于例外，全部继承 `BaseEntity`。** Release 即使业务上不可变，也保留完整基类字段，并由数据库触发器
-继续阻断 UPDATE/DELETE。
+关系表、日志、流水、Outbox/Inbox、快照、不可变事实、复合主键或外部协议模型不得为了形式统一强制
+继承完整 `BaseEntity`。System 当前已发布 Entity 的基类调整必须由独立行为证据和新 Migration 支撑，
+不能把历史实现提升为所有后续表的默认规则。
 
 Entity 只能位于 Infrastructure Persistence；不得进入 api/client、Domain 或公开响应。禁止 Lombok `@Data`
 和敏感全字段 `toString()`。
@@ -150,6 +144,11 @@ Spring Authorization Server 官方 JDBC Store 是协议特例；Framework JSONB 
 - 门禁以 Base/Head Git 对象比较不可变性，不以文件时间猜测历史。
 
 ## 9. 官方事实来源
+
+物理外键与关联完整性的项目最高决策见
+[ADR-026](../../adr/ADR-026-MOM业务表禁止物理外键与关联完整性策略.md)，CRUD、关联查询与表结构的具体
+执行规则分别见 `crud-application-standard.md`、`multi-table-association-query-standard.md` 和
+`database-schema-design-standard.md`。
 
 - [PostgreSQL 17 Schemas](https://www.postgresql.org/docs/17/ddl-schemas.html)
 - [PostgreSQL 17 Constraints](https://www.postgresql.org/docs/17/ddl-constraints.html)

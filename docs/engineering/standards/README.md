@@ -11,6 +11,9 @@
 - `http-api-contract-standard.md`：路径、DTO、校验、错误、状态码、分页、排序与过滤；
 - `api-evolution-idempotency-standard.md`：HTTP 幂等、OpenAPI、兼容、弃用与删除条件。
 - `persistence-data-modeling-standard.md`：数据所有权、命名、类型、Entity、Mapper/Repository、SQL 与 Flyway；
+- `crud-application-standard.md`：CRUD 生命周期、分层、事务、幂等、MyBatis-Plus 与验收证据；
+- `multi-table-association-query-standard.md`：关系类型、多表写入、聚合加载、Projection、JOIN 与一对多分页；
+- `database-schema-design-standard.md`：表类型、字段/约束/索引、无物理 FK、注释、归档与 Migration 风险；
 - `transaction-consistency-standard.md`：本地事务、Outbox/Inbox、Seata 与 SAS JDBC Store 特殊边界；
 - `audit-concurrency-lifecycle-standard.md`：并发控制、三类审计、Actor、删除、归档与保留。
 - `configuration-profile-secret-standard.md`：配置来源、Profile、Secret、Nacos 与动态刷新边界；
@@ -28,3 +31,6 @@
 - `user-preference-standard.md`：System 偏好所有权、覆盖层级、授权隔离和 S16 进入条件。
 
 本索引只负责导航，强制规则以根目录 `AGENTS.md` 和对应规范正文为准。
+
+持久化改动前使用 `../templates/table-design-record-template.md`、
+`../templates/multi-table-query-design-template.md` 和 `../templates/crud-slice-acceptance-template.md`；模板完成不替代实现验收。

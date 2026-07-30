@@ -33,6 +33,15 @@ required_files = [
     ".github/scripts/validate-localization-baseline.sh",
     ".github/scripts/validate_localization_baseline.py",
     ".github/scripts/test_validate_localization_baseline.py",
+    ".github/scripts/validate-crud-baseline.sh",
+    ".github/scripts/validate_crud_baseline.py",
+    ".github/scripts/test_validate_crud_baseline.py",
+    ".github/scripts/validate-schema-design-baseline.sh",
+    ".github/scripts/validate_schema_design_baseline.py",
+    ".github/scripts/test_validate_schema_design_baseline.py",
+    ".github/scripts/validate-no-business-foreign-key.sh",
+    ".github/scripts/validate_no_business_foreign_key.py",
+    ".github/scripts/test_validate_no_business_foreign_key.py",
     ".github/scripts/nacos-discovery-smoke.sh",
     ".github/scripts/redis-idempotency-smoke.sh",
     ".github/scripts/redis-rate-limit-smoke.sh",
@@ -46,6 +55,13 @@ required_files = [
     "docs/engineering/standards/http-api-contract-standard.md",
     "docs/engineering/standards/api-evolution-idempotency-standard.md",
     "docs/engineering/standards/persistence-data-modeling-standard.md",
+    "docs/engineering/standards/crud-application-standard.md",
+    "docs/engineering/standards/multi-table-association-query-standard.md",
+    "docs/engineering/standards/database-schema-design-standard.md",
+    "docs/engineering/templates/table-design-record-template.md",
+    "docs/engineering/templates/multi-table-query-design-template.md",
+    "docs/engineering/templates/crud-slice-acceptance-template.md",
+    "docs/adr/ADR-026-MOM业务表禁止物理外键与关联完整性策略.md",
     "docs/engineering/standards/transaction-consistency-standard.md",
     "docs/engineering/standards/audit-concurrency-lifecycle-standard.md",
     "docs/engineering/standards/configuration-profile-secret-standard.md",
@@ -199,3 +215,7 @@ print("- no legacy Nacos bootstrap or disabled compatibility checks")
 print("- IAM default tests contain no external data-store integration tests")
 print("- S01/S02/S03/S04/S05 standards and Maven architecture-test module are wired")
 PY
+
+bash .github/scripts/validate-crud-baseline.sh
+bash .github/scripts/validate-schema-design-baseline.sh
+bash .github/scripts/validate-no-business-foreign-key.sh
