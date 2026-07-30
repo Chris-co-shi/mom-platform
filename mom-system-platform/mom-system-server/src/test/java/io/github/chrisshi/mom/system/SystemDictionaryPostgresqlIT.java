@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * System Dictionary 的真实 PostgreSQL 17.7、Flyway V1→V2、MyBatis、审计与乐观锁集成测试。
+ * System Dictionary 的真实 PostgreSQL 17.7、Flyway V1→V3、MyBatis、审计与乐观锁集成测试。
  *
  * <p>测试使用动态端口和独立 mom_system Schema，每例清理字典数据，不依赖本机数据库。它验证同 Schema
  * Restrict FK、数据库 Check/Unique、Active/Compatibility、分页和 Parameter V1 兼容；Docker 不可用时
@@ -91,11 +91,11 @@ class SystemDictionaryPostgresqlIT {
     }
 
     @Test
-    void freshDatabaseMustApplyV1AndV2AndPreserveParameterTable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
+    void freshDatabaseMustApplyV1V2V3AndPreserveParameterTable() {
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("3");
         assertThat(jdbcTemplate.queryForObject(
-                "select count(*) from flyway_schema_history where success and version in ('1','2')", Long.class))
-                .isEqualTo(2L);
+                "select count(*) from flyway_schema_history where success and version in ('1','2','3')", Long.class))
+                .isEqualTo(3L);
         assertThat(jdbcTemplate.queryForList("""
                 select table_name from information_schema.tables
                  where table_schema=? and table_name in (
@@ -110,7 +110,7 @@ class SystemDictionaryPostgresqlIT {
     }
 
     @Test
-    void existingV1SchemaMustUpgradeToV2WithoutChangingParameterTable() {
+    void existingV1SchemaMustUpgradeThroughV3WithoutChangingParameterTable() {
         Flyway v1 = Flyway.configure().dataSource(dataSource).createSchemas(true)
                 .schemas(UPGRADE_SCHEMA).defaultSchema(UPGRADE_SCHEMA)
                 .locations("classpath:db/migration/system").target("1").load();
@@ -126,7 +126,7 @@ class SystemDictionaryPostgresqlIT {
                 .schemas(UPGRADE_SCHEMA).defaultSchema(UPGRADE_SCHEMA)
                 .locations("classpath:db/migration/system").load();
         latest.migrate();
-        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("2");
+        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("3");
         assertThat(jdbcTemplate.queryForObject(
                 "select count(*) from information_schema.tables where table_schema=? and table_name='system_dictionary'",
                 Long.class, UPGRADE_SCHEMA)).isEqualTo(1L);

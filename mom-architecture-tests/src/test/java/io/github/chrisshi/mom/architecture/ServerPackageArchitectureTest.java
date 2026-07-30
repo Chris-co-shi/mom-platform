@@ -142,7 +142,7 @@ class ServerPackageArchitectureTest {
                 .check(productionClasses);
     }
 
-    /** Parameter 与 Dictionary 的领域边界不得反向引用对方实现层。 */
+    /** Parameter、Dictionary 与 Dynamic I18n 领域边界不得反向引用其他能力的实现层。 */
     @Test
     void systemParameterAndDictionaryDomainsMustRemainMutuallyBounded() {
         noClasses()
@@ -159,9 +159,33 @@ class ServerPackageArchitectureTest {
                         "io.github.chrisshi.mom.system.infrastructure.persistence.dictionary..")
                 .because("Parameter Domain 不引用 Dictionary Application 或持久化实现")
                 .check(productionClasses);
+        noClasses()
+                .that().resideInAnyPackage("io.github.chrisshi.mom.system.domain.i18n..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "io.github.chrisshi.mom.system.application.parameter..",
+                        "io.github.chrisshi.mom.system.application.dictionary..",
+                        "io.github.chrisshi.mom.system.infrastructure.persistence.parameter..",
+                        "io.github.chrisshi.mom.system.infrastructure.persistence.dictionary..")
+                .because("Dynamic I18n Domain 不引用 Parameter/Dictionary Application 或持久化实现")
+                .check(productionClasses);
     }
 
-    /** System 不得定义 IAM、权威主数据对象或后续 Slice 的业务类型。 */
+    /** Dynamic I18n Controller 只能通过对应 Application 用例进入业务。 */
+    @Test
+    void systemI18nControllerMustOnlyEnterThroughI18nApplication() {
+        noClasses()
+                .that().resideInAnyPackage("io.github.chrisshi.mom.system.web.i18n..")
+                .and().haveSimpleNameEndingWith("Controller")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "io.github.chrisshi.mom.system.domain..",
+                        "io.github.chrisshi.mom.system.infrastructure..",
+                        "io.github.chrisshi.mom.system.application.parameter..",
+                        "io.github.chrisshi.mom.system.application.dictionary..")
+                .because("Dynamic I18n Controller 只能依赖 Dynamic I18n Application")
+                .check(productionClasses);
+    }
+
+    /** System 不得定义 IAM、权威主数据对象或 S16+ 业务类型。 */
     @Test
     void systemMustNotDefineIamOrFutureSystemObjects() {
         Set<String> forbidden = Set.of(
@@ -174,7 +198,7 @@ class ServerPackageArchitectureTest {
                 .map(javaClass -> javaClass.getName())
                 .toList();
         org.assertj.core.api.Assertions.assertThat(violations)
-                .as("System 不得定义 IAM/主数据权威对象或 S15+ 类型")
+                .as("System 不得定义 IAM/主数据权威对象或 S16+ 类型")
                 .isEmpty();
     }
 

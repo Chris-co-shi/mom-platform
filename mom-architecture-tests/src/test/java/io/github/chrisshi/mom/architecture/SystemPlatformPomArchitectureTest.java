@@ -17,10 +17,10 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * System Platform S14 的 POM 语义与参数/字典精确白名单门禁。
+ * System Platform S15-B 的 POM 语义与 Parameter/Dictionary/Dynamic I18n 精确白名单门禁。
  *
  * <p>测试通过 XML DOM 读取实际 POM，不使用字符串 grep 推断依赖。它同时检查 Reactor 注册、聚合模块、
- * API/Client/Server 直接依赖白名单和 S15+ 禁止资源。测试只读工作区，无网络、数据库或中间件副作用；
+ * API/Client/Server 直接依赖白名单和 S16+ 禁止资源。测试只读工作区，无网络、数据库或中间件副作用；
  * XML 不可解析、目录缺失或白名单外依赖均直接失败。</p>
  */
 class SystemPlatformPomArchitectureTest {
@@ -41,7 +41,7 @@ class SystemPlatformPomArchitectureTest {
             "org.springframework.security:spring-security-test",
             MOM_GROUP + ":mom-test");
     private static final Pattern FORBIDDEN_JAVA_TYPE = Pattern.compile(
-            ".*(Preference|Catalog|Menu|Navigation|DynamicI18n|AuditProjection|Permission|Role|"
+            ".*(Preference|Catalog|Menu|Navigation|AuditProjection|Permission|Role|"
                     + "Session|Refresh|Credential|FactoryScope|PartyBinding|Factory|Warehouse|Equipment|"
                     + "Person|Party).*\\.java");
     private static final Set<String> API_TYPES = Set.of(
@@ -99,7 +99,7 @@ class SystemPlatformPomArchitectureTest {
     }
 
     /**
-     * 验证 Server 仅使用参数/字典、安全和数据实际依赖，并要求测试依赖保持 test scope。
+     * 验证 Server 仅使用三项已批准能力、安全和数据实际依赖，并要求测试依赖保持 test scope。
      *
      * @throws Exception POM 读取或解析失败
      */
@@ -151,12 +151,12 @@ class SystemPlatformPomArchitectureTest {
     }
 
     /**
-     * 验证 S14 只增加参数与受限字典及其精确 Migration/Mapper，继续禁止后续 System 业务。
+     * 验证 S15-B 只增加 Parameter、Dictionary、Dynamic I18n 及精确 Migration/Mapper。
      *
      * @throws Exception 文件遍历失败
      */
     @Test
-    void s14MustContainOnlyParameterDictionaryAndApprovedPersistenceResources() throws Exception {
+    void s15BMustContainOnlyThreeApprovedCapabilitiesAndPersistenceResources() throws Exception {
         Path server = systemRoot().resolve("mom-system-server");
         Path packageRoot = server.resolve("src/main/java/io/github/chrisshi/mom/system");
 
@@ -176,7 +176,9 @@ class SystemPlatformPomArchitectureTest {
                             normalized(server.resolve(
                                     "src/main/resources/db/migration/system/V1__create_system_parameter.sql")),
                             normalized(server.resolve(
-                                    "src/main/resources/db/migration/system/V2__create_system_dictionary.sql")));
+                                    "src/main/resources/db/migration/system/V2__create_system_dictionary.sql")),
+                            normalized(server.resolve(
+                                    "src/main/resources/db/migration/system/V3__create_system_i18n.sql")));
             assertThat(files)
                     .filteredOn(path -> normalized(path).contains("/src/"))
                     .filteredOn(path -> normalized(path).contains("/src/main/resources/mapper/"))

@@ -2,7 +2,7 @@
 
 本目录是 `mom-platform` 的需求、计划、架构、安全协议和架构决策权威入口。
 
-> P1.5 S00～S12 已完成并合并。P1.6 S00～S14 已完成，ADR-025 保持 Accepted；S15-A 未发现 Dynamic I18n 真实调用方，S15 为 `Deferred — No Real Caller`，S16～S19 尚未开始；S19-A 为最终全栈集成与发布安全验收门禁。
+> P1.5 S00～S12 已完成并合并。P1.6 S00～S15 已完成，ADR-025 保持 Accepted；S15-A 历史审计未发现真实调用方，Chris 后续批准的 S15-B 已完成 Dynamic I18n 后端能力，当前客户端尚未接入；S16～S19 尚未开始。
 
 ## 文档使用原则
 
@@ -18,8 +18,8 @@
 
 - Phase 01：基础技术骨架已完成。
 - P1.5：**Completed / Merged**，S00～S12 全部完成。
-- P1.6：S00 **Completed under accepted local-development risk**，S01～S14 **Completed**，S15 **Deferred — No Real Caller**，S16～S19 Not Started。
-- 当前 Slice：S15-A 审计已收口；没有建设 Dynamic I18n。下一 Slice S16 **Not Started**。
+- P1.6：S00 **Completed under accepted local-development risk**，S01～S15 **Completed**，S16～S19 Not Started。
+- 当前 Slice：S15-B 已完成后端存储、草稿、发布、运行时读取与回滚；客户端尚未接入。S16 **Not Started**。
 - S19-A：Mobile 服务端 Logout、正式 Redirect/App Link、mom-mobile 完整检查、L4/L6 和 mom-infra 环境证据统一在最终集成阶段回收；当前仍为 Open/Deferred。
 - Phase 02：**Not Started**，业务垂直切片未因 P1.6 治理而启动。
 - Android Keystore、HTTPS App Link 与真机强杀恢复：S19-A 与 Phase 02 Mobile 正式联调前置验收项。
@@ -68,6 +68,7 @@
 - [P1.6 S13：System 类型化参数能力报告](engineering/P1.6-S13-System类型化参数能力报告.md)
 - [P1.6 S14：System 非权威通用字典能力报告](engineering/P1.6-S14-System非权威通用字典能力报告.md)
 - [P1.6 S15-A：动态国际化真实调用方证据审计](engineering/P1.6-S15-A-动态国际化真实调用方证据审计.md)
+- [P1.6 S15-B：System 动态国际化后端能力报告](engineering/P1.6-S15-B-System动态国际化后端能力报告.md)
 - [P1.6 S00：配置凭据暴露与轮换清单](security/P1.6-S00-配置凭据暴露与轮换清单.md)
 - [V1 路线图](plans/V1路线图.md)
 - [Phase 01：技术骨架计划](plans/Phase-01-技术骨架计划.md)

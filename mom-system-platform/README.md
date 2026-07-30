@@ -1,14 +1,14 @@
 # MOM System Platform
 
-`mom-system-platform` 已完成 S12 技术骨架、P1.6 S13 GLOBAL/APPLICATION 类型化非敏感参数与 S14 非权威、受限通用字典。S15-A 审计未发现 Dynamic I18n 真实调用方，S15 状态为 `Deferred — No Real Caller`；S16 偏好及后续目录、菜单能力仍为 Not Started。
+`mom-system-platform` 已完成 S12 技术骨架、S13 GLOBAL/APPLICATION 类型化非敏感参数、S14 非权威受限通用字典与 S15-B Dynamic I18n 后端。S15-A 无真实调用方的历史审计保持不变；当前客户端尚未接入，S16 偏好及后续目录、菜单能力仍为 Not Started。
 
 ## 模块职责
 
-| 模块 | S13/S14 职责 |
+| 模块 | S13～S15 职责 |
 |---|---|
 | `mom-system-api` | 参数有效值，以及字典 Active Option/Disabled Compatibility 的稳定只读契约 |
 | `mom-system-client` | 仅保留调用边界；当前无真实调用方，不提前创建 Feign Client |
-| `mom-system-server` | 参数与受限字典领域规则、事务用例、`mom_system` 持久化、管理/只读 API 与 JWT 安全 |
+| `mom-system-server` | 参数、受限字典与 Dynamic I18n 领域规则、事务用例、`mom_system` 持久化、管理/Runtime API 与 JWT 安全 |
 
 依赖方向固定为：
 
@@ -49,13 +49,23 @@ infrastructure → domain/application ports
 
 ## 精确门禁
 
-POM XML 白名单只允许 System API、WebMVC、Security、Data、Tracing、Metrics、Nacos、Lombok 与测试基础设施；`mom-iam-server` 和 `mom-mdm-api` 负例必须失败。API 只精确放行参数和字典只读契约。ArchUnit 验证两个 Domain 均无 Spring/MyBatis、Application 无 Mapper/Entity、Controller 只进入对应 Application、持久化类型只在 Infrastructure，并继续禁止 Preference、Catalog、Menu、Navigation、IAM 对象与权威主数据类型。
+POM XML 白名单只允许 System API、WebMVC、Security、Data、Tracing、Metrics、Nacos、Lombok 与测试基础设施；`mom-iam-server` 和 `mom-mdm-api` 负例必须失败。API 只精确放行参数和字典只读契约，`mom-system-client` 继续为空。ArchUnit 验证三个 Domain 均无 Spring/MyBatis、Controller 只进入对应 Application、持久化类型只在 Infrastructure，并继续禁止 Preference、Catalog、Menu、Navigation、IAM 对象与权威主数据类型。
+
+## Dynamic I18n
+
+- V1 Locale 仅支持 `zh-CN`、`en-US`；Resource 的 `applicationCode/resourceCode/defaultLocale` 与 Draft 的 `resourceId/messageKey/locale` 创建后不可修改。
+- V3 创建 Resource、Draft Message、Immutable Release 三表；Release 每版本每 Locale 保存完整 JSONB Snapshot，数据库触发器拒绝更新和删除。
+- Publish 在资源行锁与单 PostgreSQL 本地事务中校验乐观版本、默认 Locale、Placeholder Set、fallback 与 No-op，原子追加两个 Locale 并推进单调版本。
+- Rollback 不倒退指针，而是复制目标历史内容为新版本并记录 `sourceReleaseVersion`；Draft 不改变。
+- Runtime API 只向已认证用户返回当前完整发布快照，不返回 Draft/数据库 ID/管理审计；资源禁用、未发布或版本不完整均返回 404，并支持 checksum ETag/304。
+- 管理权限仅引用 IAM 的 `system:i18n:read/write/publish` Code；System 不保存 Permission 或 Role。
+- 不使用 Redis/Caffeine、MQ、Outbox/Inbox、Seata 或 Feign；当前 Web/Mobile 尚未接入。
 
 ## 当前未实现
 
 - User Preference、Locale/Timezone/Theme 与视图设置；
 - Application Catalog、Menu、Navigation；
-- Dynamic I18n（S15 已因无真实调用方推迟）、Audit Projection；
+- Dynamic I18n 客户端接入、缓存或变更通知；Audit Projection；
 - Secret 管理、配置中心替代、跨服务推送；
 - Redis 参数缓存、MQ 参数广播；
 - IAM 数据迁移或 Permission 存储。
@@ -73,7 +83,7 @@ bash scripts/codex-mvn-test.sh \
   -pl mom-architecture-tests \
   -am test
 
-BASE_REF=e3894be32f7e0fe54672e45bbd0b8e3699fd5270 \
+BASE_REF=da0b3c194ffb430275feea2ceeac1a1d898acb49 \
   bash scripts/codex-verify-changed.sh
 
 bash scripts/codex-mvn-test.sh clean verify
@@ -81,4 +91,4 @@ bash scripts/codex-mvn-test.sh clean verify
 
 ## 回滚
 
-需要撤销 S14 时，在独立 Review 后对 S14 提交执行普通 `git revert`；已执行 V2 的数据库必须另行评估字典记录保留，禁止删除/修改历史 Migration 或使用 reset/rebase 改写阶段历史。S13 参数提交与 V1 保持不变。
+需要撤销 S15-B 时，对功能提交执行普通 `git revert`；已执行 V3 的数据库必须另行评估 Resource/Draft/Release 数据保留，禁止删除或修改历史 Migration，也不得用 reset/rebase 改写 S15-A 历史。

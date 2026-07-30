@@ -322,3 +322,5 @@ Chris 于 2026-07-30 明确批准建设 Dynamic I18n 后端能力。该批准不
 S15-B 的目标消费者为 `mom-web`、`mom-mobile` 和未来 System 管理端；当前客户端尚未接入。本 Slice 仅建设 System 自有的后端存储、草稿、显式发布、不可变发布快照、认证运行时读取、ETag/304 与创建新单调版本的回滚能力。它不修改客户端、不进入 S16 Preference 或 S17 Catalog/Menu，不保存 IAM Permission/Role，也不引入缓存、消息、Seata 或跨 Schema 访问。
 
 实施期间状态为：S15-A `Completed`、S15-B `In Progress`、S15 `In Progress`、S16 `Not Started`。只有 S15-B 全部实现与门禁通过后，才可将 S15-B 和 S15 标记为 `Completed`。
+
+后续完成记录：S15-B 全部门禁通过后已标记为 `Completed`，S15 已完成；S16 仍为 `Not Started`。
