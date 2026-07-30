@@ -5,9 +5,10 @@
 - [P1.6 IAM 与 System 平台治理计划](P1.6-IAM与System平台治理计划.md)
 - [P1.6 实施进度](P1.6-实施进度.md)
 - [P1.6 工程规范覆盖与缺口清单](../engineering/P1.6-工程规范覆盖与缺口清单.md)
+- [P1.6 S15-A 动态国际化真实调用方证据审计](../engineering/P1.6-S15-A-动态国际化真实调用方证据审计.md)
 - [P1.6 S00 配置凭据暴露与轮换清单](../security/P1.6-S00-配置凭据暴露与轮换清单.md)
 
-P1.6 当前权威状态：S00 以已接受的本地开发风险完成，S01～S14 已完成，ADR-025 保持 Accepted，S15～S19 尚未开始。S19-A 为最终全栈集成与发布安全验收门禁；Mobile Logout、正式 Redirect/App Link、mom-mobile 完整检查、L4/L6 和 mom-infra 环境证据仍为 Open/Deferred。PR #33 必须继续保持 Draft。
+P1.6 当前权威状态：S00 以已接受的本地开发风险完成，S01～S14 已完成，ADR-025 保持 Accepted；S15-A 未发现 Dynamic I18n 真实调用方，S15 为 `Deferred — No Real Caller`，S16～S19 尚未开始。S19-A 为最终全栈集成与发布安全验收门禁；Mobile Logout、正式 Redirect/App Link、mom-mobile 完整检查、L4/L6 和 mom-infra 环境证据仍为 Open/Deferred。PR #33 必须继续保持 Draft。
 
 ## 已完成阶段
 

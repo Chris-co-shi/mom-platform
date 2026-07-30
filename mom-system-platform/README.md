@@ -1,6 +1,6 @@
 # MOM System Platform
 
-`mom-system-platform` 已完成 S12 技术骨架、P1.6 S13 GLOBAL/APPLICATION 类型化非敏感参数与 S14 非权威、受限通用字典。S15 动态国际化及后续偏好、目录、菜单能力仍为 Not Started。
+`mom-system-platform` 已完成 S12 技术骨架、P1.6 S13 GLOBAL/APPLICATION 类型化非敏感参数与 S14 非权威、受限通用字典。S15-A 审计未发现 Dynamic I18n 真实调用方，S15 状态为 `Deferred — No Real Caller`；S16 偏好及后续目录、菜单能力仍为 Not Started。
 
 ## 模块职责
 
@@ -55,7 +55,7 @@ POM XML 白名单只允许 System API、WebMVC、Security、Data、Tracing、Met
 
 - User Preference、Locale/Timezone/Theme 与视图设置；
 - Application Catalog、Menu、Navigation；
-- Dynamic I18n、Audit Projection；
+- Dynamic I18n（S15 已因无真实调用方推迟）、Audit Projection；
 - Secret 管理、配置中心替代、跨服务推送；
 - Redis 参数缓存、MQ 参数广播；
 - IAM 数据迁移或 Permission 存储。
