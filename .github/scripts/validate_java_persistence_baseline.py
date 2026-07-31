@@ -11,7 +11,9 @@ import sys
 from dataclasses import dataclass, field
 
 SERVER_MAIN_JAVA = re.compile(r"^mom-[^/]+-platform/mom-[^/]+-server/src/main/java/.+\.java$")
-DIRECT_JDBC_IMPORT = re.compile(r"^\s*import\s+(?:org\.springframework\.jdbc\.|java\.sql\.)", re.MULTILINE)
+DIRECT_JDBC_IMPORT = re.compile(
+    r"^\s*import\s+(?:org\.springframework\.jdbc\.|java\.sql\.)", re.MULTILINE
+)
 SQL_ADAPTER_IMPORT = re.compile(
     r"^\s*import\s+(?:org\.apache\.ibatis\.annotations\.(?:Select|Insert|Update|Delete)|"
     r"org\.springframework\.jdbc\.)",
@@ -38,7 +40,7 @@ MOM_ADAPTER_IMPORT = re.compile(
     re.MULTILINE,
 )
 REPOSITORY_IMPLEMENTATION = re.compile(
-    r"\bimplements\s+(?!IRepository\b)[A-Za-z0-9_$.]*Repository\b"
+    r"\bimplements\s+(?!IRepository\b)[A-Za-z0-9_$.,\s]*Repository\b"
 )
 INFRA_REPOSITORY_SEGMENT = "/infrastructure/persistence/repository/"
 UPPER_LAYER_SEGMENTS = ("/domain/", "/application/", "/web/", "/interfaces/")
@@ -53,11 +55,18 @@ REQUIRED_CRUD_REPOSITORIES = {
     "mom-system-platform/mom-system-server/src/main/java/"
     "io/github/chrisshi/mom/system/infrastructure/persistence/repository/"
     "MybatisSystemDictionaryItemRepository.java",
+    "mom-iam-platform/mom-iam-server/src/main/java/"
+    "io/github/chrisshi/mom/iam/infrastructure/persistence/repository/"
+    "MybatisIamUserAccountRepository.java",
+    "mom-iam-platform/mom-iam-server/src/main/java/"
+    "io/github/chrisshi/mom/iam/infrastructure/persistence/repository/"
+    "MybatisIamRoleRepository.java",
 }
 
 DIRECT_JDBC_EXCEPTIONS = {
     "mom-iam-platform/mom-iam-server/src/main/java/"
-    "io/github/chrisshi/mom/iam/security/IamAuthorizationServerProtocolConfiguration.java",
+    "io/github/chrisshi/mom/iam/security/"
+    "IamAuthorizationServerProtocolConfiguration.java",
 }
 
 
@@ -72,26 +81,49 @@ def check_repository_abstraction(relative: str, text: str, report: Report) -> No
     """检查 MyBatis-Plus Repository 复用位置和领域边界。"""
 
     if MP_SERVICE_IMPORT.search(text):
-        report.errors.append(f"正式 bounded context 禁止 IService/ServiceImpl: {relative}")
+        report.errors.append(
+            f"正式 bounded context 禁止 IService/ServiceImpl: {relative}"
+        )
 
-    uses_mp_repository = bool(MP_REPOSITORY_IMPORT.search(text) or CRUD_REPOSITORY_EXTENDS.search(text))
+    uses_mp_repository = bool(
+        MP_REPOSITORY_IMPORT.search(text)
+        or CRUD_REPOSITORY_EXTENDS.search(text)
+    )
     if uses_mp_repository and INFRA_REPOSITORY_SEGMENT not in relative:
-        report.errors.append(f"MyBatis-Plus Repository 只能位于 Infrastructure Repository: {relative}")
+        report.errors.append(
+            f"MyBatis-Plus Repository 只能位于 Infrastructure Repository: {relative}"
+        )
 
     if EXPLICIT_IREPOSITORY_CONTRACT.search(text):
-        report.errors.append(f"MOM 契约不得显式继承或实现 IRepository: {relative}")
+        report.errors.append(
+            f"MOM 契约不得显式继承或实现 IRepository: {relative}"
+        )
 
     if CRUD_REPOSITORY_EXTENDS.search(text):
         if not REPOSITORY_IMPLEMENTATION.search(text):
-            report.errors.append(f"CrudRepository Adapter 必须实现 MOM Repository Port: {relative}")
+            report.errors.append(
+                f"CrudRepository Adapter 必须实现 MOM Repository Port: {relative}"
+            )
         if not pathlib.PurePosixPath(relative).name.startswith("Mybatis"):
-            report.errors.append(f"CrudRepository Adapter 必须使用 Mybatis*Repository 命名: {relative}")
+            report.errors.append(
+                f"CrudRepository Adapter 必须使用 Mybatis*Repository 命名: {relative}"
+            )
 
-    if relative in REQUIRED_CRUD_REPOSITORIES and not CRUD_REPOSITORY_EXTENDS.search(text):
-        report.errors.append(f"单表 Domain Repository Adapter 必须复用 CrudRepository: {relative}")
+    if (
+        relative in REQUIRED_CRUD_REPOSITORIES
+        and not CRUD_REPOSITORY_EXTENDS.search(text)
+    ):
+        report.errors.append(
+            f"单表 Domain Repository Adapter 必须复用 CrudRepository: {relative}"
+        )
 
-    if any(segment in relative for segment in UPPER_LAYER_SEGMENTS) and MOM_ADAPTER_IMPORT.search(text):
-        report.errors.append(f"Domain/Application/Web 不得依赖具体 MyBatis Repository Adapter: {relative}")
+    if (
+        any(segment in relative for segment in UPPER_LAYER_SEGMENTS)
+        and MOM_ADAPTER_IMPORT.search(text)
+    ):
+        report.errors.append(
+            f"Domain/Application/Web 不得依赖具体 MyBatis Repository Adapter: {relative}"
+        )
 
 
 def check_java_file(relative: str, text: str, report: Report) -> None:
@@ -100,7 +132,10 @@ def check_java_file(relative: str, text: str, report: Report) -> None:
     if not SERVER_MAIN_JAVA.fullmatch(relative):
         return
 
-    if DIRECT_JDBC_IMPORT.search(text) and relative not in DIRECT_JDBC_EXCEPTIONS:
+    if (
+        DIRECT_JDBC_IMPORT.search(text)
+        and relative not in DIRECT_JDBC_EXCEPTIONS
+    ):
         report.errors.append(f"正式 bounded context 禁止直接 JDBC: {relative}")
 
     check_repository_abstraction(relative, text, report)
@@ -109,7 +144,9 @@ def check_java_file(relative: str, text: str, report: Report) -> None:
         return
 
     if SELECT_STAR.search(text):
-        report.errors.append(f"正式 Java SQL 必须显式列名，禁止 SELECT *: {relative}")
+        report.errors.append(
+            f"正式 Java SQL 必须显式列名，禁止 SELECT *: {relative}"
+        )
     if DYNAMIC_SQL_TEXT.search(text):
         report.errors.append(f"Java SQL 禁止 ${{}} 动态文本: {relative}")
 
@@ -117,7 +154,7 @@ def check_java_file(relative: str, text: str, report: Report) -> None:
 def git_lines(root: pathlib.Path, *args: str) -> list[str]:
     """读取 Git 文件列表。"""
 
-    output = subprocess.check_output(["git", *args], cwd=root, text=True)
+    output = subprocess.check_output([ "git", *args], cwd=root, text=True)
     return [line for line in output.splitlines() if line]
 
 
@@ -125,20 +162,26 @@ def run(root: pathlib.Path, report: Report) -> None:
     """扫描当前工作树中的正式 Server Java 文件。"""
 
     tracked = set(git_lines(root, "ls-files"))
-    untracked = set(git_lines(root, "ls-files", "--others", "--exclude-standard"))
+    untracked = set(
+        git_lines(root, "ls-files", "--others", "--exclude-standard")
+    )
     for relative in sorted(tracked | untracked):
         if not SERVER_MAIN_JAVA.fullmatch(relative):
             continue
         path = root / relative
         if path.is_file():
-            check_java_file(relative, path.read_text(encoding="utf-8"), report)
+            check_java_file(
+                relative, path.read_text(encoding="utf-8"), report
+            )
 
 
 def main(argv: list[str] | None = None) -> int:
     """命令行入口；兼容持久化门禁既有 base/head 参数。"""
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=pathlib.Path, default=pathlib.Path.cwd())
+    parser.add_argument(
+        "--root", type=pathlib.Path, default=pathlib.Path.cwd()
+    )
     parser.add_argument("--base")
     parser.add_argument("--head", default="HEAD")
     args = parser.parse_args(argv)

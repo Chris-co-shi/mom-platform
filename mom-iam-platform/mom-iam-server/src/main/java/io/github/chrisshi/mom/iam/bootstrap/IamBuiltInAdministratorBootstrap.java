@@ -1,7 +1,7 @@
 package io.github.chrisshi.mom.iam.bootstrap;
 
 import io.github.chrisshi.mom.core.security.AuditContextExecutor;
-import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
+import io.github.chrisshi.mom.iam.domain.role.IamRole;
 import io.github.chrisshi.mom.iam.domain.type.IamRecordStatus;
 import io.github.chrisshi.mom.iam.domain.type.UserType;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserMapper;
@@ -16,13 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 
-/**
- * 内置 {@code admin} 初始化事务服务。
- *
- * <p>服务先锁定 Flyway 创建的内置 {@code PLATFORM_ADMIN} 角色，再进行用户名冲突判断、密码编码、
- * 用户插入和角色分配。共享角色行锁同时串行化多实例 Bootstrap。已有系统账号只幂等跳过，绝不重置
- * 密码、状态、锁定计数、版本或角色；任一失败由 Spring 本地事务回滚。</p>
- */
+/** 内置 admin 初始化事务服务。 */
 public class IamBuiltInAdministratorBootstrap {
     private static final Logger LOGGER =
             LoggerFactory.getLogger(IamBuiltInAdministratorBootstrap.class);
@@ -38,17 +32,6 @@ public class IamBuiltInAdministratorBootstrap {
     private final Environment environment;
     private final Clock clock;
 
-    /**
-     * 创建 Bootstrap 事务服务。
-     *
-     * @param repository 内置管理员精确仓储
-     * @param auditContextExecutor 显式 SYSTEM 审计上下文执行器
-     * @param properties Bootstrap 配置
-     * @param passwordEncoder Spring Security 密码编码器
-     * @param ids 安全 ID 生成器
-     * @param environment Spring Profile 环境
-     * @param clock UTC 时钟
-     */
     public IamBuiltInAdministratorBootstrap(
             IamBuiltInAdministratorRepository repository,
             AuditContextExecutor auditContextExecutor,
@@ -66,23 +49,15 @@ public class IamBuiltInAdministratorBootstrap {
         this.clock = clock;
     }
 
-    /**
-     * 初始化固定系统管理员。
-     *
-     * <p>方法幂等且不开放 HTTP 入口。密码只进入 PasswordEncoder 和参数化 INSERT，不进入日志、
-     * 异常或返回值。</p>
-     *
-     * @throws IllegalStateException 配置不安全、内置角色缺失或用户名被普通账号占用时抛出
-     */
     @Transactional
     public void initialize() {
         properties.validate(environment);
-        auditContextExecutor.runAsSystem(SYSTEM_AUDIT_ACTOR, this::initializeWithinAuditContext);
+        auditContextExecutor.runAsSystem(
+                SYSTEM_AUDIT_ACTOR, this::initializeWithinAuditContext);
     }
 
-    /** 在显式 SYSTEM Actor 下完成所有数据库读取和写入。 */
     private void initializeWithinAuditContext() {
-        IamAdminViews.RoleView role = repository.lockPlatformAdminRole()
+        IamRole role = repository.lockPlatformAdminRole()
                 .orElseThrow(() -> new IllegalStateException(
                         "Built-in PLATFORM_ADMIN role is required for IAM bootstrap"));
         requireUsablePlatformAdminRole(role);
@@ -113,7 +88,7 @@ public class IamBuiltInAdministratorBootstrap {
         LOGGER.info("IAM built-in administrator initialized: username=admin");
     }
 
-    private static void requireUsablePlatformAdminRole(IamAdminViews.RoleView role) {
+    private static void requireUsablePlatformAdminRole(IamRole role) {
         if (!PLATFORM_ADMIN.equals(role.code())
                 || !role.builtIn()
                 || role.applicableUserType() != UserType.INTERNAL
