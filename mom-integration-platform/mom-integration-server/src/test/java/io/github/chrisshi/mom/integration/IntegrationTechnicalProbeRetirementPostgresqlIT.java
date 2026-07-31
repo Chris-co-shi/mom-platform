@@ -57,7 +57,7 @@ class IntegrationTechnicalProbeRetirementPostgresqlIT {
 
     @Test
     void migrationsShouldRetireMessageAndSeataTechnicalTables() {
-        assertEquals(4, jdbcTemplate.queryForObject(
+        assertEquals(5, jdbcTemplate.queryForObject(
                 "select max(version::integer) from flyway_schema_history where success = true",
                 Integer.class));
         assertEquals(0L, jdbcTemplate.queryForObject("""
