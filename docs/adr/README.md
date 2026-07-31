@@ -30,7 +30,7 @@ ADR 用于记录重要架构决策的背景、候选方案、最终选择、正�
 | [ADR-006](ADR-006-库存流水余额与预占模型.md) | 库存流水、余额与预占模型 | Accepted | 数据架构 |
 | [ADR-007](ADR-007-批次谱系不可变边模型.md) | 批次谱系不可变边模型 | Accepted | 数据架构 |
 | [ADR-008](ADR-008-PCS与WCS命令状态机协议.md) | PCS 与 WCS 命令状态机协议 | Accepted | 集成架构 |
-| [ADR-009](ADR-009-Seata使用边界.md) | Seata 使用边界 | Accepted | 集成架构 |
+| [ADR-009](ADR-009-Seata使用边界.md) | Seata 使用边界 | Accepted | 集成架构、ADR-009 |
 | [ADR-010](ADR-010-开源复用与许可证规则.md) | 开源复用与许可证规则 | Accepted | 开源来源登记 |
 | [ADR-011](ADR-011-prototype-first.md) | Web 与 PDA 原型先行 | Accepted | V1 垂直切片计划 |
 | [ADR-012](ADR-012-distributed-tracing.md) | 分布式链路追踪 | Accepted | 可观测性架构 |
@@ -51,6 +51,7 @@ ADR 用于记录重要架构决策的背景、候选方案、最终选择、正�
 | [ADR-027](ADR-027-服务端包结构与基础设施适配器分层.md) | 服务端包结构与基础设施适配器分层 | Accepted | Package 与目录架构规范 |
 | [ADR-028](ADR-028-MyBatis-Plus-Repository抽象与领域仓储边界.md) | MyBatis-Plus Repository 抽象与领域仓储边界 | Accepted | 持久化规范、Repository Adapter 门禁 |
 | [ADR-029](ADR-029-IAM-Admin分层与领域模型边界.md) | IAM Admin 分层与领域模型边界 | Accepted | S16-B IAM Admin 分层与领域模型治理报告 |
+| [ADR-030](ADR-030-System应用目录导航发布与IAM权限引用边界.md) | System 应用目录、导航发布与 IAM 权限引用边界 | Accepted | S17 System 应用目录、导航与权限引用能力报告 |
 
 ## 4. 新建 ADR
 
