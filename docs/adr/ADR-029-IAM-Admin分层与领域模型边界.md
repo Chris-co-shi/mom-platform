@@ -41,7 +41,7 @@ Application Admin：
 - 不依赖 Mapper、Persistence Entity 或具体 MyBatis Repository；
 - 接收 `IamAdminActor`、`IamAdminRequestContext` 与稳定 Command；
 - 只依赖 Domain Repository Port 和 Application Outbound Port；
-- 公开冝用例继续拥有原本地事务。
+- 公开写用例继续拥有原本地事务。
 
 Web Adapter 负责把已验证的 `MomJwtAuthorization` 转换为 `IamAdminActor`。
 Permission 校验仍在 Application Actor 边界执行，避免绕过 Controller 调用时失去授权。
@@ -99,13 +99,13 @@ Permission 校验仍在 Application Actor 边界执行，避免绕过 Controller
 
 ## 3. 自动门禁
 
-- Java Persistence Baseline 将 IAM User/Role Adapter加入必需
+- Java Persistence Baseline 将 IAM User/Role Adapter 加入必需
   `CrudRepository` 清单；
 - ArchUnit 禁止 `application.admin` 依赖 Infrastructure、Web、Spring Security、
   Spring Web 和 Servlet；
 - ArchUnit 禁止 `web.admin` 直接依赖 Infrastructure；
 - ArchUnit 要求旧 `iam.admin` Package 为空；
-- ArchUnit 验证 User/Role Adapter 同旵继承 `CrudRepository` 并实现 Domain Port；
+- ArchUnit 验证 User/Role Adapter 同时继承 `CrudRepository` 并实现 Domain Port；
 - Controller 契约测试聚合检查拆分后的全部 25 条路由；
 - Domain 单元测试覆盖 User、Role 和 User Authorization 核心不变量。
 

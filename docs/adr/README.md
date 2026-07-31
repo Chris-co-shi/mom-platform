@@ -50,6 +50,7 @@ ADR 用于记录重要架构决策的背景、候选方案、最终选择、正�
 | [ADR-026](ADR-026-MOM业务表禁止物理外键与关联完整性策略.md) | MOM 业务表禁止物理外键与关联完整性策略 | Accepted | CRUD、多表关联与表结构规范 |
 | [ADR-027](ADR-027-服务端包结构与基础设施适配器分层.md) | 服务端包结构与基础设施适配器分层 | Accepted | Package 与目录架构规范 |
 | [ADR-028](ADR-028-MyBatis-Plus-Repository抽象与领域仓储边界.md) | MyBatis-Plus Repository 抽象与领域仓储边界 | Accepted | 持久化规范、Repository Adapter 门禁 |
+| [ADR-029](ADR-029-IAM-Admin分层与领域模型边界.md) | IAM Admin 分层与领域模型边界 | Accepted | S16-B IAM Admin 分层与领域模型治理报告 |
 
 ## 4. 新建 ADR
 
