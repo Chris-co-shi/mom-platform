@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Dynamic I18n 的真实 PostgreSQL 17.7、V1～V6、事务、并发、JSONB 与不可变 Release 集成测试。
+ * Dynamic I18n 的真实 PostgreSQL 17.7、V1～V7、事务、并发、JSONB 与不可变 Release 集成测试。
  *
  * <p>测试使用独立容器和 mom_system Schema，覆盖六类 System Entity 的 BaseEntity 列、三张 I18n 表、
  * 无物理外键完整性、Draft 与 Published 隔离、两 Locale 原子发布、fallback、No-op、行锁并发、Runtime Kill
@@ -82,7 +82,7 @@ class SystemI18nPostgresqlIT {
 
     @Test
     void v6MustKeepImmutableSnapshotSemanticsAndI18nJsonbConstraints() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("6");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("7");
         assertThat(jdbc.queryForObject(
                 "select count(*) from flyway_schema_history where success and version in ('1','2','3','4','5','6')",
                 Long.class)).isEqualTo(6L);

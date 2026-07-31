@@ -2,7 +2,7 @@
 
 本目录是 `mom-platform` 的需求、计划、架构、安全协议和架构决策权威入口。
 
-> P1.5 S00～S12 已完成并合并。P1.6 S00～S15-E 已完成治理工作，ADR-025/ADR-026/ADR-027 保持 Accepted；S15-E 已完成服务端 Package 布局规范、门禁与全仓行为保持重构，S16 尚未开始。
+> P1.5 S00～S12 已完成并合并。P1.6 S00～S15 已完成，S15-F 已完成探针退出；ADR-023/025/026/027 保持 Accepted。S16 已完成 System 用户显示偏好与受限视图设置后端并保留精确 Deferred；S17 尚未开始。
 
 ## 文档使用原则
 
@@ -18,8 +18,8 @@
 
 - Phase 01：基础技术骨架已完成。
 - P1.5：**Completed / Merged**，S00～S12 全部完成。
-- P1.6：S00 **Completed under accepted local-development risk**，S01～S15 **Completed**，S16～S19 Not Started。
-- 当前 Slice：S15-E **Completed with accepted exceptions**；30 个生产文件完成 Package 归位，IAM Query/配置精确例外见审计报告。S16 **Not Started**。
+- P1.6：S00 **Completed under accepted local-development risk**，S01～S15 **Completed**，S15-F **Completed**，S16 **Completed with Deferred items**，S17～S19 Not Started。
+- 当前 Slice：S16 已交付 V7 两表、显示偏好、受限视图、默认值、版本/Reset、当前用户隔离和后端契约；Default/Last Factory、Default Application、Dashboard/Favorites 与客户端接入精确 Deferred。
 - S19-A：Mobile 服务端 Logout、正式 Redirect/App Link、mom-mobile 完整检查、L4/L6 和 mom-infra 环境证据统一在最终集成阶段回收；当前仍为 Open/Deferred。
 - Phase 02：**Not Started**，业务垂直切片未因 P1.6 治理而启动。
 - Android Keystore、HTTPS App Link 与真机强杀恢复：S19-A 与 Phase 02 Mobile 正式联调前置验收项。
@@ -71,6 +71,8 @@
 - [P1.6 S15-B：System 动态国际化后端能力报告](engineering/P1.6-S15-B-System动态国际化后端能力报告.md)
 - [P1.6 S15-D：CRUD、多表关联、表结构与无外键全仓审计](engineering/P1.6-S15-D-CRUD多表关联表结构与无外键全仓审计报告.md)
 - [P1.6 S15-E：服务端 Package 结构与目录治理审计](engineering/P1.6-S15-E-服务端包结构与目录治理审计报告.md)
+- [P1.6 S15-F：MDM 技术探针退出与验证归位](engineering/P1.6-S15-F-MDM技术探针退出与验证归位报告.md)
+- [P1.6 S16：System 用户偏好与视图设置能力报告](engineering/P1.6-S16-System用户偏好与视图设置能力报告.md)
 - [P1.6 S00：配置凭据暴露与轮换清单](security/P1.6-S00-配置凭据暴露与轮换清单.md)
 - [V1 路线图](plans/V1路线图.md)
 - [Phase 01：技术骨架计划](plans/Phase-01-技术骨架计划.md)

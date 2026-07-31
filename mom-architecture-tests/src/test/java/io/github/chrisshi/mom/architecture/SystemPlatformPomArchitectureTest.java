@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * System Platform S15-C 的 POM 语义与 Parameter/Dictionary/Dynamic I18n 精确白名单门禁。
  *
  * <p>测试通过 XML DOM 读取实际 POM，不使用字符串 grep 推断依赖。它同时检查 Reactor 注册、聚合模块、
- * API/Client/Server 直接依赖白名单和 S16+ 禁止资源。System 正式持久化统一使用 MyBatis-Plus，
+ * API/Client/Server 直接依赖白名单和 S17+ 禁止资源。System 正式持久化统一使用 MyBatis-Plus，
  * {@code src/main/resources/mapper} 必须保持为空。</p>
  */
 class SystemPlatformPomArchitectureTest {
@@ -41,13 +41,14 @@ class SystemPlatformPomArchitectureTest {
             "org.springframework.security:spring-security-test",
             MOM_GROUP + ":mom-test");
     private static final Pattern FORBIDDEN_JAVA_TYPE = Pattern.compile(
-            ".*(Preference|Catalog|Menu|Navigation|AuditProjection|Permission|Role|"
+            ".*(Catalog|Menu|Navigation|AuditProjection|Permission|Role|"
                     + "Session|Refresh|Credential|FactoryScope|PartyBinding|Factory|Warehouse|Equipment|"
                     + "Person|Party).*\\.java");
     private static final Set<String> API_TYPES = Set.of(
             "package-info.java", "ParameterScopeType.java", "ParameterValueType.java",
             "ResolvedSystemParameter.java", "SystemDictionaryItemOption.java",
-            "ResolvedSystemDictionaryItem.java");
+            "ResolvedSystemDictionaryItem.java", "SupportedUserLocale.java", "UserThemeMode.java",
+            "UserDensity.java", "ResolvedUserPreference.java", "UserViewSetting.java");
 
     /** 验证根 Reactor 精确注册一次 System 聚合模块。 */
     @Test
@@ -71,7 +72,7 @@ class SystemPlatformPomArchitectureTest {
         assertThat(dependencies(project)).isEmpty();
     }
 
-    /** 验证 API 只暴露 S13 参数与 S14 字典稳定只读契约，Client 仍保持空调用骨架。 */
+    /** 验证 API 只暴露参数、字典与 S16 偏好稳定只读契约，Client 仍保持空调用骨架。 */
     @Test
     void apiAndClientMustExposeOnlyApprovedContractsAndRemainTransportBounded() throws Exception {
         Element api = parse(systemRoot().resolve("mom-system-api/pom.xml")).getDocumentElement();
@@ -131,10 +132,10 @@ class SystemPlatformPomArchitectureTest {
     }
 
     /**
-     * 验证 System 只包含已登记的 Parameter、Dictionary、Dynamic I18n 与治理 Migration，且 Mapper XML 为零。
+     * 验证 System 只包含已登记的 Parameter、Dictionary、Dynamic I18n、Preference 与治理 Migration，且 XML 为零。
      */
     @Test
-    void s15CMustUseBaseEntityAndMybatisPlusWithoutMapperXml() throws Exception {
+    void s16MustUseMybatisPlusWithoutMapperXml() throws Exception {
         Path server = systemRoot().resolve("mom-system-server");
         Path packageRoot = server.resolve("src/main/java/io/github/chrisshi/mom/system");
 
@@ -165,7 +166,10 @@ class SystemPlatformPomArchitectureTest {
                                             + "V5__remove_business_foreign_keys.sql")),
                             normalized(server.resolve(
                                     "src/main/resources/db/migration/system/"
-                                            + "V6__clarify_i18n_release_snapshot_columns.sql")));
+                                            + "V6__clarify_i18n_release_snapshot_columns.sql")),
+                            normalized(server.resolve(
+                                    "src/main/resources/db/migration/system/"
+                                            + "V7__create_system_user_preference.sql")));
             assertThat(files)
                     .filteredOn(path -> normalized(path).contains("/src/main/resources/mapper/"))
                     .isEmpty();

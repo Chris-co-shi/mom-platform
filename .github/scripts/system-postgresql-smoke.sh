@@ -107,6 +107,32 @@ docker exec "$POSTGRES_CONTAINER" \
       FROM information_schema.tables
      WHERE table_schema = '${POSTGRES_SCHEMA}'
        AND table_name IN ('system_i18n_resource', 'system_i18n_message', 'system_i18n_release');
+    SELECT 'system_preference_tables=' || count(*)
+      FROM information_schema.tables
+     WHERE table_schema = '${POSTGRES_SCHEMA}'
+       AND table_name IN ('system_user_preference', 'system_user_view_setting');
+    SELECT 'system_preference_jsonb=' || count(*)
+      FROM information_schema.columns
+     WHERE table_schema = '${POSTGRES_SCHEMA}'
+       AND table_name = 'system_user_view_setting'
+       AND column_name IN ('columns_json', 'sort_json', 'filters_json')
+       AND data_type = 'jsonb';
+    SELECT 'system_preference_user_unique=' || count(*)
+      FROM pg_constraint constraint_row
+      JOIN pg_class table_row ON table_row.oid = constraint_row.conrelid
+      JOIN pg_namespace schema_row ON schema_row.oid = table_row.relnamespace
+     WHERE schema_row.nspname = '${POSTGRES_SCHEMA}'
+       AND table_row.relname = 'system_user_preference'
+       AND constraint_row.conname = 'uk_system_user_preference_user'
+       AND constraint_row.contype = 'u';
+    SELECT 'system_view_business_unique=' || count(*)
+      FROM pg_constraint constraint_row
+      JOIN pg_class table_row ON table_row.oid = constraint_row.conrelid
+      JOIN pg_namespace schema_row ON schema_row.oid = table_row.relnamespace
+     WHERE schema_row.nspname = '${POSTGRES_SCHEMA}'
+       AND table_row.relname = 'system_user_view_setting'
+       AND constraint_row.conname = 'uk_system_user_view_setting_user_application_view'
+       AND constraint_row.contype = 'u';
     SELECT 'system_base_entity_deleted=' || count(*)
       FROM information_schema.columns
      WHERE table_schema = '${POSTGRES_SCHEMA}'
@@ -161,10 +187,14 @@ docker exec "$POSTGRES_CONTAINER" \
   " > system-postgresql-schema.txt
 
 grep --fixed-strings --quiet 'schema=1' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'flyway_version=6' system-postgresql-schema.txt
+grep --fixed-strings --quiet 'flyway_version=7' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_parameter=1' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_dictionary_tables=2' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_i18n_tables=3' system-postgresql-schema.txt
+grep --fixed-strings --quiet 'system_preference_tables=2' system-postgresql-schema.txt
+grep --fixed-strings --quiet 'system_preference_jsonb=3' system-postgresql-schema.txt
+grep --fixed-strings --quiet 'system_preference_user_unique=1' system-postgresql-schema.txt
+grep --fixed-strings --quiet 'system_view_business_unique=1' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_base_entity_deleted=6' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_i18n_release_base_columns=7' system-postgresql-schema.txt
 grep --fixed-strings --quiet 'system_i18n_jsonb=1' system-postgresql-schema.txt

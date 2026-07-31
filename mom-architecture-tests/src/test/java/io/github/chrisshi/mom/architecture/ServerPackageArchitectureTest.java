@@ -6,6 +6,7 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
@@ -181,11 +182,11 @@ class ServerPackageArchitectureTest {
                 .check(productionClasses);
     }
 
-    /** System 不得定义 IAM、权威主数据对象或 S16+ 业务类型。 */
+    /** System 不得定义 IAM、权威主数据对象或 S17+ 业务类型。 */
     @Test
     void systemMustNotDefineIamOrFutureSystemObjects() {
         Set<String> forbidden = Set.of(
-                "Permission", "Role", "Session", "Refresh", "Credential", "Preference",
+                "Permission", "Role", "Session", "Refresh", "Credential",
                 "Catalog", "Menu", "Navigation", "FactoryScope", "PartyBinding",
                 "Factory", "Warehouse", "Equipment", "Person", "Party");
         var violations = productionClasses.stream()
@@ -194,8 +195,37 @@ class ServerPackageArchitectureTest {
                 .map(javaClass -> javaClass.getName())
                 .toList();
         org.assertj.core.api.Assertions.assertThat(violations)
-                .as("System 不得定义 IAM/主数据权威对象或 S16+ 类型")
+                .as("System 不得定义 IAM/主数据权威对象或 S17+ 类型")
                 .isEmpty();
+    }
+
+    /** Preference Domain 不得依赖 SecurityContext、Web、MyBatis、Redis 或 Jackson Infrastructure。 */
+    @Test
+    void systemPreferenceDomainMustRemainSecurityAndAdapterIndependent() {
+        noClasses()
+                .that().resideInAnyPackage("io.github.chrisshi.mom.system.domain.preference..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "org.springframework.security..", "org.springframework.web..", "jakarta.servlet..",
+                        "com.baomidou.mybatisplus..", "org.apache.ibatis..", "org.springframework.data.redis..",
+                        "tools.jackson..", "io.github.chrisshi.mom.system.infrastructure..")
+                .because("Preference Domain 只表达类型化白名单、默认和版本规则")
+                .check(productionClasses);
+    }
+
+    /** Preference Controller 只能通过对应 Application 用例进入业务。 */
+    @Test
+    void systemPreferenceControllerMustOnlyEnterThroughPreferenceApplication() {
+        noClasses()
+                .that().resideInAnyPackage("io.github.chrisshi.mom.system.web.preference..")
+                .and().haveSimpleNameEndingWith("Controller")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "io.github.chrisshi.mom.system.domain..",
+                        "io.github.chrisshi.mom.system.infrastructure..",
+                        "io.github.chrisshi.mom.system.application.parameter..",
+                        "io.github.chrisshi.mom.system.application.dictionary..",
+                        "io.github.chrisshi.mom.system.application.i18n..")
+                .because("Preference Controller 只能依赖 Preference Application 和稳定 API 契约")
+                .check(productionClasses);
     }
 
     /** System 不得引用 IAM 的内部 Application、Web、Repository、Mapper 或 Infrastructure。 */
@@ -243,6 +273,47 @@ class ServerPackageArchitectureTest {
                 .orShould().haveSimpleNameEndingWith("Configuration")
                 .because("API 模块只承载跨服务稳定契约")
                 .check(productionClasses);
+    }
+
+    /** System Preference API 契约不得暴露用户引用或数据库技术主键。 */
+    @Test
+    void systemPreferenceApiMustNotExposeIdentityOrDatabaseIds() {
+        Set<String> forbidden = Set.of("userId", "databaseId", "id");
+        var violations = productionClasses.stream()
+                .filter(javaClass -> javaClass.getPackageName().equals("io.github.chrisshi.mom.system.api"))
+                .filter(javaClass -> javaClass.getSimpleName().contains("UserPreference")
+                        || javaClass.getSimpleName().contains("UserViewSetting"))
+                .flatMap(javaClass -> Stream.concat(
+                        javaClass.getAllFields().stream().map(field -> field.getName()),
+                        javaClass.getMethods().stream().map(method -> method.getName())))
+                .filter(forbidden::contains)
+                .toList();
+
+        org.assertj.core.api.Assertions.assertThat(violations)
+                .as("Preference API 不得暴露 userId/databaseId/id")
+                .isEmpty();
+    }
+
+    /** Preference 模型不得定义授权、Scope、Token、Session 或 Factory 偏好成员。 */
+    @Test
+    void systemPreferenceMustNotModelAuthorizationOrFactoryScope() {
+        Set<String> forbiddenSegments = Set.of(
+                "role", "permission", "factoryscope", "partyscope", "token", "session", "credential");
+        var violations = productionClasses.stream()
+                .filter(javaClass -> javaClass.getPackageName()
+                        .startsWith("io.github.chrisshi.mom.system"))
+                .filter(javaClass -> javaClass.getPackageName().contains("preference")
+                        || javaClass.getPackageName().equals("io.github.chrisshi.mom.system.api"))
+                .flatMap(javaClass -> Stream.concat(
+                        Stream.of(javaClass.getSimpleName()),
+                        javaClass.getAllFields().stream().map(field -> field.getName())))
+                .filter(name -> forbiddenSegments.stream()
+                        .anyMatch(segment -> name.toLowerCase(java.util.Locale.ROOT).contains(segment)))
+                .toList();
+
+        org.assertj.core.api.Assertions.assertThat(violations)
+                .as("Preference 不得成为 IAM 授权或 Factory Scope 的第二权威")
+                .isEmpty();
     }
 
     /** Gateway 生产代码不得依赖 Servlet 或 Spring MVC。 */

@@ -10,6 +10,8 @@ import io.github.chrisshi.mom.data.entity.BaseEntity;
 import io.github.chrisshi.mom.data.entity.BaseIdEntity;
 import io.github.chrisshi.mom.data.mapper.MomBaseMapper;
 import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemI18nReleaseEntity;
+import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemUserPreferenceEntity;
+import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemUserViewSettingEntity;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -57,18 +59,32 @@ class PersistenceArchitectureTest {
                 .check(productionClasses);
     }
 
-    /** System 普通可变业务表使用完整 BaseEntity，不可变发布快照精确使用审计基类。 */
+    /** System 普通可变业务表使用完整 BaseEntity；无逻辑删除的快照与 Preference 精确使用审计基类。 */
     @Test
-    void systemEntitiesMustSelectBaseClassByCapability() {
+    void systemEntitiesMustSelectBaseClassByCapability() throws NoSuchFieldException {
         classes()
                 .that().resideInAnyPackage("io.github.chrisshi.mom.system.infrastructure.persistence..")
                 .and().haveSimpleNameEndingWith("Entity")
                 .and().doNotHaveFullyQualifiedName(SystemI18nReleaseEntity.class.getName())
+                .and().doNotHaveFullyQualifiedName(SystemUserPreferenceEntity.class.getName())
+                .and().doNotHaveFullyQualifiedName(SystemUserViewSettingEntity.class.getName())
                 .should().beAssignableTo(BaseEntity.class)
                 .because("System 可更新且支持乐观锁/逻辑删除的普通业务表使用 BaseEntity")
                 .check(productionClasses);
         assertThat(BaseAuditEntity.class.isAssignableFrom(SystemI18nReleaseEntity.class)).isTrue();
         assertThat(BaseEntity.class.isAssignableFrom(SystemI18nReleaseEntity.class)).isFalse();
+        assertAuditVersionedWithoutLogicalDelete(SystemUserPreferenceEntity.class);
+        assertAuditVersionedWithoutLogicalDelete(SystemUserViewSettingEntity.class);
+    }
+
+    /** 验证显式版本化但禁止逻辑删除的 Entity 精确具备审计与乐观锁能力。 */
+    private static void assertAuditVersionedWithoutLogicalDelete(Class<?> entityType)
+            throws NoSuchFieldException {
+        assertThat(BaseAuditEntity.class.isAssignableFrom(entityType)).isTrue();
+        assertThat(BaseEntity.class.isAssignableFrom(entityType)).isFalse();
+        assertThat(entityType.getDeclaredField("version").getAnnotation(Version.class)).isNotNull();
+        assertThat(java.util.Arrays.stream(entityType.getDeclaredFields())
+                .anyMatch(field -> field.getAnnotation(TableLogic.class) != null)).isFalse();
     }
 
     /** MOM 业务代码不得把 MyBatis-Plus 通用 Service 当作领域或 Repository 契约。 */

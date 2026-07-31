@@ -1,14 +1,14 @@
 # MOM System Platform
 
-`mom-system-platform` 已完成 S12 技术骨架、S13 GLOBAL/APPLICATION 类型化非敏感参数、S14 非权威受限通用字典与 S15-B Dynamic I18n 后端。S15-A 无真实调用方的历史审计保持不变；当前客户端尚未接入，S16 偏好及后续目录、菜单能力仍为 Not Started。
+`mom-system-platform` 已完成 S12 技术骨架、S13 GLOBAL/APPLICATION 类型化非敏感参数、S14 非权威受限通用字典、S15-B Dynamic I18n 后端与 S16 用户显示偏好/受限视图设置后端。S15-A 历史审计保持不变；当前客户端尚未接入，S17 目录与菜单仍为 Not Started。
 
 ## 模块职责
 
 | 模块 | S13～S15 职责 |
 |---|---|
-| `mom-system-api` | 参数有效值，以及字典 Active Option/Disabled Compatibility 的稳定只读契约 |
+| `mom-system-api` | 参数/字典有效值，以及用户显示偏好与受限视图设置的稳定只读契约 |
 | `mom-system-client` | 仅保留调用边界；当前无真实调用方，不提前创建 Feign Client |
-| `mom-system-server` | 参数、受限字典与 Dynamic I18n 领域规则、事务用例、`mom_system` 持久化、管理/Runtime API 与 JWT 安全 |
+| `mom-system-server` | 参数、受限字典、Dynamic I18n 与用户偏好领域规则、事务用例、`mom_system` 持久化、API 与 JWT 安全 |
 
 依赖方向固定为：
 
@@ -49,7 +49,7 @@ infrastructure → domain/application ports
 
 ## 精确门禁
 
-POM XML 白名单只允许 System API、WebMVC、Security、Data、Tracing、Metrics、Nacos、Lombok 与测试基础设施；`mom-iam-server` 和 `mom-mdm-api` 负例必须失败。API 只精确放行参数和字典只读契约，`mom-system-client` 继续为空。ArchUnit 验证三个 Domain 均无 Spring/MyBatis、Controller 只进入对应 Application、持久化类型只在 Infrastructure，并继续禁止 Preference、Catalog、Menu、Navigation、IAM 对象与权威主数据类型。
+POM XML 白名单只允许 System API、WebMVC、Security、Data、Tracing、Metrics、Nacos、Lombok 与测试基础设施；`mom-iam-server` 和 `mom-mdm-api` 负例必须失败。API 精确放行参数、字典与偏好只读契约，`mom-system-client` 继续为空。ArchUnit 验证四项 Domain 均不穿透技术边界、Controller 只进入对应 Application、持久化类型只在 Infrastructure，并继续禁止 Catalog、Menu、Navigation、IAM 对象与权威主数据类型。
 
 ## Dynamic I18n
 
@@ -61,9 +61,18 @@ POM XML 白名单只允许 System API、WebMVC、Security、Data、Tracing、Met
 - 管理权限仅引用 IAM 的 `system:i18n:read/write/publish` Code；System 不保存 Permission 或 Role。
 - 不使用 Redis/Caffeine、MQ、Outbox/Inbox、Seata 或 Feign；当前 Web/Mobile 尚未接入。
 
+## 用户显示偏好与受限视图设置
+
+- V7 新增 `system_user_preference` 与 `system_user_view_setting`，无物理 FK、无逻辑删除；Reset 保留行并推进 Version。
+- 显示偏好只允许 Locale、displayTimezone、themeMode、density、pageSize；NULL 回退冻结 Platform Default。
+- View 使用类型化 Column/Sort/Filter，最多 100/3/20 项，总 JSONB 最大 16 KiB；业务查询不得直接执行恢复值。
+- 当前用户只来自已验证 JWT sub，API 路径/Body/Header 不接受 userId；自助 API 只要求认证，不新增管理 Permission。
+- Preference 不进入 JWT、不修改 `/api/iam/me`、不参与授权、Factory 业务日期、金额、数量或单位事实。
+- `mom-system-client` 继续为空；Web/Mobile 接入、缓存、MQ 和跨服务同步不在 S16。
+
 ## 当前未实现
 
-- User Preference、Locale/Timezone/Theme 与视图设置；
+- Default/Last Factory、Default Application、Dashboard/Favorites 与 Web/Mobile 正式接入；
 - Application Catalog、Menu、Navigation；
 - Dynamic I18n 客户端接入、缓存或变更通知；Audit Projection；
 - Secret 管理、配置中心替代、跨服务推送；
@@ -83,7 +92,7 @@ bash scripts/codex-mvn-test.sh \
   -pl mom-architecture-tests \
   -am test
 
-BASE_REF=da0b3c194ffb430275feea2ceeac1a1d898acb49 \
+BASE_REF=66516711dbc7e9f9849549bc27b5f11207d83481 \
   bash scripts/codex-verify-changed.sh
 
 bash scripts/codex-mvn-test.sh clean verify
@@ -91,4 +100,4 @@ bash scripts/codex-mvn-test.sh clean verify
 
 ## 回滚
 
-需要撤销 S15-B 时，对功能提交执行普通 `git revert`；已执行 V3 的数据库必须另行评估 Resource/Draft/Release 数据保留，禁止删除或修改历史 Migration，也不得用 reset/rebase 改写 S15-A 历史。
+需要撤销 S16 应用能力时，对功能提交执行普通 `git revert`；已执行 V7 的数据库必须另行评估用户偏好数据保留，禁止删除或修改历史 Migration，也不得用 reset/rebase 改写 S15/S15-F 历史。

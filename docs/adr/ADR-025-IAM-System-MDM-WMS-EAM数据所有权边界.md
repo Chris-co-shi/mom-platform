@@ -323,4 +323,10 @@ S15-B 的目标消费者为 `mom-web`、`mom-mobile` 和未来 System 管理端�
 
 实施期间状态为：S15-A `Completed`、S15-B `In Progress`、S15 `In Progress`、S16 `Not Started`。只有 S15-B 全部实现与门禁通过后，才可将 S15-B 和 S15 标记为 `Completed`。
 
-后续完成记录：S15-B 全部门禁通过后已标记为 `Completed`，S15 已完成；S16 仍为 `Not Started`。
+S15-B 完成时点记录：S15-B 全部门禁通过后已标记为 `Completed`，S15 已完成；该时点 S16 仍为 `Not Started`。
+
+## 28. S16 Preference 实施记录
+
+S16 已按本 ADR 的单一写入权威完成 System User Display Preference 与受限 User View Setting。System 只保存 Locale、显示时区、Theme、Density、白名单 Page Size，以及类型化列/排序/Filter 视图恢复状态；当前用户引用只来自 JWT `sub`。该数据不进入 IAM Token、不修改 Permission、Role、Factory Scope 或 Party Scope，也不访问 IAM/MDM Repository、Schema 或用户副本。
+
+Default/Last Factory 因 IAM Scope 与 MDM Factory 批量校验契约尚未同时具备而精确 Deferred；Default Application 延后 S17；Dashboard/Favorites 与客户端跨仓库接入也未实施。S16 不创建 Catalog/Menu/Navigation，不把 IAM OAuth Client ID 当 Application Code，不引入缓存、消息或偏好跨服务同步。本记录只追加已落地范围，不改写本 ADR 的 IAM/System/MDM 所有权和既有历史证据。

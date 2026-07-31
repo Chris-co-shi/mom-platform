@@ -64,3 +64,9 @@ MOM 同时面向浏览器、移动设备、跨时区工厂和精度敏感的工�
 - S05 专题规范和现状清单必须被工程基线索引。
 - 轻量门禁只扫描生产源码和资源，并用正反例证明不误扫注释、字符串、测试或文档。
 - 本 Slice 不修改 `mom-web`、`mom-mobile`、公开 API、IAM、Schema 或 Flyway。
+
+## S16 实施记录
+
+S16 在不改变本 ADR `Accepted` 状态和既有所有权裁决的前提下，已于 System Platform 落地两张无物理外键的用户体验表：类型化显示偏好与受限视图设置。显示偏好只允许 `zh-CN`/`en-US`、Java `ZoneId` 可验证的 IANA 显示时区、`SYSTEM`/`LIGHT`/`DARK`、`COMFORTABLE`/`COMPACT` 和 10/20/50/100 Page Size；平台默认固定为 `zh-CN`、`UTC`、`SYSTEM`、`COMFORTABLE`、`20`。
+
+用户身份只来自 JWT `sub`，Preference 不进入 JWT、不修改 `/api/iam/me`、不参与授权，也不改变 Factory 业务时区、业务日期、金额、数量或单位事实。Default/Last Factory、Default Application、Dashboard/Favorites 与客户端接入均保持 Deferred；本次未引入缓存、消息或跨服务同步。
