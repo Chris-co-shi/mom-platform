@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.system.web.preference;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.github.chrisshi.mom.system.api.ResolvedUserPreference;
 import io.github.chrisshi.mom.system.api.UserViewSetting;
 import io.github.chrisshi.mom.system.application.preference.SystemUserPreferenceApplicationModels.ColumnCommand;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
 
 import java.util.List;
 
@@ -26,8 +28,9 @@ import java.util.List;
  * 当前用户显示偏好与受限视图设置的 HTTP 入站 Adapter。
  *
  * <p>全部端点只要求已认证，不新增管理 Permission；用户身份不出现在路径、Query 或 Body，只由
- * CurrentPreferenceUserProvider 的 JWT sub 决定。Controller 只映射 DTO/Command 和 HTTP Payload 上限，
- * 不依赖 Domain Repository、Mapper 或 Entity。</p>
+ * CurrentPreferenceUserProvider 的 JWT sub 决定。所有请求 DTO 以局部 {@link JsonAnySetter} 对未声明字段
+ * fail-closed，避免身份、授权、审计或普通扩展字段被静默接受；Controller 只映射 DTO/Command 和 HTTP
+ * Payload 上限，不依赖 Domain Repository、Mapper 或 Entity。</p>
  */
 @RestController
 @RequestMapping("/api/system/preferences/me")
@@ -100,13 +103,31 @@ public class SystemUserPreferenceController {
         }
     }
 
+    /**
+     * 统一拒绝 Preference 请求中的未声明字段。
+     *
+     * <p>不记录字段名或字段值，避免身份、Token 或其他敏感输入进入错误响应和日志。异常由 Web
+     * 异常处理器稳定映射为 400 invalid_request；该策略只作用于本 Controller 的请求 DTO。</p>
+     */
+    private static void rejectUnknownField() {
+        throw new IllegalArgumentException("Preference 请求包含未声明字段");
+    }
+
     /** 五个可空显示覆盖和乐观版本；不允许携带 userId 或审计字段。 */
     public record SaveDisplayPreferenceRequest(
             String locale, String displayTimezone, String themeMode, String density, Integer pageSize, Long version) {
+        @JsonAnySetter
+        private void rejectUnknown(String fieldName, JsonNode ignoredValue) {
+            rejectUnknownField();
+        }
     }
 
     /** 乐观 Reset 请求。 */
     public record ResetRequest(Long version) {
+        @JsonAnySetter
+        private void rejectUnknown(String fieldName, JsonNode ignoredValue) {
+            rejectUnknownField();
+        }
     }
 
     /** 类型化视图保存请求；不接受任意 JSON Object。 */
@@ -117,6 +138,11 @@ public class SystemUserPreferenceController {
             List<FilterRequest> filters,
             Integer pageSize,
             Long version) {
+        @JsonAnySetter
+        private void rejectUnknown(String fieldName, JsonNode ignoredValue) {
+            rejectUnknownField();
+        }
+
         SaveViewSettingCommand toCommand() {
             return new SaveViewSettingCommand(schemaVersion,
                     columns == null ? null : columns.stream().map(ColumnRequest::toCommand).toList(),
@@ -128,6 +154,11 @@ public class SystemUserPreferenceController {
 
     /** 类型化列请求。 */
     public record ColumnRequest(String columnKey, Boolean visible, Integer order, Integer width, String pinned) {
+        @JsonAnySetter
+        private void rejectUnknown(String fieldName, JsonNode ignoredValue) {
+            rejectUnknownField();
+        }
+
         ColumnCommand toCommand() {
             return new ColumnCommand(columnKey, visible, order, width, pinned);
         }
@@ -135,6 +166,11 @@ public class SystemUserPreferenceController {
 
     /** 类型化排序请求。 */
     public record SortRequest(String fieldKey, String direction, Integer priority) {
+        @JsonAnySetter
+        private void rejectUnknown(String fieldName, JsonNode ignoredValue) {
+            rejectUnknownField();
+        }
+
         SortCommand toCommand() {
             return new SortCommand(fieldKey, direction, priority);
         }
@@ -142,6 +178,11 @@ public class SystemUserPreferenceController {
 
     /** 类型化 Filter 请求；values 的元素由 Jackson 限定为 String。 */
     public record FilterRequest(String fieldKey, String operator, String valueType, List<String> values) {
+        @JsonAnySetter
+        private void rejectUnknown(String fieldName, JsonNode ignoredValue) {
+            rejectUnknownField();
+        }
+
         FilterCommand toCommand() {
             return new FilterCommand(fieldKey, operator, valueType, values);
         }

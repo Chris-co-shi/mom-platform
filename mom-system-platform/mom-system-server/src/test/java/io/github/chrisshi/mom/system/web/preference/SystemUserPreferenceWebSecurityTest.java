@@ -28,6 +28,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -74,7 +75,9 @@ class SystemUserPreferenceWebSecurityTest {
         when(service.resetMyPreference(any())).thenReturn(defaultPreference());
         mockMvc.perform(put("/api/system/preferences/me").with(jwt().jwt(jwt -> jwt.subject("101")))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"locale\":\"en-US\",\"version\":0,\"userId\":\"202\"}"))
+                        .content("{\"locale\":\"en-US\",\"displayTimezone\":\"Asia/Tokyo\","
+                                + "\"themeMode\":\"DARK\",\"density\":\"COMPACT\","
+                                + "\"pageSize\":20,\"version\":0}"))
                 .andExpect(status().isOk());
         mockMvc.perform(post("/api/system/preferences/me/reset").with(jwt().jwt(jwt -> jwt.subject("101")))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0}"))
@@ -82,6 +85,72 @@ class SystemUserPreferenceWebSecurityTest {
         verify(service).saveMyPreference(any());
         mockMvc.perform(get("/api/system/preferences/202").with(jwt().jwt(jwt -> jwt.subject("101"))))
                 .andExpect(status().isNotFound());
+        mockMvc.perform(put("/api/system/preferences/202").with(jwt().jwt(jwt -> jwt.subject("101")))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void displayPreferenceMustRejectIdentityAuthorizationAuditAndOrdinaryUnknownFields() throws Exception {
+        List<String> undeclaredFields = List.of(
+                "userId", "user_id", "username", "subject", "sub", "actorId", "principal",
+                "role", "roles", "permission", "permissions", "scope", "scopes", "factoryScope",
+                "partyScope", "authorization", "id", "createdBy", "createdAt", "updatedBy", "updatedAt",
+                "versionActor", "padding", "debug", "metadata", "extra", "unknownField");
+
+        for (String field : undeclaredFields) {
+            mockMvc.perform(put("/api/system/preferences/me").with(jwt().jwt(jwt -> jwt.subject("101")))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"locale\":\"en-US\",\"version\":0,\"" + field + "\":\"202\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("invalid_request"))
+                    .andExpect(jsonPath("$.message").value("请求参数格式非法"));
+        }
+
+        verify(service, never()).saveMyPreference(any());
+    }
+
+    @Test
+    void resetAndTopLevelViewMustRejectUnknownFieldsBeforeCallingService() throws Exception {
+        mockMvc.perform(post("/api/system/preferences/me/reset").with(jwt().jwt(jwt -> jwt.subject("101")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"version\":0,\"subject\":\"202\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_request"));
+        mockMvc.perform(put("/api/system/preferences/me/views/mom-admin/iam.users.list")
+                        .with(jwt().jwt(jwt -> jwt.subject("101")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"schemaVersion\":1,\"columns\":[],\"sorts\":[],\"filters\":[],"
+                                + "\"version\":0,\"createdBy\":\"202\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_request"));
+
+        verify(service, never()).resetMyPreference(any());
+        verify(service, never()).saveMyView(anyString(), anyString(), any());
+    }
+
+    @Test
+    void nestedColumnSortAndFilterRequestsMustRejectUnknownFields() throws Exception {
+        List<String> bodies = List.of(
+                "{\"schemaVersion\":1,\"columns\":[{\"columnKey\":\"display-name\","
+                        + "\"visible\":true,\"order\":0,\"pinned\":\"NONE\",\"userId\":\"202\"}],"
+                        + "\"sorts\":[],\"filters\":[],\"version\":0}",
+                "{\"schemaVersion\":1,\"columns\":[],\"sorts\":[{\"fieldKey\":\"display-name\","
+                        + "\"direction\":\"ASC\",\"priority\":0,\"permissions\":[\"admin\"]}],"
+                        + "\"filters\":[],\"version\":0}",
+                "{\"schemaVersion\":1,\"columns\":[],\"sorts\":[],\"filters\":[{"
+                        + "\"fieldKey\":\"display-name\",\"operator\":\"EQ\",\"valueType\":\"STRING\","
+                        + "\"values\":[\"alice\"],\"metadata\":{}}],\"version\":0}");
+
+        for (String body : bodies) {
+            mockMvc.perform(put("/api/system/preferences/me/views/mom-admin/iam.users.list")
+                            .with(jwt().jwt(jwt -> jwt.subject("101")))
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("invalid_request"));
+        }
+
+        verify(service, never()).saveMyView(anyString(), anyString(), any());
     }
 
     @Test
@@ -121,8 +190,10 @@ class SystemUserPreferenceWebSecurityTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("stale_version"));
 
-        String oversized = "{\"schemaVersion\":1,\"columns\":[],\"sorts\":[],\"filters\":[],"
-                + "\"version\":0,\"padding\":\"" + "x".repeat(17_000) + "\"}";
+        String oversized = "{\"schemaVersion\":1,\"columns\":[{\"columnKey\":\""
+                + "x".repeat(17_000)
+                + "\",\"visible\":true,\"order\":0,\"pinned\":\"NONE\"}],"
+                + "\"sorts\":[],\"filters\":[],\"version\":0}";
         mockMvc.perform(put("/api/system/preferences/me/views/mom-admin/iam.users.list")
                         .with(jwt().jwt(jwt -> jwt.subject("101")))
                         .contentType(MediaType.APPLICATION_JSON).content(oversized))
@@ -143,6 +214,24 @@ class SystemUserPreferenceWebSecurityTest {
                         token, List.of()));
         org.assertj.core.api.Assertions.assertThat(provider.requireUserId()).isEqualTo("101");
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void selfReportedIdentityHeadersMustNotOverrideJwtSubject() throws Exception {
+        when(service.getMyPreference()).thenAnswer(invocation -> {
+            var provider = new SecurityContextCurrentPreferenceUserProvider();
+            org.assertj.core.api.Assertions.assertThat(provider.requireUserId()).isEqualTo("101");
+            return defaultPreference();
+        });
+
+        mockMvc.perform(get("/api/system/preferences/me")
+                        .header("X-User-Id", "202")
+                        .header("X-Subject", "202")
+                        .header("X-Actor-Id", "202")
+                        .with(jwt().jwt(jwt -> jwt.subject("101"))))
+                .andExpect(status().isOk());
+
+        verify(service).getMyPreference();
     }
 
     private static String viewBody() {

@@ -20,6 +20,11 @@ S16 已根据 `mom-web` 与 `mom-mobile` 的真实消费证据建立类型化、
 
 所有 API 只从认证 JWT `sub` 解析当前 IAM User ID Reference，不接受 URL、Body 或 Header 自报 `userId`。GET 无记录时返回默认值、`version=0`、`persisted=false`；PUT 与 Reset 使用乐观版本，Reset 只清空覆盖或禁用视图，不物理删除。
 
+Preference 写请求必须采用严格白名单并拒绝所有未知字段。身份、授权、审计字段即使不会被 Application 使用，
+也不得由 Jackson 静默接受；普通扩展字段和 Column/Sort/Filter 嵌套对象中的未知字段同样返回
+`400 invalid_request`。该规则必须局限于 Preference Request DTO，不得通过修改全局 Jackson 行为影响其他 API。
+客户端 Header 不能覆盖认证 JWT `sub`，错误响应不得回显未知字段值、身份信息或 Jackson 内部路径。
+
 S16 不实现缓存。未来客户端在服务不可用时按“本地最后成功版本 -> 应用静态默认”回退；服务端缓存、TTL 和失效属于 S18。降级不得阻止登录、扩大权限、改变 Factory Scope、Factory 业务日期、金额、权威单位或业务事实。
 
 Default Application 延后到 S17 Application Catalog；Dashboard/Favorites 因没有稳定对象引用和真实调用方而 Deferred。客户端跨仓库正式接入为后续独立任务，S16 不修改 `mom-web`、`mom-mobile`、`/api/iam/me` 或 Token Claim。
