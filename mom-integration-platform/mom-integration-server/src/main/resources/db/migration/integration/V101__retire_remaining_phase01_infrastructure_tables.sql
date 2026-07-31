@@ -1,20 +1,27 @@
--- S15-F：Outbox/Seata 运行时依赖退出后，清理 V4 保留但已无调用方的 Inbox 与 Undo 表。
--- V101 避免未来或既有高版本环境跳过清理；非空表拒绝自动删除。
+-- S15-F 最终退出 Integration Phase 01 Messaging/Seata 技术表；V101 同时覆盖测试资源 V100 的受控重建。
+-- 非空技术表拒绝自动删除，避免把潜在环境数据静默丢弃。
 DO $$
 DECLARE
     candidate TEXT;
     row_count BIGINT;
 BEGIN
-    FOREACH candidate IN ARRAY ARRAY['mom_inbox_event', 'undo_log'] LOOP
+    FOREACH candidate IN ARRAY ARRAY[
+        'technical_message_receipt',
+        'mom_inbox_event',
+        'technical_seata_at_participant',
+        'undo_log'
+    ] LOOP
         IF to_regclass(current_schema() || '.' || candidate) IS NOT NULL THEN
             EXECUTE format('SELECT count(*) FROM %I', candidate) INTO row_count;
             IF row_count > 0 THEN
-                RAISE EXCEPTION 'cannot retire unused infrastructure table %, rows=%', candidate, row_count;
+                RAISE EXCEPTION 'cannot retire Phase 01 technical table %, rows=%', candidate, row_count;
             END IF;
         END IF;
     END LOOP;
 END;
 $$;
 
+DROP TABLE IF EXISTS technical_seata_at_participant;
+DROP TABLE IF EXISTS technical_message_receipt;
 DROP TABLE IF EXISTS mom_inbox_event;
 DROP TABLE IF EXISTS undo_log;
