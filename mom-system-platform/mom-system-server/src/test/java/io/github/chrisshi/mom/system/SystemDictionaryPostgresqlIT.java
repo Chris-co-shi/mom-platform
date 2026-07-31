@@ -116,7 +116,7 @@ class SystemDictionaryPostgresqlIT {
     }
 
     @Test
-    void existingV1SchemaMustUpgradeThroughV7WithoutChangingParameterData() {
+    void existingV1SchemaMustUpgradeThroughV8WithoutChangingParameterData() {
         Flyway v1 = Flyway.configure().dataSource(dataSource).createSchemas(true)
                 .schemas(UPGRADE_SCHEMA).defaultSchema(UPGRADE_SCHEMA)
                 .locations("classpath:db/migration/system").target("1").load();
@@ -136,7 +136,7 @@ class SystemDictionaryPostgresqlIT {
                 .schemas(UPGRADE_SCHEMA).defaultSchema(UPGRADE_SCHEMA)
                 .locations("classpath:db/migration/system").load();
         latest.migrate();
-        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("7");
+        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("8");
         assertThat(jdbcTemplate.queryForObject(
                 "select count(*) from information_schema.tables where table_schema=? and table_name='system_dictionary'",
                 Long.class, UPGRADE_SCHEMA)).isEqualTo(1L);
@@ -146,6 +146,11 @@ class SystemDictionaryPostgresqlIT {
         assertThat(jdbcTemplate.queryForObject(
                 "select deleted from mom_system_upgrade.system_parameter where id='upgrade-param'",
                 Boolean.class)).isFalse();
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*) from information_schema.tables
+                 where table_schema=? and table_name in (
+                   'system_application','system_navigation_item','system_catalog_release')
+                """, Long.class, UPGRADE_SCHEMA)).isEqualTo(3L);
     }
 
     @Test
