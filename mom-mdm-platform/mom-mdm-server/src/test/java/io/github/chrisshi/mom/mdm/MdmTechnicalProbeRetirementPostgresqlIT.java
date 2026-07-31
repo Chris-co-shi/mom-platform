@@ -63,7 +63,7 @@ class MdmTechnicalProbeRetirementPostgresqlIT {
         HikariDataSource hikari = assertInstanceOf(HikariDataSource.class, dataSource);
         assertEquals("mom-mdm-hikari", hikari.getPoolName());
         assertEquals("UTC", jdbcTemplate.queryForObject("show timezone", String.class));
-        assertEquals(5, jdbcTemplate.queryForObject(
+        assertEquals(6, jdbcTemplate.queryForObject(
                 "select max(version::integer) from flyway_schema_history where success = true",
                 Integer.class));
         assertEquals(0L, jdbcTemplate.queryForObject("""

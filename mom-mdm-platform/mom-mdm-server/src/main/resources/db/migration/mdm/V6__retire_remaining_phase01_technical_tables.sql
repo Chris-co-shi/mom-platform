@@ -1,15 +1,11 @@
--- Phase 01 技术探针退出。历史 V1-V4 保持不可变；本迁移拒绝静默删除任何非空技术表。
+-- S15-F 清理 V5 未覆盖的 Phase 01 Outbox/Seata 基础表；历史迁移保持不可变。
+-- 非空技术表拒绝自动删除，避免把潜在环境数据静默丢弃。
 DO $$
 DECLARE
     candidate TEXT;
     row_count BIGINT;
 BEGIN
-    FOREACH candidate IN ARRAY ARRAY[
-        'technical_data_probe',
-        'mom_outbox_event',
-        'technical_seata_at_coordinator',
-        'undo_log'
-    ] LOOP
+    FOREACH candidate IN ARRAY ARRAY['mom_outbox_event', 'undo_log'] LOOP
         IF to_regclass(current_schema() || '.' || candidate) IS NOT NULL THEN
             EXECUTE format('SELECT count(*) FROM %I', candidate) INTO row_count;
             IF row_count > 0 THEN
@@ -20,7 +16,5 @@ BEGIN
 END;
 $$;
 
-DROP TABLE IF EXISTS technical_seata_at_coordinator;
 DROP TABLE IF EXISTS mom_outbox_event;
-DROP TABLE IF EXISTS technical_data_probe;
 DROP TABLE IF EXISTS undo_log;

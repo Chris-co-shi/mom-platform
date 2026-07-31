@@ -1,4 +1,5 @@
--- Phase 01 Integration 消息与 Seata 技术探针退出；历史 V1-V2 保持不可变。
+-- S15-F 退出 Integration 的 Phase 01 Messaging/Seata 技术表；历史 V1-V3 保持不可变。
+-- 非空技术表拒绝自动删除，避免把潜在环境数据静默丢弃。
 DO $$
 DECLARE
     candidate TEXT;

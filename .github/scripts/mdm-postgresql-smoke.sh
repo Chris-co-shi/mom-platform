@@ -67,7 +67,7 @@ docker exec "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DAT
 " > mdm-postgresql-schema.txt
 
 grep --fixed-strings --quiet 'schema=1' mdm-postgresql-schema.txt
-grep --fixed-strings --quiet 'flyway_version=5' mdm-postgresql-schema.txt
+grep --fixed-strings --quiet 'flyway_version=6' mdm-postgresql-schema.txt
 grep --fixed-strings --quiet 'technical_table_count=0' mdm-postgresql-schema.txt
 grep --fixed-strings --quiet 'business_fk=0' mdm-postgresql-schema.txt
 
@@ -87,4 +87,4 @@ metrics_status="$(curl --silent --output mdm-postgresql-prometheus.txt --write-o
 grep --extended-regexp --quiet '^jdbc_connections_max(\{| )' mdm-postgresql-prometheus.txt
 grep --extended-regexp --quiet '^hikaricp_connections_max(\{| )' mdm-postgresql-prometheus.txt
 
-echo "MDM_POSTGRESQL_SMOKE result=success flyway=5 technical_tables=0 readiness=UP"
+echo "MDM_POSTGRESQL_SMOKE result=success flyway=6 technical_tables=0 readiness=UP"
