@@ -5,6 +5,7 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.Test;
 
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -182,20 +183,44 @@ class ServerPackageArchitectureTest {
                 .check(productionClasses);
     }
 
-    /** System 不得定义 IAM、权威主数据对象或 S17+ 业务类型。 */
+    /**
+     * S17 允许 System 拥有 Application Catalog 与 Navigation Metadata，但仍禁止形成第二 IAM 或主数据权威。
+     */
     @Test
-    void systemMustNotDefineIamOrFutureSystemObjects() {
+    void systemMustNotDefineIamOrMasterDataAuthorityObjects() {
         Set<String> forbidden = Set.of(
                 "Permission", "Role", "Session", "Refresh", "Credential",
-                "Catalog", "Menu", "Navigation", "FactoryScope", "PartyBinding",
-                "Factory", "Warehouse", "Equipment", "Person", "Party");
+                "FactoryScope", "PartyBinding", "Factory", "Warehouse",
+                "Equipment", "Person", "Party");
         var violations = productionClasses.stream()
                 .filter(javaClass -> javaClass.getPackageName().startsWith("io.github.chrisshi.mom.system"))
                 .filter(javaClass -> forbidden.stream().anyMatch(javaClass.getSimpleName()::contains))
                 .map(javaClass -> javaClass.getName())
                 .toList();
         org.assertj.core.api.Assertions.assertThat(violations)
-                .as("System 不得定义 IAM/主数据权威对象或 S17+ 类型")
+                .as("System Catalog 只能引用 IAM/主数据稳定 Code，不得定义权威对象")
+                .isEmpty();
+    }
+
+    /** Catalog 只能保存元数据和稳定 Reference，不得承载可执行客户端实现或 IAM Assignment。 */
+    @Test
+    void systemCatalogMustNotExposeExecutableClientArtifactsOrIamAssignments() {
+        Set<String> forbiddenSegments = Set.of(
+                "component", "layout", "javascript", "html", "dynamicimport",
+                "roleid", "roleids", "permissionid", "permissionids", "userid",
+                "factoryid", "partyid", "clientsecret", "accesstoken", "refreshtoken");
+        var violations = productionClasses.stream()
+                .filter(javaClass -> javaClass.getPackageName().contains(".system.")
+                        && (javaClass.getPackageName().contains(".catalog")
+                        || javaClass.getSimpleName().contains("SystemCatalogContracts")))
+                .flatMap(javaClass -> Stream.concat(
+                        Stream.of(javaClass.getSimpleName()),
+                        javaClass.getAllFields().stream().map(field -> field.getName())))
+                .filter(name -> forbiddenSegments.stream().anyMatch(segment ->
+                        name.toLowerCase(Locale.ROOT).contains(segment)))
+                .toList();
+        org.assertj.core.api.Assertions.assertThat(violations)
+                .as("Catalog 不得返回 Component/Layout/Script 或保存 IAM Assignment")
                 .isEmpty();
     }
 
@@ -300,15 +325,15 @@ class ServerPackageArchitectureTest {
         Set<String> forbiddenSegments = Set.of(
                 "role", "permission", "factoryscope", "partyscope", "token", "session", "credential");
         var violations = productionClasses.stream()
-                .filter(javaClass -> javaClass.getPackageName()
-                        .startsWith("io.github.chrisshi.mom.system"))
-                .filter(javaClass -> javaClass.getPackageName().contains("preference")
-                        || javaClass.getPackageName().equals("io.github.chrisshi.mom.system.api"))
+                .filter(javaClass -> javaClass.getPackageName().contains(".system.preference")
+                        || (javaClass.getPackageName().equals("io.github.chrisshi.mom.system.api")
+                        && (javaClass.getSimpleName().contains("UserPreference")
+                        || javaClass.getSimpleName().contains("UserViewSetting"))))
                 .flatMap(javaClass -> Stream.concat(
                         Stream.of(javaClass.getSimpleName()),
                         javaClass.getAllFields().stream().map(field -> field.getName())))
                 .filter(name -> forbiddenSegments.stream()
-                        .anyMatch(segment -> name.toLowerCase(java.util.Locale.ROOT).contains(segment)))
+                        .anyMatch(segment -> name.toLowerCase(Locale.ROOT).contains(segment)))
                 .toList();
 
         org.assertj.core.api.Assertions.assertThat(violations)
