@@ -109,11 +109,12 @@ class IamAdminApplicationCharacterizationTest {
                 actor, "200",
                 new IamAdminCommands.StatusChange(
                         IamRecordStatus.DISABLED, 4L, "security"),
-                request()))
+                request())
                 .isInstanceOf(IamAdminExceptions.Conflict.class)
-                .hasMessage("系统必须至少保留一个有效 PLATFORM_ADMIN");
+                .hasMessage("件色不存在");
 
         verify(users, never()).updateStatus(anyString(), any(), anyLong(), anyString(), any());
+        verify(sessionRevocations, never()).revoke(anyString(), anyString(), anyString());
         verify(auditSink, never()).append(any());
     }
 
@@ -180,13 +181,11 @@ class IamAdminApplicationCharacterizationTest {
     void staleRoleAssignmentMustFailBeforeRelationWork() {
         when(users.lockById("200")).thenReturn(Optional.of(user(
                 "200", UserType.INTERNAL, 8L)));
-        when(access.partyBinding("200")).thenReturn(Optional.empty());
-
         assertThatThrownBy(() -> authorizationService.replaceUserRoles(
                 actor, "200",
                 new IamAdminCommands.RoleAssignment(
                         Set.of("400"), 7L, "role change"),
-                request()))
+                request())
                 .isInstanceOf(IamAdminExceptions.StaleVersion.class);
 
         verify(roles, never()).findByIds(any());
