@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * S16 Flyway V7、PostgreSQL 17.7、JSONB、审计、Version、Reset、并发创建和用户隔离集成测试。
  *
  * <p>测试使用真实 mom_system Schema、MyBatis-Plus 和事务；不依赖 Redis/Nacos/OTLP。V1～V6 升级测试
- * 不修改历史 Migration，Docker 不可用时只能标记 Testcontainers skipped，不能描述为成功。</p>
+ * 继续验证旧数据在最新 V8 Schema 下保持不变；Docker 不可用时只能标记 Testcontainers skipped，不能描述为成功。</p>
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
@@ -123,7 +123,7 @@ class SystemUserPreferencePostgresqlIT {
     }
 
     @Test
-    void existingV1ThroughV6MustUpgradeToV7WithoutChangingExistingTables() {
+    void existingV1ThroughV6MustUpgradeToV8WithoutChangingExistingTables() {
         Flyway old = Flyway.configure().dataSource(dataSource).createSchemas(true)
                 .schemas(UPGRADE_SCHEMA).defaultSchema(UPGRADE_SCHEMA)
                 .locations("classpath:db/migration/system").target("6").load();
@@ -140,7 +140,7 @@ class SystemUserPreferencePostgresqlIT {
                 .schemas(UPGRADE_SCHEMA).defaultSchema(UPGRADE_SCHEMA)
                 .locations("classpath:db/migration/system").load();
         latest.migrate();
-        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("7");
+        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("8");
         assertThat(jdbcTemplate.queryForObject(
                 "select parameter_value from mom_system_preference_upgrade.system_parameter where id='upgrade-param'",
                 String.class)).isEqualTo("kept");
@@ -148,6 +148,11 @@ class SystemUserPreferencePostgresqlIT {
                 select count(*) from information_schema.tables
                  where table_schema=? and table_name in ('system_user_preference','system_user_view_setting')
                 """, Long.class, UPGRADE_SCHEMA)).isEqualTo(2L);
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*) from information_schema.tables
+                 where table_schema=? and table_name in (
+                   'system_application','system_navigation_item','system_catalog_release')
+                """, Long.class, UPGRADE_SCHEMA)).isEqualTo(3L);
     }
 
     @Test
