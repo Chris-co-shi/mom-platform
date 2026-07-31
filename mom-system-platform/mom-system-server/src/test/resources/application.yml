@@ -1,4 +1,8 @@
 spring:
+  datasource:
+    hikari:
+      # 历史 SpringBootTest 仍验证正式 System DataSource 命名，不接受默认 HikariPool-N。
+      pool-name: mom-system-hikari
   flyway:
     # S13～S16 的 SpringBootTest 固定验证各自已发布的 V1～V7 历史能力。
     # S17 V8 由独立 SystemCatalogPostgresqlIT 在隔离 Schema 上执行最新 Migration 验收。
