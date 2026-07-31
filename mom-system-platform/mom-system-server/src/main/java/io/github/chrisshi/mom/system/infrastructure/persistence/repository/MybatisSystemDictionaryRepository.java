@@ -2,6 +2,7 @@ package io.github.chrisshi.mom.system.infrastructure.persistence.repository;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.repository.CrudRepository;
 import io.github.chrisshi.mom.system.application.dictionary.SystemDictionaryException;
 import io.github.chrisshi.mom.system.domain.dictionary.SystemDictionary;
 import io.github.chrisshi.mom.system.domain.dictionary.SystemDictionaryRepository;
@@ -14,31 +15,35 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * 基于 MyBatis-Plus 的 System Dictionary Repository Adapter。
+ * 基于 MyBatis-Plus Repository 抽象的 System Dictionary 持久化 Adapter。
  *
- * <p>普通 CRUD、稳定 Code 查询、计数、固定排序和分页全部由 MomBaseMapper 与 Lambda Wrapper 表达；
- * 不维护 Mapper XML，也不暴露 Mapper、Entity 或 Wrapper 到 Domain/Web。</p>
+ * <p>该类型在 Infrastructure 内部复用 {@link CrudRepository} 的单表 CRUD、计数和列表能力，对上仍只实现
+ * 框架无关的 {@link SystemDictionaryRepository}。Entity、Mapper、Wrapper 和通用 CRUD 不得泄漏到
+ * Application、Domain 或 Web。</p>
+ *
+ * <p>字典业务规则、授权和事务边界由 Application/Domain 负责；唯一冲突与 Version CAS 失败继续转换为
+ * MOM 稳定语义。数据库不可用时异常向上传播，不进行缓存或内存降级。</p>
  */
 @Repository
-public class MybatisSystemDictionaryRepository implements SystemDictionaryRepository {
-    private final SystemDictionaryMapper mapper;
+public class MybatisSystemDictionaryRepository
+        extends CrudRepository<SystemDictionaryMapper, SystemDictionaryEntity>
+        implements SystemDictionaryRepository {
 
-    public MybatisSystemDictionaryRepository(SystemDictionaryMapper mapper) {
-        this.mapper = mapper;
-    }
-
+    /** 按技术主键读取字典。 */
     @Override
     public Optional<SystemDictionary> findById(String id) {
-        return Optional.ofNullable(mapper.selectById(id)).map(MybatisSystemDictionaryRepository::toDomain);
+        return Optional.ofNullable(getById(id)).map(MybatisSystemDictionaryRepository::toDomain);
     }
 
+    /** 按稳定 dictionaryCode 精确读取字典。 */
     @Override
     public Optional<SystemDictionary> findByCode(String dictionaryCode) {
         var query = Wrappers.<SystemDictionaryEntity>lambdaQuery()
                 .eq(SystemDictionaryEntity::getDictionaryCode, dictionaryCode);
-        return Optional.ofNullable(mapper.selectOne(query)).map(MybatisSystemDictionaryRepository::toDomain);
+        return Optional.ofNullable(getOne(query)).map(MybatisSystemDictionaryRepository::toDomain);
     }
 
+    /** 插入字典；数据库唯一冲突转换为稳定业务冲突。 */
     @Override
     public SystemDictionary insert(SystemDictionary dictionary) {
         SystemDictionaryEntity entity = new SystemDictionaryEntity();
@@ -47,13 +52,16 @@ public class MybatisSystemDictionaryRepository implements SystemDictionaryReposi
         entity.setEnabled(dictionary.enabled());
         entity.setDescription(dictionary.description());
         try {
-            mapper.insert(entity);
+            if (!save(entity)) {
+                throw new IllegalStateException("字典未插入预期的一行");
+            }
         } catch (DataIntegrityViolationException exception) {
             throw new SystemDictionaryException.Conflict("dictionaryCode 已存在", exception);
         }
         return findById(entity.getId()).orElseThrow(() -> new IllegalStateException("字典插入成功后无法读取"));
     }
 
+    /** 使用 Entity Version 执行 CAS 内容更新。 */
     @Override
     public boolean update(SystemDictionary dictionary) {
         SystemDictionaryEntity entity = new SystemDictionaryEntity();
@@ -61,23 +69,25 @@ public class MybatisSystemDictionaryRepository implements SystemDictionaryReposi
         entity.setVersion(dictionary.version());
         entity.setDictionaryName(dictionary.dictionaryName());
         entity.setDescription(dictionary.description());
-        return mapper.updateById(entity) == 1;
+        return updateById(entity);
     }
 
+    /** 使用 Entity Version 执行 CAS 状态更新。 */
     @Override
     public boolean updateStatus(SystemDictionary dictionary) {
         SystemDictionaryEntity entity = new SystemDictionaryEntity();
         entity.setId(dictionary.id());
         entity.setVersion(dictionary.version());
         entity.setEnabled(dictionary.enabled());
-        return mapper.updateById(entity) == 1;
+        return updateById(entity);
     }
 
+    /** 按受控单表条件分页，返回 Infrastructure 无关的 Domain Page。 */
     @Override
     public DictionaryPage findPage(DictionaryQuery query) {
         long offset = Math.multiplyExact((long) query.page(), query.size());
-        long total = mapper.selectCount(dictionaryFilter(query));
-        List<SystemDictionary> items = total == 0 ? List.of() : mapper.selectList(
+        long total = count(dictionaryFilter(query));
+        List<SystemDictionary> items = total == 0 ? List.of() : list(
                         dictionaryFilter(query)
                                 .orderByAsc(SystemDictionaryEntity::getDictionaryCode)
                                 .orderByAsc(SystemDictionaryEntity::getId)
@@ -88,6 +98,7 @@ public class MybatisSystemDictionaryRepository implements SystemDictionaryReposi
         return new DictionaryPage(items, total, query.page(), query.size());
     }
 
+    /** 构造只包含服务端白名单字段的查询条件。 */
     private static LambdaQueryWrapper<SystemDictionaryEntity> dictionaryFilter(DictionaryQuery query) {
         return Wrappers.<SystemDictionaryEntity>lambdaQuery()
                 .eq(query.dictionaryCode() != null,
@@ -95,10 +106,12 @@ public class MybatisSystemDictionaryRepository implements SystemDictionaryReposi
                 .eq(query.enabled() != null, SystemDictionaryEntity::getEnabled, query.enabled());
     }
 
+    /** 生成仅包含已校验非负数字的固定 PostgreSQL 分页尾句。 */
     private static String limitOffset(int size, long offset) {
         return "LIMIT " + size + " OFFSET " + offset;
     }
 
+    /** 将数据库行模型转换为不可泄漏 Entity 的领域快照。 */
     private static SystemDictionary toDomain(SystemDictionaryEntity entity) {
         return new SystemDictionary(entity.getId(), entity.getDictionaryCode(), entity.getDictionaryName(),
                 Boolean.TRUE.equals(entity.getEnabled()), entity.getVersion(), entity.getDescription(),

@@ -2,6 +2,7 @@ package io.github.chrisshi.mom.architecture;
 
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.Version;
+import com.baomidou.mybatisplus.extension.repository.CrudRepository;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
@@ -12,6 +13,9 @@ import io.github.chrisshi.mom.data.mapper.MomBaseMapper;
 import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemI18nReleaseEntity;
 import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemUserPreferenceEntity;
 import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemUserViewSettingEntity;
+import io.github.chrisshi.mom.system.infrastructure.persistence.repository.MybatisSystemDictionaryItemRepository;
+import io.github.chrisshi.mom.system.infrastructure.persistence.repository.MybatisSystemDictionaryRepository;
+import io.github.chrisshi.mom.system.infrastructure.persistence.repository.MybatisSystemParameterRepository;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -21,16 +25,30 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * MOM 持久化类型位置、技术栈选择与基础 Entity 能力的渐进式架构门禁。
+ * MOM 持久化类型位置、Repository 抽象、技术栈选择与基础 Entity 能力的架构门禁。
  *
- * <p>本测试分析 Reactor 已编译字节码，不解析 Java import。它自动判断稳定且可证明的事实：业务 Mapper
- * 和 Entity 的包位置、MyBatis-Plus 通用 Service 禁区、正式 bounded context 对 Spring JDBC/java.sql 的
- * 直接依赖、System Entity 按生命周期选择的基类能力以及公共基类字段类型。</p>
+ * <p>本测试分析 Reactor 已编译生产字节码。Domain Repository Port 必须保持框架无关；单表 CRUD
+ * Adapter 可以在 Infrastructure 内部复用 MyBatis-Plus {@link CrudRepository}，但该能力不得进入
+ * Domain、Application、Web 或公开 API。MyBatis-Plus {@code IService/ServiceImpl} 继续全面禁止。</p>
  *
- * <p>直接 JDBC 只允许四个已经登记的精确历史/协议例外；不得新增包级排除。System Parameter、Dictionary、
- * Dynamic I18n 及后续正式业务能力必须统一通过 MyBatis-Plus Mapper 体系访问 PostgreSQL。</p>
+ * <p>多 Mapper 聚合、Query/Projection、OAuth/SAS 协议存储和专用 SQL Adapter 不为形式统一强制继承
+ * 单表 Repository。正式 bounded context 对 Spring JDBC/java.sql 的直接依赖仅保留 SAS 官方 Store 的
+ * 精确协议例外。</p>
  */
 class PersistenceArchitectureTest {
+
+    private static final String[] BOUNDED_CONTEXT_PACKAGES = {
+            "io.github.chrisshi.mom.iam..",
+            "io.github.chrisshi.mom.mdm..",
+            "io.github.chrisshi.mom.integration..",
+            "io.github.chrisshi.mom.system..",
+            "io.github.chrisshi.mom.mes..",
+            "io.github.chrisshi.mom.wms..",
+            "io.github.chrisshi.mom.qms..",
+            "io.github.chrisshi.mom.ems..",
+            "io.github.chrisshi.mom.eam..",
+            "io.github.chrisshi.mom.traceability.."
+    };
 
     private final JavaClasses productionClasses = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
@@ -87,45 +105,69 @@ class PersistenceArchitectureTest {
                 .anyMatch(field -> field.getAnnotation(TableLogic.class) != null)).isFalse();
     }
 
-    /** MOM 业务代码不得把 MyBatis-Plus 通用 Service 当作领域或 Repository 契约。 */
+    /** MyBatis-Plus 通用 Service 不得成为 MOM 业务 Service 或 Repository。 */
     @Test
-    void businessCodeMustNotUseMybatisPlusGenericServices() {
+    void boundedContextsMustNotUseMybatisPlusGenericServices() {
         noClasses()
-                .that().resideInAnyPackage("io.github.chrisshi.mom..")
+                .that().resideInAnyPackage(BOUNDED_CONTEXT_PACKAGES)
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "com.baomidou.mybatisplus.extension.service..")
-                .because("IService/ServiceImpl 泄漏 ORM CRUD，不表达 MOM 用例或持久化语义")
+                .because("IService/ServiceImpl 暴露 ORM CRUD，不能表达 MOM 用例或领域仓储语义")
                 .check(productionClasses);
     }
 
-    /**
-     * 正式 bounded context 默认且强制使用 MyBatis-Plus；精确例外只覆盖 SAS 官方 Store 与既有技术探针。
-     */
+    /** MyBatis-Plus Repository 抽象只能作为 Infrastructure Repository Adapter 的实现机制。 */
+    @Test
+    void mybatisPlusRepositoriesMustStayInsideInfrastructureRepository() {
+        noClasses()
+                .that().resideInAnyPackage(BOUNDED_CONTEXT_PACKAGES)
+                .and().resideOutsideOfPackage("..infrastructure.persistence.repository..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.baomidou.mybatisplus.extension.repository..")
+                .because("IRepository/CrudRepository 不得泄漏到 Domain、Application、Web、API 或其他 Adapter")
+                .check(productionClasses);
+    }
+
+    /** Domain Repository Port 不得依赖任何 MyBatis-Plus 类型。 */
+    @Test
+    void domainRepositoryPortsMustRemainFrameworkIndependent() {
+        noClasses()
+                .that().resideInAnyPackage("..domain..")
+                .and().haveSimpleNameEndingWith("Repository")
+                .should().dependOnClassesThat().resideInAnyPackage("com.baomidou.mybatisplus..")
+                .because("Domain Repository 是框架无关 Port，不是 ORM Repository 接口")
+                .check(productionClasses);
+    }
+
+    /** Domain、Application 和 Web 不得依赖具体 MyBatis Repository Adapter。 */
+    @Test
+    void upperLayersMustNotDependOnConcreteMybatisRepositories() {
+        noClasses()
+                .that().resideInAnyPackage("..domain..", "..application..", "..web..", "..interfaces..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "..infrastructure.persistence.repository..")
+                .because("上层只依赖 Domain Port，CrudRepository 的宽 CRUD 能力必须封闭在 Infrastructure")
+                .check(productionClasses);
+    }
+
+    /** 当前明确的单表 Domain Port Adapter 必须复用 CrudRepository。 */
+    @Test
+    void approvedSingleTableAdaptersMustUseCrudRepository() {
+        assertThat(CrudRepository.class.isAssignableFrom(MybatisSystemParameterRepository.class)).isTrue();
+        assertThat(CrudRepository.class.isAssignableFrom(MybatisSystemDictionaryRepository.class)).isTrue();
+        assertThat(CrudRepository.class.isAssignableFrom(MybatisSystemDictionaryItemRepository.class)).isTrue();
+    }
+
+    /** 正式 bounded context 默认且强制使用 MyBatis-Plus；SAS 官方 Store 是唯一精确 JDBC 例外。 */
     @Test
     void boundedContextsMustNotIntroduceDirectJdbcAccess() {
         noClasses()
-                .that().resideInAnyPackage(
-                        "io.github.chrisshi.mom.iam..",
-                        "io.github.chrisshi.mom.mdm..",
-                        "io.github.chrisshi.mom.integration..",
-                        "io.github.chrisshi.mom.system..",
-                        "io.github.chrisshi.mom.mes..",
-                        "io.github.chrisshi.mom.wms..",
-                        "io.github.chrisshi.mom.qms..",
-                        "io.github.chrisshi.mom.ems..",
-                        "io.github.chrisshi.mom.eam..",
-                        "io.github.chrisshi.mom.traceability..")
+                .that().resideInAnyPackage(BOUNDED_CONTEXT_PACKAGES)
                 .and().doNotHaveFullyQualifiedName(
                         "io.github.chrisshi.mom.iam.security.IamAuthorizationServerProtocolConfiguration")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.mdm.application.MdmSeataAtLocalParticipantService")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.integration.application.IntegrationSeataAtParticipantService")
-                .and().doNotHaveFullyQualifiedName(
-                        "io.github.chrisshi.mom.integration.infrastructure.messaging.IntegrationDomainEventConsumerConfiguration")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "org.springframework.jdbc..", "java.sql..")
-                .because("正式业务表统一使用 MyBatis-Plus；直接 JDBC 必须先登记精确协议或技术例外")
+                .because("正式业务表统一使用 MyBatis-Plus；直接 JDBC 必须先登记精确协议例外")
                 .check(productionClasses);
     }
 

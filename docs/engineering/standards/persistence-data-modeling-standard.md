@@ -4,10 +4,11 @@
 
 本规范冻结 MOM 新增和实质修改数据访问代码的工程边界。当前事实基线是 PostgreSQL 17、Flyway
 12.4.0、MyBatis-Plus 3.5.17、Spring Framework 7 / Spring Boot 4.1 与 Spring Authorization Server
-7.1.0；其行为以对应官方资料为事实来源，本文中的命名、失败策略和分层是 MOM 项目决策。
+7.1.0；框架行为以官方资料为事实来源，命名、失败策略和分层是 MOM 项目决策。
 
 历史实现差异见 [S02 历史例外清单](../P1.6-S02-持久化历史例外清单.md)。历史差异只用于识别债务，
-不得复制为新代码模式。
+不得复制为新代码模式。MyBatis-Plus Repository 与领域仓储边界以
+[ADR-028](../../adr/ADR-028-MyBatis-Plus-Repository抽象与领域仓储边界.md) 为最高决策来源。
 
 ## 2. 数据所有权与物理命名
 
@@ -69,26 +70,75 @@ Versioned Migration 向前补齐，不得修改已经发布的 Migration。
 - Framework 内部技术租约、锁和基础设施状态表。
 
 关系表、日志、流水、Outbox/Inbox、快照、不可变事实、复合主键或外部协议模型不得为了形式统一强制
-继承完整 `BaseEntity`。System 当前已发布 Entity 的基类调整必须由独立行为证据和新 Migration 支撑，
-不能把历史实现提升为所有后续表的默认规则。
+继承完整 `BaseEntity`。Entity 只能位于 Infrastructure Persistence；不得进入 api/client、Domain 或公开响应。
+禁止 Lombok `@Data` 和敏感全字段 `toString()`。
 
-Entity 只能位于 Infrastructure Persistence；不得进入 api/client、Domain 或公开响应。禁止 Lombok `@Data`
-和敏感全字段 `toString()`。
+## 5. Mapper、Domain Repository 与 Adapter
 
-## 5. Mapper、Repository 与 Application
+### 5.1 Mapper
 
 - Mapper 属于 Infrastructure Persistence，默认只继承 `MomBaseMapper<Entity>`。
-- Repository 隐藏 Entity、Wrapper、Page 和 affected rows，并将唯一冲突、版本冲突转换为稳定语义。
-- Application Service 定义事务、授权和用例编排；Controller 不得直接依赖 Mapper。
-- 禁止使用 MyBatis-Plus `IService`/`ServiceImpl` 作为 MOM 领域服务或 Repository 契约。
-- 查询投影可使用专用 Row/View，但不能伪装成领域聚合或公开 HTTP DTO。
+- Mapper 是物理数据访问层，不承担业务授权、事务编排、状态机或跨聚合规则。
+- MyBatis-Plus 已能表达的普通 CRUD 不新增重复 Mapper 方法、注解 SQL 或 XML。
+
+### 5.2 Domain Repository Port
+
+Domain Repository Port 必须保持框架无关：
+
+- 只表达领域或用例需要的读取、保存、锁定、版本推进和查询语义；
+- 隐藏 Entity、Mapper、Wrapper、`IPage`、affected rows 和底层数据库异常；
+- 不继承 `IRepository`、`IService` 或其他 MyBatis-Plus 接口；
+- Application Service 定义事务、授权和用例编排；Controller 不得直接依赖 Mapper 或具体 Adapter。
+
+### 5.3 单表 Repository Adapter
+
+一个主要 Mapper 对应一个主要 Entity，且普通单表 CRUD 是主要路径时，Infrastructure Adapter 应优先：
+
+```java
+@Repository
+public class MybatisExampleRepository
+        extends CrudRepository<ExampleMapper, ExampleEntity>
+        implements ExampleRepository {
+}
+```
+
+Adapter 对上只暴露 MOM Domain Repository Port，对内可使用 `getById`、`getOne`、`list`、`count`、`save`、
+`updateById` 和受控 `getBaseMapper`。唯一冲突、乐观锁冲突和数据库异常仍必须转换为稳定 MOM 语义。
+
+`CrudRepository` 是 Infrastructure 实现复用机制，不是 Domain 契约。Application/Web 不得按具体 Adapter、
+`IRepository` 或 `CrudRepository` 注入。
+
+### 5.4 多表、Query 与协议例外
+
+以下场景不为形式统一强行继承单一 `CrudRepository`：
+
+- 多 Mapper、多 Entity、本地聚合或关系替换；
+- Query/Projection/Read Model；
+- OAuth/SAS 协议表与 Framework 基础设施状态；
+- 主要依赖 JOIN、CTE、窗口函数、批量 Upsert、`SKIP LOCKED` 等专用 SQL；
+- 一个 Domain Repository 管理多张生命周期不同的表。
+
+这些 Adapter 可以直接组合 Mapper；只有在显著减少重复且不破坏事务、聚合和生命周期边界时，才拆分为多个
+Infrastructure 内部表级 `CrudRepository` 组件。
+
+### 5.5 继续禁止的通用 Service
+
+正式 bounded context 继续禁止：
+
+- `IService<T>` 作为业务 Service 或 Repository；
+- `ServiceImpl<M,T>` 作为 Application Service；
+- 自定义接口继承 `IRepository<T>` 后向上暴露通用 CRUD；
+- `Db`、Active Record 或静态 ORM Helper 绕过 Domain Port。
+
+查询投影可使用专用 Row/View，但不能伪装成领域聚合或公开 HTTP DTO。
 
 ## 6. MyBatis-Plus 强制规范
 
 ### 6.1 默认实现
 
-普通 Insert、Update、Delete、主键读取、单表等值/范围过滤、计数、固定排序和分页必须使用：
+普通 Insert、Update、Delete、主键读取、单表等值/范围过滤、计数、固定排序和分页必须优先使用：
 
+- `CrudRepository`（符合单表 Domain Port Adapter 条件时）；
 - `MomBaseMapper`；
 - Entity；
 - `LambdaQueryWrapper` / `LambdaUpdateWrapper`；
@@ -99,9 +149,9 @@ MOM 新增或实质修改的业务模块不得为这些能力新增 Mapper XML�
 
 ### 6.2 System Platform 零 XML 门禁
 
-`mom-system-server/src/main/resources/mapper` 必须为空。Parameter、Dictionary 和 Dynamic I18n 的所有正式
-持久化路径统一使用 MyBatis-Plus。PostgreSQL advisory lock 允许保留一条固定、参数化的 Mapper 注解语句；
-JSONB 使用 Framework TypeHandler；历史聚合使用受控 QueryWrapper 表达式和 Java 侧分组。
+`mom-system-server/src/main/resources/mapper` 必须为空。Parameter、Dictionary、Dynamic I18n 和 Preference 的
+所有正式持久化路径统一使用 MyBatis-Plus。PostgreSQL advisory lock 允许保留一条固定、参数化的 Mapper
+注解语句；JSONB 使用 Framework TypeHandler；历史聚合使用受控 QueryWrapper 表达式和 Java 侧分组。
 
 System 新增 XML、MyBatis Provider 或客户端可控 SQL 尾句均直接违反门禁。
 
@@ -122,7 +172,7 @@ SQL 统一要求：
 
 ## 7. 直接 JDBC 禁区
 
-除精确登记的协议存储、Framework 基础设施和默认关闭的技术验证设施外，正式 bounded context 生产代码禁止：
+除精确登记的协议存储和 Framework 基础设施外，正式 bounded context 生产代码禁止：
 
 - `JdbcTemplate`；
 - `JdbcClient`；
@@ -146,10 +196,11 @@ Spring Authorization Server 官方 JDBC Store 是协议特例；Framework JSONB 
 ## 9. 官方事实来源
 
 物理外键与关联完整性的项目最高决策见
-[ADR-026](../../adr/ADR-026-MOM业务表禁止物理外键与关联完整性策略.md)，CRUD、关联查询与表结构的具体
-执行规则分别见 `crud-application-standard.md`、`multi-table-association-query-standard.md` 和
-`database-schema-design-standard.md`。
+[ADR-026](../../adr/ADR-026-MOM业务表禁止物理外键与关联完整性策略.md)，Package 与 Adapter 分层见
+[ADR-027](../../adr/ADR-027-服务端包结构与基础设施适配器分层.md)，MyBatis-Plus Repository 边界见
+[ADR-028](../../adr/ADR-028-MyBatis-Plus-Repository抽象与领域仓储边界.md)。
 
+- [MyBatis-Plus 持久层接口与 Repository 抽象](https://baomidou.com/guides/data-interface/)
 - [PostgreSQL 17 Schemas](https://www.postgresql.org/docs/17/ddl-schemas.html)
 - [PostgreSQL 17 Constraints](https://www.postgresql.org/docs/17/ddl-constraints.html)
 - [PostgreSQL 17 JSON Types](https://www.postgresql.org/docs/17/datatype-json.html)

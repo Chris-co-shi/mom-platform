@@ -49,6 +49,7 @@ ADR 用于记录重要架构决策的背景、候选方案、最终选择、正�
 | [ADR-025](ADR-025-IAM-System-MDM-WMS-EAM数据所有权边界.md) | IAM、System、MDM、WMS、EAM 数据所有权边界 | Accepted | 2026-07-29；方案 C 与七项决策已冻结 |
 | [ADR-026](ADR-026-MOM业务表禁止物理外键与关联完整性策略.md) | MOM 业务表禁止物理外键与关联完整性策略 | Accepted | CRUD、多表关联与表结构规范 |
 | [ADR-027](ADR-027-服务端包结构与基础设施适配器分层.md) | 服务端包结构与基础设施适配器分层 | Accepted | Package 与目录架构规范 |
+| [ADR-028](ADR-028-MyBatis-Plus-Repository抽象与领域仓储边界.md) | MyBatis-Plus Repository 抽象与领域仓储边界 | Accepted | 持久化规范、Repository Adapter 门禁 |
 
 ## 4. 新建 ADR
 
