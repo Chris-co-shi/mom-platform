@@ -48,13 +48,14 @@ class RuntimeSecurityArchitectureTest {
                 .check(productionClasses);
     }
 
-    /** Feign Client 只能位于 client 或明确 Infrastructure Adapter。 */
+    /** Feign Client 只能位于 client 或明确 Infrastructure Adapter；当前允许没有任何真实调用方。 */
     @Test
     void feignClientsMustStayInClientOrInfrastructure() {
         classes()
                 .that().areAnnotatedWith(FeignClient.class)
                 .should().resideInAnyPackage("..client..", "..infrastructure..")
                 .because("Feign 传输类型不得进入 Domain、Application、Web 或 API")
+                .allowEmptyShould(true)
                 .check(productionClasses);
     }
 
