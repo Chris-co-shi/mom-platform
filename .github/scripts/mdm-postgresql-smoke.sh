@@ -57,7 +57,7 @@ done
 
 docker exec "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -Atc "
   select 'schema=' || count(*) from information_schema.schemata where schema_name='${POSTGRES_SCHEMA}';
-  select 'flyway_version=' || max(version::integer) from ${POSTGRES_SCHEMA}.flyway_schema_history where success=true;
+  select 'retirement_migration=' || count(*) from ${POSTGRES_SCHEMA}.flyway_schema_history where success=true and version='101';
   select 'technical_table_count=' || count(*) from information_schema.tables
    where table_schema='${POSTGRES_SCHEMA}' and table_name in
    ('technical_data_probe','mom_outbox_event','technical_seata_at_coordinator','undo_log');
@@ -67,7 +67,7 @@ docker exec "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DAT
 " > mdm-postgresql-schema.txt
 
 grep --fixed-strings --quiet 'schema=1' mdm-postgresql-schema.txt
-grep --fixed-strings --quiet 'flyway_version=6' mdm-postgresql-schema.txt
+grep --fixed-strings --quiet 'retirement_migration=1' mdm-postgresql-schema.txt
 grep --fixed-strings --quiet 'technical_table_count=0' mdm-postgresql-schema.txt
 grep --fixed-strings --quiet 'business_fk=0' mdm-postgresql-schema.txt
 
@@ -87,4 +87,4 @@ metrics_status="$(curl --silent --output mdm-postgresql-prometheus.txt --write-o
 grep --extended-regexp --quiet '^jdbc_connections_max(\{| )' mdm-postgresql-prometheus.txt
 grep --extended-regexp --quiet '^hikaricp_connections_max(\{| )' mdm-postgresql-prometheus.txt
 
-echo "MDM_POSTGRESQL_SMOKE result=success flyway=6 technical_tables=0 readiness=UP"
+echo "MDM_POSTGRESQL_SMOKE result=success retirement_migration=101 technical_tables=0 readiness=UP"

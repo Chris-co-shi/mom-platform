@@ -1,4 +1,4 @@
--- S15-F 清理 V5 未覆盖的 Phase 01 Outbox/Seata 基础表；历史迁移保持不可变。
+-- S15-F 清理 V5 未覆盖的 Phase 01 Outbox/Seata 基础表；V101 保证已到 V100 的环境可顺序升级。
 -- 非空技术表拒绝自动删除，避免把潜在环境数据静默丢弃。
 DO $$
 DECLARE

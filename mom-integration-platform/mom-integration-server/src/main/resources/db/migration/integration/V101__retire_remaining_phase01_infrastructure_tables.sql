@@ -1,5 +1,5 @@
 -- S15-F：Outbox/Seata 运行时依赖退出后，清理 V4 保留但已无调用方的 Inbox 与 Undo 表。
--- 非空表拒绝自动删除，避免静默丢失环境数据。
+-- V101 避免未来或既有高版本环境跳过清理；非空表拒绝自动删除。
 DO $$
 DECLARE
     candidate TEXT;
