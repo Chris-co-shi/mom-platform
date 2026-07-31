@@ -15,9 +15,7 @@ cleanup() {
   exit_code=$?
   set +e
   if [[ "$exit_code" -ne 0 ]]; then
-    jq --null-input \
-      --arg reason "$FAILURE_REASON" \
-      --arg container "$POSTGRES_CONTAINER" \
+    jq --null-input --arg reason "$FAILURE_REASON" --arg container "$POSTGRES_CONTAINER" \
       --arg port "$POSTGRES_PORT" \
       '{reason: $reason, container: $container, postgresPort: $port}' \
       > system-postgresql-failure.json
@@ -31,184 +29,71 @@ cleanup() {
 trap cleanup EXIT
 
 docker run --name "$POSTGRES_CONTAINER" \
-  -e POSTGRES_DB="$POSTGRES_DATABASE" \
-  -e POSTGRES_USER="$POSTGRES_USERNAME" \
-  -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
-  -p 127.0.0.1::5432 \
-  -d postgres:17.7-alpine \
-  postgres -c timezone=Asia/Tokyo >/dev/null
-
+  -e POSTGRES_DB="$POSTGRES_DATABASE" -e POSTGRES_USER="$POSTGRES_USERNAME" \
+  -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" -p 127.0.0.1::5432 \
+  -d postgres:17.7-alpine postgres -c timezone=Asia/Tokyo >/dev/null
 POSTGRES_PORT=$(docker port "$POSTGRES_CONTAINER" 5432/tcp | awk -F: 'NR == 1 {print $NF}')
-if [[ -z "$POSTGRES_PORT" ]]; then
-  FAILURE_REASON="cannot resolve dynamic PostgreSQL host port"
-  exit 1
-fi
+[[ -n "$POSTGRES_PORT" ]] || { FAILURE_REASON="cannot resolve PostgreSQL port"; exit 1; }
 
 for attempt in {1..60}; do
-  if docker exec "$POSTGRES_CONTAINER" \
-    pg_isready -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" >/dev/null 2>&1; then
-    break
-  fi
-  if [[ "$attempt" == "60" ]]; then
-    FAILURE_REASON="PostgreSQL did not become ready"
-    exit 1
-  fi
+  docker exec "$POSTGRES_CONTAINER" pg_isready -U "$POSTGRES_USERNAME" \
+    -d "$POSTGRES_DATABASE" >/dev/null 2>&1 && break
+  [[ "$attempt" != "60" ]] || { FAILURE_REASON="PostgreSQL did not become ready"; exit 1; }
   sleep 2
 done
 
-POSTGRES_HOST=127.0.0.1 \
-POSTGRES_PORT="$POSTGRES_PORT" \
-POSTGRES_DATABASE="$POSTGRES_DATABASE" \
-POSTGRES_SCHEMA="$POSTGRES_SCHEMA" \
-POSTGRES_USERNAME="$POSTGRES_USERNAME" \
-POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
-NACOS_DISCOVERY_ENABLED=false \
-MANAGEMENT_HEALTH_REDIS_ENABLED=false \
-MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED=false \
-MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED=false \
-TZ=UTC \
+POSTGRES_HOST=127.0.0.1 POSTGRES_PORT="$POSTGRES_PORT" \
+POSTGRES_DATABASE="$POSTGRES_DATABASE" POSTGRES_SCHEMA="$POSTGRES_SCHEMA" \
+POSTGRES_USERNAME="$POSTGRES_USERNAME" POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+NACOS_DISCOVERY_ENABLED=false MANAGEMENT_HEALTH_REDIS_ENABLED=false \
+MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED=false MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED=false TZ=UTC \
 java -jar mom-system-platform/mom-system-server/target/mom-system-server-0.1.0-SNAPSHOT-exec.jar \
-  --server.port="$SYSTEM_PORT" \
-  > system-postgresql-server.log 2>&1 &
+  --server.port="$SYSTEM_PORT" > system-postgresql-server.log 2>&1 &
 SYSTEM_PID=$!
 
 for attempt in {1..60}; do
-  health_status=$(curl --silent --output system-postgresql-health.json \
-    --write-out '%{http_code}' \
+  status=$(curl --silent --output system-postgresql-health.json --write-out '%{http_code}' \
     "http://127.0.0.1:${SYSTEM_PORT}/actuator/health/readiness" || true)
-  if [[ "$health_status" == "200" ]]; then
-    if jq --exit-status '.status == "UP"' system-postgresql-health.json >/dev/null; then
-      break
-    fi
+  if [[ "$status" == "200" ]] && jq --exit-status '.status == "UP"' \
+      system-postgresql-health.json >/dev/null; then
+    break
   fi
-  if [[ "$attempt" == "60" ]]; then
-    FAILURE_REASON="System readiness did not become UP; HTTP ${health_status}"
-    exit 1
-  fi
+  [[ "$attempt" != "60" ]] || {
+    FAILURE_REASON="System readiness did not become UP; HTTP ${status}"; exit 1;
+  }
   sleep 2
 done
 
-docker exec "$POSTGRES_CONTAINER" \
-  psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -v ON_ERROR_STOP=1 -Atc "
-    SELECT 'schema=' || count(*)
-      FROM information_schema.schemata
-     WHERE schema_name = '${POSTGRES_SCHEMA}';
-    SELECT 'flyway_version=' || max(version::integer)
-      FROM ${POSTGRES_SCHEMA}.flyway_schema_history
-     WHERE success = true;
-    SELECT 'system_parameter=' || count(*)
-      FROM information_schema.tables
-     WHERE table_schema = '${POSTGRES_SCHEMA}' AND table_name = 'system_parameter';
-    SELECT 'system_dictionary_tables=' || count(*)
-      FROM information_schema.tables
-     WHERE table_schema = '${POSTGRES_SCHEMA}'
-       AND table_name IN ('system_dictionary', 'system_dictionary_item');
-    SELECT 'system_i18n_tables=' || count(*)
-      FROM information_schema.tables
-     WHERE table_schema = '${POSTGRES_SCHEMA}'
-       AND table_name IN ('system_i18n_resource', 'system_i18n_message', 'system_i18n_release');
-    SELECT 'system_preference_tables=' || count(*)
-      FROM information_schema.tables
-     WHERE table_schema = '${POSTGRES_SCHEMA}'
-       AND table_name IN ('system_user_preference', 'system_user_view_setting');
-    SELECT 'system_preference_jsonb=' || count(*)
-      FROM information_schema.columns
-     WHERE table_schema = '${POSTGRES_SCHEMA}'
-       AND table_name = 'system_user_view_setting'
-       AND column_name IN ('columns_json', 'sort_json', 'filters_json')
-       AND data_type = 'jsonb';
-    SELECT 'system_preference_user_unique=' || count(*)
-      FROM pg_constraint constraint_row
-      JOIN pg_class table_row ON table_row.oid = constraint_row.conrelid
-      JOIN pg_namespace schema_row ON schema_row.oid = table_row.relnamespace
-     WHERE schema_row.nspname = '${POSTGRES_SCHEMA}'
-       AND table_row.relname = 'system_user_preference'
-       AND constraint_row.conname = 'uk_system_user_preference_user'
-       AND constraint_row.contype = 'u';
-    SELECT 'system_view_business_unique=' || count(*)
-      FROM pg_constraint constraint_row
-      JOIN pg_class table_row ON table_row.oid = constraint_row.conrelid
-      JOIN pg_namespace schema_row ON schema_row.oid = table_row.relnamespace
-     WHERE schema_row.nspname = '${POSTGRES_SCHEMA}'
-       AND table_row.relname = 'system_user_view_setting'
-       AND constraint_row.conname = 'uk_system_user_view_setting_user_application_view'
-       AND constraint_row.contype = 'u';
-    SELECT 'system_base_entity_deleted=' || count(*)
-      FROM information_schema.columns
-     WHERE table_schema = '${POSTGRES_SCHEMA}'
-       AND table_name IN (
-         'system_parameter', 'system_dictionary', 'system_dictionary_item',
-         'system_i18n_resource', 'system_i18n_message', 'system_i18n_release')
-       AND column_name = 'deleted'
-       AND data_type = 'boolean'
-       AND is_nullable = 'NO';
-    SELECT 'system_i18n_release_base_columns=' || count(*)
-      FROM information_schema.columns
-     WHERE table_schema = '${POSTGRES_SCHEMA}'
-       AND table_name = 'system_i18n_release'
-       AND column_name IN ('id','created_by','created_at','updated_by','updated_at','version','deleted');
-    SELECT 'system_i18n_jsonb=' || count(*)
-      FROM information_schema.columns
-     WHERE table_schema = '${POSTGRES_SCHEMA}'
-       AND table_name = 'system_i18n_release'
-       AND column_name = 'messages_json'
-       AND data_type = 'jsonb';
-    SELECT 'system_i18n_release_pk=' || count(*)
-      FROM pg_constraint constraint_row
-      JOIN pg_class table_row ON table_row.oid = constraint_row.conrelid
-      JOIN pg_namespace schema_row ON schema_row.oid = table_row.relnamespace
-     WHERE schema_row.nspname = '${POSTGRES_SCHEMA}'
-       AND table_row.relname = 'system_i18n_release'
-       AND constraint_row.conname = 'pk_system_i18n_release'
-       AND constraint_row.contype = 'p';
-    SELECT 'system_i18n_release_business_unique=' || count(*)
-      FROM pg_constraint constraint_row
-      JOIN pg_class table_row ON table_row.oid = constraint_row.conrelid
-      JOIN pg_namespace schema_row ON schema_row.oid = table_row.relnamespace
-     WHERE schema_row.nspname = '${POSTGRES_SCHEMA}'
-       AND table_row.relname = 'system_i18n_release'
-       AND constraint_row.conname = 'uk_system_i18n_release_version_locale'
-       AND constraint_row.contype = 'u';
-    SELECT 'cross_schema_fk=' || count(*)
-      FROM pg_constraint constraint_row
-      JOIN pg_class source_table ON source_table.oid = constraint_row.conrelid
-      JOIN pg_namespace source_schema ON source_schema.oid = source_table.relnamespace
-      JOIN pg_class target_table ON target_table.oid = constraint_row.confrelid
-      JOIN pg_namespace target_schema ON target_schema.oid = target_table.relnamespace
-     WHERE constraint_row.contype = 'f'
-       AND source_schema.nspname = '${POSTGRES_SCHEMA}'
-       AND target_schema.nspname <> '${POSTGRES_SCHEMA}';
-    SELECT 'business_fk=' || count(*)
-      FROM pg_constraint constraint_row
-      JOIN pg_class source_table ON source_table.oid = constraint_row.conrelid
-      JOIN pg_namespace source_schema ON source_schema.oid = source_table.relnamespace
-     WHERE constraint_row.contype = 'f'
-       AND source_schema.nspname = '${POSTGRES_SCHEMA}';
-  " > system-postgresql-schema.txt
+docker exec "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" \
+  -v ON_ERROR_STOP=1 -Atc "
+SELECT 'schema=' || count(*) FROM information_schema.schemata WHERE schema_name='${POSTGRES_SCHEMA}';
+SELECT 'flyway_version=' || max(version::integer) FROM ${POSTGRES_SCHEMA}.flyway_schema_history WHERE success=true;
+SELECT 'parameter=' || count(*) FROM information_schema.tables WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name='system_parameter';
+SELECT 'dictionary=' || count(*) FROM information_schema.tables WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name IN ('system_dictionary','system_dictionary_item');
+SELECT 'i18n=' || count(*) FROM information_schema.tables WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name IN ('system_i18n_resource','system_i18n_message','system_i18n_release');
+SELECT 'preference=' || count(*) FROM information_schema.tables WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name IN ('system_user_preference','system_user_view_setting');
+SELECT 'catalog=' || count(*) FROM information_schema.tables WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name IN ('system_application','system_navigation_item','system_catalog_release');
+SELECT 'preference_jsonb=' || count(*) FROM information_schema.columns WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name='system_user_view_setting' AND column_name IN ('columns_json','sort_json','filters_json') AND data_type='jsonb';
+SELECT 'i18n_jsonb=' || count(*) FROM information_schema.columns WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name='system_i18n_release' AND column_name='messages_json' AND data_type='jsonb';
+SELECT 'catalog_jsonb=' || count(*) FROM information_schema.columns WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name='system_catalog_release' AND column_name='snapshot_json' AND data_type='jsonb';
+SELECT 'catalog_unique=' || count(*) FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='${POSTGRES_SCHEMA}' AND c.conname IN ('uk_system_application_code','uk_system_navigation_item_route','uk_system_catalog_release_application_version') AND c.contype='u';
+SELECT 'catalog_immutable_trigger=' || count(*) FROM pg_trigger tr JOIN pg_class t ON t.oid=tr.tgrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='${POSTGRES_SCHEMA}' AND t.relname='system_catalog_release' AND tr.tgname='trg_system_catalog_release_immutable' AND NOT tr.tgisinternal;
+SELECT 'base_entity_deleted=' || count(*) FROM information_schema.columns WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name IN ('system_parameter','system_dictionary','system_dictionary_item','system_i18n_resource','system_i18n_message','system_i18n_release') AND column_name='deleted' AND data_type='boolean' AND is_nullable='NO';
+SELECT 'cross_schema_fk=' || count(*) FROM pg_constraint c JOIN pg_class s ON s.oid=c.conrelid JOIN pg_namespace sn ON sn.oid=s.relnamespace JOIN pg_class t ON t.oid=c.confrelid JOIN pg_namespace tn ON tn.oid=t.relnamespace WHERE c.contype='f' AND sn.nspname='${POSTGRES_SCHEMA}' AND tn.nspname<>'${POSTGRES_SCHEMA}';
+SELECT 'business_fk=' || count(*) FROM pg_constraint c JOIN pg_class s ON s.oid=c.conrelid JOIN pg_namespace sn ON sn.oid=s.relnamespace WHERE c.contype='f' AND sn.nspname='${POSTGRES_SCHEMA}';
+" > system-postgresql-schema.txt
 
-grep --fixed-strings --quiet 'schema=1' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'flyway_version=7' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'system_parameter=1' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'system_dictionary_tables=2' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'system_i18n_tables=3' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'system_preference_tables=2' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'system_preference_jsonb=3' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'system_preference_user_unique=1' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'system_view_business_unique=1' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'system_base_entity_deleted=6' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'system_i18n_release_base_columns=7' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'system_i18n_jsonb=1' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'system_i18n_release_pk=1' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'system_i18n_release_business_unique=1' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'cross_schema_fk=0' system-postgresql-schema.txt
-grep --fixed-strings --quiet 'business_fk=0' system-postgresql-schema.txt
+for expected in schema=1 flyway_version=8 parameter=1 dictionary=2 i18n=3 preference=2 \
+  catalog=3 preference_jsonb=3 i18n_jsonb=1 catalog_jsonb=1 catalog_unique=3 \
+  catalog_immutable_trigger=1 base_entity_deleted=6 cross_schema_fk=0 business_fk=0; do
+  grep --fixed-strings --quiet "$expected" system-postgresql-schema.txt || {
+    FAILURE_REASON="missing schema evidence: $expected"; exit 1;
+  }
+done
 
-application_connection_count=$(docker exec "$POSTGRES_CONTAINER" \
-  psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -tAc \
-  "select count(*) from pg_stat_activity where application_name = 'mom-system-server'")
-[[ "$application_connection_count" -ge 1 ]]
-[[ "$application_connection_count" -le 5 ]]
-
-server_timezone=$(docker exec "$POSTGRES_CONTAINER" \
-  psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -tAc 'show timezone')
-[[ "$server_timezone" == "Asia/Tokyo" ]]
+connections=$(docker exec "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USERNAME" \
+  -d "$POSTGRES_DATABASE" -tAc \
+  "select count(*) from pg_stat_activity where application_name='mom-system-server'")
+[[ "$connections" -ge 1 && "$connections" -le 5 ]]
+[[ "$(docker exec "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USERNAME" \
+  -d "$POSTGRES_DATABASE" -tAc 'show timezone')" == "Asia/Tokyo" ]]

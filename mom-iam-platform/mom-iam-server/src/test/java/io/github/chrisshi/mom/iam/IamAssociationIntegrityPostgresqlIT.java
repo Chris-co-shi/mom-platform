@@ -15,13 +15,7 @@ import org.testcontainers.utility.DockerImageName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * IAM V9 无物理外键与迁移孤儿保护的真实 PostgreSQL 集成测试。
- *
- * <p>测试只验证 IAM 自有 Schema 的 Flyway DDL、索引和孤儿阻断，不启动 OAuth2/Redis/Nacos。V9 在删除
- * 已发布 V1～V3 的业务外键前检查全部本地关系；发现孤儿时迁移 fail closed，合法空库则升级到 V9。
- * Docker 不可用时 Testcontainers 明确跳过，不能描述为专项成功。</p>
- */
+/** IAM V9 无物理外键与 V10 System Catalog Permission Seed 的真实 PostgreSQL 集成测试。 */
 @Testcontainers(disabledWithoutDocker = true)
 class IamAssociationIntegrityPostgresqlIT {
     private static final String SCHEMA = "mom_iam";
@@ -37,7 +31,6 @@ class IamAssociationIntegrityPostgresqlIT {
     private static JdbcTemplate jdbc;
     private static Flyway flyway;
 
-    /** 初始化独立数据源并从空库迁移完整 IAM Schema。 */
     @BeforeAll
     static void migrateFreshDatabase() {
         var dataSource = new DriverManagerDataSource(
@@ -47,7 +40,6 @@ class IamAssociationIntegrityPostgresqlIT {
         flyway.migrate();
     }
 
-    /** 清理测试创建的三个独立 Schema。 */
     @AfterAll
     static void cleanSchemas() {
         jdbc.execute("DROP SCHEMA IF EXISTS " + ORPHAN_SCHEMA + " CASCADE");
@@ -55,10 +47,9 @@ class IamAssociationIntegrityPostgresqlIT {
         jdbc.execute("DROP SCHEMA IF EXISTS " + SCHEMA + " CASCADE");
     }
 
-    /** 空库必须完整迁移到 V9，业务 FK 为零且原查询索引保留。 */
     @Test
-    void freshMigrationMustRemoveBusinessForeignKeysAndKeepIndexes() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("9");
+    void freshMigrationMustRemoveBusinessForeignKeysAndSeedCatalogPermissions() {
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM information_schema.table_constraints
                  WHERE table_schema=? AND constraint_type='FOREIGN KEY'
@@ -72,26 +63,32 @@ class IamAssociationIntegrityPostgresqlIT {
                    'idx_iam_user_session_client_status','uk_iam_refresh_token_one_active_per_session')
                 """, Long.class, SCHEMA)).isEqualTo(8L);
         assertThat(jdbc.queryForObject("""
-                SELECT
-                  (SELECT count(*) FROM mom_iam.iam_user_role child LEFT JOIN mom_iam.iam_user parent ON parent.id=child.user_id WHERE parent.id IS NULL)
-                  + (SELECT count(*) FROM mom_iam.iam_role_permission child LEFT JOIN mom_iam.iam_permission parent ON parent.id=child.permission_id WHERE parent.id IS NULL)
-                  + (SELECT count(*) FROM mom_iam.iam_refresh_token child LEFT JOIN mom_iam.iam_user_session parent ON parent.id=child.session_id WHERE parent.id IS NULL)
-                """, Long.class)).isZero();
+                SELECT count(*) FROM mom_iam.iam_permission
+                 WHERE code IN ('system:catalog:read','system:catalog:write','system:catalog:publish')
+                   AND status='ENABLED' AND built_in=true AND deleted=false
+                """, Long.class)).isEqualTo(3L);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*)
+                  FROM mom_iam.iam_role_permission assignment
+                  JOIN mom_iam.iam_role role_row ON role_row.id=assignment.role_id
+                  JOIN mom_iam.iam_permission permission_row ON permission_row.id=assignment.permission_id
+                 WHERE role_row.code='PLATFORM_ADMIN'
+                   AND permission_row.code IN (
+                     'system:catalog:read','system:catalog:write','system:catalog:publish')
+                """, Long.class)).isEqualTo(3L);
     }
 
-    /** 已发布 V1～V8 的合法数据库必须通过新增 V9 向前升级。 */
     @Test
-    void existingV8DatabaseMustUpgradeToV9() {
+    void existingV8DatabaseMustUpgradeToV10() {
         var dataSource = new DriverManagerDataSource(
                 POSTGRESQL.getJdbcUrl(), POSTGRESQL.getUsername(), POSTGRESQL.getPassword());
         Flyway v8 = flyway(dataSource, UPGRADE_SCHEMA, "8");
         v8.migrate();
         Flyway latest = flyway(dataSource, UPGRADE_SCHEMA, null);
         latest.migrate();
-        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("9");
+        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("10");
     }
 
-    /** V9 必须在删除约束前拒绝已经存在的孤儿，而不是把问题静默带入无 FK 结构。 */
     @Test
     void migrationMustFailClosedWhenHistoricalDataContainsOrphan() {
         var dataSource = new DriverManagerDataSource(

@@ -28,8 +28,8 @@ CREATE TABLE system_application (
     CONSTRAINT ck_system_application_route_contract CHECK (route_contract_version > 0),
     CONSTRAINT ck_system_application_sort_order CHECK (sort_order >= 0),
     CONSTRAINT ck_system_application_published_pointer CHECK (
-        (published_release_id IS NULL AND published_version = 0)
-        OR (published_release_id IS NOT NULL AND published_version > 0)),
+        published_version >= 0
+        AND ((published_release_id IS NULL) = (published_version = 0))),
     CONSTRAINT ck_system_application_version CHECK (version >= 0)
 );
 
@@ -50,6 +50,10 @@ COMMENT ON COLUMN system_application.enabled IS '运行时即时 Kill Switch；f
 COMMENT ON COLUMN system_application.published_release_id IS '当前不可变 Release 技术引用，无物理外键';
 COMMENT ON COLUMN system_application.published_version IS '当前发布版本，零表示尚未发布';
 COMMENT ON COLUMN system_application.version IS 'Application Catalog Draft 聚合乐观锁版本';
+COMMENT ON COLUMN system_application.created_by IS '创建 Actor ID';
+COMMENT ON COLUMN system_application.created_at IS 'UTC 创建时间点';
+COMMENT ON COLUMN system_application.updated_by IS '最近修改 Actor ID';
+COMMENT ON COLUMN system_application.updated_at IS 'UTC 最近修改时间点';
 
 CREATE TABLE system_navigation_item (
     id varchar(19) NOT NULL,
@@ -85,8 +89,8 @@ CREATE TABLE system_navigation_item (
     CONSTRAINT ck_system_navigation_item_i18n_key CHECK (
         i18n_message_key ~ '^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$'),
     CONSTRAINT ck_system_navigation_item_permission CHECK (
-        permission_code IS NULL
-        OR permission_code ~ '^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$'),
+        permission_code IS NULL OR permission_code ~
+        '^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$'),
     CONSTRAINT ck_system_navigation_item_not_self_parent CHECK (parent_id IS NULL OR parent_id <> id),
     CONSTRAINT ck_system_navigation_item_group_keep_alive CHECK (
         navigation_type = 'ROUTE' OR keep_alive = false),
@@ -104,12 +108,21 @@ CREATE INDEX ix_system_navigation_item_i18n_reference
     ON system_navigation_item (i18n_resource_code, i18n_message_key);
 
 COMMENT ON TABLE system_navigation_item IS 'Application 内可编辑 Navigation Draft；System 只保存元数据和稳定引用';
+COMMENT ON COLUMN system_navigation_item.id IS 'MOM String 技术主键';
 COMMENT ON COLUMN system_navigation_item.application_id IS 'System Application 技术引用，无物理外键';
 COMMENT ON COLUMN system_navigation_item.parent_id IS '同 Application、同 Channel 父节点引用，无物理外键';
+COMMENT ON COLUMN system_navigation_item.client_channel IS '静态客户端执行渠道：WEB/MOBILE';
+COMMENT ON COLUMN system_navigation_item.navigation_type IS 'V1 节点类型：GROUP/ROUTE';
 COMMENT ON COLUMN system_navigation_item.route_key IS '客户端静态 Route Registry Key；不是 Path、Component 或动态 import';
+COMMENT ON COLUMN system_navigation_item.i18n_resource_code IS 'Dynamic I18n 资源稳定引用';
+COMMENT ON COLUMN system_navigation_item.i18n_message_key IS 'Dynamic I18n 消息 Key 稳定引用';
 COMMENT ON COLUMN system_navigation_item.permission_code IS 'IAM Permission Code Reference；NULL 表示已认证即可见';
 COMMENT ON COLUMN system_navigation_item.enabled IS 'Draft 启停状态，仅在下一次 Publish 后影响 Runtime';
 COMMENT ON COLUMN system_navigation_item.version IS '节点乐观锁版本';
+COMMENT ON COLUMN system_navigation_item.created_by IS '创建 Actor ID';
+COMMENT ON COLUMN system_navigation_item.created_at IS 'UTC 创建时间点';
+COMMENT ON COLUMN system_navigation_item.updated_by IS '最近修改 Actor ID';
+COMMENT ON COLUMN system_navigation_item.updated_at IS 'UTC 最近修改时间点';
 
 CREATE TABLE system_catalog_release (
     id varchar(19) NOT NULL,
@@ -149,10 +162,21 @@ CREATE INDEX ix_system_catalog_release_history
     ON system_catalog_release (application_id, release_version DESC, id);
 
 COMMENT ON TABLE system_catalog_release IS 'Application Catalog 不可变完整发布快照；Rollback 创建新版本而不修改历史';
+COMMENT ON COLUMN system_catalog_release.id IS 'MOM String 技术主键';
 COMMENT ON COLUMN system_catalog_release.application_id IS 'System Application 技术引用，无物理外键';
+COMMENT ON COLUMN system_catalog_release.application_code IS '发布时 Application Code 快照';
+COMMENT ON COLUMN system_catalog_release.release_version IS 'Application 内单调递增发布版本';
+COMMENT ON COLUMN system_catalog_release.snapshot_schema_version IS '受控 Snapshot JSON 契约版本';
+COMMENT ON COLUMN system_catalog_release.route_contract_version IS '发布时客户端 Route Registry 契约版本';
+COMMENT ON COLUMN system_catalog_release.source_application_version IS '发布时 Application Draft 聚合版本';
 COMMENT ON COLUMN system_catalog_release.snapshot_json IS '受控 Catalog Snapshot JSONB，不含 Path、Component、JavaScript 或数据库内部 ID';
+COMMENT ON COLUMN system_catalog_release.node_count IS 'WEB 与 MOBILE 两个 Channel 的发布节点总数';
 COMMENT ON COLUMN system_catalog_release.checksum IS '确定性 Snapshot SHA-256，用于 ETag 与 No-op Publish';
 COMMENT ON COLUMN system_catalog_release.source_release_version IS 'Rollback 时被复制的历史版本；普通 Publish 为 NULL';
+COMMENT ON COLUMN system_catalog_release.created_by IS '发布 Actor ID';
+COMMENT ON COLUMN system_catalog_release.created_at IS 'UTC 发布时间点';
+COMMENT ON COLUMN system_catalog_release.updated_by IS '插入时与发布 Actor 相同';
+COMMENT ON COLUMN system_catalog_release.updated_at IS '插入时与发布时间相同';
 
 CREATE OR REPLACE FUNCTION reject_system_catalog_release_mutation()
 RETURNS trigger

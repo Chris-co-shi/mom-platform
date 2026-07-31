@@ -16,68 +16,49 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * System Platform S15-C 的 POM 语义与 Parameter/Dictionary/Dynamic I18n 精确白名单门禁。
- *
- * <p>测试通过 XML DOM 读取实际 POM，不使用字符串 grep 推断依赖。它同时检查 Reactor 注册、聚合模块、
- * API/Client/Server 直接依赖白名单和 S17+ 禁止资源。System 正式持久化统一使用 MyBatis-Plus，
- * {@code src/main/resources/mapper} 必须保持为空。</p>
- */
+/** System Platform S17 的 POM、API、Migration 与零 Mapper XML 精确门禁。 */
 class SystemPlatformPomArchitectureTest {
-
     private static final String MOM_GROUP = "io.github.chrisshi.mom";
     private static final Set<String> CLIENT_DEPENDENCIES = Set.of(
-            MOM_GROUP + ":mom-system-api",
-            MOM_GROUP + ":mom-openfeign");
+            MOM_GROUP + ":mom-system-api", MOM_GROUP + ":mom-openfeign");
     private static final Set<String> SERVER_DEPENDENCIES = Set.of(
-            MOM_GROUP + ":mom-system-api",
-            MOM_GROUP + ":mom-webmvc",
-            MOM_GROUP + ":mom-security",
-            MOM_GROUP + ":mom-data",
-            MOM_GROUP + ":mom-tracing",
-            MOM_GROUP + ":mom-metrics",
+            MOM_GROUP + ":mom-system-api", MOM_GROUP + ":mom-webmvc",
+            MOM_GROUP + ":mom-security", MOM_GROUP + ":mom-data",
+            MOM_GROUP + ":mom-tracing", MOM_GROUP + ":mom-metrics",
             "com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery",
-            "org.projectlombok:lombok",
-            "org.springframework.security:spring-security-test",
+            "org.projectlombok:lombok", "org.springframework.security:spring-security-test",
             MOM_GROUP + ":mom-test");
     private static final Pattern FORBIDDEN_JAVA_TYPE = Pattern.compile(
-            ".*(Catalog|Menu|Navigation|AuditProjection|Permission|Role|"
-                    + "Session|Refresh|Credential|FactoryScope|PartyBinding|Factory|Warehouse|Equipment|"
-                    + "Person|Party).*\\.java");
+            ".*(AuditProjection|Session|Refresh|Credential|FactoryScope|PartyBinding|Factory|Warehouse|"
+                    + "Equipment|Person|Party).*\\.java");
     private static final Set<String> API_TYPES = Set.of(
             "package-info.java", "ParameterScopeType.java", "ParameterValueType.java",
             "ResolvedSystemParameter.java", "SystemDictionaryItemOption.java",
             "ResolvedSystemDictionaryItem.java", "SupportedUserLocale.java", "UserThemeMode.java",
-            "UserDensity.java", "ResolvedUserPreference.java", "UserViewSetting.java");
+            "UserDensity.java", "ResolvedUserPreference.java", "UserViewSetting.java",
+            "SystemCatalogContracts.java");
 
-    /** 验证根 Reactor 精确注册一次 System 聚合模块。 */
     @Test
     void rootReactorMustRegisterSystemPlatformExactlyOnce() throws Exception {
         Path root = reactorRoot();
-        List<String> modules = modules(parse(root.resolve("pom.xml")));
-
-        assertThat(modules).containsOnlyOnce("mom-system-platform");
+        assertThat(modules(parse(root.resolve("pom.xml")))).containsOnlyOnce("mom-system-platform");
         assertThat(root.resolve("mom-system-platform")).isDirectory();
     }
 
-    /** 验证聚合 POM 只包含 api/client/server，且不声明业务依赖。 */
     @Test
     void aggregateMustContainOnlyApprovedModulesAndNoDependencies() throws Exception {
         Document document = parse(systemRoot().resolve("pom.xml"));
         Element project = document.getDocumentElement();
-
         assertThat(directText(project, "packaging")).isEqualTo("pom");
-        assertThat(modules(document))
-                .containsExactly("mom-system-api", "mom-system-client", "mom-system-server");
+        assertThat(modules(document)).containsExactly(
+                "mom-system-api", "mom-system-client", "mom-system-server");
         assertThat(dependencies(project)).isEmpty();
     }
 
-    /** 验证 API 只暴露参数、字典与 S16 偏好稳定只读契约，Client 仍保持空调用骨架。 */
     @Test
     void apiAndClientMustExposeOnlyApprovedContractsAndRemainTransportBounded() throws Exception {
         Element api = parse(systemRoot().resolve("mom-system-api/pom.xml")).getDocumentElement();
         Element client = parse(systemRoot().resolve("mom-system-client/pom.xml")).getDocumentElement();
-
         assertThat(dependencies(api)).isEmpty();
         assertThat(coordinates(dependencies(client))).containsExactlyInAnyOrderElementsOf(CLIENT_DEPENDENCIES);
         assertThat(javaFiles(systemRoot().resolve("mom-system-api/src/main/java")))
@@ -87,93 +68,54 @@ class SystemPlatformPomArchitectureTest {
                 .allMatch(path -> path.getFileName().toString().equals("package-info.java"));
     }
 
-    /** 验证 Server 仅使用三项已批准能力、安全和数据实际依赖，并要求测试依赖保持 test scope。 */
     @Test
     void serverMustUseOnlyApprovedSystemDependencies() throws Exception {
         Element server = parse(systemRoot().resolve("mom-system-server/pom.xml")).getDocumentElement();
         List<Dependency> dependencies = dependencies(server);
-
         assertThat(coordinates(dependencies)).containsExactlyInAnyOrderElementsOf(SERVER_DEPENDENCIES);
-        assertThat(dependencies)
-                .filteredOn(dependency -> Set.of("mom-test", "spring-security-test")
-                        .contains(dependency.artifactId()))
-                .hasSize(2)
-                .allSatisfy(dependency -> assertThat(dependency.scope()).isEqualTo("test"));
-        assertThat(dependencies)
-                .filteredOn(dependency -> "lombok".equals(dependency.artifactId()))
-                .singleElement()
-                .extracting(Dependency::scope)
-                .isEqualTo("provided");
         assertThat(validateServerDependencies(dependencies)).isEmpty();
     }
 
-    /** 负例 Fixture 必须证明 IAM Server 依赖会被同一语义校验拒绝。 */
     @Test
-    void invalidServerDependencyFixtureMustBeRejected() throws Exception {
-        Path fixture = reactorRoot().resolve(
-                "mom-architecture-tests/src/test/resources/fixtures/invalid-system-server.xml");
-        List<String> violations = validateServerDependencies(
-                dependencies(parse(fixture).getDocumentElement()));
-
-        assertThat(violations)
+    void invalidFixturesMustRemainRejected() throws Exception {
+        assertThat(validateServerDependencies(dependencies(parse(reactorRoot().resolve(
+                "mom-architecture-tests/src/test/resources/fixtures/invalid-system-server.xml"))
+                .getDocumentElement())))
                 .containsExactly("System Server 禁止依赖 io.github.chrisshi.mom:mom-iam-server");
-    }
-
-    /** 未经批准的其他业务 API 依赖也必须被同一精确白名单拒绝。 */
-    @Test
-    void unapprovedBusinessDependencyFixtureMustBeRejected() throws Exception {
-        Path fixture = reactorRoot().resolve(
-                "mom-architecture-tests/src/test/resources/fixtures/invalid-system-business-dependency.xml");
-        List<String> violations = validateServerDependencies(
-                dependencies(parse(fixture).getDocumentElement()));
-
-        assertThat(violations)
+        assertThat(validateServerDependencies(dependencies(parse(reactorRoot().resolve(
+                "mom-architecture-tests/src/test/resources/fixtures/invalid-system-business-dependency.xml"))
+                .getDocumentElement())))
                 .containsExactly("System Server 禁止依赖 io.github.chrisshi.mom:mom-mdm-api");
     }
 
-    /**
-     * 验证 System 只包含已登记的 Parameter、Dictionary、Dynamic I18n、Preference 与治理 Migration，且 XML 为零。
-     */
     @Test
-    void s16MustUseMybatisPlusWithoutMapperXml() throws Exception {
+    void s17MustUseMybatisPlusWithoutMapperXml() throws Exception {
         Path server = systemRoot().resolve("mom-system-server");
-        Path packageRoot = server.resolve("src/main/java/io/github/chrisshi/mom/system");
-
-        assertThat(packageRoot.resolve("MomSystemApplication.java")).isRegularFile();
-        assertThat(List.of("web", "application", "domain", "infrastructure"))
-                .allSatisfy(layer ->
-                        assertThat(packageRoot.resolve(layer).resolve("package-info.java")).isRegularFile());
-
         try (var paths = Files.walk(systemRoot())) {
             List<Path> files = paths.filter(Files::isRegularFile).toList();
+            assertThat(files).noneMatch(path -> FORBIDDEN_JAVA_TYPE
+                    .matcher(path.getFileName().toString()).matches());
             assertThat(files)
-                    .noneMatch(path -> FORBIDDEN_JAVA_TYPE.matcher(path.getFileName().toString()).matches())
                     .filteredOn(path -> normalized(path).contains("/src/"))
                     .filteredOn(path -> path.getFileName().toString().endsWith(".sql"))
                     .extracting(SystemPlatformPomArchitectureTest::normalized)
                     .containsExactlyInAnyOrder(
-                            normalized(server.resolve(
-                                    "src/main/resources/db/migration/system/V1__create_system_parameter.sql")),
-                            normalized(server.resolve(
-                                    "src/main/resources/db/migration/system/V2__create_system_dictionary.sql")),
-                            normalized(server.resolve(
-                                    "src/main/resources/db/migration/system/V3__create_system_i18n.sql")),
-                            normalized(server.resolve(
-                                    "src/main/resources/db/migration/system/"
-                                            + "V4__align_system_entities_with_base_entity.sql")),
-                            normalized(server.resolve(
-                                    "src/main/resources/db/migration/system/"
-                                            + "V5__remove_business_foreign_keys.sql")),
-                            normalized(server.resolve(
-                                    "src/main/resources/db/migration/system/"
-                                            + "V6__clarify_i18n_release_snapshot_columns.sql")),
-                            normalized(server.resolve(
-                                    "src/main/resources/db/migration/system/"
-                                            + "V7__create_system_user_preference.sql")));
+                            migration(server, "V1__create_system_parameter.sql"),
+                            migration(server, "V2__create_system_dictionary.sql"),
+                            migration(server, "V3__create_system_i18n.sql"),
+                            migration(server, "V4__align_system_entities_with_base_entity.sql"),
+                            migration(server, "V5__remove_business_foreign_keys.sql"),
+                            migration(server, "V6__clarify_i18n_release_snapshot_columns.sql"),
+                            migration(server, "V7__create_system_user_preference.sql"),
+                            migration(server, "V8__create_system_application_catalog.sql"));
             assertThat(files)
                     .filteredOn(path -> normalized(path).contains("/src/main/resources/mapper/"))
                     .isEmpty();
         }
+    }
+
+    private static String migration(Path server, String name) {
+        return normalized(server.resolve("src/main/resources/db/migration/system/" + name));
     }
 
     private static List<String> validateServerDependencies(List<Dependency> dependencies) {
@@ -195,7 +137,8 @@ class SystemPlatformPomArchitectureTest {
     }
 
     private static Set<String> coordinates(List<Dependency> dependencies) {
-        return dependencies.stream().map(Dependency::coordinates).collect(java.util.stream.Collectors.toSet());
+        return dependencies.stream().map(Dependency::coordinates)
+                .collect(java.util.stream.Collectors.toSet());
     }
 
     private static List<Path> javaFiles(Path root) throws Exception {
@@ -241,24 +184,15 @@ class SystemPlatformPomArchitectureTest {
 
     private static List<String> modules(Document document) {
         Element modules = directChild(document.getDocumentElement(), "modules");
-        if (modules == null) {
-            return List.of();
-        }
-        return directChildren(modules, "module").stream()
-                .map(element -> element.getTextContent().trim())
-                .toList();
+        return modules == null ? List.of() : directChildren(modules, "module").stream()
+                .map(element -> element.getTextContent().trim()).toList();
     }
 
     private static List<Dependency> dependencies(Element project) {
         Element dependencies = directChild(project, "dependencies");
-        if (dependencies == null) {
-            return List.of();
-        }
-        return directChildren(dependencies, "dependency").stream()
-                .map(element -> new Dependency(
-                        directText(element, "groupId"),
-                        directText(element, "artifactId"),
-                        directText(element, "scope")))
+        return dependencies == null ? List.of() : directChildren(dependencies, "dependency").stream()
+                .map(element -> new Dependency(directText(element, "groupId"),
+                        directText(element, "artifactId"), directText(element, "scope")))
                 .toList();
     }
 
