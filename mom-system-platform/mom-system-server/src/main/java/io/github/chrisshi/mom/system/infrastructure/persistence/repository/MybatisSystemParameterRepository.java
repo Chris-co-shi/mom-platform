@@ -2,7 +2,7 @@ package io.github.chrisshi.mom.system.infrastructure.persistence.repository;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.repository.CrudRepository;
+import com.baomidou.mybatisplus.spring.repository.CrudRepository;
 import io.github.chrisshi.mom.system.api.ParameterScopeType;
 import io.github.chrisshi.mom.system.application.parameter.SystemParameterException;
 import io.github.chrisshi.mom.system.domain.parameter.SystemParameter;

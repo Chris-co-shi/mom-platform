@@ -65,24 +65,34 @@ class JavaPersistenceBaselineTest(unittest.TestCase):
         baseline.check_java_file(path, text, report)
         self.assertTrue(any("动态文本" in item for item in report.errors))
 
-    def test_iservice_is_rejected_everywhere(self):
+    def test_current_spring_iservice_is_rejected_everywhere(self):
         report = self.report()
         path = (
             "mom-system-platform/mom-system-server/src/main/java/"
             "io/github/chrisshi/mom/system/application/parameter/BadService.java"
         )
+        text = "import com.baomidou.mybatisplus.spring.service.IService;"
+        baseline.check_java_file(path, text, report)
+        self.assertTrue(any("IService/ServiceImpl" in item for item in report.errors))
+
+    def test_legacy_extension_service_import_is_also_rejected(self):
+        report = self.report()
+        path = (
+            "mom-system-platform/mom-system-server/src/main/java/"
+            "io/github/chrisshi/mom/system/application/parameter/LegacyBadService.java"
+        )
         text = "import com.baomidou.mybatisplus.extension.service.IService;"
         baseline.check_java_file(path, text, report)
         self.assertTrue(any("IService/ServiceImpl" in item for item in report.errors))
 
-    def test_crud_repository_outside_infrastructure_repository_is_rejected(self):
+    def test_spring_crud_repository_outside_infrastructure_repository_is_rejected(self):
         report = self.report()
         path = (
             "mom-system-platform/mom-system-server/src/main/java/"
             "io/github/chrisshi/mom/system/application/parameter/BadRepository.java"
         )
         text = (
-            "import com.baomidou.mybatisplus.extension.repository.CrudRepository;\n"
+            "import com.baomidou.mybatisplus.spring.repository.CrudRepository;\n"
             "class BadRepository extends CrudRepository<BadMapper, BadEntity> {}"
         )
         baseline.check_java_file(path, text, report)
@@ -116,7 +126,7 @@ class JavaPersistenceBaselineTest(unittest.TestCase):
             "MybatisSystemParameterRepository.java"
         )
         text = (
-            "import com.baomidou.mybatisplus.extension.repository.CrudRepository;\n"
+            "import com.baomidou.mybatisplus.spring.repository.CrudRepository;\n"
             "class MybatisSystemParameterRepository "
             "extends CrudRepository<SystemParameterMapper, SystemParameterEntity> "
             "implements SystemParameterRepository {}"

@@ -20,10 +20,13 @@ SQL_ADAPTER_IMPORT = re.compile(
 SELECT_STAR = re.compile(r"\bSELECT\s+\*\s+FROM\b", re.IGNORECASE | re.DOTALL)
 DYNAMIC_SQL_TEXT = re.compile(r"\$\{")
 MP_SERVICE_IMPORT = re.compile(
-    r"^\s*import\s+com\.baomidou\.mybatisplus\.extension\.service\.", re.MULTILINE
+    r"^\s*import\s+com\.baomidou\.mybatisplus\.(?:spring\.service|extension\.service)\.",
+    re.MULTILINE,
 )
 MP_REPOSITORY_IMPORT = re.compile(
-    r"^\s*import\s+com\.baomidou\.mybatisplus\.extension\.repository\.", re.MULTILINE
+    r"^\s*import\s+com\.baomidou\.mybatisplus\."
+    r"(?:spring\.repository|extension\.repository)\.",
+    re.MULTILINE,
 )
 CRUD_REPOSITORY_EXTENDS = re.compile(r"\bextends\s+CrudRepository\s*<")
 EXPLICIT_IREPOSITORY_CONTRACT = re.compile(
@@ -151,8 +154,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print("JAVA_PERSISTENCE_BASELINE: PASSED")
     print("- bounded contexts use MyBatis/MyBatis-Plus unless precisely exempted")
-    print("- CrudRepository stays inside Infrastructure and implements a MOM Repository Port")
-    print("- IService/ServiceImpl and explicit IRepository contracts remain forbidden")
+    print("- Spring CrudRepository stays inside Infrastructure and implements a MOM Repository Port")
+    print("- IRepository contracts and Spring/legacy generic Service abstractions remain forbidden")
     print("- Java annotation/JDBC SQL rejects SELECT * and ${} dynamic text")
     return 0
 

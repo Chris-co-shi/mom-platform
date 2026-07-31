@@ -2,7 +2,7 @@ package io.github.chrisshi.mom.architecture;
 
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.Version;
-import com.baomidou.mybatisplus.extension.repository.CrudRepository;
+import com.baomidou.mybatisplus.spring.repository.CrudRepository;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
@@ -105,24 +105,26 @@ class PersistenceArchitectureTest {
                 .anyMatch(field -> field.getAnnotation(TableLogic.class) != null)).isFalse();
     }
 
-    /** MyBatis-Plus 通用 Service 不得成为 MOM 业务 Service 或 Repository。 */
+    /** MyBatis-Plus 当前和历史通用 Service 包都不得成为 MOM 业务 Service 或 Repository。 */
     @Test
     void boundedContextsMustNotUseMybatisPlusGenericServices() {
         noClasses()
                 .that().resideInAnyPackage(BOUNDED_CONTEXT_PACKAGES)
                 .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.baomidou.mybatisplus.spring.service..",
                         "com.baomidou.mybatisplus.extension.service..")
                 .because("IService/ServiceImpl 暴露 ORM CRUD，不能表达 MOM 用例或领域仓储语义")
                 .check(productionClasses);
     }
 
-    /** MyBatis-Plus Repository 抽象只能作为 Infrastructure Repository Adapter 的实现机制。 */
+    /** Spring CrudRepository 与 extension IRepository 只能服务于 Infrastructure Repository Adapter。 */
     @Test
     void mybatisPlusRepositoriesMustStayInsideInfrastructureRepository() {
         noClasses()
                 .that().resideInAnyPackage(BOUNDED_CONTEXT_PACKAGES)
                 .and().resideOutsideOfPackage("..infrastructure.persistence.repository..")
                 .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.baomidou.mybatisplus.spring.repository..",
                         "com.baomidou.mybatisplus.extension.repository..")
                 .because("IRepository/CrudRepository 不得泄漏到 Domain、Application、Web、API 或其他 Adapter")
                 .check(productionClasses);
@@ -150,7 +152,7 @@ class PersistenceArchitectureTest {
                 .check(productionClasses);
     }
 
-    /** 当前明确的单表 Domain Port Adapter 必须复用 CrudRepository。 */
+    /** 当前明确的单表 Domain Port Adapter 必须复用 Spring CrudRepository。 */
     @Test
     void approvedSingleTableAdaptersMustUseCrudRepository() {
         assertThat(CrudRepository.class.isAssignableFrom(MybatisSystemParameterRepository.class)).isTrue();

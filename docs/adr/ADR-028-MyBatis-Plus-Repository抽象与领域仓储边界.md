@@ -12,7 +12,7 @@ MOM 已冻结 `Web → Application → Domain Port ← Infrastructure Adapter` �
 
 此前项目为防止 ORM 抽象泄漏，进一步全面禁止 `IService`、`ServiceImpl` 以及 Repository 抽象复用。该规则保护了领域边界，但也使部分单表 Repository Adapter 只能重复组合 Mapper，产生 `selectById`、`selectOne`、`selectList`、`selectCount`、`insert`、`updateById` 等模板代码。
 
-MyBatis-Plus 3.5.9 之后将通用 Service 抽象重构为 Repository 语义。当前项目使用 3.5.17，正式单表 Adapter 可以在 Infrastructure 内部复用 `CrudRepository<M, E>`，同时继续向上实现框架无关的 MOM Domain Repository Port。
+MyBatis-Plus 3.5.9 之后将通用 Service 抽象重构为 Repository 语义。当前项目使用 3.5.17，其中 `IRepository` 位于 extension 模块，Spring 实现 `CrudRepository<M,E>` 位于 `com.baomidou.mybatisplus.spring.repository`。正式单表 Adapter 可以在 Infrastructure 内部复用该 Spring Repository 实现，同时继续向上实现框架无关的 MOM Domain Repository Port。
 
 ## 2. 决策
 
@@ -56,7 +56,7 @@ Adapter 可使用 `getById`、`getOne`、`list`、`count`、`save`、`updateById
 - 自定义接口继承 `IRepository<T>` 后向 Application/Web 暴露通用 CRUD；
 - `Db`、Active Record 或静态 ORM Helper 绕过 Domain Port。
 
-原因是这些接口会把通用 CRUD、Persistence Entity 和 ORM 语义提升为业务契约。
+当前版本的 `IService/ServiceImpl` 位于 `com.baomidou.mybatisplus.spring.service`；门禁同时阻断历史 extension service 包，避免升级或遗留代码重新引入。
 
 ### 2.4 不强制继承的类型
 
@@ -77,7 +77,7 @@ Adapter 可使用 `getById`、`getOne`、`list`、`count`、`save`、`updateById
 
 - Domain Port 不声明这些方法；
 - Application/Web 不按具体 Adapter、`IRepository` 或 `CrudRepository` 注入；
-- Infrastructure Repository 包之外不得依赖 `com.baomidou.mybatisplus.extension.repository`；
+- Infrastructure Repository 包之外不得依赖 `com.baomidou.mybatisplus.spring.repository` 或 `com.baomidou.mybatisplus.extension.repository`；
 - 具体 Adapter 仍按能力命名为 `Mybatis*Repository`，不得命名为业务 `*Service`。
 
 ## 3. 分类与验收
