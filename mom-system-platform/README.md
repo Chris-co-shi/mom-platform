@@ -1,14 +1,14 @@
 # MOM System Platform
 
-`mom-system-platform` 已完成 S12 技术骨架、S13 GLOBAL/APPLICATION 类型化非敏感参数、S14 非权威受限通用字典、S15-B Dynamic I18n 后端与 S16 用户显示偏好/受限视图设置后端。S15-A 历史审计保持不变；当前客户端尚未接入，S17 目录与菜单仍为 Not Started。
+`mom-system-platform` 已完成 S12 技术骨架、S13 GLOBAL/APPLICATION 类型化非敏感参数、S14 非权威受限通用字典、S15-B Dynamic I18n、S16 用户显示偏好/受限视图设置，以及 S17 Application Catalog/Navigation Draft、不可变发布快照与权限过滤 Runtime。S15-A 历史审计保持不变；当前客户端尚未正式接入，S18 缓存、变更通知和跨服务验证仍为 Not Started。
 
 ## 模块职责
 
-| 模块 | S13～S15 职责 |
+| 模块 | 当前职责 |
 |---|---|
-| `mom-system-api` | 参数/字典有效值，以及用户显示偏好与受限视图设置的稳定只读契约 |
-| `mom-system-client` | 仅保留调用边界；当前无真实调用方，不提前创建 Feign Client |
-| `mom-system-server` | 参数、受限字典、Dynamic I18n 与用户偏好领域规则、事务用例、`mom_system` 持久化、API 与 JWT 安全 |
+| `mom-system-api` | 参数/字典有效值、用户显示偏好/受限视图，以及不可执行 Runtime Catalog 稳定只读契约 |
+| `mom-system-client` | 仅保留调用边界；当前无 Java 服务真实调用方，不提前创建 Feign Client |
+| `mom-system-server` | 参数、受限字典、Dynamic I18n、用户偏好与 Application Catalog 领域规则、事务用例、`mom_system` 持久化、管理/Runtime API 与 JWT 安全 |
 
 依赖方向固定为：
 
@@ -49,7 +49,7 @@ infrastructure → domain/application ports
 
 ## 精确门禁
 
-POM XML 白名单只允许 System API、WebMVC、Security、Data、Tracing、Metrics、Nacos、Lombok 与测试基础设施；`mom-iam-server` 和 `mom-mdm-api` 负例必须失败。API 精确放行参数、字典与偏好只读契约，`mom-system-client` 继续为空。ArchUnit 验证四项 Domain 均不穿透技术边界、Controller 只进入对应 Application、持久化类型只在 Infrastructure，并继续禁止 Catalog、Menu、Navigation、IAM 对象与权威主数据类型。
+POM XML 白名单只允许 System API、WebMVC、Security、Data、Tracing、Metrics、Nacos、Lombok 与测试基础设施；`mom-iam-server` 和 `mom-mdm-api` 负例必须失败。API 精确放行参数、字典、偏好和 Catalog 只读契约，`mom-system-client` 继续为空。ArchUnit 验证各 Domain 不穿透技术边界、Controller 只进入对应 Application、持久化类型只在 Infrastructure；Catalog 允许保存元数据与稳定 Reference，但继续禁止形成第二 IAM、主数据权威或返回 Component/Layout/Script 等可执行客户端 Artifact。
 
 ## Dynamic I18n
 
@@ -70,14 +70,30 @@ POM XML 白名单只允许 System API、WebMVC、Security、Data、Tracing、Met
 - Preference 不进入 JWT、不修改 `/api/iam/me`、不参与授权、Factory 业务日期、金额、数量或单位事实。
 - `mom-system-client` 继续为空；Web/Mobile 接入、缓存、MQ 和跨服务同步不在 S16。
 
+## Application Catalog 与 Navigation
+
+- V8 新增 `system_application`、`system_navigation_item` 与不可变 `system_catalog_release`，无物理 FK；Release Trigger 拒绝 UPDATE/DELETE。
+- Application 使用稳定小写 kebab-case `applicationCode`，不是 IAM OAuth Client；V1 类型为 `PLATFORM/BUSINESS`。
+- Navigation Draft 按 `WEB/MOBILE` Channel 管理 `GROUP/ROUTE` 节点，保存 `routeKey`、Dynamic I18n Reference、IAM `permissionCode` Reference 和受限展示元数据。
+- System 只返回 Metadata，不保存或返回 Path、Component、Layout、JavaScript、HTML、动态 import 或远程模块 URL。
+- Application Version 是全部 Navigation Draft 写入和 Publish 的聚合并发边界；节点同时使用独立 Version。
+- Publish 校验完整树、Dynamic I18n 发布引用、Snapshot 大小和 No-op，生成确定性 JSONB Snapshot、SHA-256 与单调版本。
+- Rollback 复制历史 Snapshot 创建新版本，记录 `sourceReleaseVersion`，不修改 Draft 或历史 Release。
+- Runtime 只读发布快照，根据当前 JWT 原始 Permission Authority 精确过滤节点；菜单隐藏不替代业务 API 授权。
+- Runtime 支持 ETag/304；Application `enabled=false` 是即时 Kill Switch。
+- IAM V10 注册 `system:catalog:read/write/publish` 并赋予内置 `PLATFORM_ADMIN`；System 仍只保存 Permission Code Reference。
+- 发布期 IAM Permission 权威批量验证、缓存/通知、Web/Mobile Route Registry 正式接入进入 S18 或后续独立跨仓库任务。
+
 ## 当前未实现
 
-- Default/Last Factory、Default Application、Dashboard/Favorites 与 Web/Mobile 正式接入；
-- Application Catalog、Menu、Navigation；
-- Dynamic I18n 客户端接入、缓存或变更通知；Audit Projection；
+- Default/Last Factory、Dashboard/Favorites 与 Web/Mobile 正式接入；
+- Catalog/I18n/Parameter/Dictionary/Preference 缓存、变更通知和跨服务对账；
+- Catalog 发布期 IAM Permission 批量权威验证；
+- Dynamic I18n 客户端接入；Audit Projection；
 - Secret 管理、配置中心替代、跨服务推送；
 - Redis 参数缓存、MQ 参数广播；
-- IAM 数据迁移或 Permission 存储。
+- IAM 数据迁移或 System 内 Permission 存储；
+-可执行远程模块、External URL 或动态 Component 配置。
 
 ## 本地验证
 
@@ -92,12 +108,14 @@ bash scripts/codex-mvn-test.sh \
   -pl mom-architecture-tests \
   -am test
 
-BASE_REF=66516711dbc7e9f9849549bc27b5f11207d83481 \
+BASE_REF=399e859674a6e29819aa32dbf5d7dd056f41480d \
   bash scripts/codex-verify-changed.sh
+
+bash .github/scripts/system-postgresql-smoke.sh
 
 bash scripts/codex-mvn-test.sh clean verify
 ```
 
 ## 回滚
 
-需要撤销 S16 应用能力时，对功能提交执行普通 `git revert`；已执行 V7 的数据库必须另行评估用户偏好数据保留，禁止删除或修改历史 Migration，也不得用 reset/rebase 改写 S15/S15-F 历史。
+需要撤销 S17 应用能力时，对 S17 功能提交执行普通 `git revert`；已执行 System V8 和 IAM V10 的数据库必须另行评估 Catalog Draft/Release 与 Permission Seed 保留，禁止删除或修改历史 Migration，也不得用 reset/rebase 改写 S15～S16 历史。
