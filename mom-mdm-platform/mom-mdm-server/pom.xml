@@ -20,11 +20,6 @@
     </dependency>
     <dependency>
       <groupId>io.github.chrisshi.mom</groupId>
-      <artifactId>mom-integration-client</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.github.chrisshi.mom</groupId>
       <artifactId>mom-core</artifactId>
       <version>${project.version}</version>
     </dependency>
@@ -45,16 +40,6 @@
     </dependency>
     <dependency>
       <groupId>io.github.chrisshi.mom</groupId>
-      <artifactId>mom-outbox</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.github.chrisshi.mom</groupId>
-      <artifactId>mom-seata</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.github.chrisshi.mom</groupId>
       <artifactId>mom-tracing</artifactId>
       <version>${project.version}</version>
     </dependency>
@@ -66,10 +51,6 @@
     <dependency>
       <groupId>com.alibaba.cloud</groupId>
       <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.alibaba.cloud</groupId>
-      <artifactId>spring-cloud-starter-stream-rocketmq</artifactId>
     </dependency>
     <dependency>
       <groupId>org.projectlombok</groupId>

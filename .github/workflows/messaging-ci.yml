@@ -21,12 +21,10 @@ jobs:
     outputs:
       messaging: ${{ steps.scope.outputs.messaging }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Detect messaging-related changes
-        id: scope
+      - id: scope
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_ACTION: ${{ github.event.action }}
@@ -38,59 +36,41 @@ jobs:
           MANUAL_SCOPE: ${{ github.event_name == 'workflow_dispatch' && 'messaging' || 'auto' }}
         run: bash .github/scripts/detect-ci-scope.sh
 
-  rocketmq-outbox:
+  framework-verification:
+    name: Messaging framework verification
     needs: changes
     if: needs.changes.outputs.messaging == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 25
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "25"
           cache: maven
-
-      - name: Package MDM and Integration applications
-        shell: bash
+      - name: Verify messaging and outbox modules
         run: >-
           bash scripts/codex-mvn-test.sh
-          -DskipTests
-          -pl :mom-mdm-server,:mom-integration-server
-          -am package
-
-      - name: Run RocketMQ Stream Outbox smoke test
-        shell: bash
+          -pl mom-framework/mom-messaging,mom-framework/mom-outbox
+          -am verify
+      - name: Record retired fixture boundary
         run: |
-          set -o pipefail
-          bash .github/scripts/p01-s05-rocketmq-outbox-smoke.sh \
-            2>&1 | tee p01-s05-smoke.log
-
-      - name: Upload messaging diagnostics on failure
+          {
+            echo '### Messaging acceptance boundary'
+            echo
+            echo 'The MDM Phase 01 producer/consumer fixture was retired.'
+            echo 'This workflow verifies framework contracts only; the first real domain event slice must restore real Broker, retry and DLQ acceptance.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: messaging-verification-diagnostics
           path: |
-            messaging-build.log
             .codex/runtime/logs/**
             .codex/runtime/summaries/**
-            p01-s05-smoke.log
-            p01-s05-postgresql.log
-            p01-s05-rocketmq-namesrv.log
-            p01-s05-rocketmq-broker.log
-            p01-s05-mdm-server.log
-            p01-s05-integration-server.log
-            p01-s05-mdm-health.json
-            p01-s05-integration-health.json
-            p01-s05-normal-create.json
-            p01-s05-outage-create.json
-            p01-s05-poison-create.json
-            p01-s05-dlq-status.txt
-            p01-s05-outbox-status.txt
-            p01-s05-inbox-status.txt
             **/target/surefire-reports/**
+            **/target/failsafe-reports/**
           if-no-files-found: ignore
+          include-hidden-files: true
