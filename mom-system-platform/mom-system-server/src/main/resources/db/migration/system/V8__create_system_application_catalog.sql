@@ -27,9 +27,8 @@ CREATE TABLE system_application (
         i18n_message_key ~ '^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$'),
     CONSTRAINT ck_system_application_route_contract CHECK (route_contract_version > 0),
     CONSTRAINT ck_system_application_sort_order CHECK (sort_order >= 0),
-    CONSTRAINT ck_system_application_published_pointer CHECK (
-        published_version >= 0
-        AND ((published_release_id IS NULL) = (published_version = 0))),
+    CONSTRAINT ck_system_application_published_pointer CHECK (published_version >= 0 AND
+        ((published_release_id IS NULL) = (published_version = 0))),
     CONSTRAINT ck_system_application_version CHECK (version >= 0)
 );
 
