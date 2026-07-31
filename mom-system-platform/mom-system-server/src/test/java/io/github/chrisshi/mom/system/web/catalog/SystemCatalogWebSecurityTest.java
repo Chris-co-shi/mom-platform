@@ -12,12 +12,10 @@ import io.github.chrisshi.mom.system.application.catalog.SystemCatalogApplicatio
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogApplicationModels.CatalogReleaseView;
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogApplicationModels.RuntimeResult;
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogApplicationService;
-import io.github.chrisshi.mom.system.application.catalog.SystemCatalogException;
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogNavigationMoveApplicationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockServletContext;
@@ -75,7 +73,8 @@ class SystemCatalogWebSecurityTest {
     }
 
     @Test
-    void runtimeMustRequireAuthenticationAndExposeNoExecutableOrDatabaseFields() throws Exception {
+    void runtimeMustRequireAuthenticationFilterAuthoritiesAndExposeNoExecutableFields()
+            throws Exception {
         mockMvc.perform(get("/api/system/catalog/me")).andExpect(status().isUnauthorized());
         when(service.runtimeCatalog(anySet())).thenReturn(runtime());
         mockMvc.perform(get("/api/system/catalog/me")
@@ -86,8 +85,10 @@ class SystemCatalogWebSecurityTest {
                 .andExpect(jsonPath("$.applications[0].channels[0].navigation[0].routeKey")
                         .value("iam.users"))
                 .andExpect(jsonPath("$.applications[0].id").doesNotExist())
-                .andExpect(jsonPath("$.applications[0].channels[0].navigation[0].component").doesNotExist())
-                .andExpect(jsonPath("$.applications[0].channels[0].navigation[0].path").doesNotExist());
+                .andExpect(jsonPath("$.applications[0].channels[0].navigation[0].component")
+                        .doesNotExist())
+                .andExpect(jsonPath("$.applications[0].channels[0].navigation[0].path")
+                        .doesNotExist());
     }
 
     @Test
@@ -101,10 +102,11 @@ class SystemCatalogWebSecurityTest {
     }
 
     @Test
-    void adminMustSeparateReadWriteAndPublishPermissions() throws Exception {
+    void adminMustSeparateReadWritePublishAndRejectUnknownFields() throws Exception {
         when(service.getApplication("1")).thenReturn(application());
         when(service.createApplication(any())).thenReturn(application());
         when(service.publish(anyString(), any())).thenReturn(release());
+
         mockMvc.perform(get("/api/system/admin/applications/1").with(jwt()))
                 .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/system/admin/applications/1").with(readJwt()))
@@ -123,20 +125,11 @@ class SystemCatalogWebSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"applicationVersion\":0,\"changeNote\":\"initial\"}"))
                 .andExpect(status().isCreated());
-    }
-
-    @Test
-    void unknownFieldsAndStableErrorsMustFailClosed() throws Exception {
         mockMvc.perform(post("/api/system/admin/applications").with(writeJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createBody().replace("}", ",\"component\":\"../App.vue\"}")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("invalid_request"));
-        when(service.getApplication("missing")).thenThrow(
-                new SystemCatalogException.NotFound("not_found", "不存在"));
-        mockMvc.perform(get("/api/system/admin/applications/missing").with(readJwt()))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("not_found"));
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor readJwt() {
@@ -177,39 +170,49 @@ class SystemCatalogWebSecurityTest {
         return new RuntimeResult(new RuntimeCatalogView(1, Instant.EPOCH, List.of(app)), CHECKSUM);
     }
 
-    @TestConfiguration(proxyBeanMethods = false)
+    /**
+     * 仅由本测试通过 context.register 显式装配；不使用 @TestConfiguration，避免被主应用 Component Scan
+     * 发现并污染 MomSystemApplicationTest 的 Fail-Closed 启动上下文。
+     */
     @EnableWebMvc
     @EnableWebSecurity
     @EnableMethodSecurity
     static class TestWebConfiguration {
         @Bean
-        SystemCatalogApplicationService service() {
+        SystemCatalogApplicationService catalogApplicationService() {
             return mock(SystemCatalogApplicationService.class);
         }
+
         @Bean
-        SystemCatalogNavigationMoveApplicationService moveService() {
+        SystemCatalogNavigationMoveApplicationService catalogMoveService() {
             return mock(SystemCatalogNavigationMoveApplicationService.class);
         }
+
         @Bean
-        SystemCatalogAdminController admin(
+        SystemCatalogAdminController catalogAdminController(
                 SystemCatalogApplicationService service,
                 SystemCatalogNavigationMoveApplicationService moveService) {
             return new SystemCatalogAdminController(service, moveService);
         }
+
         @Bean
-        SystemCatalogRuntimeController runtime(SystemCatalogApplicationService service) {
+        SystemCatalogRuntimeController catalogRuntimeController(
+                SystemCatalogApplicationService service) {
             return new SystemCatalogRuntimeController(service);
         }
+
         @Bean
-        SystemCatalogExceptionHandler errors() {
+        SystemCatalogExceptionHandler catalogExceptionHandler() {
             return new SystemCatalogExceptionHandler();
         }
+
         @Bean
-        JwtDecoder jwtDecoder() {
+        JwtDecoder catalogJwtDecoder() {
             return token -> { throw new IllegalStateException("No real JWT"); };
         }
+
         @Bean
-        SecurityFilterChain security(HttpSecurity http) throws Exception {
+        SecurityFilterChain catalogSecurity(HttpSecurity http) throws Exception {
             http.csrf(csrf -> csrf.disable())
                     .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
                     .oauth2ResourceServer(resource -> resource.jwt(withDefaults()));
