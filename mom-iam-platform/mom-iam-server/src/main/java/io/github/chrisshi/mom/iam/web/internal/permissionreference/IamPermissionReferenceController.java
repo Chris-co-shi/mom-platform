@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.github.chrisshi.mom.iam.api.IamPermissionReferenceContracts.ValidatePermissionReferencesResponse;
 import io.github.chrisshi.mom.iam.application.permissionreference.IamPermissionReferenceApplicationService;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,10 +19,15 @@ import java.util.List;
  * 服务间 Permission Code 权威批量校验 HTTP 入站 Adapter。
  *
  * <p>端点只接受具有精确 OAuth2 Scope 的服务身份，不复用 IAM Admin 用户权限。请求严格拒绝未知字段，避免
- * 客户端静默提交身份、审计或授权字段。</p>
+ * 客户端静默提交身份、审计或授权字段。端点与 Authorization Server 使用同一显式开关；构造器依赖保证
+ * Application Service 缺失时启动失败，不使用扫描阶段顺序敏感的 {@code ConditionalOnBean}。</p>
  */
 @RestController
-@ConditionalOnBean(IamPermissionReferenceApplicationService.class)
+@ConditionalOnProperty(
+        prefix = "mom.iam.authorization",
+        name = "enabled",
+        havingValue = "true",
+        matchIfMissing = true)
 @RequestMapping("/api/iam/internal/permission-references")
 @PreAuthorize("hasAuthority('SCOPE_iam.permission-reference.read')")
 public class IamPermissionReferenceController {
