@@ -1,6 +1,6 @@
 package io.github.chrisshi.mom.system.application.catalog;
 
-import io.github.chrisshi.mom.system.application.catalog.port.PermissionReferenceValidationPort;
+import io.github.chrisshi.mom.system.application.catalog.port.CatalogReferenceValidationPort;
 import io.github.chrisshi.mom.system.domain.catalog.SystemApplication;
 import io.github.chrisshi.mom.system.domain.catalog.SystemApplicationRepository;
 import io.github.chrisshi.mom.system.domain.catalog.SystemCatalogRelease;
@@ -34,7 +34,7 @@ public class SystemCatalogPublishOrchestrator {
     private final SystemNavigationRepository navigation;
     private final SystemCatalogReleaseRepository releases;
     private final SystemCatalogSnapshotCodec codec;
-    private final PermissionReferenceValidationPort permissionReferences;
+    private final CatalogReferenceValidationPort referenceValidation;
     private final SystemCatalogPublishCommitService commitService;
 
     public SystemCatalogPublishOrchestrator(
@@ -42,13 +42,13 @@ public class SystemCatalogPublishOrchestrator {
             SystemNavigationRepository navigation,
             SystemCatalogReleaseRepository releases,
             SystemCatalogSnapshotCodec codec,
-            PermissionReferenceValidationPort permissionReferences,
+            CatalogReferenceValidationPort referenceValidation,
             SystemCatalogPublishCommitService commitService) {
         this.applications = Objects.requireNonNull(applications, "applications");
         this.navigation = Objects.requireNonNull(navigation, "navigation");
         this.releases = Objects.requireNonNull(releases, "releases");
         this.codec = Objects.requireNonNull(codec, "codec");
-        this.permissionReferences = Objects.requireNonNull(permissionReferences, "permissionReferences");
+        this.referenceValidation = Objects.requireNonNull(referenceValidation, "referenceValidation");
         this.commitService = Objects.requireNonNull(commitService, "commitService");
     }
 
@@ -101,10 +101,10 @@ public class SystemCatalogPublishOrchestrator {
         if (permissions.isEmpty()) {
             return;
         }
-        var result = permissionReferences.validate(permissions);
+        var result = referenceValidation.validate(permissions);
         Set<String> invalid = new TreeSet<>();
         permissions.forEach(code -> {
-            if (result.statuses().get(code) != PermissionReferenceValidationPort.Status.ENABLED) {
+            if (result.statuses().get(code) != CatalogReferenceValidationPort.Status.ENABLED) {
                 invalid.add(code);
             }
         });

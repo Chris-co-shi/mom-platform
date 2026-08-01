@@ -7,7 +7,7 @@ import io.github.chrisshi.mom.iam.api.IamPermissionReferenceContracts.ValidatePe
 import io.github.chrisshi.mom.iam.api.IamPermissionReferenceContracts.ValidatePermissionReferencesResponse;
 import io.github.chrisshi.mom.iam.client.IamPermissionReferenceClient;
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogException;
-import io.github.chrisshi.mom.system.application.catalog.port.PermissionReferenceValidationPort;
+import io.github.chrisshi.mom.system.application.catalog.port.CatalogReferenceValidationPort;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,29 +18,29 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * IAM Permission Reference Feign 出站 Client Adapter。
+ * IAM Catalog Reference Feign 出站 Client Adapter。
  *
  * <p>调用强制使用 {@link Propagation#NEVER}，如果上游错误地在活动数据库事务中调用将立即失败。Adapter 不透传
- * 用户 Token，不提供 fallback，不把 IAM 错误伪造为全部有效。</p>
+ * 用户 Token，不提供 fallback，不把 IAM 错误伪造为全部有效，也不在 System 内定义 Permission 权威对象。</p>
  */
 @Component
-public class IamPermissionReferenceValidationAdapter implements PermissionReferenceValidationPort {
+public class IamCatalogReferenceValidationAdapter implements CatalogReferenceValidationPort {
     private final IamPermissionReferenceClient client;
 
-    public IamPermissionReferenceValidationAdapter(IamPermissionReferenceClient client) {
+    public IamCatalogReferenceValidationAdapter(IamPermissionReferenceClient client) {
         this.client = Objects.requireNonNull(client, "client");
     }
 
     @Override
     @Transactional(propagation = Propagation.NEVER)
-    public ValidationResult validate(Set<String> permissionCodes) {
-        if (permissionCodes == null || permissionCodes.isEmpty()) {
+    public ValidationResult validate(Set<String> referenceCodes) {
+        if (referenceCodes == null || referenceCodes.isEmpty()) {
             return new ValidationResult(java.time.Instant.EPOCH, Map.of());
         }
         ValidatePermissionReferencesResponse response;
         try {
             response = client.validate(new ValidatePermissionReferencesRequest(
-                    permissionCodes.stream().sorted().toList()));
+                    referenceCodes.stream().sorted().toList()));
         } catch (RetryableException exception) {
             throw new SystemCatalogException.DependencyUnavailable(
                     "IAM Permission 权威服务暂时不可用", exception);
@@ -58,12 +58,12 @@ public class IamPermissionReferenceValidationAdapter implements PermissionRefere
         Map<String, Status> statuses = new LinkedHashMap<>();
         for (PermissionReferenceResult result : response.results()) {
             if (result == null || result.permissionCode() == null || result.status() == null
-                    || !permissionCodes.contains(result.permissionCode())
+                    || !referenceCodes.contains(result.permissionCode())
                     || statuses.putIfAbsent(result.permissionCode(), Status.valueOf(result.status().name())) != null) {
                 throw new SystemCatalogException.DependencyProtocol("IAM Permission 校验响应包含非法或重复结果");
             }
         }
-        if (!statuses.keySet().equals(permissionCodes)) {
+        if (!statuses.keySet().equals(referenceCodes)) {
             throw new SystemCatalogException.DependencyProtocol("IAM Permission 校验响应缺少请求 Code");
         }
         return new ValidationResult(response.checkedAt(), statuses);

@@ -3,7 +3,7 @@ package io.github.chrisshi.mom.system.application.catalog;
 import io.github.chrisshi.mom.system.api.SystemCatalogContracts.ApplicationType;
 import io.github.chrisshi.mom.system.api.SystemCatalogContracts.ClientChannel;
 import io.github.chrisshi.mom.system.api.SystemCatalogContracts.NavigationType;
-import io.github.chrisshi.mom.system.application.catalog.port.PermissionReferenceValidationPort;
+import io.github.chrisshi.mom.system.application.catalog.port.CatalogReferenceValidationPort;
 import io.github.chrisshi.mom.system.domain.catalog.SystemApplication;
 import io.github.chrisshi.mom.system.domain.catalog.SystemApplicationRepository;
 import io.github.chrisshi.mom.system.domain.catalog.SystemCatalogReleaseRepository;
@@ -29,22 +29,22 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** Catalog 事务外 Permission 校验与候选指纹编排测试。 */
+/** Catalog 事务外 Reference 校验与候选指纹编排测试。 */
 class SystemCatalogPublishOrchestratorTest {
 
     @Test
-    void mustValidatePermissionsOutsideCommitAndPassVersionChecksumAndSet() {
+    void mustValidateReferencesOutsideCommitAndPassVersionChecksumAndSet() {
         Fixture fixture = new Fixture();
-        when(fixture.permissionReferences.validate(anySet())).thenReturn(
-                new PermissionReferenceValidationPort.ValidationResult(Instant.EPOCH,
-                        Map.of("iam:user:read", PermissionReferenceValidationPort.Status.ENABLED)));
+        when(fixture.referenceValidation.validate(anySet())).thenReturn(
+                new CatalogReferenceValidationPort.ValidationResult(Instant.EPOCH,
+                        Map.of("iam:user:read", CatalogReferenceValidationPort.Status.ENABLED)));
         when(fixture.commit.publish(any(), any(), any())).thenReturn(fixture.releaseView());
 
         fixture.orchestrator.publish("app", new SystemCatalogApplicationModels.PublishCommand(3L, "publish"));
 
         ArgumentCaptor<SystemCatalogPublishPlan> plan =
                 ArgumentCaptor.forClass(SystemCatalogPublishPlan.class);
-        verify(fixture.permissionReferences).validate(Set.of("iam:user:read"));
+        verify(fixture.referenceValidation).validate(Set.of("iam:user:read"));
         verify(fixture.commit).publish(any(), any(), plan.capture());
         assertThat(plan.getValue().applicationVersion()).isEqualTo(3L);
         assertThat(plan.getValue().checksum()).isEqualTo(SystemCatalogRules.sha256("snapshot-json"));
@@ -52,11 +52,11 @@ class SystemCatalogPublishOrchestratorTest {
     }
 
     @Test
-    void disabledOrUnknownPermissionMustFailBeforeLocalCommit() {
+    void disabledOrUnknownReferenceMustFailBeforeLocalCommit() {
         Fixture fixture = new Fixture();
-        when(fixture.permissionReferences.validate(anySet())).thenReturn(
-                new PermissionReferenceValidationPort.ValidationResult(Instant.EPOCH,
-                        Map.of("iam:user:read", PermissionReferenceValidationPort.Status.DISABLED)));
+        when(fixture.referenceValidation.validate(anySet())).thenReturn(
+                new CatalogReferenceValidationPort.ValidationResult(Instant.EPOCH,
+                        Map.of("iam:user:read", CatalogReferenceValidationPort.Status.DISABLED)));
 
         assertThatThrownBy(() -> fixture.orchestrator.publish(
                 "app", new SystemCatalogApplicationModels.PublishCommand(3L, "publish")))
@@ -71,8 +71,8 @@ class SystemCatalogPublishOrchestratorTest {
         private final SystemNavigationRepository navigation = mock(SystemNavigationRepository.class);
         private final SystemCatalogReleaseRepository releases = mock(SystemCatalogReleaseRepository.class);
         private final SystemCatalogSnapshotCodec codec = mock(SystemCatalogSnapshotCodec.class);
-        private final PermissionReferenceValidationPort permissionReferences =
-                mock(PermissionReferenceValidationPort.class);
+        private final CatalogReferenceValidationPort referenceValidation =
+                mock(CatalogReferenceValidationPort.class);
         private final SystemCatalogPublishCommitService commit = mock(SystemCatalogPublishCommitService.class);
         private final SystemCatalogPublishOrchestrator orchestrator;
 
@@ -90,7 +90,7 @@ class SystemCatalogPublishOrchestratorTest {
             when(navigation.findByApplication("app")).thenReturn(List.of(item));
             when(codec.encode(any())).thenReturn("snapshot-json");
             orchestrator = new SystemCatalogPublishOrchestrator(
-                    applications, navigation, releases, codec, permissionReferences, commit);
+                    applications, navigation, releases, codec, referenceValidation, commit);
         }
 
         private SystemCatalogApplicationModels.CatalogReleaseView releaseView() {

@@ -4,6 +4,7 @@ import io.github.chrisshi.mom.iam.api.IamPermissionReferenceContracts.Permission
 import io.github.chrisshi.mom.iam.api.IamPermissionReferenceContracts.PermissionReferenceStatus;
 import io.github.chrisshi.mom.iam.api.IamPermissionReferenceContracts.ValidatePermissionReferencesResponse;
 import io.github.chrisshi.mom.iam.client.IamPermissionReferenceClient;
+import io.github.chrisshi.mom.system.application.catalog.port.CatalogReferenceValidationPort;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,8 +29,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/** Feign Permission Adapter 的真实 Spring Proxy 事务外门禁测试。 */
-class IamPermissionReferenceValidationAdapterTest {
+/** Feign Catalog Reference Adapter 的真实 Spring Proxy 事务外门禁测试。 */
+class IamCatalogReferenceValidationAdapterTest {
     private AnnotationConfigApplicationContext context;
 
     @BeforeEach
@@ -49,10 +50,9 @@ class IamPermissionReferenceValidationAdapterTest {
                 Instant.EPOCH,
                 List.of(new PermissionReferenceResult(
                         "iam:user:read", PermissionReferenceStatus.ENABLED))));
-        var adapter = context.getBean(IamPermissionReferenceValidationAdapter.class);
+        var adapter = context.getBean(IamCatalogReferenceValidationAdapter.class);
         assertThat(adapter.validate(Set.of("iam:user:read")).statuses())
-                .containsEntry("iam:user:read",
-                        io.github.chrisshi.mom.system.application.catalog.port.PermissionReferenceValidationPort.Status.ENABLED);
+                .containsEntry("iam:user:read", CatalogReferenceValidationPort.Status.ENABLED);
 
         TransactionTemplate transaction = new TransactionTemplate(
                 context.getBean(PlatformTransactionManager.class));
@@ -70,8 +70,8 @@ class IamPermissionReferenceValidationAdapterTest {
         }
 
         @Bean
-        IamPermissionReferenceValidationAdapter adapter(IamPermissionReferenceClient client) {
-            return new IamPermissionReferenceValidationAdapter(client);
+        IamCatalogReferenceValidationAdapter adapter(IamPermissionReferenceClient client) {
+            return new IamCatalogReferenceValidationAdapter(client);
         }
 
         @Bean
