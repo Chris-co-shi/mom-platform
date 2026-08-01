@@ -1,22 +1,22 @@
 package io.github.chrisshi.mom.cache.local;
 
 import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.chrisshi.mom.cache.api.CacheKey;
 import io.github.chrisshi.mom.cache.api.CachePolicy;
 import io.github.chrisshi.mom.cache.api.CacheProvider;
+import io.github.chrisshi.mom.cache.api.CacheType;
 
 import java.time.Duration;
 
 /**
- * Local L1 cache provider based on Caffeine.
+ * Local L1 cache provider based on Caffeine cache manager.
  */
 public class CaffeineCacheProvider implements CacheProvider {
 
-    private final Cache<String, Object> cache;
+    private final CaffeineCacheManager cacheManager;
 
-    public CaffeineCacheProvider() {
-        this.cache = Caffeine.newBuilder().build();
+    public CaffeineCacheProvider(CaffeineCacheManager cacheManager) {
+        this.cacheManager = cacheManager;
     }
 
     @Override
@@ -26,16 +26,20 @@ public class CaffeineCacheProvider implements CacheProvider {
 
     @Override
     public Object get(CacheKey key) {
-        return cache.getIfPresent(key.build());
+        return cache(key).getIfPresent(key.build());
     }
 
     @Override
     public void put(CacheKey key, Object value, Duration ttl) {
-        cache.put(key.build(), value);
+        cache(key).put(key.build(), value);
     }
 
     @Override
     public void delete(CacheKey key) {
-        cache.invalidate(key.build());
+        cache(key).invalidate(key.build());
+    }
+
+    private Cache<String, Object> cache(CacheKey key) {
+        return cacheManager.getCache(CacheType.valueOf(key.type().name()));
     }
 }
