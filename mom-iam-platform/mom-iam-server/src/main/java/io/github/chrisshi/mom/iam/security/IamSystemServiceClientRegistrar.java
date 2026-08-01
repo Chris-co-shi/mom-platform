@@ -39,7 +39,7 @@ final class IamSystemServiceClientRegistrar implements ApplicationRunner {
         if (!service.isEnabled()) {
             return;
         }
-        properties.validate();
+        service.validate();
         RegisteredClient existing = repository.findByClientId(service.getClientId());
         String id = existing == null ? service.getClientId() : existing.getId();
         repository.save(RegisteredClient.withId(id)

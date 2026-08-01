@@ -34,7 +34,7 @@ public class IamAuthorizationProperties {
                 new ClientRegistration("mom-mobile-pda", "MOM Mobile PDA", mobilePda));
     }
 
-    /** 在创建任何协议 Bean 前验证安全相关配置。 */
+    /** 在创建任何协议 Bean 前验证全部启用的安全相关配置。 */
     public void validate() {
         if (issuer == null || !issuer.isAbsolute() || issuer.getFragment() != null) {
             throw new IllegalStateException("IAM issuer 必须是无 fragment 的绝对 URI");
@@ -95,7 +95,8 @@ public class IamAuthorizationProperties {
         private String scope = "iam.permission-reference.read";
         private Duration accessTokenTtl = Duration.ofMinutes(3);
 
-        private void validate() {
+        /** 只验证本服务 Client，不依赖 Public Client 回调 URI。 */
+        void validate() {
             if (!enabled) {
                 return;
             }
