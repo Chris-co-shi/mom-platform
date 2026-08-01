@@ -19,7 +19,7 @@ public class MultiLevelCacheProvider {
 
     public MultiLevelCacheProvider(List<CacheProvider> providers) {
         this.providers = providers.stream()
-                .sorted(Comparator.comparingInt(this::priority))
+                .sorted(Comparator.comparingInt(provider -> provider.layer().priority()))
                 .toList();
     }
 
@@ -46,9 +46,5 @@ public class MultiLevelCacheProvider {
         providers.stream()
                 .filter(provider -> provider.supports(policy))
                 .forEach(provider -> provider.delete(key));
-    }
-
-    private int priority(CacheProvider provider) {
-        return provider.getClass().getSimpleName().contains("Caffeine") ? 10 : 20;
     }
 }
