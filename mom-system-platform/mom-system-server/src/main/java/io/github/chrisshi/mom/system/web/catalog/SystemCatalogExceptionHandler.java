@@ -31,6 +31,18 @@ public class SystemCatalogExceptionHandler {
         return error(exception.code(), exception.getMessage());
     }
 
+    @ExceptionHandler(SystemCatalogException.DependencyUnavailable.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ErrorResponse unavailable(SystemCatalogException.DependencyUnavailable exception) {
+        return error(exception.code(), "IAM Permission 权威服务暂时不可用");
+    }
+
+    @ExceptionHandler(SystemCatalogException.DependencyProtocol.class)
+    @ResponseStatus(HttpStatus.BAD_GATEWAY)
+    public ErrorResponse protocol(SystemCatalogException.DependencyProtocol exception) {
+        return error(exception.code(), "IAM Permission 权威服务响应非法");
+    }
+
     @ExceptionHandler({IllegalArgumentException.class, HttpMessageNotReadableException.class,
             MethodArgumentTypeMismatchException.class, MethodArgumentNotValidException.class})
     @ResponseStatus(HttpStatus.BAD_REQUEST)

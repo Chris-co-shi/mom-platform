@@ -3,8 +3,8 @@ package io.github.chrisshi.mom.system.application.catalog;
 /**
  * Application Catalog 的稳定应用错误族。
  *
- * <p>该类型只表达 Not Found、Conflict 与乐观锁失败，不暴露 SQL、约束名、表名或底层异常文本。Web
- * Adapter 将错误码映射为稳定 HTTP 响应；基础设施不可用时异常继续失败并触发本地事务回滚。</p>
+ * <p>该类型表达 Not Found、Conflict、乐观锁与受控远程权威依赖错误，不暴露 SQL、约束名、表名、Token 或
+ * 底层网络异常文本。Web Adapter 映射稳定 HTTP 响应；基础设施不可用时本地事务必须回滚。</p>
  */
 public abstract class SystemCatalogException extends RuntimeException {
     private final String code;
@@ -46,6 +46,24 @@ public abstract class SystemCatalogException extends RuntimeException {
     public static final class StaleVersion extends SystemCatalogException {
         public StaleVersion(String message) {
             super("stale_version", message);
+        }
+    }
+
+    /** IAM Permission 权威服务临时不可用或超时。 */
+    public static final class DependencyUnavailable extends SystemCatalogException {
+        public DependencyUnavailable(String message, Throwable cause) {
+            super("permission_authority_unavailable", message, cause);
+        }
+    }
+
+    /** IAM Permission 权威服务返回不符合稳定契约的响应。 */
+    public static final class DependencyProtocol extends SystemCatalogException {
+        public DependencyProtocol(String message) {
+            super("permission_authority_protocol_error", message);
+        }
+
+        public DependencyProtocol(String message, Throwable cause) {
+            super("permission_authority_protocol_error", message, cause);
         }
     }
 }

@@ -23,6 +23,7 @@ import io.github.chrisshi.mom.system.application.catalog.SystemCatalogApplicatio
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogApplicationModels.UpdateNavigationCommand;
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogApplicationService;
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogNavigationMoveApplicationService;
+import io.github.chrisshi.mom.system.application.catalog.SystemCatalogPublishOrchestrator;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,12 +46,15 @@ import java.util.List;
 public class SystemCatalogAdminController {
     private final SystemCatalogApplicationService service;
     private final SystemCatalogNavigationMoveApplicationService moveService;
+    private final SystemCatalogPublishOrchestrator publishOrchestrator;
 
     public SystemCatalogAdminController(
             SystemCatalogApplicationService service,
-            SystemCatalogNavigationMoveApplicationService moveService) {
+            SystemCatalogNavigationMoveApplicationService moveService,
+            SystemCatalogPublishOrchestrator publishOrchestrator) {
         this.service = service;
         this.moveService = moveService;
+        this.publishOrchestrator = publishOrchestrator;
     }
 
     @PostMapping
@@ -145,7 +149,7 @@ public class SystemCatalogAdminController {
     @PreAuthorize("hasAuthority('system:catalog:publish')")
     public CatalogReleaseView publish(
             @PathVariable String applicationId, @RequestBody PublishRequest request) {
-        return service.publish(applicationId,
+        return publishOrchestrator.publish(applicationId,
                 new PublishCommand(request.applicationVersion(), request.changeNote()));
     }
 
@@ -154,7 +158,7 @@ public class SystemCatalogAdminController {
     @PreAuthorize("hasAuthority('system:catalog:publish')")
     public CatalogReleaseView rollback(
             @PathVariable String applicationId, @RequestBody RollbackRequest request) {
-        return service.rollback(applicationId, new RollbackCommand(
+        return publishOrchestrator.rollback(applicationId, new RollbackCommand(
                 request.targetReleaseVersion(), request.applicationVersion(), request.changeNote()));
     }
 

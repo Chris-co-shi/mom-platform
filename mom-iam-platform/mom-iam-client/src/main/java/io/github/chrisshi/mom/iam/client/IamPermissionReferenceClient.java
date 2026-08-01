@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 @FeignClient(
         name = "${mom.iam.permission-reference.service-name:mom-iam-server}",
         contextId = "iamPermissionReferenceClient",
+        url = "${mom.iam.permission-reference.url:}",
         path = "/api/iam/internal/permission-references")
 public interface IamPermissionReferenceClient {
 

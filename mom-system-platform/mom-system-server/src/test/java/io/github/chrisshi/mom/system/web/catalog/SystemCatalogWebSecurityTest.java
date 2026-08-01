@@ -13,6 +13,7 @@ import io.github.chrisshi.mom.system.application.catalog.SystemCatalogApplicatio
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogApplicationModels.RuntimeResult;
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogApplicationService;
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogNavigationMoveApplicationService;
+import io.github.chrisshi.mom.system.application.catalog.SystemCatalogPublishOrchestrator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +56,7 @@ class SystemCatalogWebSecurityTest {
     private AnnotationConfigWebApplicationContext context;
     private MockMvc mockMvc;
     private SystemCatalogApplicationService service;
+    private SystemCatalogPublishOrchestrator publishOrchestrator;
 
     @BeforeEach
     void setUp() {
@@ -63,7 +65,8 @@ class SystemCatalogWebSecurityTest {
         context.register(TestWebConfiguration.class);
         context.refresh();
         service = context.getBean(SystemCatalogApplicationService.class);
-        reset(service);
+        publishOrchestrator = context.getBean(SystemCatalogPublishOrchestrator.class);
+        reset(service, publishOrchestrator);
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     }
 
@@ -105,7 +108,7 @@ class SystemCatalogWebSecurityTest {
     void adminMustSeparateReadWritePublishAndRejectUnknownFields() throws Exception {
         when(service.getApplication("1")).thenReturn(application());
         when(service.createApplication(any())).thenReturn(application());
-        when(service.publish(anyString(), any())).thenReturn(release());
+        when(publishOrchestrator.publish(anyString(), any())).thenReturn(release());
 
         mockMvc.perform(get("/api/system/admin/applications/1").with(jwt()))
                 .andExpect(status().isForbidden());
@@ -170,10 +173,6 @@ class SystemCatalogWebSecurityTest {
         return new RuntimeResult(new RuntimeCatalogView(1, Instant.EPOCH, List.of(app)), CHECKSUM);
     }
 
-    /**
-     * 仅由本测试通过 context.register 显式装配；不使用 @TestConfiguration，避免被主应用 Component Scan
-     * 发现并污染 MomSystemApplicationTest 的 Fail-Closed 启动上下文。
-     */
     @EnableWebMvc
     @EnableWebSecurity
     @EnableMethodSecurity
@@ -189,10 +188,16 @@ class SystemCatalogWebSecurityTest {
         }
 
         @Bean
+        SystemCatalogPublishOrchestrator catalogPublishOrchestrator() {
+            return mock(SystemCatalogPublishOrchestrator.class);
+        }
+
+        @Bean
         SystemCatalogAdminController catalogAdminController(
                 SystemCatalogApplicationService service,
-                SystemCatalogNavigationMoveApplicationService moveService) {
-            return new SystemCatalogAdminController(service, moveService);
+                SystemCatalogNavigationMoveApplicationService moveService,
+                SystemCatalogPublishOrchestrator publishOrchestrator) {
+            return new SystemCatalogAdminController(service, moveService, publishOrchestrator);
         }
 
         @Bean

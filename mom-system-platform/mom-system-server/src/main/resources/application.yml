@@ -31,10 +31,59 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
       database: ${REDIS_DATABASE:0}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${REDIS_COMMAND_TIMEOUT:2s}
+  security:
+    oauth2:
+      client:
+        registration:
+          iam-permission-reference:
+            provider: iam
+            client-id: ${IAM_SYSTEM_CLIENT_ID:mom-system-server}
+            client-secret: ${IAM_SYSTEM_CLIENT_SECRET:}
+            authorization-grant-type: client_credentials
+            scope: iam.permission-reference.read
+        provider:
+          iam:
+            token-uri: ${IAM_TOKEN_URI:http://127.0.0.1:20100/oauth2/token}
   cloud:
     nacos:
       discovery:
         enabled: ${NACOS_DISCOVERY_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
+    openfeign:
+      oauth2:
+        enabled: ${IAM_PERMISSION_REFERENCE_OAUTH2_ENABLED:false}
+        client-registration-id: iam-permission-reference
+      client:
+        config:
+          iamPermissionReferenceClient:
+            connect-timeout: ${IAM_PERMISSION_REFERENCE_CONNECT_TIMEOUT:2000}
+            read-timeout: ${IAM_PERMISSION_REFERENCE_READ_TIMEOUT:3000}
+            logger-level: basic
+    function:
+      definition: ${SYSTEM_STREAM_FUNCTION_DEFINITION:}
+    stream:
+      bindings:
+        systemRuntimeEvents-out-0:
+          destination: ${SYSTEM_RUNTIME_EVENT_TOPIC:mom-system-runtime-events-v1}
+          content-type: application/json
+      rocketmq:
+        binder:
+          name-server: ${ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
+          enable-msg-trace: ${ROCKETMQ_ENABLE_MSG_TRACE:false}
+        bindings:
+          systemRuntimeEvents-out-0:
+            producer:
+              group: ${SYSTEM_RUNTIME_EVENT_PRODUCER_GROUP:mom-system-runtime-events-producer-v1}
+              send-type: Sync
+              send-msg-timeout: ${ROCKETMQ_SEND_TIMEOUT:3000}
+              retry-times-when-send-failed: 0
 
 mybatis-plus:
   configuration:
@@ -43,6 +92,20 @@ mybatis-plus:
     banner: false
 
 mom:
+  iam:
+    permission-reference:
+      service-name: ${IAM_PERMISSION_REFERENCE_SERVICE_NAME:mom-iam-server}
+      url: ${IAM_PERMISSION_REFERENCE_URL:}
+  outbox:
+    publisher:
+      enabled: ${OUTBOX_PUBLISHER_ENABLED:false}
+      binding-name: systemRuntimeEvents-out-0
+      fixed-delay-millis: ${OUTBOX_FIXED_DELAY_MILLIS:1000}
+      batch-size: ${OUTBOX_BATCH_SIZE:20}
+      lease-duration: ${OUTBOX_LEASE_DURATION:30s}
+      max-attempts: ${OUTBOX_MAX_ATTEMPTS:8}
+      initial-backoff: ${OUTBOX_INITIAL_BACKOFF:1s}
+      max-backoff: ${OUTBOX_MAX_BACKOFF:5m}
   security:
     resource-server:
       enabled: ${MOM_RESOURCE_SERVER_ENABLED:true}
@@ -59,7 +122,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,nacos-discovery
+        include: health,info,prometheus,nacos-discovery,bindings
   endpoint:
     health:
       probes:

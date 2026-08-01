@@ -16,16 +16,21 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** System Platform S17 的 POM、API、Migration 与零 Mapper XML 精确门禁。 */
+/** System Platform S18 的 POM、API、Migration、事务与零 Mapper XML 精确门禁。 */
 class SystemPlatformPomArchitectureTest {
     private static final String MOM_GROUP = "io.github.chrisshi.mom";
     private static final Set<String> CLIENT_DEPENDENCIES = Set.of(
             MOM_GROUP + ":mom-system-api", MOM_GROUP + ":mom-openfeign");
     private static final Set<String> SERVER_DEPENDENCIES = Set.of(
-            MOM_GROUP + ":mom-system-api", MOM_GROUP + ":mom-webmvc",
-            MOM_GROUP + ":mom-security", MOM_GROUP + ":mom-data",
-            MOM_GROUP + ":mom-tracing", MOM_GROUP + ":mom-metrics",
+            MOM_GROUP + ":mom-system-api", MOM_GROUP + ":mom-iam-client",
+            MOM_GROUP + ":mom-webmvc", MOM_GROUP + ":mom-security",
+            MOM_GROUP + ":mom-data", MOM_GROUP + ":mom-messaging",
+            MOM_GROUP + ":mom-outbox", MOM_GROUP + ":mom-tracing",
+            MOM_GROUP + ":mom-metrics",
+            "org.springframework.boot:spring-boot-starter-data-redis",
+            "org.springframework.boot:spring-boot-starter-oauth2-client",
             "com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery",
+            "com.alibaba.cloud:spring-cloud-starter-stream-rocketmq",
             "org.projectlombok:lombok", "org.springframework.security:spring-security-test",
             MOM_GROUP + ":mom-test");
     private static final Pattern FORBIDDEN_JAVA_TYPE = Pattern.compile(
@@ -69,11 +74,12 @@ class SystemPlatformPomArchitectureTest {
     }
 
     @Test
-    void serverMustUseOnlyApprovedSystemDependencies() throws Exception {
+    void serverMustUseOnlyApprovedSystemDependenciesAndNoSeata() throws Exception {
         Element server = parse(systemRoot().resolve("mom-system-server/pom.xml")).getDocumentElement();
         List<Dependency> dependencies = dependencies(server);
         assertThat(coordinates(dependencies)).containsExactlyInAnyOrderElementsOf(SERVER_DEPENDENCIES);
         assertThat(validateServerDependencies(dependencies)).isEmpty();
+        assertThat(coordinates(dependencies)).doesNotContain(MOM_GROUP + ":mom-seata");
     }
 
     @Test
@@ -89,7 +95,7 @@ class SystemPlatformPomArchitectureTest {
     }
 
     @Test
-    void s17MustUseMybatisPlusWithoutMapperXml() throws Exception {
+    void s18MustUseApprovedMigrationsWithoutMapperXmlOrGlobalTransaction() throws Exception {
         Path server = systemRoot().resolve("mom-system-server");
         try (var paths = Files.walk(systemRoot())) {
             List<Path> files = paths.filter(Files::isRegularFile).toList();
@@ -107,10 +113,15 @@ class SystemPlatformPomArchitectureTest {
                             migration(server, "V5__remove_business_foreign_keys.sql"),
                             migration(server, "V6__clarify_i18n_release_snapshot_columns.sql"),
                             migration(server, "V7__create_system_user_preference.sql"),
-                            migration(server, "V8__create_system_application_catalog.sql"));
+                            migration(server, "V8__create_system_application_catalog.sql"),
+                            migration(server, "V9__create_system_runtime_change_outbox.sql"));
             assertThat(files)
                     .filteredOn(path -> normalized(path).contains("/src/main/resources/mapper/"))
                     .isEmpty();
+            for (Path javaFile : files.stream()
+                    .filter(path -> path.getFileName().toString().endsWith(".java")).toList()) {
+                assertThat(Files.readString(javaFile)).doesNotContain("@GlobalTransactional");
+            }
         }
     }
 
