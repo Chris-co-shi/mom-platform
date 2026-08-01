@@ -2,6 +2,7 @@ package io.github.chrisshi.mom.system.infrastructure.messaging;
 
 import io.github.chrisshi.mom.messaging.event.EventEnvelope;
 import io.github.chrisshi.mom.outbox.application.InboxDeduplicator;
+import io.github.chrisshi.mom.system.application.i18n.port.SystemI18nRuntimeCachePort;
 import io.github.chrisshi.mom.system.application.runtime.SystemRuntimeCachePort;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -10,6 +11,7 @@ import org.springframework.messaging.Message;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -31,19 +33,21 @@ public class SystemRuntimeChangeConsumerConfiguration {
     Consumer<Message<EventEnvelope>> systemRuntimeChangeConsumer(
             InboxDeduplicator inbox,
             SystemRuntimeCachePort cache,
+            SystemI18nRuntimeCachePort i18nCache,
             ObjectMapper objectMapper) {
         return message -> {
             EventEnvelope event = Objects.requireNonNull(message.getPayload(), "event");
             inbox.executeOnce(event, CONSUMER_NAME, () -> {
                 // Inbox 事务只保存接收事实；Redis 必须在事务返回后调用。
             });
-            invalidate(event, cache, objectMapper);
+            invalidate(event, cache, i18nCache, objectMapper);
         };
     }
 
     private static void invalidate(
             EventEnvelope event,
             SystemRuntimeCachePort cache,
+            SystemI18nRuntimeCachePort i18nCache,
             ObjectMapper objectMapper) {
         switch (event.eventType()) {
             case OutboxSystemRuntimeChangeEventAdapter.CATALOG_PUBLISHED_EVENT -> {
@@ -82,10 +86,39 @@ public class SystemRuntimeChangeConsumerConfiguration {
                 }
                 cache.evictDictionary(payload.dictionaryCode());
             }
+            case OutboxSystemRuntimeChangeEventAdapter.I18N_PUBLISHED_EVENT -> {
+                requireVersionOne(event, "I18n");
+                I18nPublishedPayload payload = decode(
+                        event.payloadJson(), I18nPublishedPayload.class, objectMapper, "I18n");
+                if (!validI18nCodes(payload.applicationCode(), payload.resourceCode())
+                        || payload.releaseVersion() < 1
+                        || payload.checksums() == null
+                        || payload.checksums().size() != 2
+                        || payload.checksums().values().stream().anyMatch(value ->
+                                value == null || value.length() != 64)) {
+                    throw new IllegalArgumentException("I18n 发布事件负载非法");
+                }
+                i18nCache.evict(payload.applicationCode(), payload.resourceCode());
+            }
+            case OutboxSystemRuntimeChangeEventAdapter.I18N_STATUS_CHANGED_EVENT -> {
+                requireVersionOne(event, "I18n");
+                I18nStatusChangedPayload payload = decode(
+                        event.payloadJson(), I18nStatusChangedPayload.class, objectMapper, "I18n");
+                if (!validI18nCodes(payload.applicationCode(), payload.resourceCode())
+                        || payload.version() < 0) {
+                    throw new IllegalArgumentException("I18n 状态事件负载非法");
+                }
+                i18nCache.evict(payload.applicationCode(), payload.resourceCode());
+            }
             default -> {
                 // 其他生产者或未来版本事件不属于当前 Cache Consumer，保持向后兼容并忽略。
             }
         }
+    }
+
+    private static boolean validI18nCodes(String applicationCode, String resourceCode) {
+        return applicationCode != null && !applicationCode.isBlank()
+                && resourceCode != null && !resourceCode.isBlank();
     }
 
     private static void requireVersionOne(EventEnvelope event, String capability) {
@@ -129,5 +162,20 @@ public class SystemRuntimeChangeConsumerConfiguration {
             long version,
             boolean enabled,
             String changeKind) {
+    }
+
+    record I18nPublishedPayload(
+            String applicationCode,
+            String resourceCode,
+            long releaseVersion,
+            Map<String, String> checksums,
+            Long sourceReleaseVersion) {
+    }
+
+    record I18nStatusChangedPayload(
+            String applicationCode,
+            String resourceCode,
+            long version,
+            boolean enabled) {
     }
 }
