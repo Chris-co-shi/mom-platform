@@ -4,21 +4,19 @@ import io.github.chrisshi.mom.system.application.catalog.SystemCatalogReferenceR
 import org.junit.jupiter.api.Test;
 
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-/** Catalog Reference 定时与启动门禁使用同一 Application Service 的装配测试。 */
+/** 定时对账入口只委派给非事务 Application Service。 */
 class SystemCatalogReferenceReconciliationConfigurationTest {
 
     @Test
-    void scheduledAndStartupEntrypointsMustDelegateToSameNonTransactionalService() throws Exception {
+    void scheduledEntrypointMustDelegateToReconciliationService() {
         SystemCatalogReferenceReconciliationService service =
                 mock(SystemCatalogReferenceReconciliationService.class);
         var configuration = new SystemCatalogReferenceReconciliationConfiguration(service);
 
         configuration.reconcile();
-        configuration.catalogReferenceReconciliationStartupRunner().run(null);
 
-        verify(service, times(2)).reconcile();
+        verify(service).reconcile();
     }
 }
