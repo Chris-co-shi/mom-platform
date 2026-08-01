@@ -89,6 +89,7 @@ java -jar mom-iam-platform/mom-iam-server/target/mom-iam-server-0.1.0-SNAPSHOT-e
 IAM_PID=$!
 wait_readiness "$IAM_PORT" "${KEY_DIR}/iam-health.json" "IAM"
 
+FAILURE_REASON="IAM token endpoint request failed"
 curl --fail --silent --show-error \
   --user "${CLIENT_ID}:${CLIENT_SECRET}" \
   --header 'Content-Type: application/x-www-form-urlencoded' \
@@ -105,6 +106,7 @@ jq --exit-status --arg scope "$CLIENT_SCOPE" \
   FAILURE_REASON="IAM service token response contract is invalid"; exit 1;
 }
 
+FAILURE_REASON="IAM permission reference endpoint request failed"
 curl --fail --silent --show-error \
   --header "Authorization: Bearer ${ACCESS_TOKEN}" \
   --header 'Content-Type: application/json' \
@@ -149,12 +151,17 @@ SNAPSHOT_JSON=$(jq --compact-output --null-input '
     ]
   }
 ')
-NORMALIZED_SNAPSHOT=$(docker exec "$POSTGRES_CONTAINER" psql \
+FAILURE_REASON="PostgreSQL could not normalize the Catalog snapshot JSON"
+NORMALIZED_SNAPSHOT=$(docker exec -i "$POSTGRES_CONTAINER" psql \
   -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" \
-  -v "snapshot=${SNAPSHOT_JSON}" -Atc "select :'snapshot'::jsonb::text")
+  -v ON_ERROR_STOP=1 -v "snapshot=${SNAPSHOT_JSON}" -At <<'SQL'
+SELECT :'snapshot'::jsonb::text;
+SQL
+)
 SNAPSHOT_CHECKSUM=$(printf '%s' "$NORMALIZED_SNAPSHOT" | sha256sum | awk '{print $1}')
 
 # 直接写入不可变已发布快照，仅用于验证 System 对账跨服务调用；不伪造业务 API 授权。
+FAILURE_REASON="System reconciliation fixture could not be inserted"
 docker exec -i "$POSTGRES_CONTAINER" psql \
   -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -v ON_ERROR_STOP=1 \
   -v "snapshot=${NORMALIZED_SNAPSHOT}" -v "checksum=${SNAPSHOT_CHECKSUM}" <<'SQL'
@@ -200,6 +207,7 @@ java -jar mom-system-platform/mom-system-server/target/mom-system-server-0.1.0-S
 SYSTEM_INTEGRATION_PID=$!
 wait_readiness "$SYSTEM_INTEGRATION_PORT" "${KEY_DIR}/system-health.json" "System integration"
 
+FAILURE_REASON="System did not expose successful IAM reconciliation metric"
 metric_found=false
 for attempt in {1..60}; do
   curl --fail --silent --show-error \
@@ -216,14 +224,13 @@ for attempt in {1..60}; do
   fi
   sleep 2
 done
-[[ "$metric_found" == "true" ]] || {
-  FAILURE_REASON="System did not expose successful IAM reconciliation metric"; exit 1;
-}
+[[ "$metric_found" == "true" ]] || exit 1
 
 kill "$IAM_PID"
 wait "$IAM_PID" 2>/dev/null || true
 IAM_PID=""
 sleep 5
+FAILURE_REASON="System readiness failed after IAM outage"
 status=$(curl --silent --output "${KEY_DIR}/system-after-iam-outage.json" \
   --write-out '%{http_code}' \
   "http://127.0.0.1:${SYSTEM_INTEGRATION_PORT}/actuator/health/readiness" || true)
