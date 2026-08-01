@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * System Dictionary 的真实 PostgreSQL 17.7、Flyway V1→V7、MyBatis-Plus、审计与乐观锁集成测试。
+ * System Dictionary 的真实 PostgreSQL 17.7、Flyway V1→V9、MyBatis-Plus、审计与乐观锁集成测试。
  *
  * <p>测试使用动态端口和独立 mom_system Schema，每例清理字典数据，不依赖本机数据库。它验证同 Schema
  * 无物理外键完整性、数据库 Check/Unique、BaseEntity 逻辑删除列、Active/Compatibility、分页和 Parameter V1
@@ -91,8 +91,8 @@ class SystemDictionaryPostgresqlIT {
     }
 
     @Test
-    void freshDatabaseMustApplyV1ThroughV7AndPreserveParameterTable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("7");
+    void freshDatabaseMustApplyV1ThroughV9AndPreserveParameterTable() {
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("9");
         assertThat(jdbcTemplate.queryForObject(
                 "select count(*) from flyway_schema_history where success and version in ('1','2','3','4','5','6')",
                 Long.class)).isEqualTo(6L);
@@ -116,7 +116,7 @@ class SystemDictionaryPostgresqlIT {
     }
 
     @Test
-    void existingV1SchemaMustUpgradeThroughV8WithoutChangingParameterData() {
+    void existingV1SchemaMustUpgradeThroughV9WithoutChangingParameterData() {
         Flyway v1 = Flyway.configure().dataSource(dataSource).createSchemas(true)
                 .schemas(UPGRADE_SCHEMA).defaultSchema(UPGRADE_SCHEMA)
                 .locations("classpath:db/migration/system").target("1").load();
@@ -136,7 +136,7 @@ class SystemDictionaryPostgresqlIT {
                 .schemas(UPGRADE_SCHEMA).defaultSchema(UPGRADE_SCHEMA)
                 .locations("classpath:db/migration/system").load();
         latest.migrate();
-        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("8");
+        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("9");
         assertThat(jdbcTemplate.queryForObject(
                 "select count(*) from information_schema.tables where table_schema=? and table_name='system_dictionary'",
                 Long.class, UPGRADE_SCHEMA)).isEqualTo(1L);
@@ -151,6 +151,10 @@ class SystemDictionaryPostgresqlIT {
                  where table_schema=? and table_name in (
                    'system_application','system_navigation_item','system_catalog_release')
                 """, Long.class, UPGRADE_SCHEMA)).isEqualTo(3L);
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*) from information_schema.tables
+                 where table_schema=? and table_name in ('mom_outbox_event','mom_inbox_event')
+                """, Long.class, UPGRADE_SCHEMA)).isEqualTo(2L);
     }
 
     @Test

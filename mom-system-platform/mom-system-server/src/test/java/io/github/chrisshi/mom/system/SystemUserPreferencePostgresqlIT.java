@@ -37,10 +37,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * S16 Flyway V7、PostgreSQL 17.7、JSONB、审计、Version、Reset、并发创建和用户隔离集成测试。
+ * S16 Preference 与 S18 Flyway V9、PostgreSQL 17.7、JSONB、审计、Version、Reset 和用户隔离集成测试。
  *
  * <p>测试使用真实 mom_system Schema、MyBatis-Plus 和事务；不依赖 Redis/Nacos/OTLP。V1～V6 升级测试
- * 继续验证旧数据在最新 V8 Schema 下保持不变；Docker 不可用时只能标记 Testcontainers skipped，不能描述为成功。</p>
+ * 继续验证旧数据在最新 V9 Schema 下保持不变；Docker 不可用时只能标记 Testcontainers skipped。</p>
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
@@ -95,16 +95,20 @@ class SystemUserPreferencePostgresqlIT {
     }
 
     @Test
-    void freshV1ThroughV7MustCreateTwoPreferenceTablesWithJsonbAndNoForeignKeys() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("7");
+    void freshV1ThroughV9MustCreatePreferenceAndRuntimeEventTablesWithoutForeignKeys() {
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("9");
         assertThat(jdbcTemplate.queryForObject(
-                "select count(*) from flyway_schema_history where success and version between '1' and '7'",
-                Long.class)).isEqualTo(7L);
+                "select count(*) from flyway_schema_history where success and version between '1' and '9'",
+                Long.class)).isEqualTo(9L);
         assertThat(jdbcTemplate.queryForList("""
                 select table_name from information_schema.tables
                  where table_schema=? and table_name in ('system_user_preference','system_user_view_setting')
                  order by table_name
                 """, String.class, SCHEMA)).containsExactly("system_user_preference", "system_user_view_setting");
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*) from information_schema.tables
+                 where table_schema=? and table_name in ('mom_outbox_event','mom_inbox_event')
+                """, Long.class, SCHEMA)).isEqualTo(2L);
         assertThat(jdbcTemplate.queryForObject("""
                 select count(*) from information_schema.columns
                  where table_schema=? and table_name='system_user_view_setting'
@@ -112,8 +116,7 @@ class SystemUserPreferencePostgresqlIT {
                 """, Long.class, SCHEMA)).isEqualTo(3L);
         assertThat(jdbcTemplate.queryForObject("""
                 select count(*) from information_schema.table_constraints
-                 where table_schema=? and table_name in ('system_user_preference','system_user_view_setting')
-                   and constraint_type='FOREIGN KEY'
+                 where table_schema=? and constraint_type='FOREIGN KEY'
                 """, Long.class, SCHEMA)).isZero();
         assertThat(jdbcTemplate.queryForObject("""
                 select count(*) from information_schema.columns
@@ -123,7 +126,7 @@ class SystemUserPreferencePostgresqlIT {
     }
 
     @Test
-    void existingV1ThroughV6MustUpgradeToV8WithoutChangingExistingTables() {
+    void existingV1ThroughV6MustUpgradeToV9WithoutChangingExistingTables() {
         Flyway old = Flyway.configure().dataSource(dataSource).createSchemas(true)
                 .schemas(UPGRADE_SCHEMA).defaultSchema(UPGRADE_SCHEMA)
                 .locations("classpath:db/migration/system").target("6").load();
@@ -140,7 +143,7 @@ class SystemUserPreferencePostgresqlIT {
                 .schemas(UPGRADE_SCHEMA).defaultSchema(UPGRADE_SCHEMA)
                 .locations("classpath:db/migration/system").load();
         latest.migrate();
-        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("8");
+        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("9");
         assertThat(jdbcTemplate.queryForObject(
                 "select parameter_value from mom_system_preference_upgrade.system_parameter where id='upgrade-param'",
                 String.class)).isEqualTo("kept");
@@ -153,6 +156,10 @@ class SystemUserPreferencePostgresqlIT {
                  where table_schema=? and table_name in (
                    'system_application','system_navigation_item','system_catalog_release')
                 """, Long.class, UPGRADE_SCHEMA)).isEqualTo(3L);
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*) from information_schema.tables
+                 where table_schema=? and table_name in ('mom_outbox_event','mom_inbox_event')
+                """, Long.class, UPGRADE_SCHEMA)).isEqualTo(2L);
     }
 
     @Test

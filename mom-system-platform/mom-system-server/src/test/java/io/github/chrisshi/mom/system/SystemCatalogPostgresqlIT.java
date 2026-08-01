@@ -15,7 +15,7 @@ import org.testcontainers.utility.DockerImageName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** V8 Catalog 三表、零 FK、唯一性、JSONB 与不可变 Release 的真实 PostgreSQL 测试。 */
+/** V9 Catalog、Outbox/Inbox、零 FK、JSONB 与不可变 Release 的真实 PostgreSQL 测试。 */
 @Testcontainers(disabledWithoutDocker = true)
 class SystemCatalogPostgresqlIT {
     private static final String SCHEMA = "mom_system_catalog";
@@ -46,13 +46,17 @@ class SystemCatalogPostgresqlIT {
     }
 
     @Test
-    void migrationMustCreateThreeCatalogTablesWithoutForeignKeys() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("8");
+    void migrationMustCreateCatalogAndRuntimeEventTablesWithoutForeignKeys() {
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("9");
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM information_schema.tables
                  WHERE table_schema=? AND table_name IN (
                    'system_application','system_navigation_item','system_catalog_release')
                 """, Long.class, SCHEMA)).isEqualTo(3L);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM information_schema.tables
+                 WHERE table_schema=? AND table_name IN ('mom_outbox_event','mom_inbox_event')
+                """, Long.class, SCHEMA)).isEqualTo(2L);
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM information_schema.table_constraints
                  WHERE table_schema=? AND constraint_type='FOREIGN KEY'
