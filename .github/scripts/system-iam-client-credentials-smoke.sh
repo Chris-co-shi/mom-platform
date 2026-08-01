@@ -20,6 +20,7 @@ CLIENT_ID="mom-system-server"
 CLIENT_SECRET="s18-system-client-secret-0123456789"
 CLIENT_SCOPE="iam.permission-reference.read"
 REFRESH_PEPPER="s18-refresh-pepper-012345678901234567890123456789"
+SECURITY_EXCLUSIONS="org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration,org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration,org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration,org.springframework.boot.security.autoconfigure.SecurityFilterAutoConfiguration,org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration,org.springframework.boot.security.oauth2.client.autoconfigure.servlet.OAuth2ClientWebSecurityAutoConfiguration"
 FAILURE_REASON="IAM-System client_credentials smoke failed"
 
 cleanup() {
@@ -199,6 +200,7 @@ IAM_TOKEN_URI="http://127.0.0.1:${IAM_PORT}/oauth2/token" \
 IAM_SYSTEM_CLIENT_ID="$CLIENT_ID" IAM_SYSTEM_CLIENT_SECRET="$CLIENT_SECRET" \
 java -jar mom-system-platform/mom-system-server/target/mom-system-server-0.1.0-SNAPSHOT-exec.jar \
   --server.port="$SYSTEM_INTEGRATION_PORT" \
+  --spring.autoconfigure.exclude="$SECURITY_EXCLUSIONS" \
   --mom.system.catalog.permission-reconciliation.enabled=true \
   --mom.system.catalog.permission-reconciliation.run-on-startup=true \
   --mom.system.catalog.permission-reconciliation.initial-delay=PT1H \
