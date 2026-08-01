@@ -142,7 +142,7 @@ class SystemCatalogPermissionReconciliationServiceTest {
                                     false,
                                     List.of(new SystemCatalogSnapshot.NodeSnapshot(
                                             "iam.users.write",
-                                            NavigationType.ACTION,
+                                            NavigationType.ROUTE,
                                             "mom-web",
                                             "mom.menu.users.write",
                                             "iam:user:write",
