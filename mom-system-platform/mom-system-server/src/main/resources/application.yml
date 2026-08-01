@@ -73,6 +73,12 @@ spring:
         systemRuntimeEvents-out-0:
           destination: ${SYSTEM_RUNTIME_EVENT_TOPIC:mom-system-runtime-events-v1}
           content-type: application/json
+        systemRuntimeChangeConsumer-in-0:
+          destination: ${SYSTEM_RUNTIME_EVENT_TOPIC:mom-system-runtime-events-v1}
+          group: ${SYSTEM_RUNTIME_EVENT_CONSUMER_GROUP:mom-system-runtime-cache-invalidation-v1}
+          content-type: application/json
+          consumer:
+            max-attempts: 1
       rocketmq:
         binder:
           name-server: ${ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
@@ -84,6 +90,9 @@ spring:
               send-type: Sync
               send-msg-timeout: ${ROCKETMQ_SEND_TIMEOUT:3000}
               retry-times-when-send-failed: 0
+          systemRuntimeChangeConsumer-in-0:
+            consumer:
+              orderly: false
 
 mybatis-plus:
   configuration:
@@ -96,6 +105,13 @@ mom:
     permission-reference:
       service-name: ${IAM_PERMISSION_REFERENCE_SERVICE_NAME:mom-iam-server}
       url: ${IAM_PERMISSION_REFERENCE_URL:}
+  system:
+    runtime-cache:
+      enabled: ${SYSTEM_RUNTIME_CACHE_ENABLED:false}
+      environment: ${MOM_ENVIRONMENT:local}
+    runtime-events:
+      consumer:
+        enabled: ${SYSTEM_RUNTIME_EVENT_CONSUMER_ENABLED:false}
   outbox:
     publisher:
       enabled: ${OUTBOX_PUBLISHER_ENABLED:false}

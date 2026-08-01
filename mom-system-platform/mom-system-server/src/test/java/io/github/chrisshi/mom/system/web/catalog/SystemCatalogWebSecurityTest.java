@@ -14,6 +14,7 @@ import io.github.chrisshi.mom.system.application.catalog.SystemCatalogApplicatio
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogApplicationService;
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogNavigationMoveApplicationService;
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogPublishOrchestrator;
+import io.github.chrisshi.mom.system.application.catalog.SystemCatalogRuntimeApplicationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,7 @@ class SystemCatalogWebSecurityTest {
     private AnnotationConfigWebApplicationContext context;
     private MockMvc mockMvc;
     private SystemCatalogApplicationService service;
+    private SystemCatalogRuntimeApplicationService runtimeService;
     private SystemCatalogPublishOrchestrator publishOrchestrator;
 
     @BeforeEach
@@ -65,8 +67,9 @@ class SystemCatalogWebSecurityTest {
         context.register(TestWebConfiguration.class);
         context.refresh();
         service = context.getBean(SystemCatalogApplicationService.class);
+        runtimeService = context.getBean(SystemCatalogRuntimeApplicationService.class);
         publishOrchestrator = context.getBean(SystemCatalogPublishOrchestrator.class);
-        reset(service, publishOrchestrator);
+        reset(service, runtimeService, publishOrchestrator);
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     }
 
@@ -79,7 +82,7 @@ class SystemCatalogWebSecurityTest {
     void runtimeMustRequireAuthenticationFilterAuthoritiesAndExposeNoExecutableFields()
             throws Exception {
         mockMvc.perform(get("/api/system/catalog/me")).andExpect(status().isUnauthorized());
-        when(service.runtimeCatalog(anySet())).thenReturn(runtime());
+        when(runtimeService.runtimeCatalog(anySet())).thenReturn(runtime());
         mockMvc.perform(get("/api/system/catalog/me")
                         .with(jwt().authorities(new SimpleGrantedAuthority("iam:user:read"))))
                 .andExpect(status().isOk())
@@ -96,7 +99,7 @@ class SystemCatalogWebSecurityTest {
 
     @Test
     void matchingEtagMustReturn304WithoutBody() throws Exception {
-        when(service.runtimeCatalog(anySet())).thenReturn(runtime());
+        when(runtimeService.runtimeCatalog(anySet())).thenReturn(runtime());
         mockMvc.perform(get("/api/system/catalog/me")
                         .header("If-None-Match", "\"" + CHECKSUM + "\"").with(jwt()))
                 .andExpect(status().isNotModified())
@@ -183,6 +186,11 @@ class SystemCatalogWebSecurityTest {
         }
 
         @Bean
+        SystemCatalogRuntimeApplicationService catalogRuntimeApplicationService() {
+            return mock(SystemCatalogRuntimeApplicationService.class);
+        }
+
+        @Bean
         SystemCatalogNavigationMoveApplicationService catalogMoveService() {
             return mock(SystemCatalogNavigationMoveApplicationService.class);
         }
@@ -202,7 +210,7 @@ class SystemCatalogWebSecurityTest {
 
         @Bean
         SystemCatalogRuntimeController catalogRuntimeController(
-                SystemCatalogApplicationService service) {
+                SystemCatalogRuntimeApplicationService service) {
             return new SystemCatalogRuntimeController(service);
         }
 

@@ -2,7 +2,7 @@ package io.github.chrisshi.mom.system.web.catalog;
 
 import io.github.chrisshi.mom.system.api.SystemCatalogContracts.RuntimeCatalogView;
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogApplicationModels.RuntimeResult;
-import io.github.chrisshi.mom.system.application.catalog.SystemCatalogApplicationService;
+import io.github.chrisshi.mom.system.application.catalog.SystemCatalogRuntimeApplicationService;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -24,9 +24,9 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/system/catalog")
 @PreAuthorize("isAuthenticated()")
 public class SystemCatalogRuntimeController {
-    private final SystemCatalogApplicationService service;
+    private final SystemCatalogRuntimeApplicationService service;
 
-    public SystemCatalogRuntimeController(SystemCatalogApplicationService service) {
+    public SystemCatalogRuntimeController(SystemCatalogRuntimeApplicationService service) {
         this.service = service;
     }
 
