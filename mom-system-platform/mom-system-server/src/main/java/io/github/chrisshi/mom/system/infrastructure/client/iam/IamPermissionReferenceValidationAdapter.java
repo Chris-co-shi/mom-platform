@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.system.infrastructure.http.iam;
+package io.github.chrisshi.mom.system.infrastructure.client.iam;
 
 import feign.FeignException;
 import feign.RetryableException;
@@ -18,7 +18,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * IAM Permission Reference Feign 出站 Adapter。
+ * IAM Permission Reference Feign 出站 Client Adapter。
  *
  * <p>调用强制使用 {@link Propagation#NEVER}，如果上游错误地在活动数据库事务中调用将立即失败。Adapter 不透传
  * 用户 Token，不提供 fallback，不把 IAM 错误伪造为全部有效。</p>
