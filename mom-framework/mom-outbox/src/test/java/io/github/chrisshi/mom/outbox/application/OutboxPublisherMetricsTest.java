@@ -19,8 +19,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import org.mockito.ArgumentCaptor;
 
 /**
  * {@link OutboxPublisher} 运行指标契约测试。
@@ -117,6 +119,65 @@ class OutboxPublisherMetricsTest {
                 .tag("outcome", "cas_conflict")
                 .counter()
                 .count());
+    }
+
+    /**
+     * Broker 异常消息可能包含 Token 或 Payload，last_error 只能持久化稳定异常类型。
+     */
+    @Test
+    void shouldNotPersistSensitiveTransportMessage() {
+        JdbcOutboxRepository repository = mock(JdbcOutboxRepository.class);
+        EventTransport transport = mock(EventTransport.class);
+        OutboxRecord record = record(0);
+        when(repository.claimAvailable(anyString(), anyInt(), any())).thenReturn(List.of(record));
+        when(transport.send(anyString(), any()))
+                .thenThrow(new IllegalStateException("Bearer secret-token payload={private}"));
+        when(repository.markFailure(anyString(), anyString(), anyInt(), any(), any(), anyString()))
+                .thenReturn(true);
+        OutboxPublisher publisher = new OutboxPublisher(
+                repository,
+                transport,
+                new OutboxPublisherProperties(),
+                Clock.fixed(Instant.parse("2026-07-19T00:00:00Z"), ZoneOffset.UTC),
+                "test-owner");
+
+        publisher.publishAvailableBatch();
+
+        ArgumentCaptor<String> error = ArgumentCaptor.forClass(String.class);
+        verify(repository).markFailure(
+                anyString(), anyString(), anyInt(), any(), any(), error.capture());
+        assertEquals("IllegalStateException", error.getValue());
+    }
+
+    /** 达到最大尝试次数时由 Outbox 状态机进入 DEAD，不再伪装成 RETRY。 */
+    @Test
+    void shouldMoveToDeadAtConfiguredAttemptLimit() {
+        JdbcOutboxRepository repository = mock(JdbcOutboxRepository.class);
+        EventTransport transport = mock(EventTransport.class);
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        when(repository.claimAvailable(anyString(), anyInt(), any())).thenReturn(List.of(record(0)));
+        when(transport.send(anyString(), any())).thenReturn(false);
+        when(repository.markFailure(anyString(), anyString(), anyInt(), any(), any(), anyString()))
+                .thenReturn(true);
+        OutboxPublisherProperties properties = new OutboxPublisherProperties();
+        properties.setMaxAttempts(1);
+        OutboxPublisher publisher = new OutboxPublisher(
+                repository,
+                transport,
+                properties,
+                Clock.fixed(Instant.parse("2026-07-19T00:00:00Z"), ZoneOffset.UTC),
+                "test-owner",
+                ObservationRegistry.NOOP,
+                registry);
+
+        publisher.publishAvailableBatch();
+
+        ArgumentCaptor<OutboxStatus> status = ArgumentCaptor.forClass(OutboxStatus.class);
+        verify(repository).markFailure(
+                anyString(), anyString(), anyInt(), status.capture(), any(), anyString());
+        assertEquals(OutboxStatus.DEAD, status.getValue());
+        assertEquals(1.0, registry.get(MomMetricNames.OUTBOX_PUBLISH_RESULTS)
+                .tag("outcome", "dead").counter().count());
     }
 
     private static OutboxRecord record(int retryCount) {

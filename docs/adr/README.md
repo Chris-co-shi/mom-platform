@@ -54,6 +54,7 @@ ADR 用于记录重要架构决策的背景、候选方案、最终选择、后�
 | [ADR-030](ADR-030-System应用目录导航发布与IAM权限引用边界.md) | System 应用目录、导航发布与 IAM 权限引用边界 | Accepted |
 | [ADR-031](ADR-031-System运行时缓存变更通知与服务身份事务边界.md) | System Runtime Cache、变更通知、服务身份与事务边界 | Accepted |
 | [ADR-032](ADR-032-Cache-Region与Factory-Scope兼容迁移.md) | Cache Region、Factory Scope 与兼容迁移 | Accepted |
+| [ADR-033](ADR-033-Event与Outbox-Ownership.md) | Event 与 Outbox Ownership | Accepted |
 
 ## 4. 当前 P1.6 权威决策链
 
@@ -68,6 +69,7 @@ ADR-023 Locale/Timezone/Preference
 → ADR-030 Catalog/Navigation/Permission Reference
 → ADR-031 Cache/Event/Service Identity/Transaction
 → ADR-032 Cache Region/Factory Scope/Compatibility
+→ ADR-033 Event/Outbox Ownership
 ```
 
 ## 5. 新建 ADR
