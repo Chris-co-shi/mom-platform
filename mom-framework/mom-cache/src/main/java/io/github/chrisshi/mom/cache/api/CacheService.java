@@ -5,9 +5,9 @@ package io.github.chrisshi.mom.cache.api;
  */
 public interface CacheService {
 
-    <T> T get(CacheType type, String key, Class<T> clazz);
+    <T> T get(CacheKey key, Class<T> clazz);
 
-    void put(CacheType type, String key, Object value);
+    <T> void put(CacheKey key, T value);
 
-    void evict(CacheType type, String key);
+    void evict(CacheKey key);
 }
