@@ -27,8 +27,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** Catalog Permission Reference 只读对账、Fail Closed 与低基数指标测试。 */
-class SystemCatalogPermissionReconciliationServiceTest {
+/** Catalog 稳定 Reference 只读对账、Fail Closed 与低基数指标测试。 */
+class SystemCatalogReferenceReconciliationServiceTest {
 
     @Test
     void mustBatchValidatePublishedReferencesWithoutMutatingCatalog() {
@@ -98,7 +98,7 @@ class SystemCatalogPermissionReconciliationServiceTest {
         private final CatalogReferenceValidationPort references =
                 mock(CatalogReferenceValidationPort.class);
         private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
-        private final SystemCatalogPermissionReconciliationService service;
+        private final SystemCatalogReferenceReconciliationService service;
 
         private Fixture() {
             SystemApplication application = new SystemApplication(
@@ -173,7 +173,7 @@ class SystemCatalogPermissionReconciliationServiceTest {
             when(applications.findEnabledPublished()).thenReturn(List.of(application));
             when(releases.findByIds(List.of("release"))).thenReturn(List.of(release));
             when(codec.decode(json)).thenReturn(snapshot);
-            service = new SystemCatalogPermissionReconciliationService(
+            service = new SystemCatalogReferenceReconciliationService(
                     applications, releases, codec, references, registry);
         }
     }

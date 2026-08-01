@@ -1,6 +1,6 @@
 package io.github.chrisshi.mom.system.configuration;
 
-import io.github.chrisshi.mom.system.application.catalog.SystemCatalogPermissionReconciliationService;
+import io.github.chrisshi.mom.system.application.catalog.SystemCatalogReferenceReconciliationService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -9,7 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import java.util.Objects;
 
 /**
- * Catalog Permission Reference 定期对账调度。
+ * Catalog 稳定 Reference 定期对账调度。
  *
  * <p>默认关闭；启用后每十分钟执行一次只读对账。调度只触发 Application Service，不持有数据库事务等待 IAM，
  * 不修改 Catalog，也不使用 Seata。</p>
@@ -20,11 +20,11 @@ import java.util.Objects;
         prefix = "mom.system.catalog.permission-reconciliation",
         name = "enabled",
         havingValue = "true")
-public class SystemCatalogPermissionReconciliationConfiguration {
-    private final SystemCatalogPermissionReconciliationService reconciliation;
+public class SystemCatalogReferenceReconciliationConfiguration {
+    private final SystemCatalogReferenceReconciliationService reconciliation;
 
-    public SystemCatalogPermissionReconciliationConfiguration(
-            SystemCatalogPermissionReconciliationService reconciliation) {
+    public SystemCatalogReferenceReconciliationConfiguration(
+            SystemCatalogReferenceReconciliationService reconciliation) {
         this.reconciliation = Objects.requireNonNull(reconciliation, "reconciliation");
     }
 

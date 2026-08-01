@@ -24,16 +24,16 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * 当前已发布 Catalog Permission Reference 的只读权威对账服务。
+ * 当前已发布 Catalog 稳定 Reference 的只读权威对账服务。
  *
- * <p>对账不修改 Catalog、不自动取消发布，也不复制 IAM Permission 状态。方法强制在数据库事务之外执行，
- * 读取当前发布指针和不可变 Snapshot 后，按最多 1000 个 Code 分批调用 IAM；UNKNOWN/DISABLED 只产生低基数
- * 指标与脱敏告警。Runtime 仍由 JWT Authority 精确匹配保持 Fail Closed。</p>
+ * <p>对账不修改 Catalog、不自动取消发布，也不复制 IAM 权威状态。方法强制在数据库事务之外执行，读取当前
+ * 发布指针和不可变 Snapshot 后，按最多 1000 个 Code 分批调用 IAM；UNKNOWN/DISABLED 只产生低基数指标与
+ * 脱敏告警。Runtime 仍由 JWT Authority 精确匹配保持 Fail Closed。</p>
  */
 @Service
-public class SystemCatalogPermissionReconciliationService {
+public class SystemCatalogReferenceReconciliationService {
     private static final Logger LOGGER =
-            LoggerFactory.getLogger(SystemCatalogPermissionReconciliationService.class);
+            LoggerFactory.getLogger(SystemCatalogReferenceReconciliationService.class);
     private static final int MAX_BATCH_SIZE = 1000;
     private static final String METRIC =
             "mom.system.catalog.permission_reconciliation.results";
@@ -44,7 +44,7 @@ public class SystemCatalogPermissionReconciliationService {
     private final CatalogReferenceValidationPort references;
     private final MeterRegistry meterRegistry;
 
-    public SystemCatalogPermissionReconciliationService(
+    public SystemCatalogReferenceReconciliationService(
             SystemApplicationRepository applications,
             SystemCatalogReleaseRepository releases,
             SystemCatalogSnapshotCodec codec,
@@ -98,7 +98,7 @@ public class SystemCatalogPermissionReconciliationService {
             var result = references.validate(batch);
             if (!result.statuses().keySet().equals(batch)) {
                 throw new SystemCatalogException.DependencyProtocol(
-                        "IAM Permission 对账响应缺少或增加了 Reference Code");
+                        "IAM Catalog Reference 对账响应缺少或增加了 Code");
             }
             for (CatalogReferenceValidationPort.Status status : result.statuses().values()) {
                 switch (status) {
@@ -112,7 +112,7 @@ public class SystemCatalogPermissionReconciliationService {
         record(enabled, disabled, unknown);
         if (disabled > 0 || unknown > 0) {
             LOGGER.warn(
-                    "Catalog Permission Reference 对账发现失效引用。applications={} references={} disabled={} unknown={}",
+                    "Catalog Reference 对账发现失效引用。applications={} references={} disabled={} unknown={}",
                     published.size(),
                     codes.size(),
                     disabled,
@@ -155,7 +155,7 @@ public class SystemCatalogPermissionReconciliationService {
         meterRegistry.counter(METRIC, "status", "unknown").increment(unknown);
     }
 
-    /** 不包含具体 Permission Code 的低基数执行结果。 */
+    /** 不包含具体 Reference Code 的低基数执行结果。 */
     public record ReconciliationResult(
             int applicationCount,
             int referenceCount,
