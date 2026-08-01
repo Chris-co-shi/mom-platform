@@ -92,7 +92,10 @@ spring:
               retry-times-when-send-failed: 0
           systemRuntimeChangeConsumer-in-0:
             consumer:
-              orderly: false
+              push:
+                orderly: false
+                max-reconsume-times: ${ROCKETMQ_MAX_RECONSUME_TIMES:2}
+                consume-message-batch-max-size: 1
 
 mybatis-plus:
   configuration:
