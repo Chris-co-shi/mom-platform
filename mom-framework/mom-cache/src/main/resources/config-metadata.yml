@@ -1,4 +1,30 @@
 module: mom-cache
 version: 1.0
 
-configs: []
+configs:
+  - key: mom.cache.enabled
+    type: boolean
+    default: true
+    required: false
+    sensitive: false
+    risk:
+      level: LOW
+    owner: mom-framework
+    changeImpact:
+      - runtime-cache-behavior
+
+  - key: mom.cache.policies.*
+    type: CachePolicy
+    default: null
+    required: false
+    sensitive: false
+    description:
+      zh-CN: 缓存策略配置，包括TTL、本地缓存和Redis缓存能力
+      en-US: Cache policy configuration including TTL, local cache and Redis capability
+    risk:
+      level: MEDIUM
+    owner: mom-framework
+    changeImpact:
+      - cache-hit-rate
+      - memory-usage
+      - data-freshness
