@@ -81,7 +81,7 @@ SELECT 'catalog_jsonb=' || count(*) FROM information_schema.columns WHERE table_
 SELECT 'catalog_unique=' || count(*) FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='${POSTGRES_SCHEMA}' AND c.conname IN ('uk_system_application_code','uk_system_navigation_item_route','uk_system_catalog_release_application_version') AND c.contype='u';
 SELECT 'catalog_immutable_trigger=' || count(*) FROM pg_trigger tr JOIN pg_class t ON t.oid=tr.tgrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='${POSTGRES_SCHEMA}' AND t.relname='system_catalog_release' AND tr.tgname='trg_system_catalog_release_immutable' AND NOT tr.tgisinternal;
 SELECT 'outbox_claim_index=' || count(*) FROM pg_indexes WHERE schemaname='${POSTGRES_SCHEMA}' AND tablename='mom_outbox_event' AND indexname='ix_mom_outbox_event_claim';
-SELECT 'inbox_unique=' || count(*) FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='${POSTGRES_SCHEMA}' AND t.relname='mom_inbox_event' AND c.conname='pk_mom_inbox_event' AND c.contype='p';
+SELECT 'inbox_identity=' || count(*) FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='${POSTGRES_SCHEMA}' AND t.relname='mom_inbox_event' AND c.conname='pk_mom_inbox_event' AND c.contype='p' AND pg_get_constraintdef(c.oid) LIKE '%event_id, consumer_name%';
 SELECT 'base_entity_deleted=' || count(*) FROM information_schema.columns WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name IN ('system_parameter','system_dictionary','system_dictionary_item','system_i18n_resource','system_i18n_message','system_i18n_release') AND column_name='deleted' AND data_type='boolean' AND is_nullable='NO';
 SELECT 'cross_schema_fk=' || count(*) FROM pg_constraint c JOIN pg_class s ON s.oid=c.conrelid JOIN pg_namespace sn ON sn.oid=s.relnamespace JOIN pg_class t ON t.oid=c.confrelid JOIN pg_namespace tn ON tn.oid=t.relnamespace WHERE c.contype='f' AND sn.nspname='${POSTGRES_SCHEMA}' AND tn.nspname<>'${POSTGRES_SCHEMA}';
 SELECT 'business_fk=' || count(*) FROM pg_constraint c JOIN pg_class s ON s.oid=c.conrelid JOIN pg_namespace sn ON sn.oid=s.relnamespace WHERE c.contype='f' AND sn.nspname='${POSTGRES_SCHEMA}';
@@ -89,7 +89,7 @@ SELECT 'business_fk=' || count(*) FROM pg_constraint c JOIN pg_class s ON s.oid=
 
 for expected in schema=1 flyway_version=9 parameter=1 dictionary=2 i18n=3 preference=2 \
   catalog=3 outbox=1 inbox=1 preference_jsonb=3 i18n_jsonb=1 catalog_jsonb=1 \
-  catalog_unique=3 catalog_immutable_trigger=1 outbox_claim_index=1 inbox_unique=1 \
+  catalog_unique=3 catalog_immutable_trigger=1 outbox_claim_index=1 inbox_identity=1 \
   base_entity_deleted=6 cross_schema_fk=0 business_fk=0; do
   grep --fixed-strings --quiet "$expected" system-postgresql-schema.txt || {
     FAILURE_REASON="missing schema evidence: $expected"; exit 1;
@@ -103,5 +103,9 @@ connections=$(docker exec "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USERNAME" \
 [[ "$(docker exec "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USERNAME" \
   -d "$POSTGRES_DATABASE" -tAc 'show timezone')" == "Asia/Tokyo" ]]
 
-printf '%s\n' \
-  "SYSTEM_POSTGRESQL_SMOKE result=success flyway=9 outbox=1 inbox=1 business_fk=0 cross_schema_fk=0 readiness=UP"
+echo "SYSTEM_POSTGRESQL_SMOKE result=success flyway=9 outbox=1 inbox=1 business_fk=0 cross_schema_fk=0 readiness=UP"
+
+POSTGRES_CONTAINER="$POSTGRES_CONTAINER" POSTGRES_PORT="$POSTGRES_PORT" \
+POSTGRES_DATABASE="$POSTGRES_DATABASE" POSTGRES_USERNAME="$POSTGRES_USERNAME" \
+POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+  bash .github/scripts/system-iam-client-credentials-smoke.sh
