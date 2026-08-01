@@ -33,27 +33,30 @@ public class RedisCacheProvider implements CacheProvider {
 
     @Override
     public Object get(CacheKey key) {
-        String value;
         try {
-            value = redisTemplate.opsForValue().get(key.value());
+            String value = redisTemplate.opsForValue().get(namespace(key));
+            return value == null ? null : serializer.deserialize(value, Object.class);
         } catch (RuntimeException ex) {
             return null;
         }
-        return value == null ? null : serializer.deserialize(value, Object.class);
     }
 
     @Override
     public void put(CacheKey key, Object value, Duration ttl) {
         CacheValueEnvelope envelope = serializer.wrap(value);
-        redisTemplate.opsForValue().set(key.value(), serializer.serialize(envelope), ttl);
+        redisTemplate.opsForValue().set(namespace(key), serializer.serialize(envelope), ttl);
     }
 
     @Override
     public void delete(CacheKey key) {
         try {
-            redisTemplate.delete(key.value());
+            redisTemplate.delete(namespace(key));
         } catch (RuntimeException ignored) {
             // cache eviction failure must not break business flow
         }
+    }
+
+    private String namespace(CacheKey key) {
+        return "mom:cache:v1:" + key.value();
     }
 }
