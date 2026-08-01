@@ -48,6 +48,27 @@ class PlatformEngineeringGovernanceTest {
                 "后续 Major Cleanup 删除");
     }
 
+    @Test
+    void systemRocketMqSmokeMustAssertTypedVersionedKeysWithoutRedisIndex() throws Exception {
+        String smoke = Files.readString(reactorRoot().resolve(
+                ".github/scripts/system-rocketmq-runtime-event-smoke.sh"));
+
+        assertThat(smoke)
+                .contains("mom:${ENVIRONMENT}:_global:system:cache:v1:parameter-resolved")
+                .doesNotContain("parameter-resolved-index", "redis-cli SMEMBERS", "redis-cli KEYS");
+        String systemConfiguration = Files.readString(reactorRoot().resolve(
+                "mom-system-platform/mom-system-server/src/main/resources/application.yml"));
+        assertThat(systemConfiguration).contains("""
+                systemRuntimeChangeConsumer-in-0:
+                          destination: ${SYSTEM_RUNTIME_EVENT_TOPIC:mom-system-runtime-events-v1}
+                          group: ${SYSTEM_RUNTIME_EVENT_CONSUMER_GROUP:mom-system-runtime-cache-invalidation-v1}
+                          content-type: application/json
+                          consumer:
+                            max-attempts: 1
+                            use-native-decoding: true
+                """);
+    }
+
     private static Path reactorRoot() {
         Path candidate = Path.of(System.getProperty("maven.multiModuleProjectDirectory", "."))
                 .toAbsolutePath().normalize();

@@ -30,18 +30,29 @@ public class SystemRuntimeChangeConsumerConfiguration {
     public static final String CONSUMER_NAME = "mom-system-runtime-cache-invalidation-v1";
 
     @Bean
-    Consumer<Message<EventEnvelope>> systemRuntimeChangeConsumer(
+    Consumer<Message<byte[]>> systemRuntimeChangeConsumer(
             InboxDeduplicator inbox,
             SystemRuntimeCachePort cache,
             SystemI18nRuntimeCachePort i18nCache,
             ObjectMapper objectMapper) {
         return message -> {
-            EventEnvelope event = Objects.requireNonNull(message.getPayload(), "event");
+            EventEnvelope event = decodeEnvelope(
+                    Objects.requireNonNull(message.getPayload(), "event payload"), objectMapper);
             inbox.executeOnce(event, CONSUMER_NAME, () -> {
                 // Inbox 事务只保存接收事实；Redis 必须在事务返回后调用。
             });
             invalidate(event, cache, i18nCache, objectMapper);
         };
+    }
+
+    /** 使用 Boot 管理的 Jackson 明确解析 Broker JSON，避免 Binder 特有 Converter 改变线格式语义。 */
+    private static EventEnvelope decodeEnvelope(byte[] json, ObjectMapper objectMapper) {
+        try {
+            return objectMapper.readValue(json, EventEnvelope.class);
+        }
+        catch (JacksonException exception) {
+            throw new IllegalArgumentException("Event Envelope 无法解析", exception);
+        }
     }
 
     private static void invalidate(

@@ -87,6 +87,7 @@ spring:
           content-type: application/json
           consumer:
             max-attempts: 1
+            use-native-decoding: true
       rocketmq:
         binder:
           name-server: ${ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
