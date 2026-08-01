@@ -2,6 +2,7 @@ package io.github.chrisshi.mom.system.infrastructure.persistence.query;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.system.application.i18n.port.SystemI18nRuntimeQueryPort;
+import io.github.chrisshi.mom.system.domain.i18n.SystemI18nRules;
 import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemI18nReleaseEntity;
 import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemI18nResourceEntity;
 import io.github.chrisshi.mom.system.infrastructure.persistence.mapper.SystemI18nReleaseMapper;
@@ -10,9 +11,6 @@ import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -110,8 +108,10 @@ public class MybatisSystemI18nRuntimeQuery implements SystemI18nRuntimeQueryPort
                 || !Objects.equals(release.getPublishedAt(), header.publishedAt())) {
             return Optional.empty();
         }
-        String json = release.getMessagesJson();
-        if (json == null || !sha256(json).equals(header.checksum())) {
+        Map<String, String> messages = parseMessages(release.getMessagesJson());
+        String semanticChecksum = SystemI18nRules.snapshot(
+                messages, release.getFallbackCount()).checksum();
+        if (!semanticChecksum.equals(header.checksum())) {
             throw new IllegalStateException("I18n Release checksum 不一致");
         }
         return Optional.of(new RuntimeSnapshot(
@@ -123,10 +123,13 @@ public class MybatisSystemI18nRuntimeQuery implements SystemI18nRuntimeQueryPort
                 header.checksum(),
                 header.fallbackCount(),
                 header.publishedAt(),
-                parseMessages(json)));
+                messages));
     }
 
     private Map<String, String> parseMessages(String json) {
+        if (json == null || json.isBlank()) {
+            throw new IllegalStateException("I18n Release JSON 为空");
+        }
         try {
             Object value = objectMapper.readValue(json, Map.class);
             if (!(value instanceof Map<?, ?> raw)) {
@@ -142,16 +145,6 @@ public class MybatisSystemI18nRuntimeQuery implements SystemI18nRuntimeQueryPort
             return Map.copyOf(result);
         } catch (JacksonException exception) {
             throw new IllegalStateException("I18n Release JSON 损坏", exception);
-        }
-    }
-
-    private static String sha256(String value) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(value.getBytes(StandardCharsets.UTF_8));
-            return java.util.HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("JDK 缺少 SHA-256", exception);
         }
     }
 }
