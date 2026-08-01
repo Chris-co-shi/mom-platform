@@ -1,7 +1,7 @@
 spring:
   datasource:
     hikari:
-      # 历史 SpringBootTest 继续验证正式 System DataSource 边界，不接受 Hikari 默认值漂移。
+      # SpringBootTest 验证正式 System DataSource 边界，不接受 Hikari 默认值漂移。
       pool-name: mom-system-hikari
       minimum-idle: 1
       maximum-pool-size: 5
@@ -10,6 +10,5 @@ spring:
       leak-detection-threshold: 0
       connection-init-sql: SET TIME ZONE 'UTC'
   flyway:
-    # S13～S16 的 SpringBootTest 固定验证各自已发布的 V1～V7 历史能力。
-    # S17 V8 由独立 SystemCatalogPostgresqlIT 在隔离 Schema 上执行最新 Migration 验收。
-    target: 7
+    # S18 起共享 SpringBootTest 必须验证当前完整 V1～V9 Schema；历史升级路径由各隔离 Schema 测试覆盖。
+    target: 9
