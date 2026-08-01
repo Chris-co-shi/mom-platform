@@ -1,0 +1,23 @@
+schemaVersion: 1
+owner: mom-platform-engineering
+failureMode: metadata-validation-fails-ci-without-changing-runtime
+changeImpact: configuration-governance-and-deployment-review
+
+modules:
+  - module: mom-cache
+    metadata: mom-framework/mom-cache/src/main/resources/config-metadata.yml
+    owner: mom-framework
+    cacheScope: global-and-factory
+    resilienceProfile: not-applicable
+
+  - module: mom-resilience
+    metadata: mom-framework/mom-resilience/src/main/resources/config-metadata.yml
+    owner: mom-framework
+    cacheScope: not-applicable
+    resilienceProfile: default-and-named-overridable
+
+  - module: mom-system-server
+    metadata: mom-system-platform/mom-system-server/src/main/resources/config-metadata.yml
+    owner: mom-system-platform
+    cacheScope: global
+    resilienceProfile: system-query

@@ -1,5 +1,12 @@
 module: mom-cache
-version: 1.0
+version: 1.1
+owner: mom-framework
+
+governance:
+  cacheScopes: [global, factory]
+  factoryScopeSource: verified-server-ownership-context
+  authorizationDecisionCache: forbidden-without-accepted-security-adr
+  failureMode: cache-failure-becomes-miss-authoritative-loader-remains-source
 
 configs:
   - key: mom.cache.environment
@@ -11,37 +18,9 @@ configs:
     owner: mom-framework
     failureMode: fail-fast-invalid-key-segment
     restartRequired: true
-    scope: [global, factory]
-    changeImpact:
-      - redis-key-namespace
-      - cache-cold-start
-
-  - key: mom.cache.enabled
-    type: boolean
-    default: true
-    required: false
-    sensitive: false
-    risk:
-      level: LOW
-    owner: mom-framework
-    changeImpact:
-      - runtime-cache-behavior
-
-  - key: mom.cache.policies.*
-    type: CachePolicy
-    default: null
-    required: false
-    sensitive: false
-    description:
-      zh-CN: 缓存策略配置，包括TTL、本地缓存和Redis缓存能力
-      en-US: Cache policy configuration including TTL, local cache and Redis capability
-    risk:
-      level: MEDIUM
-    owner: mom-framework
-    changeImpact:
-      - cache-hit-rate
-      - memory-usage
-      - data-freshness
+    cacheScope: namespace-for-global-and-factory
+    resilienceProfile: not-applicable
+    changeImpact: [redis-key-namespace, cache-cold-start]
 
   - key: mom.cache.caffeine.maximum-size
     environmentVariable: MOM_CACHE_CAFFEINE_MAXIMUM_SIZE
@@ -50,11 +29,37 @@ configs:
     required: false
     sensitive: false
     owner: mom-framework
-    failureMode: use-reasonable-default
+    failureMode: use-framework-reasonable-default
     restartRequired: true
-    changeImpact:
-      - l1-memory-usage
-      - cache-hit-rate
+    cacheScope: per-region-process-local
+    resilienceProfile: not-applicable
+    changeImpact: [l1-memory-usage, cache-hit-rate]
+
+  - key: mom.cache.caffeine.expire-after-write
+    environmentVariable: MOM_CACHE_CAFFEINE_EXPIRE_AFTER_WRITE
+    type: duration
+    default: 10m
+    required: false
+    sensitive: false
+    owner: mom-framework
+    failureMode: legacy-api-default-only
+    restartRequired: true
+    cacheScope: legacy-global
+    resilienceProfile: not-applicable
+    changeImpact: [legacy-cache-freshness]
+
+  - key: mom.cache.redis.key-prefix
+    environmentVariable: MOM_CACHE_REDIS_KEY_PREFIX
+    type: string
+    default: "mom:cache"
+    required: false
+    sensitive: false
+    owner: mom-framework
+    failureMode: legacy-key-prefix-only
+    restartRequired: true
+    cacheScope: legacy-global
+    resilienceProfile: not-applicable
+    changeImpact: [legacy-redis-key-namespace]
 
   - key: mom.cache.redis.enabled
     environmentVariable: MOM_CACHE_REDIS_ENABLED
@@ -65,6 +70,19 @@ configs:
     owner: mom-framework
     failureMode: l1-and-authoritative-loader-only
     restartRequired: true
-    changeImpact:
-      - l2-availability
-      - authoritative-source-load
+    cacheScope: global-and-factory
+    resilienceProfile: not-applicable
+    changeImpact: [l2-availability, authoritative-source-load]
+
+  - key: mom.cache.redis.timeout
+    environmentVariable: MOM_CACHE_REDIS_TIMEOUT
+    type: duration
+    default: 200ms
+    required: false
+    sensitive: false
+    owner: mom-framework
+    failureMode: diagnostic-value-client-timeout-remains-authoritative
+    restartRequired: true
+    cacheScope: global-and-factory
+    resilienceProfile: not-applicable
+    changeImpact: [cache-diagnostics]
