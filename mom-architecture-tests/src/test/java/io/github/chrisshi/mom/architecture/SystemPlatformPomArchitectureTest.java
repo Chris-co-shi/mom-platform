@@ -26,7 +26,7 @@ class SystemPlatformPomArchitectureTest {
             MOM_GROUP + ":mom-webmvc", MOM_GROUP + ":mom-security",
             MOM_GROUP + ":mom-data", MOM_GROUP + ":mom-messaging",
             MOM_GROUP + ":mom-outbox", MOM_GROUP + ":mom-tracing",
-            MOM_GROUP + ":mom-metrics",
+            MOM_GROUP + ":mom-metrics", MOM_GROUP + ":mom-resilience",
             "org.springframework.boot:spring-boot-starter-data-redis",
             "org.springframework.boot:spring-boot-starter-oauth2-client",
             "com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery",

@@ -56,6 +56,7 @@ ADR 用于记录重要架构决策的背景、候选方案、最终选择、后�
 | [ADR-032](ADR-032-Cache-Region与Factory-Scope兼容迁移.md) | Cache Region、Factory Scope 与兼容迁移 | Accepted |
 | [ADR-033](ADR-033-Event与Outbox-Ownership.md) | Event 与 Outbox Ownership | Accepted |
 | [ADR-034](ADR-034-Resilience-Profile与事务边界.md) | Resilience Profile 与事务边界 | Accepted |
+| [ADR-035](ADR-035-Framework-Freeze与平台适应度函数.md) | Framework Freeze 与平台适应度函数 | Accepted |
 
 ## 4. 当前 P1.6 权威决策链
 
@@ -72,6 +73,7 @@ ADR-023 Locale/Timezone/Preference
 → ADR-032 Cache Region/Factory Scope/Compatibility
 → ADR-033 Event/Outbox Ownership
 → ADR-034 Resilience Profile/Transaction Boundary
+→ ADR-035 Framework Freeze/Fitness Functions
 ```
 
 ## 5. 新建 ADR
