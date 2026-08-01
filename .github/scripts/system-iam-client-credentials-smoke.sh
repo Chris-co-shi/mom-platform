@@ -16,7 +16,7 @@ IAM_LOG="${KEY_DIR}/iam.log"
 SYSTEM_LOG="${KEY_DIR}/system.log"
 TOKEN_RESPONSE="${KEY_DIR}/token.json"
 VALIDATION_RESPONSE="${KEY_DIR}/validation.json"
-PROMETHEUS_RESPONSE="${KEY_DIR}/prometheus.txt"
+PROMETHEUS_RESPONSE="system-iam-prometheus.txt"
 CLIENT_ID="mom-system-server"
 CLIENT_SECRET="s18-system-client-secret-0123456789"
 CLIENT_SCOPE="iam.permission-reference.read"
@@ -39,6 +39,8 @@ cleanup() {
       tail -n 200 "$IAM_LOG" 2>/dev/null
       echo "----- System integration log -----"
       tail -n 200 "$SYSTEM_LOG" 2>/dev/null
+      echo "----- System IAM Prometheus -----"
+      tail -n 200 "$PROMETHEUS_RESPONSE" 2>/dev/null
     } >> system-postgresql-server.log
   fi
   rm -rf "$KEY_DIR"
@@ -201,30 +203,23 @@ IAM_SYSTEM_CLIENT_ID="$CLIENT_ID" IAM_SYSTEM_CLIENT_SECRET="$CLIENT_SECRET" \
 java -jar mom-system-platform/mom-system-server/target/mom-system-server-0.1.0-SNAPSHOT-exec.jar \
   --server.port="$SYSTEM_INTEGRATION_PORT" \
   --mom.system.catalog.permission-reconciliation.enabled=true \
-  --mom.system.catalog.permission-reconciliation.initial-delay=PT2S \
-  --mom.system.catalog.permission-reconciliation.interval=PT2S \
+  --mom.system.catalog.permission-reconciliation.run-on-startup=true \
+  --mom.system.catalog.permission-reconciliation.initial-delay=PT1H \
+  --mom.system.catalog.permission-reconciliation.interval=PT1H \
   > "$SYSTEM_LOG" 2>&1 &
 SYSTEM_INTEGRATION_PID=$!
 wait_readiness "$SYSTEM_INTEGRATION_PORT" "${KEY_DIR}/system-health.json" "System integration"
 
 FAILURE_REASON="System did not expose successful IAM reconciliation metric"
-metric_found=false
-for attempt in {1..60}; do
-  curl --fail --silent --show-error \
-    "http://127.0.0.1:${SYSTEM_INTEGRATION_PORT}/actuator/prometheus" \
-    > "$PROMETHEUS_RESPONSE" || true
-  if awk '
-      /^mom_system_catalog_permission_reconciliation_results_total\{status="enabled"\}/ {
-        if ($2 + 0 > 0) found=1
-      }
-      END { exit found ? 0 : 1 }
-    ' "$PROMETHEUS_RESPONSE"; then
-    metric_found=true
-    break
-  fi
-  sleep 2
-done
-[[ "$metric_found" == "true" ]] || exit 1
+curl --fail --silent --show-error \
+  "http://127.0.0.1:${SYSTEM_INTEGRATION_PORT}/actuator/prometheus" \
+  > "$PROMETHEUS_RESPONSE"
+awk '
+    $1 ~ /^mom_system_catalog_permission_reconciliation_results_total\{/ \
+      && $1 ~ /status="enabled"/ \
+      && ($2 + 0) > 0 { found=1 }
+    END { exit found ? 0 : 1 }
+  ' "$PROMETHEUS_RESPONSE" || exit 1
 
 kill "$IAM_PID"
 wait "$IAM_PID" 2>/dev/null || true
