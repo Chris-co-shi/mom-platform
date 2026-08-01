@@ -7,6 +7,8 @@ import java.time.Duration;
  */
 public interface CacheProvider {
 
+    CacheLayer layer();
+
     boolean supports(CachePolicy policy);
 
     Object get(CacheKey key);
