@@ -28,4 +28,16 @@ public class MultiLevelCacheProvider {
         }
         return null;
     }
+
+    public void put(CacheKey key, Object value, CachePolicy policy) {
+        providers.stream()
+                .filter(provider -> provider.supports(policy))
+                .forEach(provider -> provider.put(key, value, policy.ttl()));
+    }
+
+    public void evict(CacheKey key, CachePolicy policy) {
+        providers.stream()
+                .filter(provider -> provider.supports(policy))
+                .forEach(provider -> provider.delete(key));
+    }
 }
