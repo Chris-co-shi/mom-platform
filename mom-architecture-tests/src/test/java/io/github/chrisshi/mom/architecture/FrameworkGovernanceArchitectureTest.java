@@ -17,19 +17,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * P1.6 Framework Freeze 的源码级基础设施依赖适应度函数。
  *
  * <p>测试读取所有 {@code src/main/java}，只解析明确 import、注解和类型名，不扫描测试源码。历史例外必须是
- * 完整文件路径，禁止目录或通配符白名单。当前两条 System Redis 例外只服务 ADR-037 迁移，Phase 6 完成后
- * 必须从列表删除；SAS JDBC 是协议边界，Outbox JDBC 是 Framework Adapter 边界。</p>
+ * 完整文件路径，禁止目录或通配符白名单。SAS JDBC 是协议边界，Outbox JDBC 是 Framework Adapter 边界。</p>
  */
 class FrameworkGovernanceArchitectureTest {
 
     private static final Pattern IMPORT = Pattern.compile("(?m)^\\s*import\\s+([^;]+);");
     private static final Pattern CONTEXT_PATH = Pattern.compile("^mom-([a-z0-9-]+)-platform/");
-    private static final Set<String> TEMPORARY_SYSTEM_CACHE_EXCEPTIONS = Set.of(
-            "mom-system-platform/mom-system-server/src/main/java/io/github/chrisshi/mom/system/"
-                    + "infrastructure/cache/redis/RedisSystemRuntimeCacheAdapter.java",
-            "mom-system-platform/mom-system-server/src/main/java/io/github/chrisshi/mom/system/"
-                    + "infrastructure/cache/redis/RedisSystemI18nRuntimeCacheAdapter.java"
-    );
+    private static final Set<String> TEMPORARY_SYSTEM_CACHE_EXCEPTIONS = Set.of();
     private static final String SAS_JDBC_EXCEPTION =
             "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/security/"
                     + "IamAuthorizationServerProtocolConfiguration.java";
@@ -169,6 +163,25 @@ class FrameworkGovernanceArchitectureTest {
         assertThat(iamSources)
                 .extracting(SourceFile::path)
                 .noneMatch(path -> path.endsWith("/IamEventType.java"));
+    }
+
+    /** System 必须通过 typed Cache API 和本地事件枚举消费 Framework。 */
+    @Test
+    void systemMustConsumeTypedCacheAndOwnItsEventEnum() throws Exception {
+        List<SourceFile> systemSources = productionSources().stream()
+                .filter(source -> source.path().startsWith("mom-system-platform/mom-system-server/"))
+                .toList();
+
+        assertThat(systemSources)
+                .flatExtracting(SourceFile::imports)
+                .noneMatch(FrameworkGovernanceArchitectureTest::isRedisOrCaffeine);
+        SourceFile producer = systemSources.stream()
+                .filter(source -> source.path().endsWith("/OutboxSystemRuntimeChangeEventAdapter.java"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(producer.content())
+                .contains("SystemEventType")
+                .doesNotContain("public static final String");
     }
 
     private static boolean isRedisOrCaffeine(String name) {

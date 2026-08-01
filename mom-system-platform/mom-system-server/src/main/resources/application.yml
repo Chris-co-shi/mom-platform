@@ -153,13 +153,16 @@ mybatis-plus:
     banner: false
 
 mom:
+  cache:
+    environment: ${MOM_ENVIRONMENT:local}
+    redis:
+      enabled: ${SYSTEM_RUNTIME_CACHE_ENABLED:false}
   iam:
     permission-reference:
       service-name: ${IAM_PERMISSION_REFERENCE_SERVICE_NAME:mom-iam-server}
   system:
     runtime-cache:
       enabled: ${SYSTEM_RUNTIME_CACHE_ENABLED:false}
-      environment: ${MOM_ENVIRONMENT:local}
     runtime-events:
       consumer:
         enabled: ${SYSTEM_RUNTIME_EVENT_CONSUMER_ENABLED:false}

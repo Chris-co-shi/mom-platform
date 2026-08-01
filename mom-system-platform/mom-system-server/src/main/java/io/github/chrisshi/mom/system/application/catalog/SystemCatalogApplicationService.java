@@ -7,6 +7,7 @@ import io.github.chrisshi.mom.system.api.SystemCatalogContracts.RuntimeChannelCa
 import io.github.chrisshi.mom.system.api.SystemCatalogContracts.RuntimeNavigationItem;
 import io.github.chrisshi.mom.system.api.SystemCatalogContracts.ClientChannel;
 import io.github.chrisshi.mom.system.api.SystemCatalogContracts.NavigationType;
+import io.github.chrisshi.mom.system.application.runtime.SystemRuntimeCachePort;
 import io.github.chrisshi.mom.system.domain.catalog.SystemApplication;
 import io.github.chrisshi.mom.system.domain.catalog.SystemApplicationRepository;
 import io.github.chrisshi.mom.system.domain.catalog.SystemCatalogRelease;
@@ -17,6 +18,7 @@ import io.github.chrisshi.mom.system.domain.catalog.SystemCatalogSnapshotCodec;
 import io.github.chrisshi.mom.system.domain.catalog.SystemNavigationItem;
 import io.github.chrisshi.mom.system.domain.catalog.SystemNavigationRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -36,8 +38,9 @@ import static io.github.chrisshi.mom.system.application.catalog.SystemCatalogApp
  * Application Catalog 的 Draft CRUD、全树发布、回滚和权限过滤 Runtime 用例服务。
  *
  * <p>全部写入使用 System 单 PostgreSQL 本地事务；Application Version 是全部 Navigation Draft 写入和 Publish
- * 的聚合并发边界。Runtime 只读取不可变 Release，不读取 Draft，不调用 IAM，不使用 Redis、MQ、Seata 或
- * 跨服务事务。Permission 过滤只影响目录展示，业务 API 仍由各 Resource Server 独立鉴权。</p>
+ * 的聚合并发边界。Runtime 先读取 PostgreSQL 不可变 Release，再通过 System Cache Port 复用已校验 Snapshot，
+ * 不读取 Draft、不调用 IAM，也不直接依赖 Redis、MQ 或 Seata。Permission 过滤只影响目录展示，业务 API
+ * 仍由各 Resource Server 独立鉴权。</p>
  */
 @Service
 public class SystemCatalogApplicationService {
@@ -52,18 +55,31 @@ public class SystemCatalogApplicationService {
     private final SystemCatalogReleaseRepository releases;
     private final SystemCatalogSnapshotCodec codec;
     private final CatalogI18nReferenceQuery i18nReferences;
+    private final SystemRuntimeCachePort runtimeCache;
 
+    /**
+     * 创建 Catalog 用例服务。
+     *
+     * @param applications Application 权威仓储
+     * @param navigation Navigation 权威仓储
+     * @param releases 不可变 Release 权威仓储
+     * @param codec Snapshot JSON 编解码端口
+     * @param i18nReferences I18n 发布引用查询
+     * @param runtimeCache 可重建 Snapshot Cache Port
+     */
     public SystemCatalogApplicationService(
             SystemApplicationRepository applications,
             SystemNavigationRepository navigation,
             SystemCatalogReleaseRepository releases,
             SystemCatalogSnapshotCodec codec,
-            CatalogI18nReferenceQuery i18nReferences) {
+            CatalogI18nReferenceQuery i18nReferences,
+            SystemRuntimeCachePort runtimeCache) {
         this.applications = Objects.requireNonNull(applications, "applications");
         this.navigation = Objects.requireNonNull(navigation, "navigation");
         this.releases = Objects.requireNonNull(releases, "releases");
         this.codec = Objects.requireNonNull(codec, "codec");
         this.i18nReferences = Objects.requireNonNull(i18nReferences, "i18nReferences");
+        this.runtimeCache = Objects.requireNonNull(runtimeCache, "runtimeCache");
     }
 
     @Transactional
@@ -313,7 +329,8 @@ public class SystemCatalogApplicationService {
                 result.total(), result.page(), result.size());
     }
 
-    @Transactional(readOnly = true)
+    /** PostgreSQL Release 权威确认后生成全部可见 Catalog；远端 Cache 不进入数据库事务。 */
+    @Transactional(propagation = Propagation.NEVER)
     public RuntimeResult runtimeCatalog(Set<String> authorities) {
         Set<String> granted = authorities == null ? Set.of() : Set.copyOf(authorities);
         List<SystemApplication> applicationList = applications.findEnabledPublished();
@@ -344,7 +361,8 @@ public class SystemCatalogApplicationService {
                 SystemCatalogRules.SNAPSHOT_SCHEMA_VERSION, generatedAt, visible), checksum);
     }
 
-    @Transactional(readOnly = true)
+    /** PostgreSQL Release 权威确认后生成单 Application Catalog；远端 Cache 不进入数据库事务。 */
+    @Transactional(propagation = Propagation.NEVER)
     public RuntimeResult runtimeApplication(String applicationCode, Set<String> authorities) {
         String code = SystemCatalogRules.requireApplicationCode(applicationCode);
         SystemApplication application = applications.findByCode(code)
@@ -455,11 +473,19 @@ public class SystemCatalogApplicationService {
                 snapshot.iconKey(), channels);
     }
 
+    /** 先校验数据库 JSON checksum，再命中版本化 Cache；任何元数据漂移都 Fail Closed。 */
     private SystemCatalogSnapshot checkedSnapshot(SystemCatalogRelease release) {
         if (!SystemCatalogRules.sha256(release.snapshotJson()).equals(release.checksum())) {
             throw new IllegalStateException("Catalog Release checksum 不一致");
         }
-        SystemCatalogSnapshot snapshot = codec.decode(release.snapshotJson());
+        SystemCatalogSnapshot snapshot = runtimeCache.findCatalog(
+                        release.applicationCode(), release.releaseVersion(), release.checksum())
+                .orElseGet(() -> {
+                    SystemCatalogSnapshot decoded = codec.decode(release.snapshotJson());
+                    runtimeCache.putCatalog(
+                            release.applicationCode(), release.releaseVersion(), release.checksum(), decoded);
+                    return decoded;
+                });
         if (snapshot.snapshotSchemaVersion() != release.snapshotSchemaVersion()
                 || !snapshot.applicationCode().equals(release.applicationCode())
                 || snapshot.routeContractVersion() != release.routeContractVersion()) {

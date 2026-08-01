@@ -58,6 +58,7 @@ ADR 用于记录重要架构决策的背景、候选方案、最终选择、后�
 | [ADR-034](ADR-034-Resilience-Profile与事务边界.md) | Resilience Profile 与事务边界 | Accepted |
 | [ADR-035](ADR-035-Framework-Freeze与平台适应度函数.md) | Framework Freeze 与平台适应度函数 | Accepted |
 | [ADR-036](ADR-036-IAM安全状态Cache与Event边界.md) | IAM 安全状态、Cache 与 Event 边界 | Accepted |
+| [ADR-037](ADR-037-System消费Cache与Event-Framework.md) | System 消费 Cache/Event Framework | Accepted |
 
 ## 4. 当前 P1.6 权威决策链
 
@@ -76,6 +77,7 @@ ADR-023 Locale/Timezone/Preference
 → ADR-034 Resilience Profile/Transaction Boundary
 → ADR-035 Framework Freeze/Fitness Functions
 → ADR-036 IAM Security State/Cache/Event Boundary
+→ ADR-037 System Cache/Event Framework Consumption
 ```
 
 ## 5. 新建 ADR

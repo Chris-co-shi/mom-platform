@@ -49,8 +49,8 @@ public class SystemRuntimeChangeConsumerConfiguration {
             SystemRuntimeCachePort cache,
             SystemI18nRuntimeCachePort i18nCache,
             ObjectMapper objectMapper) {
-        switch (event.eventType()) {
-            case OutboxSystemRuntimeChangeEventAdapter.CATALOG_PUBLISHED_EVENT -> {
+        switch (SystemEventType.fromCode(event.eventType())) {
+            case SYSTEM_CATALOG_PUBLISHED -> {
                 requireVersionOne(event, "Catalog");
                 CatalogPublishedPayload payload =
                         decode(event.payloadJson(), CatalogPublishedPayload.class, objectMapper, "Catalog");
@@ -62,7 +62,7 @@ public class SystemRuntimeChangeConsumerConfiguration {
                 }
                 cache.evictCatalog(payload.applicationCode());
             }
-            case OutboxSystemRuntimeChangeEventAdapter.CATALOG_STATUS_CHANGED_EVENT -> {
+            case SYSTEM_CATALOG_STATUS_CHANGED -> {
                 requireVersionOne(event, "Catalog");
                 CatalogStatusChangedPayload payload = decode(
                         event.payloadJson(), CatalogStatusChangedPayload.class, objectMapper, "Catalog");
@@ -72,7 +72,7 @@ public class SystemRuntimeChangeConsumerConfiguration {
                 }
                 cache.evictCatalog(payload.applicationCode());
             }
-            case OutboxSystemRuntimeChangeEventAdapter.PARAMETER_CHANGED_EVENT -> {
+            case SYSTEM_PARAMETER_CHANGED -> {
                 requireVersionOne(event, "Parameter");
                 ParameterChangedPayload payload =
                         decode(event.payloadJson(), ParameterChangedPayload.class, objectMapper, "Parameter");
@@ -84,7 +84,7 @@ public class SystemRuntimeChangeConsumerConfiguration {
                 }
                 cache.evictParameter(payload.parameterKey());
             }
-            case OutboxSystemRuntimeChangeEventAdapter.DICTIONARY_CHANGED_EVENT -> {
+            case SYSTEM_DICTIONARY_CHANGED -> {
                 requireVersionOne(event, "Dictionary");
                 DictionaryChangedPayload payload =
                         decode(event.payloadJson(), DictionaryChangedPayload.class, objectMapper, "Dictionary");
@@ -96,7 +96,7 @@ public class SystemRuntimeChangeConsumerConfiguration {
                 }
                 cache.evictDictionary(payload.dictionaryCode());
             }
-            case OutboxSystemRuntimeChangeEventAdapter.I18N_PUBLISHED_EVENT -> {
+            case SYSTEM_I18N_PUBLISHED -> {
                 requireVersionOne(event, "I18n");
                 I18nPublishedPayload payload = decode(
                         event.payloadJson(), I18nPublishedPayload.class, objectMapper, "I18n");
@@ -110,7 +110,7 @@ public class SystemRuntimeChangeConsumerConfiguration {
                 }
                 i18nCache.evict(payload.applicationCode(), payload.resourceCode());
             }
-            case OutboxSystemRuntimeChangeEventAdapter.I18N_STATUS_CHANGED_EVENT -> {
+            case SYSTEM_I18N_STATUS_CHANGED -> {
                 requireVersionOne(event, "I18n");
                 I18nStatusChangedPayload payload = decode(
                         event.payloadJson(), I18nStatusChangedPayload.class, objectMapper, "I18n");
@@ -119,9 +119,6 @@ public class SystemRuntimeChangeConsumerConfiguration {
                     throw new IllegalArgumentException("I18n 状态事件负载非法");
                 }
                 i18nCache.evict(payload.applicationCode(), payload.resourceCode());
-            }
-            default -> {
-                // 其他生产者或未来版本事件不属于当前 Cache Consumer，保持向后兼容并忽略。
             }
         }
     }

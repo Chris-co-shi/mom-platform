@@ -1,6 +1,7 @@
 package io.github.chrisshi.mom.system.application.catalog;
 
 import io.github.chrisshi.mom.system.application.runtime.SystemRuntimeChangeEventPort;
+import io.github.chrisshi.mom.system.application.runtime.SystemRuntimeCachePort;
 import io.github.chrisshi.mom.system.domain.catalog.SystemApplicationRepository;
 import io.github.chrisshi.mom.system.domain.catalog.SystemCatalogReleaseRepository;
 import io.github.chrisshi.mom.system.domain.catalog.SystemCatalogSnapshotCodec;
@@ -31,8 +32,9 @@ public class SystemCatalogRuntimeApplicationService extends SystemCatalogApplica
             SystemCatalogReleaseRepository releases,
             SystemCatalogSnapshotCodec codec,
             CatalogI18nReferenceQuery i18nReferences,
+            SystemRuntimeCachePort runtimeCache,
             SystemRuntimeChangeEventPort events) {
-        super(applications, navigation, releases, codec, i18nReferences);
+        super(applications, navigation, releases, codec, i18nReferences, runtimeCache);
         this.events = Objects.requireNonNull(events, "events");
     }
 

@@ -20,13 +20,6 @@ import java.util.UUID;
  */
 @Component
 public class OutboxSystemRuntimeChangeEventAdapter implements SystemRuntimeChangeEventPort {
-    public static final String CATALOG_PUBLISHED_EVENT = "system.catalog.published";
-    public static final String CATALOG_STATUS_CHANGED_EVENT = "system.catalog.status-changed";
-    public static final String PARAMETER_CHANGED_EVENT = "system.parameter.changed";
-    public static final String DICTIONARY_CHANGED_EVENT = "system.dictionary.changed";
-    public static final String I18N_PUBLISHED_EVENT = "system.i18n.published";
-    public static final String I18N_STATUS_CHANGED_EVENT = "system.i18n.status-changed";
-
     private static final String PRODUCER = "mom-system-server";
 
     private final OutboxAppender outbox;
@@ -46,7 +39,7 @@ public class OutboxSystemRuntimeChangeEventAdapter implements SystemRuntimeChang
     public void catalogPublished(CatalogPublishedEvent event) {
         Objects.requireNonNull(event, "event");
         append(
-                CATALOG_PUBLISHED_EVENT,
+                SystemEventType.SYSTEM_CATALOG_PUBLISHED,
                 "SystemApplicationCatalog",
                 event.applicationId(),
                 new CatalogPublishedPayload(
@@ -61,7 +54,7 @@ public class OutboxSystemRuntimeChangeEventAdapter implements SystemRuntimeChang
     public void catalogStatusChanged(CatalogStatusChangedEvent event) {
         Objects.requireNonNull(event, "event");
         append(
-                CATALOG_STATUS_CHANGED_EVENT,
+                SystemEventType.SYSTEM_CATALOG_STATUS_CHANGED,
                 "SystemApplicationCatalog",
                 event.applicationId(),
                 new CatalogStatusChangedPayload(
@@ -74,7 +67,7 @@ public class OutboxSystemRuntimeChangeEventAdapter implements SystemRuntimeChang
     public void parameterChanged(ParameterChangedEvent event) {
         Objects.requireNonNull(event, "event");
         append(
-                PARAMETER_CHANGED_EVENT,
+                SystemEventType.SYSTEM_PARAMETER_CHANGED,
                 "SystemParameter",
                 event.parameterId(),
                 new ParameterChangedPayload(
@@ -90,7 +83,7 @@ public class OutboxSystemRuntimeChangeEventAdapter implements SystemRuntimeChang
     public void dictionaryChanged(DictionaryChangedEvent event) {
         Objects.requireNonNull(event, "event");
         append(
-                DICTIONARY_CHANGED_EVENT,
+                SystemEventType.SYSTEM_DICTIONARY_CHANGED,
                 "SystemDictionary",
                 event.dictionaryId(),
                 new DictionaryChangedPayload(
@@ -105,7 +98,7 @@ public class OutboxSystemRuntimeChangeEventAdapter implements SystemRuntimeChang
     public void i18nPublished(I18nPublishedEvent event) {
         Objects.requireNonNull(event, "event");
         append(
-                I18N_PUBLISHED_EVENT,
+                SystemEventType.SYSTEM_I18N_PUBLISHED,
                 "SystemI18nResource",
                 event.resourceId(),
                 new I18nPublishedPayload(
@@ -120,7 +113,7 @@ public class OutboxSystemRuntimeChangeEventAdapter implements SystemRuntimeChang
     public void i18nStatusChanged(I18nStatusChangedEvent event) {
         Objects.requireNonNull(event, "event");
         append(
-                I18N_STATUS_CHANGED_EVENT,
+                SystemEventType.SYSTEM_I18N_STATUS_CHANGED,
                 "SystemI18nResource",
                 event.resourceId(),
                 new I18nStatusChangedPayload(
@@ -131,7 +124,7 @@ public class OutboxSystemRuntimeChangeEventAdapter implements SystemRuntimeChang
     }
 
     private void append(
-            String eventType,
+            SystemEventType eventType,
             String aggregateType,
             String aggregateId,
             Object payload) {

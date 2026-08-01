@@ -98,6 +98,8 @@ class RuntimeSecurityArchitectureTest {
                 .that().resideOutsideOfPackages(
                         "io.github.chrisshi.mom.idempotency..",
                         "io.github.chrisshi.mom.ratelimit..",
+                        "io.github.chrisshi.mom.cache.redis..",
+                        "io.github.chrisshi.mom.cache.config..",
                         "io.github.chrisshi.mom.gateway.security..",
                         "io.github.chrisshi.mom.iam.security..",
                         "..infrastructure..",

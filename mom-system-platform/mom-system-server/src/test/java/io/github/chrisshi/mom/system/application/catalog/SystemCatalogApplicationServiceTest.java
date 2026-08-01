@@ -3,6 +3,7 @@ package io.github.chrisshi.mom.system.application.catalog;
 import io.github.chrisshi.mom.system.api.SystemCatalogContracts.ApplicationType;
 import io.github.chrisshi.mom.system.api.SystemCatalogContracts.ClientChannel;
 import io.github.chrisshi.mom.system.api.SystemCatalogContracts.NavigationType;
+import io.github.chrisshi.mom.system.application.runtime.SystemRuntimeCachePort;
 import io.github.chrisshi.mom.system.domain.catalog.SystemApplication;
 import io.github.chrisshi.mom.system.domain.catalog.SystemApplicationRepository;
 import io.github.chrisshi.mom.system.domain.catalog.SystemCatalogRelease;
@@ -22,6 +23,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /** Catalog Runtime 权限过滤、Snapshot 完整性与 I18n 发布门禁测试。 */
@@ -31,6 +33,7 @@ class SystemCatalogApplicationServiceTest {
     private SystemCatalogReleaseRepository releases;
     private SystemCatalogSnapshotCodec codec;
     private CatalogI18nReferenceQuery i18n;
+    private SystemRuntimeCachePort runtimeCache;
     private SystemCatalogApplicationService service;
 
     @BeforeEach
@@ -40,7 +43,9 @@ class SystemCatalogApplicationServiceTest {
         releases = mock(SystemCatalogReleaseRepository.class);
         codec = mock(SystemCatalogSnapshotCodec.class);
         i18n = mock(CatalogI18nReferenceQuery.class);
-        service = new SystemCatalogApplicationService(applications, navigation, releases, codec, i18n);
+        runtimeCache = mock(SystemRuntimeCachePort.class);
+        service = new SystemCatalogApplicationService(
+                applications, navigation, releases, codec, i18n, runtimeCache);
     }
 
     @Test
@@ -62,6 +67,23 @@ class SystemCatalogApplicationServiceTest {
                         .containsExactly("iam.users"));
         assertThatThrownBy(() -> service.runtimeApplication("iam", Set.of()))
                 .isInstanceOf(SystemCatalogException.NotFound.class);
+    }
+
+    @Test
+    void runtimeMustUseVersionedCacheOnlyAfterAuthoritativeReleaseRead() {
+        SystemCatalogSnapshot snapshot = snapshot();
+        String json = "{\"snapshot\":1}";
+        String checksum = SystemCatalogRules.sha256(json);
+        SystemApplication application = application("release", 1);
+        SystemCatalogRelease release = release("release", json, checksum);
+        when(applications.findByCode("iam")).thenReturn(Optional.of(application));
+        when(releases.findById("release")).thenReturn(Optional.of(release));
+        when(runtimeCache.findCatalog("iam", 1, checksum)).thenReturn(Optional.of(snapshot));
+
+        assertThat(service.runtimeApplication("iam", Set.of("iam:user:read"))
+                .view().applications()).hasSize(1);
+
+        verifyNoInteractions(codec);
     }
 
     @Test
