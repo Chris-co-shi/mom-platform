@@ -12,6 +12,7 @@
     <module>mom-data</module>
     <module>mom-data-permission</module>
     <module>mom-openfeign</module>
+    <module>mom-resilience</module>
     <module>mom-messaging</module>
     <module>mom-idempotency</module>
     <module>mom-outbox</module>

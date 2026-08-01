@@ -1,0 +1,35 @@
+module: mom-resilience
+version: 1.0
+
+governance:
+  precedence:
+    - business-instance
+    - named-profile
+    - framework-default-profile
+  frozen:
+    - profile-structure
+    - circuit-breaker-instance-naming
+    - no-active-transaction
+  notFrozen:
+    - timeout-values
+    - circuit-breaker-thresholds
+    - bulkhead-capacity
+    - sampling-or-deployment-capacity
+
+profiles:
+  - name: default
+    owner: mom-framework
+    retryDefault: disabled
+    failureMode: propagate-dependency-unavailable
+    metrics: resilience4j-micrometer
+  - name: system-query
+    owner: mom-system-platform
+    extends: default
+    retryDefault: disabled
+    failureMode: preserve-4xx-map-infrastructure-unavailable
+
+rules:
+  - post-auto-retry-forbidden
+  - fallback-must-not-return-fake-success
+  - feign-timeout-remains-client-configuration
+  - resilience-inside-transaction-forbidden

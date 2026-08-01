@@ -47,6 +47,9 @@ spring:
           iam:
             token-uri: ${IAM_TOKEN_URI:http://127.0.0.1:20100/oauth2/token}
   cloud:
+    circuitbreaker:
+      resilience4j:
+        enable-semaphore-default-bulkhead: true
     nacos:
       discovery:
         enabled: ${NACOS_DISCOVERY_ENABLED:false}
@@ -57,6 +60,10 @@ spring:
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
     openfeign:
+      circuitbreaker:
+        enabled: ${SYSTEM_FEIGN_CIRCUIT_BREAKER_ENABLED:true}
+        group:
+          enabled: false
       oauth2:
         enabled: ${IAM_PERMISSION_REFERENCE_OAUTH2_ENABLED:false}
         client-registration-id: iam-permission-reference
@@ -96,7 +103,48 @@ spring:
               push:
                 orderly: false
                 max-reconsume-times: ${ROCKETMQ_MAX_RECONSUME_TIMES:2}
-                consume-message-batch-max-size: 1
+              consume-message-batch-max-size: 1
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: ${MOM_RESILIENCE_DEFAULT_WINDOW_SIZE:20}
+        minimum-number-of-calls: ${MOM_RESILIENCE_DEFAULT_MINIMUM_CALLS:10}
+        failure-rate-threshold: ${MOM_RESILIENCE_DEFAULT_FAILURE_RATE:50}
+        wait-duration-in-open-state: ${MOM_RESILIENCE_DEFAULT_OPEN_WAIT:30s}
+      system-query:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: ${SYSTEM_QUERY_RESILIENCE_WINDOW_SIZE:20}
+        minimum-number-of-calls: ${SYSTEM_QUERY_RESILIENCE_MINIMUM_CALLS:10}
+        failure-rate-threshold: ${SYSTEM_QUERY_RESILIENCE_FAILURE_RATE:50}
+        wait-duration-in-open-state: ${SYSTEM_QUERY_RESILIENCE_OPEN_WAIT:30s}
+    instances:
+      IamPermissionReferenceClient_validate:
+        base-config: system-query
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: ${MOM_RESILIENCE_DEFAULT_TIME_LIMIT:4s}
+        cancel-running-future: true
+      system-query:
+        timeout-duration: ${SYSTEM_QUERY_TIME_LIMIT:4s}
+        cancel-running-future: true
+    instances:
+      IamPermissionReferenceClient_validate:
+        base-config: system-query
+  bulkhead:
+    configs:
+      default:
+        max-concurrent-calls: ${MOM_RESILIENCE_DEFAULT_MAX_CONCURRENT_CALLS:20}
+        max-wait-duration: 0
+      system-query:
+        max-concurrent-calls: ${SYSTEM_QUERY_MAX_CONCURRENT_CALLS:20}
+        max-wait-duration: 0
+    instances:
+      IamPermissionReferenceClient_validate:
+        base-config: system-query
 
 mybatis-plus:
   configuration:

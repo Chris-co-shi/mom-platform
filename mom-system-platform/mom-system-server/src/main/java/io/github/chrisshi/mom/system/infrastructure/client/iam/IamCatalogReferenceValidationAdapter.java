@@ -6,11 +6,13 @@ import io.github.chrisshi.mom.iam.api.IamPermissionReferenceContracts.Permission
 import io.github.chrisshi.mom.iam.api.IamPermissionReferenceContracts.ValidatePermissionReferencesRequest;
 import io.github.chrisshi.mom.iam.api.IamPermissionReferenceContracts.ValidatePermissionReferencesResponse;
 import io.github.chrisshi.mom.iam.client.IamPermissionReferenceClient;
+import io.github.chrisshi.mom.resilience.ResilienceTransactionGuard;
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogException;
 import io.github.chrisshi.mom.system.application.catalog.port.CatalogReferenceValidationPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.cloud.client.circuitbreaker.NoFallbackAvailableException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,10 +44,13 @@ public class IamCatalogReferenceValidationAdapter implements CatalogReferenceVal
             return new ValidationResult(java.time.Instant.EPOCH, Map.of());
         }
         LOGGER.info("IAM Catalog Reference 批量校验开始。count={}", referenceCodes.size());
+        ResilienceTransactionGuard.requireNoActiveTransaction("System IAM Permission Reference Query");
         ValidatePermissionReferencesResponse response;
         try {
             response = client.validate(new ValidatePermissionReferencesRequest(
                     referenceCodes.stream().sorted().toList()));
+        } catch (NoFallbackAvailableException exception) {
+            throw mapCircuitBreakerFailure(exception);
         } catch (RetryableException exception) {
             throw new SystemCatalogException.DependencyUnavailable(
                     "IAM Permission 权威服务暂时不可用", exception);
@@ -73,5 +78,23 @@ public class IamCatalogReferenceValidationAdapter implements CatalogReferenceVal
         }
         LOGGER.info("IAM Catalog Reference 批量校验完成。count={}", referenceCodes.size());
         return new ValidationResult(response.checkedAt(), statuses);
+    }
+
+    /**
+     * 把 Spring Cloud CircuitBreaker 的无 Fallback 结果映射为既有 System 依赖错误模型。
+     *
+     * <p>Open Circuit、timeout、bulkhead 拒绝和连接失败统一视为依赖不可用；被 CircuitBreaker 包装的 HTTP 4xx
+     * 仍保留协议错误。任何分支都不会返回“全部 Permission 有效”等伪造成功。</p>
+     */
+    private static SystemCatalogException mapCircuitBreakerFailure(NoFallbackAvailableException exception) {
+        Throwable cause = exception.getCause();
+        if (cause instanceof FeignException feignException
+                && feignException.status() >= 400
+                && feignException.status() < 500) {
+            return new SystemCatalogException.DependencyProtocol(
+                    "IAM Permission 权威服务拒绝或返回非法协议状态", exception);
+        }
+        return new SystemCatalogException.DependencyUnavailable(
+                "IAM Permission 权威服务暂时不可用", exception);
     }
 }
