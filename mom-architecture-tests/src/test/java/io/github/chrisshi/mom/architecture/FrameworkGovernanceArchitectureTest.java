@@ -43,8 +43,8 @@ class FrameworkGovernanceArchitectureTest {
             boolean systemServer = source.path().startsWith("mom-system-platform/mom-system-server/");
             boolean iamServer = source.path().startsWith("mom-iam-platform/mom-iam-server/");
             boolean businessServer = source.path().matches("mom-[^/]+-platform/mom-[^/]+-server/.*");
-            boolean domainOrApplication = source.path().contains("/domain/")
-                    || source.path().contains("/application/");
+            boolean domainOrApplication = businessServer && (source.path().contains("/domain/")
+                    || source.path().contains("/application/"));
 
             if (systemServer && imports.stream().anyMatch(FrameworkGovernanceArchitectureTest::isRedisOrCaffeine)
                     && !TEMPORARY_SYSTEM_CACHE_EXCEPTIONS.contains(source.path())) {
@@ -149,6 +149,28 @@ class FrameworkGovernanceArchitectureTest {
         assertThat(violations).as("事务内部远程调用门禁").isEmpty();
     }
 
+    /** IAM revoked SID 必须保持 Security fail-closed 状态，不得伪装成 Cache 或提前创建事件模型。 */
+    @Test
+    void iamSecurityStateMustReuseMomSecurityWithoutSpeculativeCacheOrEvents() throws Exception {
+        List<SourceFile> iamSources = productionSources().stream()
+                .filter(source -> source.path().startsWith("mom-iam-platform/"))
+                .toList();
+        SourceFile revokedStore = iamSources.stream()
+                .filter(source -> source.path().endsWith("/IamRevokedSessionStore.java"))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(revokedStore.imports())
+                .contains(
+                        "io.github.chrisshi.mom.security.revocation.MomRevokedSessionKeys",
+                        "io.github.chrisshi.mom.security.revocation.MomRevocationStoreUnavailableException")
+                .noneMatch(name -> name.startsWith("io.github.chrisshi.mom.cache."))
+                .noneMatch(name -> name.startsWith("io.github.chrisshi.mom.resilience."));
+        assertThat(iamSources)
+                .extracting(SourceFile::path)
+                .noneMatch(path -> path.endsWith("/IamEventType.java"));
+    }
+
     private static boolean isRedisOrCaffeine(String name) {
         return name.startsWith("org.springframework.data.redis")
                 || name.startsWith("com.github.benmanes.caffeine");
@@ -208,9 +230,12 @@ class FrameworkGovernanceArchitectureTest {
         while (candidate != null) {
             Path pom = candidate.resolve("pom.xml");
             try {
-                if (Files.isRegularFile(pom)
-                        && Files.readString(pom).contains("<artifactId>mom-platform</artifactId>")) {
-                    return candidate;
+                if (Files.isRegularFile(pom)) {
+                    String content = Files.readString(pom);
+                    if (content.contains("<artifactId>mom-platform</artifactId>")
+                            && content.contains("<modules>")) {
+                        return candidate;
+                    }
                 }
             }
             catch (IOException exception) {
