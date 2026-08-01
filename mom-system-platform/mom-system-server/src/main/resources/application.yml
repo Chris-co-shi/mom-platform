@@ -63,6 +63,7 @@ spring:
       client:
         config:
           iamPermissionReferenceClient:
+            url: ${IAM_PERMISSION_REFERENCE_URL:}
             connect-timeout: ${IAM_PERMISSION_REFERENCE_CONNECT_TIMEOUT:2000}
             read-timeout: ${IAM_PERMISSION_REFERENCE_READ_TIMEOUT:3000}
             logger-level: basic
@@ -107,7 +108,6 @@ mom:
   iam:
     permission-reference:
       service-name: ${IAM_PERMISSION_REFERENCE_SERVICE_NAME:mom-iam-server}
-      url: ${IAM_PERMISSION_REFERENCE_URL:}
   system:
     runtime-cache:
       enabled: ${SYSTEM_RUNTIME_CACHE_ENABLED:false}

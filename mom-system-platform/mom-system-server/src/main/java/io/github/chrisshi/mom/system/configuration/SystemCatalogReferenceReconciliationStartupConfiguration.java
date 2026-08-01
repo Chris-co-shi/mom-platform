@@ -1,6 +1,8 @@
 package io.github.chrisshi.mom.system.configuration;
 
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogReferenceReconciliationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -20,12 +22,24 @@ import java.util.Objects;
         name = "run-on-startup",
         havingValue = "true")
 public class SystemCatalogReferenceReconciliationStartupConfiguration {
+    private static final Logger LOGGER = LoggerFactory.getLogger(
+            SystemCatalogReferenceReconciliationStartupConfiguration.class);
 
     /** 创建在 Ready 前执行一次对账的 ApplicationRunner。 */
     @Bean
     ApplicationRunner catalogReferenceReconciliationStartupRunner(
             SystemCatalogReferenceReconciliationService reconciliation) {
         Objects.requireNonNull(reconciliation, "reconciliation");
-        return arguments -> reconciliation.reconcile();
+        return arguments -> {
+            LOGGER.info("Catalog Reference 启动对账开始");
+            var result = reconciliation.reconcile();
+            LOGGER.info(
+                    "Catalog Reference 启动对账完成。applications={} references={} enabled={} disabled={} unknown={}",
+                    result.applicationCount(),
+                    result.referenceCount(),
+                    result.enabledCount(),
+                    result.disabledCount(),
+                    result.unknownCount());
+        };
     }
 }

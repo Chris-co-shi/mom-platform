@@ -10,12 +10,12 @@ import org.springframework.web.bind.annotation.RequestBody;
  * IAM Permission Code 权威批量校验 Feign Client。
  *
  * <p>调用方必须使用服务身份和有限超时。本 Client 不提供 fallback，不重试写请求，也不透传用户 Bearer Token。
- * Feign 仅负责 HTTP 契约；事务外调用和错误语义由调用方基础设施 Adapter 控制。</p>
+ * 直连 URL 由 {@code spring.cloud.openfeign.client.config.iamPermissionReferenceClient.url} 配置；未配置时才使用
+ * {@code name} 通过服务发现解析，避免注解注册阶段的嵌套占位符丢失。</p>
  */
 @FeignClient(
         name = "${mom.iam.permission-reference.service-name:mom-iam-server}",
         contextId = "iamPermissionReferenceClient",
-        url = "${mom.iam.permission-reference.url:}",
         path = "/api/iam/internal/permission-references")
 public interface IamPermissionReferenceClient {
 

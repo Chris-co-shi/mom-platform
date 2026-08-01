@@ -8,6 +8,8 @@ import io.github.chrisshi.mom.iam.api.IamPermissionReferenceContracts.ValidatePe
 import io.github.chrisshi.mom.iam.client.IamPermissionReferenceClient;
 import io.github.chrisshi.mom.system.application.catalog.SystemCatalogException;
 import io.github.chrisshi.mom.system.application.catalog.port.CatalogReferenceValidationPort;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +27,8 @@ import java.util.Set;
  */
 @Component
 public class IamCatalogReferenceValidationAdapter implements CatalogReferenceValidationPort {
+    private static final Logger LOGGER =
+            LoggerFactory.getLogger(IamCatalogReferenceValidationAdapter.class);
     private final IamPermissionReferenceClient client;
 
     public IamCatalogReferenceValidationAdapter(IamPermissionReferenceClient client) {
@@ -37,6 +41,7 @@ public class IamCatalogReferenceValidationAdapter implements CatalogReferenceVal
         if (referenceCodes == null || referenceCodes.isEmpty()) {
             return new ValidationResult(java.time.Instant.EPOCH, Map.of());
         }
+        LOGGER.info("IAM Catalog Reference 批量校验开始。count={}", referenceCodes.size());
         ValidatePermissionReferencesResponse response;
         try {
             response = client.validate(new ValidatePermissionReferencesRequest(
@@ -66,6 +71,7 @@ public class IamCatalogReferenceValidationAdapter implements CatalogReferenceVal
         if (!statuses.keySet().equals(referenceCodes)) {
             throw new SystemCatalogException.DependencyProtocol("IAM Permission 校验响应缺少请求 Code");
         }
+        LOGGER.info("IAM Catalog Reference 批量校验完成。count={}", referenceCodes.size());
         return new ValidationResult(response.checkedAt(), statuses);
     }
 }
