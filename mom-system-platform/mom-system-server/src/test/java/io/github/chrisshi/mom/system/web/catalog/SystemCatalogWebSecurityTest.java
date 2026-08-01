@@ -19,6 +19,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -181,6 +182,7 @@ class SystemCatalogWebSecurityTest {
     @EnableMethodSecurity
     static class TestWebConfiguration {
         @Bean
+        @Primary
         SystemCatalogApplicationService catalogApplicationService() {
             return mock(SystemCatalogApplicationService.class);
         }
