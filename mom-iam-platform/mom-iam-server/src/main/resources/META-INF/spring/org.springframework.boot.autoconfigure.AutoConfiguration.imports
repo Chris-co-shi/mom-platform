@@ -2,3 +2,4 @@ io.github.chrisshi.mom.iam.configuration.IamPersistenceRepositoryAutoConfigurati
 io.github.chrisshi.mom.iam.security.IamAuthorizationServerConfiguration
 io.github.chrisshi.mom.iam.bootstrap.IamAdministratorBootstrapConfiguration
 io.github.chrisshi.mom.iam.configuration.IamAdminConfiguration
+io.github.chrisshi.mom.iam.configuration.IamPermissionReferenceConfiguration
