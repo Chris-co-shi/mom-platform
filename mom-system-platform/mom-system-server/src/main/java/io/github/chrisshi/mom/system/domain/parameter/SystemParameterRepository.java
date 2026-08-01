@@ -1,7 +1,9 @@
 package io.github.chrisshi.mom.system.domain.parameter;
 
 import io.github.chrisshi.mom.system.api.ParameterScopeType;
+import io.github.chrisshi.mom.system.api.ParameterValueType;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,6 +25,14 @@ public interface SystemParameterRepository {
     Optional<SystemParameter> findByScopeAndKey(
             ParameterScopeType scopeType, String scopeCode, String parameterKey);
 
+    /**
+     * 只读取 Runtime 解析所需的权威 Header，不读取 parameterValue。
+     *
+     * <p>调用方使用 Header 的 ID、状态和 Version 选择版本化 Cache；Cache Miss 后再按 ID 读取完整值。</p>
+     */
+    Optional<RuntimeHeader> findRuntimeHeader(
+            ParameterScopeType scopeType, String scopeCode, String parameterKey);
+
     /** 读取同 Key 的所有 Scope，用于强制类型一致性。 */
     List<SystemParameter> findAllByKey(String parameterKey);
 
@@ -37,6 +47,18 @@ public interface SystemParameterRepository {
 
     /** 按精确条件分页读取。 */
     ParameterPage findPage(ParameterQuery query);
+
+    /** Runtime 生效判断使用的轻量权威头。 */
+    record RuntimeHeader(
+            String id,
+            ParameterScopeType scopeType,
+            String scopeCode,
+            String parameterKey,
+            ParameterValueType valueType,
+            boolean enabled,
+            long version,
+            Instant updatedAt) {
+    }
 
     /** Infrastructure 无关的有限分页查询。 */
     record ParameterQuery(

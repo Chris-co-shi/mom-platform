@@ -2,6 +2,9 @@ package io.github.chrisshi.mom.system.application.parameter;
 
 import io.github.chrisshi.mom.system.api.ParameterScopeType;
 import io.github.chrisshi.mom.system.api.ParameterValueType;
+import io.github.chrisshi.mom.system.api.ResolvedSystemParameter;
+import io.github.chrisshi.mom.system.application.runtime.SystemRuntimeCachePort;
+import io.github.chrisshi.mom.system.application.runtime.SystemRuntimeChangeEventPort;
 import io.github.chrisshi.mom.system.domain.parameter.ParameterValueNormalizer;
 import io.github.chrisshi.mom.system.domain.parameter.SystemParameter;
 import io.github.chrisshi.mom.system.domain.parameter.SystemParameterRepository;
@@ -23,27 +26,42 @@ import static io.github.chrisshi.mom.system.application.parameter.SystemParamete
 import static io.github.chrisshi.mom.system.application.parameter.SystemParameterApplicationModels.UpdateCommand;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
-/** System Parameter 事务编排、类型一致性、解析与并发语义单元测试。 */
+/** System Parameter 事务编排、类型一致性、解析、Cache 与事件语义单元测试。 */
 class SystemParameterApplicationServiceTest {
     private InMemoryRepository repository;
+    private SystemRuntimeCachePort cache;
+    private SystemRuntimeChangeEventPort events;
     private SystemParameterApplicationService service;
 
     @BeforeEach
     void setUp() {
         repository = new InMemoryRepository();
+        cache = mock(SystemRuntimeCachePort.class);
+        events = mock(SystemRuntimeChangeEventPort.class);
         service = new SystemParameterApplicationService(
-                repository, new ParameterValueNormalizer(JsonMapper.builder().build()));
+                repository,
+                new ParameterValueNormalizer(JsonMapper.builder().build()),
+                cache,
+                events);
     }
 
     @Test
-    void shouldCreateGlobalWithCanonicalValue() {
+    void shouldCreateGlobalWithCanonicalValueAndAppendNonSensitiveEvent() {
         var created = service.create(command(ParameterScopeType.GLOBAL, null,
                 "Feature.Timeout", ParameterValueType.INTEGER, "00012"));
         assertThat(created.scopeCode()).isEmpty();
         assertThat(created.parameterKey()).isEqualTo("feature.timeout");
         assertThat(created.parameterValue()).isEqualTo("12");
         assertThat(created.createdBy()).isEqualTo("test-actor");
+
+        verify(events).parameterChanged(any(SystemRuntimeChangeEventPort.ParameterChangedEvent.class));
+        assertThat(SystemRuntimeChangeEventPort.ParameterChangedEvent.class.getRecordComponents())
+                .extracting(component -> component.getName())
+                .doesNotContain("parameterValue", "value", "secret");
     }
 
     @Test
@@ -106,6 +124,29 @@ class SystemParameterApplicationServiceTest {
     }
 
     @Test
+    void matchingVersionedCacheMustBeUsedAfterAuthorityHeaderRead() {
+        var created = service.create(command(ParameterScopeType.GLOBAL, null,
+                "feature.timeout", ParameterValueType.INTEGER, "12"));
+        ResolvedSystemParameter cached = new ResolvedSystemParameter(
+                created.parameterKey(),
+                created.valueType(),
+                "13",
+                created.scopeType(),
+                created.scopeCode(),
+                created.version(),
+                created.updatedAt());
+        org.mockito.Mockito.when(cache.findParameter(
+                        "",
+                        created.parameterKey(),
+                        created.scopeType(),
+                        created.scopeCode(),
+                        created.version()))
+                .thenReturn(Optional.of(cached));
+
+        assertThat(service.resolve("feature.timeout", null).parameterValue()).isEqualTo("13");
+    }
+
+    @Test
     void missingEffectiveValueMustReturnNotFound() {
         assertThatThrownBy(() -> service.resolve("feature.timeout", "mom-web"))
                 .isInstanceOf(SystemParameterException.NotFound.class);
@@ -159,14 +200,12 @@ class SystemParameterApplicationServiceTest {
         return new CreateCommand(scopeType, scopeCode, key, type, value, null, true);
     }
 
-    /** 无框架内存 Port，仅验证 Application 编排，不模拟数据库事务或 SQL。 */
     private static final class InMemoryRepository implements SystemParameterRepository {
         private final Map<String, SystemParameter> values = new LinkedHashMap<>();
         private long sequence;
 
         @Override
         public void lockParameterKey(String parameterKey) {
-            // 单线程单元测试不需要锁；真实 Adapter 使用 PostgreSQL 事务级锁。
         }
 
         @Override
@@ -183,6 +222,21 @@ class SystemParameterApplicationServiceTest {
         }
 
         @Override
+        public Optional<RuntimeHeader> findRuntimeHeader(
+                ParameterScopeType scopeType, String scopeCode, String parameterKey) {
+            return findByScopeAndKey(scopeType, scopeCode, parameterKey)
+                    .map(parameter -> new RuntimeHeader(
+                            parameter.id(),
+                            parameter.scopeType(),
+                            parameter.scopeCode(),
+                            parameter.parameterKey(),
+                            parameter.valueType(),
+                            parameter.enabled(),
+                            parameter.version(),
+                            parameter.updatedAt()));
+        }
+
+        @Override
         public List<SystemParameter> findAllByKey(String parameterKey) {
             return values.values().stream()
                     .filter(parameter -> parameter.parameterKey().equals(parameterKey)).toList();
@@ -190,14 +244,28 @@ class SystemParameterApplicationServiceTest {
 
         @Override
         public SystemParameter insert(SystemParameter parameter) {
-            if (findByScopeAndKey(parameter.scopeType(), parameter.scopeCode(), parameter.parameterKey()).isPresent()) {
+            if (findByScopeAndKey(
+                    parameter.scopeType(),
+                    parameter.scopeCode(),
+                    parameter.parameterKey()).isPresent()) {
                 throw new SystemParameterException.Conflict("duplicate");
             }
             String id = String.valueOf(++sequence);
             Instant now = Instant.parse("2026-07-30T00:00:00Z");
-            SystemParameter persisted = new SystemParameter(id, parameter.scopeType(), parameter.scopeCode(),
-                    parameter.parameterKey(), parameter.valueType(), parameter.parameterValue(), parameter.enabled(),
-                    0L, parameter.description(), "test-actor", now, "test-actor", now);
+            SystemParameter persisted = new SystemParameter(
+                    id,
+                    parameter.scopeType(),
+                    parameter.scopeCode(),
+                    parameter.parameterKey(),
+                    parameter.valueType(),
+                    parameter.parameterValue(),
+                    parameter.enabled(),
+                    0L,
+                    parameter.description(),
+                    "test-actor",
+                    now,
+                    "test-actor",
+                    now);
             values.put(id, persisted);
             return persisted;
         }
@@ -208,8 +276,12 @@ class SystemParameterApplicationServiceTest {
             if (current == null || current.version() != parameter.version()) {
                 return false;
             }
-            values.put(parameter.id(), persistedUpdate(current, parameter.valueType(), parameter.parameterValue(),
-                    current.enabled(), parameter.description()));
+            values.put(parameter.id(), persistedUpdate(
+                    current,
+                    parameter.valueType(),
+                    parameter.parameterValue(),
+                    current.enabled(),
+                    parameter.description()));
             return true;
         }
 
@@ -219,24 +291,36 @@ class SystemParameterApplicationServiceTest {
             if (current == null || current.version() != parameter.version()) {
                 return false;
             }
-            values.put(parameter.id(), persistedUpdate(current, current.valueType(), current.parameterValue(),
-                    parameter.enabled(), current.description()));
+            values.put(parameter.id(), persistedUpdate(
+                    current,
+                    current.valueType(),
+                    current.parameterValue(),
+                    parameter.enabled(),
+                    current.description()));
             return true;
         }
 
         @Override
         public ParameterPage findPage(ParameterQuery query) {
             List<SystemParameter> filtered = new ArrayList<>(values.values().stream()
-                    .filter(parameter -> query.scopeType() == null || parameter.scopeType() == query.scopeType())
-                    .filter(parameter -> query.scopeCode() == null || parameter.scopeCode().equals(query.scopeCode()))
+                    .filter(parameter -> query.scopeType() == null
+                            || parameter.scopeType() == query.scopeType())
+                    .filter(parameter -> query.scopeCode() == null
+                            || parameter.scopeCode().equals(query.scopeCode()))
                     .filter(parameter -> query.parameterKey() == null
                             || parameter.parameterKey().equals(query.parameterKey()))
-                    .filter(parameter -> query.enabled() == null || parameter.enabled() == query.enabled())
-                    .sorted(Comparator.comparing(SystemParameter::parameterKey).thenComparing(SystemParameter::id))
+                    .filter(parameter -> query.enabled() == null
+                            || parameter.enabled() == query.enabled())
+                    .sorted(Comparator.comparing(SystemParameter::parameterKey)
+                            .thenComparing(SystemParameter::id))
                     .toList());
             int from = Math.min(query.page() * query.size(), filtered.size());
             int to = Math.min(from + query.size(), filtered.size());
-            return new ParameterPage(filtered.subList(from, to), filtered.size(), query.page(), query.size());
+            return new ParameterPage(
+                    filtered.subList(from, to),
+                    filtered.size(),
+                    query.page(),
+                    query.size());
         }
 
         private static SystemParameter persistedUpdate(
@@ -245,9 +329,20 @@ class SystemParameterApplicationServiceTest {
                 String value,
                 boolean enabled,
                 String description) {
-            return new SystemParameter(current.id(), current.scopeType(), current.scopeCode(), current.parameterKey(),
-                    type, value, enabled, current.version() + 1, description, current.createdBy(), current.createdAt(),
-                    "test-actor", current.updatedAt().plusSeconds(1));
+            return new SystemParameter(
+                    current.id(),
+                    current.scopeType(),
+                    current.scopeCode(),
+                    current.parameterKey(),
+                    type,
+                    value,
+                    enabled,
+                    current.version() + 1,
+                    description,
+                    current.createdBy(),
+                    current.createdAt(),
+                    "test-actor",
+                    current.updatedAt().plusSeconds(1));
         }
     }
 }

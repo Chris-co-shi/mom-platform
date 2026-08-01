@@ -45,35 +45,89 @@ public class SystemRuntimeChangeConsumerConfiguration {
             EventEnvelope event,
             SystemRuntimeCachePort cache,
             ObjectMapper objectMapper) {
-        if (OutboxSystemRuntimeChangeEventAdapter.CATALOG_PUBLISHED_EVENT.equals(event.eventType())) {
-            if (event.eventVersion() != 1) {
-                throw new IllegalArgumentException("不支持的 Catalog 事件版本");
+        switch (event.eventType()) {
+            case OutboxSystemRuntimeChangeEventAdapter.CATALOG_PUBLISHED_EVENT -> {
+                requireVersionOne(event, "Catalog");
+                CatalogPublishedPayload payload =
+                        decode(event.payloadJson(), CatalogPublishedPayload.class, objectMapper, "Catalog");
+                if (payload.applicationCode() == null || payload.applicationCode().isBlank()
+                        || payload.releaseVersion() < 1
+                        || payload.checksum() == null
+                        || payload.checksum().length() != 64) {
+                    throw new IllegalArgumentException("Catalog 事件负载非法");
+                }
+                cache.evictCatalog(payload.applicationCode());
             }
-            CatalogPublishedPayload payload = decode(event.payloadJson(), objectMapper);
-            cache.evictCatalog(payload.applicationCode());
+            case OutboxSystemRuntimeChangeEventAdapter.PARAMETER_CHANGED_EVENT -> {
+                requireVersionOne(event, "Parameter");
+                ParameterChangedPayload payload =
+                        decode(event.payloadJson(), ParameterChangedPayload.class, objectMapper, "Parameter");
+                if (payload.parameterKey() == null || payload.parameterKey().isBlank()
+                        || payload.version() < 0
+                        || payload.changeKind() == null
+                        || payload.changeKind().isBlank()) {
+                    throw new IllegalArgumentException("Parameter 事件负载非法");
+                }
+                cache.evictParameter(payload.parameterKey());
+            }
+            case OutboxSystemRuntimeChangeEventAdapter.DICTIONARY_CHANGED_EVENT -> {
+                requireVersionOne(event, "Dictionary");
+                DictionaryChangedPayload payload =
+                        decode(event.payloadJson(), DictionaryChangedPayload.class, objectMapper, "Dictionary");
+                if (payload.dictionaryCode() == null || payload.dictionaryCode().isBlank()
+                        || payload.version() < 0
+                        || payload.changeKind() == null
+                        || payload.changeKind().isBlank()) {
+                    throw new IllegalArgumentException("Dictionary 事件负载非法");
+                }
+                cache.evictDictionary(payload.dictionaryCode());
+            }
+            default -> {
+                // 其他生产者或未来版本事件不属于当前 Cache Consumer，保持向后兼容并忽略。
+            }
         }
     }
 
-    private static CatalogPublishedPayload decode(String json, ObjectMapper objectMapper) {
+    private static void requireVersionOne(EventEnvelope event, String capability) {
+        if (event.eventVersion() != 1) {
+            throw new IllegalArgumentException("不支持的 " + capability + " 事件版本");
+        }
+    }
+
+    private static <T> T decode(
+            String json,
+            Class<T> type,
+            ObjectMapper objectMapper,
+            String capability) {
         try {
-            CatalogPublishedPayload payload = objectMapper.readValue(json, CatalogPublishedPayload.class);
-            if (payload.applicationCode() == null || payload.applicationCode().isBlank()
-                    || payload.releaseVersion() < 1 || payload.checksum() == null
-                    || payload.checksum().length() != 64) {
-                throw new IllegalArgumentException("Catalog 事件负载非法");
-            }
-            return payload;
+            return objectMapper.readValue(json, type);
         } catch (JacksonException exception) {
-            throw new IllegalArgumentException("Catalog 事件负载无法解析", exception);
+            throw new IllegalArgumentException(capability + " 事件负载无法解析", exception);
         }
     }
 
-    /** 与生产者 v1 Payload 对齐的本地消费模型。 */
     record CatalogPublishedPayload(
             String applicationCode,
             long releaseVersion,
             int routeContractVersion,
             String checksum,
             Long sourceReleaseVersion) {
+    }
+
+    record ParameterChangedPayload(
+            String parameterKey,
+            String scopeType,
+            String scopeCode,
+            long version,
+            boolean enabled,
+            String changeKind) {
+    }
+
+    record DictionaryChangedPayload(
+            String dictionaryCode,
+            String itemCode,
+            long version,
+            boolean enabled,
+            String changeKind) {
     }
 }

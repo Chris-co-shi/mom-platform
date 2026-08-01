@@ -3,6 +3,8 @@ package io.github.chrisshi.mom.system.application.parameter;
 import io.github.chrisshi.mom.system.api.ParameterScopeType;
 import io.github.chrisshi.mom.system.api.ParameterValueType;
 import io.github.chrisshi.mom.system.api.ResolvedSystemParameter;
+import io.github.chrisshi.mom.system.application.runtime.SystemRuntimeCachePort;
+import io.github.chrisshi.mom.system.application.runtime.SystemRuntimeChangeEventPort;
 import io.github.chrisshi.mom.system.domain.parameter.ParameterValueNormalizer;
 import io.github.chrisshi.mom.system.domain.parameter.SystemParameter;
 import io.github.chrisshi.mom.system.domain.parameter.SystemParameterRepository;
@@ -12,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import static io.github.chrisshi.mom.system.application.parameter.SystemParameterApplicationModels.CreateCommand;
 import static io.github.chrisshi.mom.system.application.parameter.SystemParameterApplicationModels.PageQuery;
@@ -19,35 +22,37 @@ import static io.github.chrisshi.mom.system.application.parameter.SystemParamete
 import static io.github.chrisshi.mom.system.application.parameter.SystemParameterApplicationModels.ParameterView;
 import static io.github.chrisshi.mom.system.application.parameter.SystemParameterApplicationModels.StatusCommand;
 import static io.github.chrisshi.mom.system.application.parameter.SystemParameterApplicationModels.UpdateCommand;
+import static io.github.chrisshi.mom.system.application.runtime.SystemRuntimeChangeEventPort.ChangeKind;
 
 /**
  * System Parameter 的事务用例服务。
  *
  * <p>所有写操作位于单 System PostgreSQL 本地事务中。同 Key 写入先获取数据库事务级 Key 锁，再执行
- * 跨 Scope 类型一致性检查；唯一约束仍兜底同 Scope 并发。服务只依赖领域 Port，不依赖 Mapper、Entity、
- * HTTP、Redis、MQ 或 Seata。基础设施不可用时失败向上传播，不缓存或伪造默认参数。</p>
+ * 跨 Scope 类型一致性检查；业务行与 Runtime 变更 Outbox 在同一事务提交。Runtime 解析不开启数据库事务：
+ * 先读取轻量权威 Header，再访问版本化 Redis Projection；Cache Miss 后按 ID 回源 PostgreSQL。</p>
  */
 @Service
 public class SystemParameterApplicationService {
     private static final int MAX_PAGE_SIZE = 100;
+    private static final int MAX_RUNTIME_READ_ATTEMPTS = 2;
+
     private final SystemParameterRepository repository;
     private final ParameterValueNormalizer valueNormalizer;
+    private final SystemRuntimeCachePort cache;
+    private final SystemRuntimeChangeEventPort events;
 
     public SystemParameterApplicationService(
             SystemParameterRepository repository,
-            ParameterValueNormalizer valueNormalizer) {
+            ParameterValueNormalizer valueNormalizer,
+            SystemRuntimeCachePort cache,
+            SystemRuntimeChangeEventPort events) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.valueNormalizer = Objects.requireNonNull(valueNormalizer, "valueNormalizer");
+        this.cache = Objects.requireNonNull(cache, "cache");
+        this.events = Objects.requireNonNull(events, "events");
     }
 
-    /**
-     * 创建 GLOBAL 或 APPLICATION 参数。
-     *
-     * @param command 不含客户端审计字段的创建命令
-     * @return 数据库填充 ID、审计和版本后的视图
-     * @throws IllegalArgumentException 输入非法或疑似 Secret Key
-     * @throws SystemParameterException.Conflict 唯一性或跨 Scope 类型冲突
-     */
+    /** 创建 GLOBAL 或 APPLICATION 参数。 */
     @Transactional
     public ParameterView create(CreateCommand command) {
         Objects.requireNonNull(command, "command");
@@ -60,18 +65,12 @@ public class SystemParameterApplicationService {
                 command.scopeType(), scopeCode, key, command.valueType(), value,
                 command.enabled() == null || command.enabled(),
                 SystemParameterRules.normalizeDescription(command.description()));
-        return ParameterView.from(repository.insert(parameter));
+        SystemParameter persisted = repository.insert(parameter);
+        appendChange(persisted, ChangeKind.CREATED);
+        return ParameterView.from(persisted);
     }
 
-    /**
-     * 使用客户端 Version 更新参数值、类型和描述。
-     *
-     * @param id String 技术主键
-     * @param command 版本化更新命令
-     * @return 更新后的完整视图
-     * @throws SystemParameterException.NotFound 参数不存在
-     * @throws SystemParameterException.StaleVersion 版本冲突
-     */
+    /** 使用客户端 Version 更新参数值、类型和描述。 */
     @Transactional
     public ParameterView update(String id, UpdateCommand command) {
         Objects.requireNonNull(command, "command");
@@ -85,7 +84,9 @@ public class SystemParameterApplicationService {
         if (!repository.update(changed)) {
             throw new SystemParameterException.StaleVersion("参数已被其他请求修改");
         }
-        return ParameterView.from(requireParameter(current.id()));
+        SystemParameter persisted = requireParameter(current.id());
+        appendChange(persisted, ChangeKind.UPDATED);
+        return ParameterView.from(persisted);
     }
 
     /** 使用客户端 Version 启用或禁用参数；禁用不改变类型一致性约束。 */
@@ -98,7 +99,9 @@ public class SystemParameterApplicationService {
         if (!repository.updateStatus(current.changeStatus(command.version(), command.enabled()))) {
             throw new SystemParameterException.StaleVersion("参数已被其他请求修改");
         }
-        return ParameterView.from(requireParameter(current.id()));
+        SystemParameter persisted = requireParameter(current.id());
+        appendChange(persisted, ChangeKind.STATUS_CHANGED);
+        return ParameterView.from(persisted);
     }
 
     /** 按 ID 查询管理视图，无副作用。 */
@@ -130,27 +133,62 @@ public class SystemParameterApplicationService {
     /**
      * 解析应用有效参数；enabled APPLICATION 优先，禁用时回退 enabled GLOBAL。
      *
-     * @param parameterKey 参数键
-     * @param applicationCode 可选独立应用编码，不是 IAM clientId
-     * @return 类型与规范字符串组成的稳定跨服务契约
-     * @throws SystemParameterException.NotFound 无有效值
+     * <p>该方法故意不使用 {@code @Transactional}，保证 Redis 访问不发生在活动数据库事务中。每次读取先以
+     * PostgreSQL Header 确认生效行和版本，数据库不可用时不会仅凭旧 Cache 返回值。</p>
      */
-    @Transactional(readOnly = true)
     public ResolvedSystemParameter resolve(String parameterKey, String applicationCode) {
         String key = SystemParameterRules.normalizeKey(parameterKey);
-        if (applicationCode != null && !applicationCode.isBlank()) {
-            String app = SystemParameterRules.normalizeScopeCode(ParameterScopeType.APPLICATION, applicationCode);
-            var override = repository.findByScopeAndKey(ParameterScopeType.APPLICATION, app, key);
-            if (override.isPresent() && override.orElseThrow().enabled()) {
-                return resolved(override.orElseThrow());
+        String application = applicationCode == null || applicationCode.isBlank()
+                ? null
+                : SystemParameterRules.normalizeScopeCode(ParameterScopeType.APPLICATION, applicationCode);
+        String lookupScope = application == null ? SystemParameterRules.GLOBAL_SCOPE_CODE : application;
+
+        for (int attempt = 0; attempt < MAX_RUNTIME_READ_ATTEMPTS; attempt++) {
+            Optional<SystemParameterRepository.RuntimeHeader> selected =
+                    selectEffectiveHeader(key, application);
+            if (selected.isEmpty()) {
+                throw new SystemParameterException.NotFound("有效参数不存在");
+            }
+            var header = selected.orElseThrow();
+            Optional<ResolvedSystemParameter> cached = cache.findParameter(
+                    lookupScope, key, header.scopeType(), header.scopeCode(), header.version());
+            if (cached.filter(value -> matches(value, header)).isPresent()) {
+                return cached.orElseThrow();
+            }
+            Optional<SystemParameter> current = repository.findById(header.id());
+            if (current.filter(value -> matches(value, header)).isPresent()) {
+                ResolvedSystemParameter resolved = resolved(current.orElseThrow());
+                cache.putParameter(
+                        lookupScope, key, header.scopeType(), header.scopeCode(), header.version(), resolved);
+                return resolved;
             }
         }
-        var global = repository.findByScopeAndKey(
-                ParameterScopeType.GLOBAL, SystemParameterRules.GLOBAL_SCOPE_CODE, key);
-        if (global.isPresent() && global.orElseThrow().enabled()) {
-            return resolved(global.orElseThrow());
+        throw new IllegalStateException("参数在 Runtime 解析过程中持续发生并发变化");
+    }
+
+    private Optional<SystemParameterRepository.RuntimeHeader> selectEffectiveHeader(
+            String key, String applicationCode) {
+        if (applicationCode != null) {
+            var override = repository.findRuntimeHeader(
+                    ParameterScopeType.APPLICATION, applicationCode, key);
+            if (override.isPresent() && override.orElseThrow().enabled()) {
+                return override;
+            }
         }
-        throw new SystemParameterException.NotFound("有效参数不存在");
+        var global = repository.findRuntimeHeader(
+                ParameterScopeType.GLOBAL, SystemParameterRules.GLOBAL_SCOPE_CODE, key);
+        return global.filter(SystemParameterRepository.RuntimeHeader::enabled);
+    }
+
+    private void appendChange(SystemParameter parameter, ChangeKind changeKind) {
+        events.parameterChanged(new SystemRuntimeChangeEventPort.ParameterChangedEvent(
+                parameter.id(),
+                parameter.parameterKey(),
+                parameter.scopeType(),
+                parameter.scopeCode(),
+                parameter.version(),
+                parameter.enabled(),
+                changeKind));
     }
 
     private void requireCompatibleValueType(String key, ParameterValueType requested, String excludedId) {
@@ -161,7 +199,8 @@ public class SystemParameterApplicationService {
                 .filter(parameter -> !Objects.equals(parameter.id(), excludedId))
                 .anyMatch(parameter -> parameter.valueType() != requested);
         if (incompatible) {
-            throw new SystemParameterException.Conflict("同一 parameterKey 的 GLOBAL 与 APPLICATION valueType 必须一致");
+            throw new SystemParameterException.Conflict(
+                    "同一 parameterKey 的 GLOBAL 与 APPLICATION valueType 必须一致");
         }
     }
 
@@ -169,6 +208,30 @@ public class SystemParameterApplicationService {
         String normalizedId = requireId(id);
         return repository.findById(normalizedId)
                 .orElseThrow(() -> new SystemParameterException.NotFound("参数不存在"));
+    }
+
+    private static boolean matches(
+            ResolvedSystemParameter value,
+            SystemParameterRepository.RuntimeHeader header) {
+        return value.parameterKey().equals(header.parameterKey())
+                && value.valueType() == header.valueType()
+                && value.resolvedScopeType() == header.scopeType()
+                && value.resolvedScopeCode().equals(header.scopeCode())
+                && value.version() == header.version()
+                && value.updatedAt().equals(header.updatedAt());
+    }
+
+    private static boolean matches(
+            SystemParameter value,
+            SystemParameterRepository.RuntimeHeader header) {
+        return value.id().equals(header.id())
+                && value.scopeType() == header.scopeType()
+                && value.scopeCode().equals(header.scopeCode())
+                && value.parameterKey().equals(header.parameterKey())
+                && value.valueType() == header.valueType()
+                && value.enabled() == header.enabled()
+                && value.version() == header.version()
+                && value.updatedAt().equals(header.updatedAt());
     }
 
     private static String requireId(String id) {

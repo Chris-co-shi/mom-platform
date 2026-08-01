@@ -53,6 +53,34 @@ public class MybatisSystemParameterRepository
         return Optional.ofNullable(getOne(query)).map(MybatisSystemParameterRepository::toDomain);
     }
 
+    /** 只查询 Runtime 生效判断需要的 Header 列，不加载 parameter_value。 */
+    @Override
+    public Optional<RuntimeHeader> findRuntimeHeader(
+            ParameterScopeType scopeType, String scopeCode, String parameterKey) {
+        var query = Wrappers.<SystemParameterEntity>lambdaQuery()
+                .select(
+                        SystemParameterEntity::getId,
+                        SystemParameterEntity::getScopeType,
+                        SystemParameterEntity::getScopeCode,
+                        SystemParameterEntity::getParameterKey,
+                        SystemParameterEntity::getValueType,
+                        SystemParameterEntity::getEnabled,
+                        SystemParameterEntity::getVersion,
+                        SystemParameterEntity::getUpdatedAt)
+                .eq(SystemParameterEntity::getScopeType, scopeType)
+                .eq(SystemParameterEntity::getScopeCode, scopeCode)
+                .eq(SystemParameterEntity::getParameterKey, parameterKey);
+        return Optional.ofNullable(getOne(query)).map(entity -> new RuntimeHeader(
+                entity.getId(),
+                entity.getScopeType(),
+                entity.getScopeCode(),
+                entity.getParameterKey(),
+                entity.getValueType(),
+                Boolean.TRUE.equals(entity.getEnabled()),
+                entity.getVersion(),
+                entity.getUpdatedAt()));
+    }
+
     /** 读取同 Key 的全部作用域，用于 Application 强制值类型一致性。 */
     @Override
     public List<SystemParameter> findAllByKey(String parameterKey) {
