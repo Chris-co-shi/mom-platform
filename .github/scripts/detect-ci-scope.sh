@@ -13,6 +13,7 @@ emit_summary() { printf '%s\n' "$1" >> "$SUMMARY_FILE"; }
 
 emit_scopes() {
   emit nacos "$nacos"
+  emit redis_cache "$redis_cache"
   emit redis_idempotency "$redis_idempotency"
   emit redis_rate_limit "$redis_rate_limit"
   emit postgresql "$postgresql"
@@ -24,6 +25,7 @@ emit_scopes() {
 set_manual_scope() {
   local scope="$1"
   nacos=false
+  redis_cache=false
   redis_idempotency=false
   redis_rate_limit=false
   postgresql=false
@@ -34,6 +36,7 @@ set_manual_scope() {
   case "$scope" in
     all)
       nacos=true
+      redis_cache=true
       redis_idempotency=true
       redis_rate_limit=true
       postgresql=true
@@ -43,7 +46,7 @@ set_manual_scope() {
       ;;
     none) ;;
     nacos) nacos=true ;;
-    redis) redis_idempotency=true; redis_rate_limit=true ;;
+    redis) redis_cache=true; redis_idempotency=true; redis_rate_limit=true ;;
     postgresql) postgresql=true ;;
     messaging) messaging=true ;;
     seata) seata=true ;;
@@ -67,6 +70,7 @@ emit_scope_summary() {
   emit_summary "- Mode: ${mode}"
   emit_summary "- Diff range: ${range}"
   emit_summary "- Nacos: ${nacos}"
+  emit_summary "- Redis Cache: ${redis_cache}"
   emit_summary "- Redis Idempotency: ${redis_idempotency}"
   emit_summary "- Redis Rate Limit: ${redis_rate_limit}"
   emit_summary "- PostgreSQL: ${postgresql}"
@@ -112,6 +116,7 @@ git diff --name-only "$BASE_SHA" "$HEAD_SHA" > changed-files.txt
 path_matches() { grep --extended-regexp --quiet "$1" changed-files.txt; }
 
 nacos=false
+redis_cache=false
 redis_idempotency=false
 redis_rate_limit=false
 postgresql=false
@@ -122,6 +127,7 @@ observability=false
 # Scope detector 或主 CI 自身变化必须验证所有主 CI 基础设施分支，避免脚本修改跳过自身。
 if path_matches '(^\.github/scripts/detect-ci-scope\.sh$|^\.github/workflows/ci\.yml$)'; then
   nacos=true
+  redis_cache=true
   redis_idempotency=true
   redis_rate_limit=true
   postgresql=true
@@ -133,6 +139,9 @@ if path_matches '(^\.github/scripts/nacos-discovery-smoke\.sh$|^mom-gateway/|^mo
 fi
 if path_matches '(^\.github/scripts/redis-idempotency-smoke\.sh$|^mom-framework/mom-idempotency/|IntegrationIdempotencyProbeController|/idempotenc)'; then
   redis_idempotency=true
+fi
+if path_matches '(^mom-framework/mom-cache/|/infrastructure/cache/|CacheRegion|CacheService)'; then
+  redis_cache=true
 fi
 if path_matches '(^\.github/scripts/redis-rate-limit-smoke\.sh$|^mom-framework/mom-rate-limit/|^mom-gateway/|/rate.?limit|RedisRate)'; then
   redis_rate_limit=true

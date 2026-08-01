@@ -77,7 +77,7 @@ class BaselineTest(unittest.TestCase):
         (self.root / "pom.xml").write_text(VALID_POM, encoding="utf-8")
         (self.root / ".github/workflows/ci.yml").write_text(VALID_WORKFLOW, encoding="utf-8")
         detector = "\n".join(f"emit {name} false" for name in (
-            "nacos", "redis_idempotency", "redis_rate_limit", "postgresql",
+            "nacos", "redis_cache", "redis_idempotency", "redis_rate_limit", "postgresql",
             "messaging", "seata", "observability",
         ))
         (self.root / ".github/scripts/detect-ci-scope.sh").write_text(detector, encoding="utf-8")
@@ -192,6 +192,7 @@ class ScopeDetectorTest(unittest.TestCase):
             shutil.copy2(SCRIPT_DIR / "detect-ci-scope.sh", root / ".github/scripts/detect-ci-scope.sh")
             result = self.run_detector(root, MANUAL_SCOPE="redis")
             self.assertEqual("false", result["nacos"])
+            self.assertEqual("true", result["redis_cache"])
             self.assertEqual("true", result["redis_idempotency"])
             self.assertEqual("true", result["redis_rate_limit"])
 
@@ -220,6 +221,31 @@ class ScopeDetectorTest(unittest.TestCase):
             self.assertEqual("auto:pull-request-incremental", result["mode"])
             self.assertEqual("true", result["redis_idempotency"])
             self.assertEqual("false", result["nacos"])
+
+    def test_incremental_cache_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.name", "Cache Test"], cwd=root, check=True)
+            (root / ".github/scripts").mkdir(parents=True)
+            shutil.copy2(SCRIPT_DIR / "detect-ci-scope.sh", root / ".github/scripts/detect-ci-scope.sh")
+            (root / "README.md").write_text("base\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "base"], cwd=root, check=True)
+            base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+            path = root / "mom-framework/mom-cache/src/main/java/Example.java"
+            path.parent.mkdir(parents=True)
+            path.write_text("class Example {}\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "head"], cwd=root, check=True)
+            head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+            result = self.run_detector(
+                root, MANUAL_SCOPE="auto", EVENT_NAME="pull_request", PR_ACTION="synchronize",
+                PR_PREVIOUS_SHA=base, PR_BASE_SHA=base, PR_HEAD_SHA=head,
+            )
+            self.assertEqual("true", result["redis_cache"])
+            self.assertEqual("false", result["redis_idempotency"])
 
 
 if __name__ == "__main__":

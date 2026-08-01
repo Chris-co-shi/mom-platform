@@ -36,6 +36,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       nacos: ${{ steps.scope.outputs.nacos }}
+      redis_cache: ${{ steps.scope.outputs.redis_cache }}
       redis_idempotency: ${{ steps.scope.outputs.redis_idempotency }}
       redis_rate_limit: ${{ steps.scope.outputs.redis_rate_limit }}
       postgresql: ${{ steps.scope.outputs.postgresql }}
@@ -189,6 +190,43 @@ jobs:
             idempotency-space.json
             idempotency-compact.json
             redis-idempotency-failure.json
+          if-no-files-found: ignore
+          include-hidden-files: true
+
+  redis-cache:
+    name: Redis cache integration
+    needs: [changes, verify]
+    if: needs.changes.outputs.redis_cache == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Verify cache contract and real Redis recovery
+        shell: bash
+        run: >-
+          bash scripts/codex-mvn-test.sh
+          -pl mom-framework/mom-cache
+          -am verify
+
+      - name: Upload Redis cache diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: redis-cache-diagnostics
+          path: |
+            .codex/runtime/logs/**
+            .codex/runtime/summaries/**
+            mom-framework/mom-cache/target/surefire-reports/**
+            mom-framework/mom-cache/target/failsafe-reports/**
           if-no-files-found: ignore
           include-hidden-files: true
 

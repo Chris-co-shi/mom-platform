@@ -2,6 +2,20 @@ module: mom-cache
 version: 1.0
 
 configs:
+  - key: mom.cache.environment
+    environmentVariable: MOM_CACHE_ENVIRONMENT
+    type: string
+    default: local
+    required: true
+    sensitive: false
+    owner: mom-framework
+    failureMode: fail-fast-invalid-key-segment
+    restartRequired: true
+    scope: [global, factory]
+    changeImpact:
+      - redis-key-namespace
+      - cache-cold-start
+
   - key: mom.cache.enabled
     type: boolean
     default: true
@@ -28,3 +42,29 @@ configs:
       - cache-hit-rate
       - memory-usage
       - data-freshness
+
+  - key: mom.cache.caffeine.maximum-size
+    environmentVariable: MOM_CACHE_CAFFEINE_MAXIMUM_SIZE
+    type: long
+    default: 10000
+    required: false
+    sensitive: false
+    owner: mom-framework
+    failureMode: use-reasonable-default
+    restartRequired: true
+    changeImpact:
+      - l1-memory-usage
+      - cache-hit-rate
+
+  - key: mom.cache.redis.enabled
+    environmentVariable: MOM_CACHE_REDIS_ENABLED
+    type: boolean
+    default: true
+    required: false
+    sensitive: false
+    owner: mom-framework
+    failureMode: l1-and-authoritative-loader-only
+    restartRequired: true
+    changeImpact:
+      - l2-availability
+      - authoritative-source-load
