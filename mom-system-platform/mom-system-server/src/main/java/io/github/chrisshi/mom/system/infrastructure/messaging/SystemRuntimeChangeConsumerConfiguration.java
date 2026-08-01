@@ -58,7 +58,17 @@ public class SystemRuntimeChangeConsumerConfiguration {
                         || payload.releaseVersion() < 1
                         || payload.checksum() == null
                         || payload.checksum().length() != 64) {
-                    throw new IllegalArgumentException("Catalog 事件负载非法");
+                    throw new IllegalArgumentException("Catalog 发布事件负载非法");
+                }
+                cache.evictCatalog(payload.applicationCode());
+            }
+            case OutboxSystemRuntimeChangeEventAdapter.CATALOG_STATUS_CHANGED_EVENT -> {
+                requireVersionOne(event, "Catalog");
+                CatalogStatusChangedPayload payload = decode(
+                        event.payloadJson(), CatalogStatusChangedPayload.class, objectMapper, "Catalog");
+                if (payload.applicationCode() == null || payload.applicationCode().isBlank()
+                        || payload.version() < 0) {
+                    throw new IllegalArgumentException("Catalog 状态事件负载非法");
                 }
                 cache.evictCatalog(payload.applicationCode());
             }
@@ -145,6 +155,12 @@ public class SystemRuntimeChangeConsumerConfiguration {
             int routeContractVersion,
             String checksum,
             Long sourceReleaseVersion) {
+    }
+
+    record CatalogStatusChangedPayload(
+            String applicationCode,
+            long version,
+            boolean enabled) {
     }
 
     record ParameterChangedPayload(

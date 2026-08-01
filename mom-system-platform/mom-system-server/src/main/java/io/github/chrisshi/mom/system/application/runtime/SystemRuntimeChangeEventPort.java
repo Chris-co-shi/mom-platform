@@ -15,6 +15,9 @@ public interface SystemRuntimeChangeEventPort {
     /** 在当前 Catalog 发布事务中追加发布事实。 */
     void catalogPublished(CatalogPublishedEvent event);
 
+    /** 在当前 Application 启停事务中追加 Runtime Kill Switch 事实。 */
+    void catalogStatusChanged(CatalogStatusChangedEvent event);
+
     /** 在当前 Parameter 写事务中追加失效事实。 */
     void parameterChanged(ParameterChangedEvent event);
 
@@ -40,6 +43,13 @@ public interface SystemRuntimeChangeEventPort {
             int routeContractVersion,
             String checksum,
             Long sourceReleaseVersion) {
+    }
+
+    record CatalogStatusChangedEvent(
+            String applicationId,
+            String applicationCode,
+            long version,
+            boolean enabled) {
     }
 
     record ParameterChangedEvent(

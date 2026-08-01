@@ -21,6 +21,7 @@ import java.util.UUID;
 @Component
 public class OutboxSystemRuntimeChangeEventAdapter implements SystemRuntimeChangeEventPort {
     public static final String CATALOG_PUBLISHED_EVENT = "system.catalog.published";
+    public static final String CATALOG_STATUS_CHANGED_EVENT = "system.catalog.status-changed";
     public static final String PARAMETER_CHANGED_EVENT = "system.parameter.changed";
     public static final String DICTIONARY_CHANGED_EVENT = "system.dictionary.changed";
     public static final String I18N_PUBLISHED_EVENT = "system.i18n.published";
@@ -54,6 +55,19 @@ public class OutboxSystemRuntimeChangeEventAdapter implements SystemRuntimeChang
                         event.routeContractVersion(),
                         event.checksum(),
                         event.sourceReleaseVersion()));
+    }
+
+    @Override
+    public void catalogStatusChanged(CatalogStatusChangedEvent event) {
+        Objects.requireNonNull(event, "event");
+        append(
+                CATALOG_STATUS_CHANGED_EVENT,
+                "SystemApplicationCatalog",
+                event.applicationId(),
+                new CatalogStatusChangedPayload(
+                        event.applicationCode(),
+                        event.version(),
+                        event.enabled()));
     }
 
     @Override
@@ -148,6 +162,12 @@ public class OutboxSystemRuntimeChangeEventAdapter implements SystemRuntimeChang
             int routeContractVersion,
             String checksum,
             Long sourceReleaseVersion) {
+    }
+
+    record CatalogStatusChangedPayload(
+            String applicationCode,
+            long version,
+            boolean enabled) {
     }
 
     record ParameterChangedPayload(
