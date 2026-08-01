@@ -1,6 +1,7 @@
 package io.github.chrisshi.mom.cache.redis;
 
 import io.github.chrisshi.mom.cache.api.CacheKey;
+import io.github.chrisshi.mom.cache.api.CacheLayer;
 import io.github.chrisshi.mom.cache.api.CachePolicy;
 import io.github.chrisshi.mom.cache.api.CacheProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -21,13 +22,23 @@ public class RedisCacheProvider implements CacheProvider {
     }
 
     @Override
+    public CacheLayer layer() {
+        return CacheLayer.REMOTE;
+    }
+
+    @Override
     public boolean supports(CachePolicy policy) {
         return policy != null && policy.redisEnabled();
     }
 
     @Override
     public Object get(CacheKey key) {
-        String value = redisTemplate.opsForValue().get(key.value());
+        String value;
+        try {
+            value = redisTemplate.opsForValue().get(key.value());
+        } catch (RuntimeException ex) {
+            return null;
+        }
         return value == null ? null : serializer.deserialize(value, Object.class);
     }
 
@@ -39,6 +50,10 @@ public class RedisCacheProvider implements CacheProvider {
 
     @Override
     public void delete(CacheKey key) {
-        redisTemplate.delete(key.value());
+        try {
+            redisTemplate.delete(key.value());
+        } catch (RuntimeException ignored) {
+            // cache eviction failure must not break business flow
+        }
     }
 }
