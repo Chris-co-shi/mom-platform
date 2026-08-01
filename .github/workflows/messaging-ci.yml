@@ -95,7 +95,8 @@ jobs:
             org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration,
             org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration,
             org.springframework.boot.security.autoconfigure.SecurityFilterAutoConfiguration,
-            org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration
+            org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration,
+            org.springframework.boot.security.oauth2.client.autoconfigure.servlet.OAuth2ClientWebSecurityAutoConfiguration
         run: bash .github/scripts/system-rocketmq-runtime-event-smoke.sh
       - name: Record S18 messaging evidence
         if: success()
