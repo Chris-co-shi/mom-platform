@@ -33,7 +33,8 @@ public class RedisCacheProvider implements CacheProvider {
 
     @Override
     public void put(CacheKey key, Object value, Duration ttl) {
-        redisTemplate.opsForValue().set(key.value(), serializer.serialize(value), ttl);
+        CacheValueEnvelope envelope = serializer.wrap(value);
+        redisTemplate.opsForValue().set(key.value(), serializer.serialize(envelope), ttl);
     }
 
     @Override
