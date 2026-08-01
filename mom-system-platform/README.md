@@ -1,121 +1,254 @@
 # MOM System Platform
 
-`mom-system-platform` 已完成 S12 技术骨架、S13 GLOBAL/APPLICATION 类型化非敏感参数、S14 非权威受限通用字典、S15-B Dynamic I18n、S16 用户显示偏好/受限视图设置，以及 S17 Application Catalog/Navigation Draft、不可变发布快照与权限过滤 Runtime。S15-A 历史审计保持不变；当前客户端尚未正式接入，S18 缓存、变更通知和跨服务验证仍为 Not Started。
+`mom-system-platform` 已完成 P1.6 S12～S18：技术骨架、非敏感类型化参数、受限通用字典、Dynamic I18n、用户偏好、Application Catalog，以及 Runtime Cache、变更通知、Outbox/Inbox、RocketMQ 和 IAM Permission Reference 生命周期闭环。
 
-## 模块职责
+当前状态：
 
-| 模块 | 当前职责 |
+```text
+S18：Completed with Deferred items
+S19-A：Not Started
+PR #33：Open / Draft / 未合并
+```
+
+## 1. 模块职责
+
+| 模块 | 职责 |
 |---|---|
-| `mom-system-api` | 参数/字典有效值、用户显示偏好/受限视图，以及不可执行 Runtime Catalog 稳定只读契约 |
-| `mom-system-client` | 仅保留调用边界；当前无 Java 服务真实调用方，不提前创建 Feign Client |
-| `mom-system-server` | 参数、受限字典、Dynamic I18n、用户偏好与 Application Catalog 领域规则、事务用例、`mom_system` 持久化、管理/Runtime API 与 JWT 安全 |
+| `mom-system-api` | 参数、字典、偏好和不可执行 Runtime Catalog 稳定契约 |
+| `mom-system-client` | System 对外调用边界；当前不承载业务实现 |
+| `mom-system-server` | System 领域规则、事务用例、PostgreSQL 权威持久化、Runtime Cache、事件、管理/Runtime API 与安全 |
 
-依赖方向固定为：
+依赖方向：
 
 ```text
 caller → mom-system-client → mom-system-api
 mom-system-server → mom-system-api
 web → application → domain
-infrastructure → domain/application ports
+infrastructure → application/domain ports
 ```
 
-## 参数能力
+## 2. 当前业务能力
 
-- Scope 仅允许 `GLOBAL`、`APPLICATION`；GLOBAL 使用空 `scopeCode`，APPLICATION 使用小写 kebab-case `applicationCode`。
-- Value Type 仅允许 `STRING`、`INTEGER`、`DECIMAL`、`BOOLEAN`、`JSON`；跨服务继续返回类型与规范字符串。
-- 同一 Key 的 GLOBAL 与 APPLICATION 必须保持相同 Value Type；同 Key 写事务由 PostgreSQL 事务级锁串行化。
-- enabled APPLICATION 优先；禁用或不存在时回退 enabled GLOBAL；均不存在返回 404。
-- 创建、更新与启停使用本地事务；更新与启停都必须携带 Version，冲突返回 409。
-- 不提供 DELETE；不实现历史版本表。
+### 2.1 Parameter
 
-## 安全与数据边界
+- Scope：`GLOBAL / APPLICATION`；
+-类型：`STRING / INTEGER / DECIMAL / BOOLEAN / JSON`；
+-禁止 Secret、Credential、Token、Password 等敏感语义；
+- Application 优先、GLOBAL 回退；
+- Version 乐观并发；
+- PostgreSQL 权威；
+- Runtime 有效解析结果可缓存。
 
-- `mom_system.system_parameter` 是参数唯一写入权威，不访问 IAM/MDM 或其他 Schema，不建立跨 Schema FK/JOIN。
-- `system:parameter:read` 保护管理查询与有效值解析；`system:parameter:write` 保护创建、更新和启停。这些 Code 仅引用 IAM Permission，不在 System 保存定义或分配。
-- Key 按 Segment 拒绝 password、secret、token、credential、private-key、client-secret、access-key、api-key 等明显敏感语义；System Parameter 不允许保存 Secret 或 Credential。
-- `mom-security` 传递的 Redis 仅用于现有 revoked sid 检查；Parameter Domain 不依赖 Redis，PostgreSQL 仍是唯一参数权威，S13 不实现参数缓存。
-- 不依赖 `mom-iam-server` 或其他领域 Server，不引入 MQ、Outbox、Inbox 或 Seata。
+### 2.2 Dictionary
 
-## 非权威通用字典
+-非权威、受限通用字典；
+-稳定 `dictionaryCode + itemCode`；
+- Active List 与 Disabled Compatibility；
+-禁止表达 IAM/MDM/WMS/EAM 权威对象、业务状态机、Tree、Metadata 或任意扩展属性；
+- Runtime Active List / Resolve Result 可缓存。
 
-- `dictionaryCode` 是全局唯一小写点分段稳定 Reference；`itemCode` 在字典内唯一。二者创建后不可 Rename。
-- Consumer 只保存 `dictionaryCode + itemCode`；数据库 ID、fallback Label 和 `sortOrder` 不得成为跨服务 Reference。
-- Active List 只返回字典和 Item 均启用的记录，固定按 `sortOrder`、`itemCode`、ID 排序。
-- 兼容单项读取即使禁用也返回，并显式提供 `dictionaryEnabled`、`itemEnabled` 与 `effectiveEnabled`。
-- 禁用字典不级联写 Item；重新启用后恢复原 Item 状态。字典与 Item 都不提供物理/逻辑删除 API。
-- `mom_system.system_dictionary_item` 通过 Application 引用校验、同事务写入、唯一约束与关联索引维护完整性；V5 已移除历史 Restrict FK，V2 不插入样例或业务状态。
-- 字典禁止表达 IAM/MDM/WMS/EAM 权威对象、业务状态机、Tree、Metadata、Alias、多语言资源或任意扩展属性。
-- `system:dictionary:read/write` 只作为 IAM Permission Reference；Redis 不用于字典缓存，PostgreSQL 是唯一权威。
+### 2.3 Dynamic I18n
 
-## 精确门禁
+- `zh-CN / en-US`；
+- Draft、双 Locale 不可变 Release、Publish、Rollback；
+-完整 JSONB Snapshot、checksum、ETag/304；
+- Resource disabled 是即时 Kill Switch；
+- Runtime 单 Locale Release 可缓存；
+- Web/Mobile 正式接入尚未完成。
 
-POM XML 白名单只允许 System API、WebMVC、Security、Data、Tracing、Metrics、Nacos、Lombok 与测试基础设施；`mom-iam-server` 和 `mom-mdm-api` 负例必须失败。API 精确放行参数、字典、偏好和 Catalog 只读契约，`mom-system-client` 继续为空。ArchUnit 验证各 Domain 不穿透技术边界、Controller 只进入对应 Application、持久化类型只在 Infrastructure；Catalog 允许保存元数据与稳定 Reference，但继续禁止形成第二 IAM、主数据权威或返回 Component/Layout/Script 等可执行客户端 Artifact。
+### 2.4 User Preference
 
-## Dynamic I18n
+- Locale、displayTimezone、themeMode、density、pageSize；
+-受限 Column/Sort/Filter View；
+-只使用已验证 JWT `sub` 隔离当前用户；
+-不进入 JWT，不参与 Authorization；
+- **S18 明确不缓存 Preference**，不是遗漏。
 
-- V1 Locale 仅支持 `zh-CN`、`en-US`；Resource 的 `applicationCode/resourceCode/defaultLocale` 与 Draft 的 `resourceId/messageKey/locale` 创建后不可修改。
-- V3 创建 Resource、Draft Message、Immutable Release 三表；Release 每版本每 Locale 保存完整 JSONB Snapshot，数据库触发器拒绝更新和删除。
-- Publish 在资源行锁与单 PostgreSQL 本地事务中校验乐观版本、默认 Locale、Placeholder Set、fallback 与 No-op，原子追加两个 Locale 并推进单调版本。
-- Rollback 不倒退指针，而是复制目标历史内容为新版本并记录 `sourceReleaseVersion`；Draft 不改变。
-- Runtime API 只向已认证用户返回当前完整发布快照，不返回 Draft/数据库 ID/管理审计；资源禁用、未发布或版本不完整均返回 404，并支持 checksum ETag/304。
-- 管理权限仅引用 IAM 的 `system:i18n:read/write/publish` Code；System 不保存 Permission 或 Role。
-- 不使用 Redis/Caffeine、MQ、Outbox/Inbox、Seata 或 Feign；当前 Web/Mobile 尚未接入。
+### 2.5 Application Catalog
 
-## 用户显示偏好与受限视图设置
+- Application、Navigation Draft、不可变 Release；
+- `WEB / MOBILE` Channel；
+- `GROUP / ROUTE` 节点；
+-只保存 Route、Icon、I18n、Permission 稳定 Reference；
+-不保存 Path、Component、Layout、JavaScript、HTML、动态 import 或远程模块 URL；
+- Publish/Rollback 使用单调版本和完整 Snapshot；
+- Runtime 根据当前 JWT Permission Authority 精确过滤；
+- Application disabled 是即时 Kill Switch；
+-发布 Snapshot 可缓存。
 
-- V7 新增 `system_user_preference` 与 `system_user_view_setting`，无物理 FK、无逻辑删除；Reset 保留行并推进 Version。
-- 显示偏好只允许 Locale、displayTimezone、themeMode、density、pageSize；NULL 回退冻结 Platform Default。
-- View 使用类型化 Column/Sort/Filter，最多 100/3/20 项，总 JSONB 最大 16 KiB；业务查询不得直接执行恢复值。
-- 当前用户只来自已验证 JWT sub，API 路径/Body/Header 不接受 userId；自助 API 只要求认证，不新增管理 Permission。
-- Preference 不进入 JWT、不修改 `/api/iam/me`、不参与授权、Factory 业务日期、金额、数量或单位事实。
-- `mom-system-client` 继续为空；Web/Mobile 接入、缓存、MQ 和跨服务同步不在 S16。
+## 3. S18 IAM Permission Reference
 
-## Application Catalog 与 Navigation
+IAM 提供：
 
-- V8 新增 `system_application`、`system_navigation_item` 与不可变 `system_catalog_release`，无物理 FK；Release Trigger 拒绝 UPDATE/DELETE。
-- Application 使用稳定小写 kebab-case `applicationCode`，不是 IAM OAuth Client；V1 类型为 `PLATFORM/BUSINESS`。
-- Navigation Draft 按 `WEB/MOBILE` Channel 管理 `GROUP/ROUTE` 节点，保存 `routeKey`、Dynamic I18n Reference、IAM `permissionCode` Reference 和受限展示元数据。
-- System 只返回 Metadata，不保存或返回 Path、Component、Layout、JavaScript、HTML、动态 import 或远程模块 URL。
-- Application Version 是全部 Navigation Draft 写入和 Publish 的聚合并发边界；节点同时使用独立 Version。
-- Publish 校验完整树、Dynamic I18n 发布引用、Snapshot 大小和 No-op，生成确定性 JSONB Snapshot、SHA-256 与单调版本。
-- Rollback 复制历史 Snapshot 创建新版本，记录 `sourceReleaseVersion`，不修改 Draft 或历史 Release。
-- Runtime 只读发布快照，根据当前 JWT 原始 Permission Authority 精确过滤节点；菜单隐藏不替代业务 API 授权。
-- Runtime 支持 ETag/304；Application `enabled=false` 是即时 Kill Switch。
-- IAM V10 注册 `system:catalog:read/write/publish` 并赋予内置 `PLATFORM_ADMIN`；System 仍只保存 Permission Code Reference。
-- 发布期 IAM Permission 权威批量验证、缓存/通知、Web/Mobile Route Registry 正式接入进入 S18 或后续独立跨仓库任务。
+```http
+POST /api/iam/internal/permission-references/validate
+```
 
-## 当前未实现
+响应状态：
 
-- Default/Last Factory、Dashboard/Favorites 与 Web/Mobile 正式接入；
-- Catalog/I18n/Parameter/Dictionary/Preference 缓存、变更通知和跨服务对账；
-- Catalog 发布期 IAM Permission 批量权威验证；
-- Dynamic I18n 客户端接入；Audit Projection；
-- Secret 管理、配置中心替代、跨服务推送；
-- Redis 参数缓存、MQ 参数广播；
-- IAM 数据迁移或 System 内 Permission 存储；
--可执行远程模块、External URL 或动态 Component 配置。
+- `ENABLED`；
+- `DISABLED`；
+- `UNKNOWN`。
 
-## 本地验证
+System 使用：
 
-需要 JDK 25 与 Maven 3.9.9 或更高版本：
+```text
+grant_type = client_credentials
+scope = iam.permission-reference.read
+client_id = mom-system-server
+```
+
+服务 Secret 只由环境 Secret 注入。System 不保存 Permission 定义、Role、Assignment、用户授权结果或 OAuth Client 安全配置。
+
+## 4. Catalog 发布事务
+
+```text
+非事务候选构建
+→ 事务外 IAM 权威校验
+→ Transactional Commit Service
+→ 事务内重新校验 Draft / Version / Permission Set
+→ Release + Published Pointer + Outbox 原子提交
+```
+
+边界：
+
+- Feign Adapter 使用 `Propagation.NEVER`；
+- Redis、RocketMQ 和 IAM HTTP 不进入数据库事务；
+-不使用 Seata；
+-无 `@GlobalTransactional`；
+-远程校验后 Draft 改变时返回 409；
+- IAM 不可用时发布返回 503，不 fallback 为全部有效。
+
+## 5. Runtime Cache
+
+| 能力 | Cache | 权威与降级 |
+|---|---|---|
+| Catalog | 不可变 Release Snapshot | 先读 PostgreSQL Header；Redis 故障回源 |
+| Dynamic I18n | 单 Locale Release | 先读 Resource Header；checksum/版本不符回源 |
+| Parameter | 有效解析结果 | Redis 故障回源 PostgreSQL |
+| Dictionary | Active List / Resolve Result | 先读 Dictionary Header；Redis 故障回源 |
+| Preference | 不缓存 | PostgreSQL |
+| IAM Permission Validation | 不缓存 | IAM 实时权威 |
+| `/catalog/me` 过滤结果 | 不缓存 | 当前 JWT Authority |
+
+PostgreSQL 故障时不只凭 Redis 返回 stale 数据。
+
+## 6. 变更通知
+
+事件：
+
+- `system.catalog.published`；
+- `system.catalog.status-changed`；
+- `system.i18n.published`；
+- `system.i18n.status-changed`；
+- `system.parameter.changed`；
+- `system.dictionary.changed`。
+
+链路：
+
+```text
+业务写事务
+→ 业务事实 + mom_outbox_event
+→ 事务外 RocketMQ
+→ System Consumer
+→ mom_inbox_event 幂等
+→ Redis Cache Evict
+```
+
+Payload 不包含参数值、翻译正文、字典 Label、User、Token 或 Secret。
+
+## 7. 数据库
+
+System Flyway 当前到 V9：
+
+- V1：Parameter；
+- V2：Dictionary；
+- V3：Dynamic I18n；
+- V4～V6：实体、无业务 FK 与 Snapshot 语义治理；
+- V7：User Preference / View；
+- V8：Application Catalog / Navigation / Release；
+- V9：Outbox / Inbox。
+
+约束：
+
+-单服务单 DataSource；
+-业务/跨 Schema 物理 FK = 0；
+-历史 Migration 不修改；
+- Outbox Claim Index 和 Inbox Identity Unique 已验证。
+
+## 8. 故障语义
+
+| 故障 | 行为 |
+|---|---|
+| IAM 不可用 | Publish/Rollback 503；对账失败不影响 Readiness |
+| Redis 不可用 | Runtime 回源 PostgreSQL |
+| PostgreSQL 不可用 | 不返回不可信 stale Cache |
+| RocketMQ 不可用 | 业务与 Outbox 提交；Publisher RETRY |
+| Broker 恢复 | Outbox 自动补发 |
+| 重复事件 | Inbox 幂等 |
+| 毒消息 | 重试耗尽进入 DLQ |
+| Cache Evict 失败 | 不回滚数据库，由重试与 TTL 修复 |
+
+## 9. 配置边界
+
+关键环境变量：
+
+```text
+SYSTEM_RUNTIME_CACHE_ENABLED
+MOM_ENVIRONMENT
+SYSTEM_RUNTIME_EVENT_CONSUMER_ENABLED
+SYSTEM_STREAM_FUNCTION_DEFINITION
+SYSTEM_RUNTIME_EVENT_TOPIC
+SYSTEM_RUNTIME_EVENT_CONSUMER_GROUP
+ROCKETMQ_NAME_SERVER
+OUTBOX_PUBLISHER_ENABLED
+IAM_PERMISSION_REFERENCE_URL
+IAM_PERMISSION_REFERENCE_OAUTH2_ENABLED
+IAM_TOKEN_URI
+IAM_SYSTEM_CLIENT_ID
+IAM_SYSTEM_CLIENT_SECRET
+```
+
+生产 Secret 不得写入 `application.yml` 或普通 Nacos 配置。
+
+## 10. 验证
 
 ```bash
-bash scripts/codex-mvn-test.sh \
-  -pl mom-system-platform/mom-system-server \
-  -am clean verify
-
-bash scripts/codex-mvn-test.sh \
-  -pl mom-architecture-tests \
-  -am test
-
-BASE_REF=399e859674a6e29819aa32dbf5d7dd056f41480d \
-  bash scripts/codex-verify-changed.sh
+bash scripts/codex-mvn-test.sh clean verify
 
 bash .github/scripts/system-postgresql-smoke.sh
 
-bash scripts/codex-mvn-test.sh clean verify
+bash .github/scripts/system-rocketmq-runtime-event-smoke.sh
 ```
 
-## 回滚
+CI 还会验证：
 
-需要撤销 S17 应用能力时，对 S17 功能提交执行普通 `git revert`；已执行 System V8 和 IAM V10 的数据库必须另行评估 Catalog Draft/Release 与 Permission Seed 保留，禁止删除或修改历史 Migration，也不得用 reset/rebase 改写 S15～S16 历史。
+-真实 `client_credentials`；
+- IAM 内部 Permission API；
+- System Feign OAuth2；
+-启动对账；
+- IAM 停机后 System Readiness；
+-真实 PostgreSQL、Redis、RocketMQ、重试、Inbox 和 DLQ。
+
+## 11. 当前未实现
+
+- IAM Permission 正式启停/删除事件；
+- mom-web / mom-mobile Route Registry 正式接入；
+- Dynamic I18n 客户端正式接入；
+- Default/Last Factory、Dashboard/Favorites；
+- Mobile Logout 服务端撤销；
+-正式 Client/Redirect/App Link；
+- L4/L6 和真实部署环境最终验收。
+
+上述事项进入 S19-A、后续独立客户端任务或未来 IAM 生命周期 Slice。
+
+## 12. 权威文档
+
+- [ADR-031](../docs/adr/ADR-031-System运行时缓存变更通知与服务身份事务边界.md)
+- [S18 权威报告](../docs/engineering/P1.6-S18-System运行时缓存变更通知与IAM权限引用生命周期报告.md)
+- [P1.6 实施进度](../docs/plans/P1.6-实施进度.md)
+- [P1.6 治理计划](../docs/plans/P1.6-IAM与System平台治理计划.md)
+
+## 13. 回滚
+
+代码回滚使用普通 `git revert`。已执行 V9 后不得删除或修改历史 Migration；应评估保留 Outbox/Inbox 表、停用 Publisher/Consumer 和兼容已有事件数据。禁止 reset、rebase 或 force-push 改写长期阶段历史。
