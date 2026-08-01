@@ -9,9 +9,9 @@ public interface CacheProvider {
 
     boolean supports(CachePolicy policy);
 
-    Object get(String key);
+    Object get(CacheKey key);
 
-    void put(String key, Object value, Duration ttl);
+    void put(CacheKey key, Object value, Duration ttl);
 
-    void delete(String key);
+    void delete(CacheKey key);
 }
