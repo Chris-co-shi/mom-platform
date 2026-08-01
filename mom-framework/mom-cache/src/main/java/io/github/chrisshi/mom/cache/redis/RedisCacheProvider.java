@@ -35,7 +35,11 @@ public class RedisCacheProvider implements CacheProvider {
     public Object get(CacheKey key) {
         try {
             String value = redisTemplate.opsForValue().get(namespace(key));
-            return value == null ? null : serializer.deserialize(value, Object.class);
+            if (value == null) {
+                return null;
+            }
+            CacheValueEnvelope envelope = serializer.deserialize(value, CacheValueEnvelope.class);
+            return serializer.unwrap(envelope, Object.class);
         } catch (RuntimeException ex) {
             return null;
         }
