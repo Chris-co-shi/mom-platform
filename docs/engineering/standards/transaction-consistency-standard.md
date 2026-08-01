@@ -10,10 +10,11 @@
 
 不得把网络重试、Redis 锁或 Seata 当成默认分布式一致性方案。
 
+AI、Codex 和自动化 Agent 在修改事务、Feign、Outbox/Inbox、MQ、Cache、多数据源或 Seata 前，必须同时遵守 [AI 事务设计与执行前置协议](transaction-ai-execution-standard.md)，先输出事务矩阵并通过人工 Review。
+
 ## 2. Spring 本地事务
 
-- 业务事务默认放在 Application Service 公共方法；Controller 不开启业务事务，Domain 不依赖 Spring
-  Transaction API。
+- 业务事务默认放在 Application Service 公共方法；Controller 不开启业务事务，Domain 不依赖 Spring Transaction API。
 - Spring 声明式事务通常通过代理拦截外部调用；private 方法和同类 self-invocation 不应被依赖为事务入口。
 - 默认传播 `REQUIRED`、数据库默认隔离 `READ COMMITTED`。提高隔离级别必须有并发证据和测试。
 - `readOnly=true` 是优化提示，不是授权或写保护边界；异步线程不继承调用线程事务。
@@ -29,9 +30,9 @@
 
 ## 3. 事务内外部动作
 
-普通数据库事务内禁止直接调用 RocketMQ、长时间 HTTP/Feign、设备或人工等待、sleep、无界重试、
-大文件上传和长轮询。外部动作在提交后执行；可靠发布通过 Outbox。若业务必须同步调用外部依赖，先缩短
-数据库临界区并明确失败补偿，不得持锁等待网络。
+普通数据库事务内禁止直接调用 RocketMQ、长时间 HTTP/Feign、设备或人工等待、sleep、无界重试、大文件上传和长轮询。外部动作在提交后执行；可靠发布通过 Outbox。若业务必须同步调用外部依赖，先缩短数据库临界区并明确失败补偿，不得持锁等待网络。
+
+同步权威校验默认采用“非事务 Orchestrator → 事务外远程调用 → 独立 Transactional Commit Service → 事务内重新检查 Version/Hash/候选集合 → 本地原子提交”。远程 Adapter 应通过 `Propagation.NEVER` 或等价门禁拒绝活动数据库事务。
 
 ## 4. Outbox、Inbox 与重试
 
@@ -44,28 +45,41 @@
 
 ## 5. Seata 边界
 
-- 默认关闭；不因模块存在而扩大使用。
-- 仅限短同步事务，当前 AT 基线不超过 10 秒、默认不超过两个数据库分支；放宽需要新 ADR 和故障测试。
+- 默认关闭；不因模块存在、Feign 调用或远程只读校验而扩大使用。
+- 仅限短同步事务，当前 AT 基线不超过 10 秒、默认不超过两个真实数据库写分支；放宽需要新 ADR 和故障测试。
 - 每个 RM 仍使用显式 Spring 本地事务，业务表与 `undo_log` 共用唯一 DataSource。
 - XID 缺失、不一致或 TC 不可用时 fail closed；不得降级为普通本地写入或伪造成功。
 - 全局事务内禁止 RocketMQ、设备动作、人工等待、长轮询和不可逆外部副作用。
 - Seata 不能替代 Outbox/Inbox、幂等、DEAD/DLQ、状态机和对账。
+- 只读 Feign 权威校验、缓存失效、消息发布、长流程、文件或设备操作不得使用 Seata。
 
 ## 6. Spring Authorization Server JDBC Store
 
-`JdbcRegisteredClientRepository`、`JdbcOAuth2AuthorizationService` 和
-`JdbcOAuth2AuthorizationConsentService` 是 IAM 内的标准协议持久化边界：
+`JdbcRegisteredClientRepository`、`JdbcOAuth2AuthorizationService` 和 `JdbcOAuth2AuthorizationConsentService` 是 IAM 内的标准协议持久化边界：
 
 - 保留官方 JDBC Store，不改写为 MyBatis-Plus Repository；
 - 官方表位于 IAM Schema，其他服务不得查询；
 - 不强加 `BaseEntity`、通用逻辑删除、MOM 审计列、乐观锁或领域外键；
 - 协议表迁移跟随当前 SAS 官方 Schema 与项目兼容要求；修改只能在后续 IAM Slice 完成协议级测试后进行。
 
-## 7. 官方事实来源
+## 7. AI 强制验收
+
+涉及事务的最终报告必须明确：
+
+- 实际 public 事务入口和传播；
+- 事务内表与聚合原子边界；
+- 事务外 Feign、Redis、MQ、文件和设备资源；
+- Outbox/Inbox 边界；
+- Seata 是否使用及理由；
+- 并发、幂等、回滚、对账和补偿；
+- PostgreSQL Testcontainers、Spring Proxy 与故障测试证据。
+
+无法确认事务边界时必须停止编码并进入人工 Review，不得自行添加事务注解或 Seata。
+
+## 8. 官方事实来源
 
 - [Spring 声明式事务注解](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html)
 - [Spring 事务传播](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html)
 - [Spring 回滚规则](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/rolling-back.html)
 - [PostgreSQL 17 Transaction Isolation](https://www.postgresql.org/docs/17/transaction-iso.html)
 - [Spring Authorization Server 核心组件](https://docs.spring.io/spring-security/reference/servlet/oauth2/authorization-server/core-model-components.html)
-
