@@ -25,11 +25,12 @@ public class DefaultCacheService implements CacheService {
     @Override
     public <T> void put(CacheKey key, T value) {
         CachePolicy policy = policyRegistry.get(key.type());
-        throw new UnsupportedOperationException("Put operation will be completed by cache write coordinator");
+        cacheProvider.put(key, value, policy);
     }
 
     @Override
     public void evict(CacheKey key) {
-        throw new UnsupportedOperationException("Evict operation will be completed by cache eviction coordinator");
+        CachePolicy policy = policyRegistry.get(key.type());
+        cacheProvider.evict(key, policy);
     }
 }
