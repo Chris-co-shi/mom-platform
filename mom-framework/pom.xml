@@ -15,6 +15,7 @@
     <module>mom-messaging</module>
     <module>mom-idempotency</module>
     <module>mom-outbox</module>
+    <module>mom-cache</module>
     <module>mom-seata</module>
     <module>mom-observation</module>
     <module>mom-tracing</module>
