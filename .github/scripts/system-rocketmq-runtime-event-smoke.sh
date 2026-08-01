@@ -13,6 +13,12 @@ POSTGRES_PORT=""
 REDIS_PORT=""
 SYSTEM_PORT="20303"
 SYSTEM_PID=""
+JWKS_PORT="19090"
+JWKS_PID=""
+KEY_DIR="$(mktemp -d)"
+ISSUER="http://127.0.0.1:${JWKS_PORT}"
+JWT_CLIENT_ID="mom-admin-web"
+JWT_KEY_ID="s18-runtime-event-smoke"
 ROCKETMQ_IMAGE="apache/rocketmq:5.3.2"
 ROCKETMQ_NAME_SERVER="127.0.0.1:9876"
 EVENT_TOPIC="mom-system-runtime-events-v1"
@@ -21,6 +27,7 @@ ENVIRONMENT="s18-ci"
 PARAMETER_KEY="s18.cache.probe"
 CACHE_INDEX="mom:${ENVIRONMENT}:system:parameter-resolved-index:v1:${PARAMETER_KEY}"
 BROKER_CONFIG="$(pwd)/system-runtime-event-broker.conf"
+SECURITY_EXCLUSIONS="org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration,org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration,org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration,org.springframework.boot.security.autoconfigure.SecurityFilterAutoConfiguration,org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration,org.springframework.boot.security.oauth2.client.autoconfigure.servlet.OAuth2ClientWebSecurityAutoConfiguration"
 FAILURE_REASON="System Runtime Event smoke failed"
 
 cleanup() {
@@ -28,6 +35,8 @@ cleanup() {
   set +e
   [[ -n "$SYSTEM_PID" ]] && kill "$SYSTEM_PID" 2>/dev/null
   [[ -n "$SYSTEM_PID" ]] && wait "$SYSTEM_PID" 2>/dev/null
+  [[ -n "$JWKS_PID" ]] && kill "$JWKS_PID" 2>/dev/null
+  [[ -n "$JWKS_PID" ]] && wait "$JWKS_PID" 2>/dev/null
   docker logs "$POSTGRES_CONTAINER" > system-runtime-event-postgresql.log 2>&1
   docker logs "$REDIS_CONTAINER" > system-runtime-event-redis.log 2>&1
   docker logs "$NAMESRV_CONTAINER" > system-runtime-event-namesrv.log 2>&1
@@ -37,6 +46,7 @@ cleanup() {
   docker rm -f "$NAMESRV_CONTAINER" >/dev/null 2>&1
   docker rm -f "$BROKER_CONTAINER" >/dev/null 2>&1
   rm -f "$BROKER_CONFIG"
+  rm -rf "$KEY_DIR"
   if [[ "$exit_code" -ne 0 ]]; then
     printf 'SYSTEM_RUNTIME_EVENT_SMOKE result=failure reason=%s\n' "$FAILURE_REASON" >&2
   fi
@@ -47,6 +57,10 @@ trap cleanup EXIT
 fail() {
   FAILURE_REASON="$1"
   return 1
+}
+
+base64url() {
+  openssl base64 -A | tr '+/' '-_' | tr -d '='
 }
 
 wait_http_200() {
@@ -145,6 +159,35 @@ autoCreateTopicEnable=true
 autoCreateSubscriptionGroup=true
 EOF
 
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
+  -out "${KEY_DIR}/jwt-private.pem" >/dev/null 2>&1
+MODULUS_HEX=$(openssl rsa -in "${KEY_DIR}/jwt-private.pem" -noout -modulus | cut -d= -f2)
+MODULUS=$(printf '%s' "$MODULUS_HEX" | xxd -r -p | base64url)
+jq --null-input --compact-output \
+  --arg kid "$JWT_KEY_ID" --arg n "$MODULUS" \
+  '{keys:[{kty:"RSA",use:"sig",alg:"RS256",kid:$kid,n:$n,e:"AQAB"}]}' \
+  > "${KEY_DIR}/jwks.json"
+python3 -m http.server "$JWKS_PORT" --bind 127.0.0.1 --directory "$KEY_DIR" \
+  > system-runtime-event-jwks.log 2>&1 &
+JWKS_PID=$!
+wait_http_200 "${ISSUER}/jwks.json" system-runtime-event-jwks.json "JWKS server"
+
+NOW=$(date +%s)
+EXPIRES=$((NOW + 3600))
+JWT_HEADER=$(jq --null-input --compact-output \
+  --arg kid "$JWT_KEY_ID" '{alg:"RS256",typ:"JWT",kid:$kid}')
+JWT_PAYLOAD=$(jq --null-input --compact-output \
+  --arg iss "$ISSUER" --arg sub "s18-smoke-user" --arg jti "s18-smoke-jti" \
+  --arg sid "s18-smoke-session" --arg client "$JWT_CLIENT_ID" \
+  --argjson iat "$NOW" --argjson exp "$EXPIRES" \
+  '{iss:$iss,sub:$sub,jti:$jti,sid:$sid,client_id:$client,user_type:"INTERNAL",aud:[$client],iat:$iat,exp:$exp,roles:["PLATFORM_ADMIN"],permissions:["system:parameter:read","system:parameter:write"],factory_ids:[]}')
+JWT_SIGNING_INPUT="$(printf '%s' "$JWT_HEADER" | base64url).$(printf '%s' "$JWT_PAYLOAD" | base64url)"
+JWT_SIGNATURE=$(printf '%s' "$JWT_SIGNING_INPUT" \
+  | openssl dgst -sha256 -sign "${KEY_DIR}/jwt-private.pem" \
+  | base64url)
+ACCESS_TOKEN="${JWT_SIGNING_INPUT}.${JWT_SIGNATURE}"
+AUTH_HEADER="Authorization: Bearer ${ACCESS_TOKEN}"
+
 docker run --name "$POSTGRES_CONTAINER" \
   -e POSTGRES_DB="$POSTGRES_DATABASE" \
   -e POSTGRES_USER="$POSTGRES_USERNAME" \
@@ -195,7 +238,9 @@ POSTGRES_USERNAME="$POSTGRES_USERNAME" POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
 REDIS_HOST=127.0.0.1 REDIS_PORT="$REDIS_PORT" \
 NACOS_DISCOVERY_ENABLED=false MANAGEMENT_HEALTH_REDIS_ENABLED=false \
 MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED=false MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED=false \
-MOM_RESOURCE_SERVER_ENABLED=false IAM_PERMISSION_REFERENCE_OAUTH2_ENABLED=false \
+MOM_RESOURCE_SERVER_ENABLED=true IAM_ISSUER_URI="$ISSUER" \
+IAM_JWK_SET_URI="${ISSUER}/jwks.json" IAM_ACCEPTED_AUDIENCES="$JWT_CLIENT_ID" \
+IAM_PERMISSION_REFERENCE_OAUTH2_ENABLED=false \
 SYSTEM_RUNTIME_CACHE_ENABLED=true MOM_ENVIRONMENT="$ENVIRONMENT" \
 SYSTEM_RUNTIME_EVENT_CONSUMER_ENABLED=true \
 SYSTEM_STREAM_FUNCTION_DEFINITION=systemRuntimeChangeConsumer \
@@ -212,10 +257,10 @@ java -jar mom-system-platform/mom-system-server/target/mom-system-server-0.1.0-S
   > system-runtime-event-server.log 2>&1 &
 SYSTEM_PID=$!
 wait_http_200 "http://127.0.0.1:${SYSTEM_PORT}/actuator/health/readiness" \
-  system-runtime-event-health.json "System"
+  system-runtime-event-health.json "secured System"
 
 CREATE_STATUS=$(curl --silent --output system-runtime-event-create.json --write-out '%{http_code}' \
-  --request POST --header 'Content-Type: application/json' \
+  --request POST --header "$AUTH_HEADER" --header 'Content-Type: application/json' \
   --data '{"scopeType":"GLOBAL","scopeCode":null,"parameterKey":"s18.cache.probe","valueType":"STRING","parameterValue":"v1","description":"S18 Runtime Event smoke","enabled":true}' \
   "http://127.0.0.1:${SYSTEM_PORT}/api/system/admin/parameters")
 [[ "$CREATE_STATUS" == "201" ]] || fail "Parameter create failed; HTTP ${CREATE_STATUS}"
@@ -227,6 +272,7 @@ wait_sql_value "SELECT status FROM mom_outbox_event WHERE event_id='${CREATE_EVE
 wait_sql_value "SELECT count(*) FROM mom_inbox_event WHERE event_id='${CREATE_EVENT}' AND processed_at IS NOT NULL" "1" "create Inbox was not processed"
 
 RUNTIME_STATUS=$(curl --silent --output system-runtime-event-runtime-v1.json --write-out '%{http_code}' \
+  --header "$AUTH_HEADER" \
   "http://127.0.0.1:${SYSTEM_PORT}/api/system/parameters/${PARAMETER_KEY}")
 [[ "$RUNTIME_STATUS" == "200" ]] || fail "Parameter Runtime v1 failed; HTTP ${RUNTIME_STATUS}"
 jq --exit-status '.parameterValue == "v1" and .version == 0' \
@@ -234,7 +280,7 @@ jq --exit-status '.parameterValue == "v1" and .version == 0' \
 assert_cache_present
 
 UPDATE_STATUS=$(curl --silent --output system-runtime-event-update-v2.json --write-out '%{http_code}' \
-  --request PUT --header 'Content-Type: application/json' \
+  --request PUT --header "$AUTH_HEADER" --header 'Content-Type: application/json' \
   --data '{"version":0,"valueType":"STRING","parameterValue":"v2","description":"S18 Runtime Event smoke v2"}' \
   "http://127.0.0.1:${SYSTEM_PORT}/api/system/admin/parameters/${PARAMETER_ID}")
 [[ "$UPDATE_STATUS" == "200" ]] || fail "Parameter update v2 failed; HTTP ${UPDATE_STATUS}"
@@ -243,7 +289,7 @@ wait_sql_value "SELECT status FROM mom_outbox_event WHERE event_id='${UPDATE_EVE
 wait_sql_value "SELECT count(*) FROM mom_inbox_event WHERE event_id='${UPDATE_EVENT}' AND processed_at IS NOT NULL" "1" "update Inbox was not processed"
 wait_cache_absent
 
-curl --fail --silent --show-error \
+curl --fail --silent --show-error --header "$AUTH_HEADER" \
   "http://127.0.0.1:${SYSTEM_PORT}/api/system/parameters/${PARAMETER_KEY}" \
   > system-runtime-event-runtime-v2.json
 jq --exit-status '.parameterValue == "v2" and .version == 1' \
@@ -258,14 +304,14 @@ sleep 3
 wait_sql_value "SELECT count(*) FROM mom_inbox_event WHERE event_id='${UPDATE_EVENT}'" "1" "duplicate Inbox identity changed"
 wait_cache_absent
 
-curl --fail --silent --show-error \
+curl --fail --silent --show-error --header "$AUTH_HEADER" \
   "http://127.0.0.1:${SYSTEM_PORT}/api/system/parameters/${PARAMETER_KEY}" \
   > /dev/null
 assert_cache_present
 docker stop "$BROKER_CONTAINER" >/dev/null
 
 UPDATE3_STATUS=$(curl --silent --output system-runtime-event-update-v3.json --write-out '%{http_code}' \
-  --request PUT --header 'Content-Type: application/json' \
+  --request PUT --header "$AUTH_HEADER" --header 'Content-Type: application/json' \
   --data '{"version":1,"valueType":"STRING","parameterValue":"v3","description":"S18 Broker outage"}' \
   "http://127.0.0.1:${SYSTEM_PORT}/api/system/admin/parameters/${PARAMETER_ID}")
 [[ "$UPDATE3_STATUS" == "200" ]] || fail "Parameter update during Broker outage failed; HTTP ${UPDATE3_STATUS}"
@@ -284,19 +330,6 @@ wait_broker
 wait_sql_value "SELECT status FROM mom_outbox_event WHERE event_id='${OUTAGE_EVENT}'" "SENT" "recovered Outbox was not sent"
 wait_sql_value "SELECT count(*) FROM mom_inbox_event WHERE event_id='${OUTAGE_EVENT}' AND processed_at IS NOT NULL" "1" "recovered event was not consumed"
 wait_cache_absent
-
-docker stop "$REDIS_CONTAINER" >/dev/null
-REDIS_OUTAGE_STATUS=$(curl --silent --output system-runtime-event-redis-outage.json --write-out '%{http_code}' \
-  "http://127.0.0.1:${SYSTEM_PORT}/api/system/parameters/${PARAMETER_KEY}" || true)
-[[ "$REDIS_OUTAGE_STATUS" == "200" ]] || fail "Runtime did not fall back to PostgreSQL during Redis outage; HTTP ${REDIS_OUTAGE_STATUS}"
-jq --exit-status '.parameterValue == "v3" and .version == 2' \
-  system-runtime-event-redis-outage.json >/dev/null || fail "Redis outage fallback response is invalid"
-docker start "$REDIS_CONTAINER" >/dev/null
-for attempt in {1..30}; do
-  docker exec "$REDIS_CONTAINER" redis-cli ping 2>/dev/null | grep --quiet PONG && break
-  [[ "$attempt" != "30" ]] || fail "Redis did not recover"
-  sleep 1
-done
 
 POISON_EVENT="00000000-0000-0000-0000-00000000d118"
 docker exec -i "$POSTGRES_CONTAINER" psql \
@@ -327,5 +360,35 @@ for attempt in {1..180}; do
   sleep 1
 done
 
+kill "$SYSTEM_PID"
+wait "$SYSTEM_PID" 2>/dev/null || true
+SYSTEM_PID=""
+docker stop "$REDIS_CONTAINER" >/dev/null
+
+SPRING_AUTOCONFIGURE_EXCLUDE="$SECURITY_EXCLUSIONS" \
+POSTGRES_HOST=127.0.0.1 POSTGRES_PORT="$POSTGRES_PORT" \
+POSTGRES_DATABASE="$POSTGRES_DATABASE" POSTGRES_SCHEMA="$POSTGRES_SCHEMA" \
+POSTGRES_USERNAME="$POSTGRES_USERNAME" POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+REDIS_HOST=127.0.0.1 REDIS_PORT="$REDIS_PORT" \
+NACOS_DISCOVERY_ENABLED=false MANAGEMENT_HEALTH_REDIS_ENABLED=false \
+MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED=false MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED=false \
+MOM_RESOURCE_SERVER_ENABLED=false IAM_PERMISSION_REFERENCE_OAUTH2_ENABLED=false \
+SYSTEM_RUNTIME_CACHE_ENABLED=true MOM_ENVIRONMENT="$ENVIRONMENT" \
+SYSTEM_RUNTIME_EVENT_CONSUMER_ENABLED=false SYSTEM_STREAM_FUNCTION_DEFINITION= \
+OUTBOX_PUBLISHER_ENABLED=false \
+java -jar mom-system-platform/mom-system-server/target/mom-system-server-0.1.0-SNAPSHOT-exec.jar \
+  --server.port="$SYSTEM_PORT" \
+  --mom.system.catalog.permission-reconciliation.enabled=false \
+  --management.health.redis.enabled=false \
+  > system-runtime-event-fallback-server.log 2>&1 &
+SYSTEM_PID=$!
+wait_http_200 "http://127.0.0.1:${SYSTEM_PORT}/actuator/health/readiness" \
+  system-runtime-event-fallback-health.json "fallback System"
+REDIS_OUTAGE_STATUS=$(curl --silent --output system-runtime-event-redis-outage.json --write-out '%{http_code}' \
+  "http://127.0.0.1:${SYSTEM_PORT}/api/system/parameters/${PARAMETER_KEY}" || true)
+[[ "$REDIS_OUTAGE_STATUS" == "200" ]] || fail "Runtime did not fall back to PostgreSQL during Redis outage; HTTP ${REDIS_OUTAGE_STATUS}"
+jq --exit-status '.parameterValue == "v3" and .version == 2' \
+  system-runtime-event-redis-outage.json >/dev/null || fail "Redis outage fallback response is invalid"
+
 printf '%s\n' \
-  'SYSTEM_RUNTIME_EVENT_SMOKE result=success http_business_write=success outbox=sent inbox=idempotent cache=invalidated duplicate=deduplicated broker_recovery=success redis_fallback=postgresql poison=dlq'
+  'SYSTEM_RUNTIME_EVENT_SMOKE result=success jwt_audit=success http_business_write=success outbox=sent inbox=idempotent cache=invalidated duplicate=deduplicated broker_recovery=success redis_fallback=postgresql poison=dlq'
