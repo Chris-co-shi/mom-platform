@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * System Parameter 的真实 PostgreSQL、Flyway V1～V7、MyBatis-Plus 与并发集成测试。
+ * System Parameter 的真实 PostgreSQL、Flyway V1～V9、MyBatis-Plus 与并发集成测试。
  *
  * <p>测试固定 PostgreSQL 17.7 官方镜像、动态端口和容器 Wait Strategy，不使用本机数据库或 H2。每个
  * 测试前清理参数表；验证独立 mom_system Schema、BaseEntity 列、约束、审计、String ID、乐观锁、分页及
@@ -106,7 +106,7 @@ class SystemParameterPostgresqlIT {
         assertThat(hikari.getConnectionInitSql()).isEqualTo("SET TIME ZONE 'UTC'");
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("show timezone", String.class)).isEqualTo("UTC");
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("7");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("9");
         assertThat(jdbcTemplate.queryForObject(
                 "select count(*) from flyway_schema_history where success and version in ('1','2','3','4','5','6')",
                 Long.class)).isEqualTo(6L);
