@@ -3,10 +3,12 @@ package io.github.chrisshi.mom.openfeign.autoconfigure;
 import feign.RequestInterceptor;
 import io.github.chrisshi.mom.core.context.CorrelationContext;
 import io.github.chrisshi.mom.core.context.CorrelationHeaders;
+import io.github.chrisshi.mom.resilience.MomResilienceNames;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
+import org.springframework.cloud.openfeign.CircuitBreakerNameResolver;
 
 /**
  * Feign 同步调用的关联标识自动配置。
@@ -36,5 +38,20 @@ public class CorrelationIdFeignAutoConfiguration {
                 template.header(CorrelationHeaders.CORRELATION_ID, correlationId);
             }
         };
+    }
+
+    /**
+     * 创建基于 Client 接口与方法名的稳定 CircuitBreaker 名称解析器。
+     *
+     * <p>该名称不依赖 URL、服务实例或请求参数，允许业务实例通过 Resilience4j 配置覆盖命名 Profile。</p>
+     *
+     * @return {@code ClientSimpleName_methodName} 格式解析器
+     */
+    @Bean
+    @ConditionalOnClass(CircuitBreakerNameResolver.class)
+    @ConditionalOnMissingBean(CircuitBreakerNameResolver.class)
+    CircuitBreakerNameResolver momFeignCircuitBreakerNameResolver() {
+        return (feignClientName, target, method) ->
+                MomResilienceNames.feignInstance(target.type(), method.getName());
     }
 }

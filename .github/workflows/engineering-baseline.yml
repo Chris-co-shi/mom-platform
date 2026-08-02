@@ -21,6 +21,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # 持久化门禁按 PR Base/Head Git 对象验证已发布 Migration 不可变性。
+          fetch-depth: 0
 
       - name: Validate shell syntax
         shell: bash
@@ -31,10 +34,42 @@ jobs:
           scripts/codex-verify-changed.sh
           .github/scripts/detect-ci-scope.sh
           .github/scripts/validate-engineering-baseline.sh
+          .github/scripts/validate-secure-defaults.sh
+          .github/scripts/validate-persistence-baseline.sh
+          .github/scripts/validate-runtime-security-baseline.sh
+          .github/scripts/validate-test-baseline.sh
+          .github/scripts/validate-localization-baseline.sh
+          .github/scripts/validate-crud-baseline.sh
+          .github/scripts/validate-schema-design-baseline.sh
+          .github/scripts/validate-no-business-foreign-key.sh
+          .github/scripts/validate-package-layout-baseline.sh
+          .github/scripts/nacos-discovery-smoke.sh
+          .github/scripts/redis-idempotency-smoke.sh
+          .github/scripts/redis-rate-limit-smoke.sh
 
       - name: Validate Python syntax
         shell: bash
-        run: python3 -m py_compile scripts/summarize-maven-failure.py
+        run: >-
+          python3 -m py_compile
+          scripts/summarize-maven-failure.py
+          .github/scripts/validate_persistence_baseline.py
+          .github/scripts/test_validate_persistence_baseline.py
+          .github/scripts/validate_java_persistence_baseline.py
+          .github/scripts/test_validate_java_persistence_baseline.py
+          .github/scripts/validate_runtime_security_baseline.py
+          .github/scripts/test_validate_runtime_security_baseline.py
+          .github/scripts/validate_test_baseline.py
+          .github/scripts/test_validate_test_baseline.py
+          .github/scripts/validate_localization_baseline.py
+          .github/scripts/test_validate_localization_baseline.py
+          .github/scripts/validate_crud_baseline.py
+          .github/scripts/test_validate_crud_baseline.py
+          .github/scripts/validate_schema_design_baseline.py
+          .github/scripts/test_validate_schema_design_baseline.py
+          .github/scripts/validate_no_business_foreign_key.py
+          .github/scripts/test_validate_no_business_foreign_key.py
+          .github/scripts/validate_package_layout_baseline.py
+          .github/scripts/test_validate_package_layout_baseline.py
 
       - name: Validate official engineering baseline
         shell: bash
@@ -42,10 +77,80 @@ jobs:
           set -o pipefail
           bash .github/scripts/validate-engineering-baseline.sh 2>&1 | tee engineering-baseline.log
 
+      - name: Validate secure runtime defaults
+        shell: bash
+        run: |
+          set -o pipefail
+          bash .github/scripts/validate-secure-defaults.sh --self-test
+          bash .github/scripts/validate-secure-defaults.sh 2>&1 | tee secure-defaults.log
+
+      - name: Validate persistence baseline
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -o pipefail
+          python3 .github/scripts/test_validate_persistence_baseline.py
+          python3 .github/scripts/test_validate_java_persistence_baseline.py
+          if [[ -n "${BASE_SHA}" ]]; then
+            bash .github/scripts/validate-persistence-baseline.sh --base "${BASE_SHA}" --head HEAD 2>&1 | tee persistence-baseline.log
+          else
+            bash .github/scripts/validate-persistence-baseline.sh 2>&1 | tee persistence-baseline.log
+          fi
+
+      - name: Validate runtime security baseline
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 .github/scripts/test_validate_runtime_security_baseline.py
+          bash .github/scripts/validate-runtime-security-baseline.sh 2>&1 | tee runtime-security-baseline.log
+
+      - name: Validate test and CI baseline
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 .github/scripts/test_validate_test_baseline.py
+          bash .github/scripts/validate-test-baseline.sh 2>&1 | tee test-baseline.log
+
+      - name: Validate localization baseline
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 .github/scripts/test_validate_localization_baseline.py
+          bash .github/scripts/validate-localization-baseline.sh 2>&1 | tee localization-baseline.log
+
+      - name: Validate CRUD association and schema baselines
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 .github/scripts/test_validate_crud_baseline.py
+          python3 .github/scripts/test_validate_schema_design_baseline.py
+          python3 .github/scripts/test_validate_no_business_foreign_key.py
+          bash .github/scripts/validate-crud-baseline.sh 2>&1 | tee crud-baseline.log
+          bash .github/scripts/validate-schema-design-baseline.sh 2>&1 | tee schema-design-baseline.log
+          bash .github/scripts/validate-no-business-foreign-key.sh 2>&1 | tee no-business-foreign-key.log
+
+      - name: Validate server package layout baseline
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 .github/scripts/test_validate_package_layout_baseline.py
+          bash .github/scripts/validate-package-layout-baseline.sh 2>&1 | tee package-layout-baseline.log
+
       - name: Upload engineering baseline report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: engineering-baseline-report
-          path: engineering-baseline.log
+          path: |
+            engineering-baseline.log
+            secure-defaults.log
+            persistence-baseline.log
+            runtime-security-baseline.log
+            test-baseline.log
+            localization-baseline.log
+            crud-baseline.log
+            schema-design-baseline.log
+            no-business-foreign-key.log
+            package-layout-baseline.log
           if-no-files-found: error

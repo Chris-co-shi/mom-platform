@@ -1,11 +1,14 @@
 package io.github.chrisshi.mom.iam.security;
 
+import io.github.chrisshi.mom.iam.application.admin.port.IamIdentifierGenerator;
+
 import java.security.SecureRandom;
 
-/** 为 Session 与 Refresh 状态生成正数 19 位以内随机 String ID。 */
-public final class IamSecureIdGenerator {
+/** 为 IAM 状态生成正数 19 位以内随机 String ID。 */
+public final class IamSecureIdGenerator implements IamIdentifierGenerator {
     private final SecureRandom secureRandom = new SecureRandom();
 
+    @Override
     public String nextId() {
         long value;
         do {

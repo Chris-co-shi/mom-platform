@@ -1,0 +1,95 @@
+module: mom-system-server
+version: 1.0
+owner: mom-system-platform
+
+configs:
+  - key: mom.system.runtime-cache.enabled
+    environmentVariable: SYSTEM_RUNTIME_CACHE_ENABLED
+    type: boolean
+    default: false
+    required: false
+    sensitive: false
+    owner: mom-system-platform
+    failureMode: postgresql-authoritative-source-only
+    restartRequired: true
+    cacheScope: global
+    resilienceProfile: not-applicable
+    changeImpact: [runtime-latency, postgresql-load, redis-l2]
+
+  - key: mom.cache.environment
+    environmentVariable: MOM_ENVIRONMENT
+    type: string
+    default: local
+    requiredWhen: mom.system.runtime-cache.enabled=true
+    sensitive: false
+    owner: mom-system-platform
+    failureMode: fail-fast-invalid-key-segment
+    restartRequired: true
+    cacheScope: global
+    resilienceProfile: not-applicable
+    changeImpact: [redis-key-namespace, cache-cold-start]
+
+  - key: mom.system.runtime-events.consumer.enabled
+    environmentVariable: SYSTEM_RUNTIME_EVENT_CONSUMER_ENABLED
+    type: boolean
+    default: false
+    required: false
+    sensitive: false
+    owner: mom-system-platform
+    failureMode: no-runtime-cache-invalidation-consumer
+    restartRequired: true
+    cacheScope: global
+    resilienceProfile: not-applicable
+    changeImpact: [cache-invalidation, broker-consumer]
+
+  - key: mom.outbox.publisher.enabled
+    environmentVariable: OUTBOX_PUBLISHER_ENABLED
+    type: boolean
+    default: false
+    required: false
+    sensitive: false
+    owner: mom-system-platform
+    failureMode: events-remain-persisted-in-outbox
+    restartRequired: true
+    cacheScope: not-applicable
+    resilienceProfile: not-applicable
+    changeImpact: [event-publication, outbox-backlog]
+
+  - key: spring.cloud.openfeign.circuitbreaker.enabled
+    environmentVariable: SYSTEM_FEIGN_CIRCUIT_BREAKER_ENABLED
+    type: boolean
+    default: true
+    required: false
+    sensitive: false
+    owner: mom-system-platform
+    failureMode: finite-feign-timeout-still-applies
+    restartRequired: true
+    cacheScope: not-applicable
+    resilienceProfile: system-query
+    changeImpact: [iam-dependency-failure-isolation]
+
+  - key: resilience4j.circuitbreaker.configs.system-query.*
+    environmentVariable: SYSTEM_QUERY_RESILIENCE_*
+    type: overridable-profile
+    default: deployment-reasonable-defaults-from-application-yml
+    required: false
+    sensitive: false
+    owner: mom-system-platform
+    failureMode: inherit-framework-default-profile
+    restartRequired: true
+    cacheScope: not-applicable
+    resilienceProfile: system-query
+    changeImpact: [circuit-open-rate, dependency-recovery-time]
+
+  - key: resilience4j.timelimiter.configs.system-query.timeout-duration
+    environmentVariable: SYSTEM_QUERY_TIME_LIMIT
+    type: duration
+    default: 4s
+    required: false
+    sensitive: false
+    owner: mom-system-platform
+    failureMode: map-timeout-to-dependency-unavailable
+    restartRequired: true
+    cacheScope: not-applicable
+    resilienceProfile: system-query
+    changeImpact: [query-latency-budget]

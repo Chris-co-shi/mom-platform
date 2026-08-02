@@ -1,0 +1,212 @@
+server:
+  port: ${SERVER_PORT:20300}
+
+spring:
+  application:
+    name: mom-system-server
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_system}&tcpKeepAlive=${POSTGRES_TCP_KEEP_ALIVE:true}&ApplicationName=${POSTGRES_APPLICATION_NAME:mom-system-server}}
+    username: ${POSTGRES_USERNAME:mom}
+    password: ${POSTGRES_PASSWORD:}
+    hikari:
+      pool-name: ${POSTGRES_POOL_NAME:mom-system-hikari}
+      minimum-idle: ${POSTGRES_MINIMUM_IDLE:1}
+      maximum-pool-size: ${POSTGRES_MAXIMUM_POOL_SIZE:5}
+      connection-timeout: ${POSTGRES_CONNECTION_TIMEOUT:3000}
+      validation-timeout: ${POSTGRES_VALIDATION_TIMEOUT:2000}
+      leak-detection-threshold: ${POSTGRES_LEAK_DETECTION_THRESHOLD:0}
+      connection-init-sql: SET TIME ZONE 'UTC'
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    create-schemas: true
+    default-schema: ${POSTGRES_SCHEMA:mom_system}
+    schemas: ${POSTGRES_SCHEMA:mom_system}
+    locations: classpath:db/migration/system
+    validate-migration-naming: true
+    clean-disabled: true
+    baseline-on-migrate: false
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${REDIS_COMMAND_TIMEOUT:2s}
+  security:
+    oauth2:
+      client:
+        registration:
+          iam-permission-reference:
+            provider: iam
+            client-id: ${IAM_SYSTEM_CLIENT_ID:mom-system-server}
+            client-secret: ${IAM_SYSTEM_CLIENT_SECRET:}
+            authorization-grant-type: client_credentials
+            scope: iam.permission-reference.read
+        provider:
+          iam:
+            token-uri: ${IAM_TOKEN_URI:http://127.0.0.1:20100/oauth2/token}
+  cloud:
+    circuitbreaker:
+      resilience4j:
+        enable-semaphore-default-bulkhead: true
+    nacos:
+      discovery:
+        enabled: ${NACOS_DISCOVERY_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
+    openfeign:
+      circuitbreaker:
+        enabled: ${SYSTEM_FEIGN_CIRCUIT_BREAKER_ENABLED:true}
+        group:
+          enabled: false
+      oauth2:
+        enabled: ${IAM_PERMISSION_REFERENCE_OAUTH2_ENABLED:false}
+        client-registration-id: iam-permission-reference
+      client:
+        config:
+          iamPermissionReferenceClient:
+            url: ${IAM_PERMISSION_REFERENCE_URL:}
+            connect-timeout: ${IAM_PERMISSION_REFERENCE_CONNECT_TIMEOUT:2000}
+            read-timeout: ${IAM_PERMISSION_REFERENCE_READ_TIMEOUT:3000}
+            logger-level: basic
+    function:
+      definition: ${SYSTEM_STREAM_FUNCTION_DEFINITION:}
+    stream:
+      bindings:
+        systemRuntimeEvents-out-0:
+          destination: ${SYSTEM_RUNTIME_EVENT_TOPIC:mom-system-runtime-events-v1}
+          content-type: application/json
+        systemRuntimeChangeConsumer-in-0:
+          destination: ${SYSTEM_RUNTIME_EVENT_TOPIC:mom-system-runtime-events-v1}
+          group: ${SYSTEM_RUNTIME_EVENT_CONSUMER_GROUP:mom-system-runtime-cache-invalidation-v1}
+          content-type: application/json
+          consumer:
+            max-attempts: 1
+            use-native-decoding: true
+      rocketmq:
+        binder:
+          name-server: ${ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
+          enable-msg-trace: ${ROCKETMQ_ENABLE_MSG_TRACE:false}
+        bindings:
+          systemRuntimeEvents-out-0:
+            producer:
+              group: ${SYSTEM_RUNTIME_EVENT_PRODUCER_GROUP:mom-system-runtime-events-producer-v1}
+              send-type: Sync
+              send-msg-timeout: ${ROCKETMQ_SEND_TIMEOUT:3000}
+              retry-times-when-send-failed: 0
+          systemRuntimeChangeConsumer-in-0:
+            consumer:
+              push:
+                orderly: false
+                max-reconsume-times: ${ROCKETMQ_MAX_RECONSUME_TIMES:2}
+              consume-message-batch-max-size: 1
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: ${MOM_RESILIENCE_DEFAULT_WINDOW_SIZE:20}
+        minimum-number-of-calls: ${MOM_RESILIENCE_DEFAULT_MINIMUM_CALLS:10}
+        failure-rate-threshold: ${MOM_RESILIENCE_DEFAULT_FAILURE_RATE:50}
+        wait-duration-in-open-state: ${MOM_RESILIENCE_DEFAULT_OPEN_WAIT:30s}
+      system-query:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: ${SYSTEM_QUERY_RESILIENCE_WINDOW_SIZE:20}
+        minimum-number-of-calls: ${SYSTEM_QUERY_RESILIENCE_MINIMUM_CALLS:10}
+        failure-rate-threshold: ${SYSTEM_QUERY_RESILIENCE_FAILURE_RATE:50}
+        wait-duration-in-open-state: ${SYSTEM_QUERY_RESILIENCE_OPEN_WAIT:30s}
+    instances:
+      IamPermissionReferenceClient_validate:
+        base-config: system-query
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: ${MOM_RESILIENCE_DEFAULT_TIME_LIMIT:4s}
+        cancel-running-future: true
+      system-query:
+        timeout-duration: ${SYSTEM_QUERY_TIME_LIMIT:4s}
+        cancel-running-future: true
+    instances:
+      IamPermissionReferenceClient_validate:
+        base-config: system-query
+  bulkhead:
+    configs:
+      default:
+        max-concurrent-calls: ${MOM_RESILIENCE_DEFAULT_MAX_CONCURRENT_CALLS:20}
+        max-wait-duration: 0
+      system-query:
+        max-concurrent-calls: ${SYSTEM_QUERY_MAX_CONCURRENT_CALLS:20}
+        max-wait-duration: 0
+    instances:
+      IamPermissionReferenceClient_validate:
+        base-config: system-query
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+
+mom:
+  cache:
+    environment: ${MOM_ENVIRONMENT:local}
+    redis:
+      enabled: ${SYSTEM_RUNTIME_CACHE_ENABLED:false}
+  iam:
+    permission-reference:
+      service-name: ${IAM_PERMISSION_REFERENCE_SERVICE_NAME:mom-iam-server}
+  system:
+    runtime-cache:
+      enabled: ${SYSTEM_RUNTIME_CACHE_ENABLED:false}
+    runtime-events:
+      consumer:
+        enabled: ${SYSTEM_RUNTIME_EVENT_CONSUMER_ENABLED:false}
+  outbox:
+    publisher:
+      enabled: ${OUTBOX_PUBLISHER_ENABLED:false}
+      binding-name: systemRuntimeEvents-out-0
+      fixed-delay-millis: ${OUTBOX_FIXED_DELAY_MILLIS:1000}
+      batch-size: ${OUTBOX_BATCH_SIZE:20}
+      lease-duration: ${OUTBOX_LEASE_DURATION:30s}
+      max-attempts: ${OUTBOX_MAX_ATTEMPTS:8}
+      initial-backoff: ${OUTBOX_INITIAL_BACKOFF:1s}
+      max-backoff: ${OUTBOX_MAX_BACKOFF:5m}
+  security:
+    resource-server:
+      enabled: ${MOM_RESOURCE_SERVER_ENABLED:true}
+      issuer-uri: ${IAM_ISSUER_URI:http://127.0.0.1:20100}
+      jwk-set-uri: ${IAM_JWK_SET_URI:http://127.0.0.1:20100/oauth2/jwks}
+      accepted-audiences: ${IAM_ACCEPTED_AUDIENCES:mom-admin-web,mom-supplier-web,mom-customer-web,mom-mobile-pda}
+      revoked-sid-key-prefix: ${IAM_REVOKED_SID_PREFIX:mom:iam:revoked:sid:}
+      public-paths:
+        - /actuator/health/**
+        - /actuator/info
+        - /error
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,nacos-discovery,bindings
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+    propagation:
+      type: w3c
+    export:
+      otlp:
+        enabled: ${OTEL_TRACING_EXPORT_ENABLED:false}
+
+logging:
+  pattern:
+    correlation: "[trace_id=%X{traceId:-} span_id=%X{spanId:-}] "

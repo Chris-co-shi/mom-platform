@@ -21,12 +21,82 @@ required_files = [
     "scripts/summarize-maven-failure.py",
     "scripts/codex-doctor.sh",
     "scripts/codex-verify-changed.sh",
+    ".github/scripts/validate-secure-defaults.sh",
+    ".github/scripts/validate-persistence-baseline.sh",
+    ".github/scripts/validate_persistence_baseline.py",
+    ".github/scripts/validate-runtime-security-baseline.sh",
+    ".github/scripts/validate_runtime_security_baseline.py",
+    ".github/scripts/test_validate_runtime_security_baseline.py",
+    ".github/scripts/validate-test-baseline.sh",
+    ".github/scripts/validate_test_baseline.py",
+    ".github/scripts/test_validate_test_baseline.py",
+    ".github/scripts/validate-localization-baseline.sh",
+    ".github/scripts/validate_localization_baseline.py",
+    ".github/scripts/test_validate_localization_baseline.py",
+    ".github/scripts/validate-crud-baseline.sh",
+    ".github/scripts/validate_crud_baseline.py",
+    ".github/scripts/test_validate_crud_baseline.py",
+    ".github/scripts/validate-schema-design-baseline.sh",
+    ".github/scripts/validate_schema_design_baseline.py",
+    ".github/scripts/test_validate_schema_design_baseline.py",
+    ".github/scripts/validate-no-business-foreign-key.sh",
+    ".github/scripts/validate_no_business_foreign_key.py",
+    ".github/scripts/test_validate_no_business_foreign_key.py",
+    ".github/scripts/validate-package-layout-baseline.sh",
+    ".github/scripts/validate_package_layout_baseline.py",
+    ".github/scripts/test_validate_package_layout_baseline.py",
+    ".github/scripts/nacos-discovery-smoke.sh",
+    ".github/scripts/redis-idempotency-smoke.sh",
+    ".github/scripts/redis-rate-limit-smoke.sh",
     "docs/engineering/codex-local-workflow.md",
     "docs/engineering/standards/official-source-policy.md",
     "docs/engineering/standards/jdk-25-engineering-standard.md",
     "docs/engineering/standards/spring-boot-4.1-engineering-standard.md",
     "docs/engineering/standards/spring-cloud-2025.1-engineering-standard.md",
     "docs/engineering/standards/spring-cloud-alibaba-2025.1-engineering-standard.md",
+    "docs/engineering/standards/module-layering-standard.md",
+    "docs/engineering/standards/http-api-contract-standard.md",
+    "docs/engineering/standards/api-evolution-idempotency-standard.md",
+    "docs/engineering/standards/persistence-data-modeling-standard.md",
+    "docs/engineering/standards/crud-application-standard.md",
+    "docs/engineering/standards/multi-table-association-query-standard.md",
+    "docs/engineering/standards/database-schema-design-standard.md",
+    "docs/engineering/standards/package-directory-architecture-standard.md",
+    "docs/engineering/templates/table-design-record-template.md",
+    "docs/engineering/templates/multi-table-query-design-template.md",
+    "docs/engineering/templates/crud-slice-acceptance-template.md",
+    "docs/engineering/templates/package-layout-acceptance-template.md",
+    "docs/adr/ADR-026-MOM业务表禁止物理外键与关联完整性策略.md",
+    "docs/adr/ADR-027-服务端包结构与基础设施适配器分层.md",
+    "docs/engineering/standards/transaction-consistency-standard.md",
+    "docs/engineering/standards/audit-concurrency-lifecycle-standard.md",
+    "docs/engineering/standards/configuration-profile-secret-standard.md",
+    "docs/engineering/standards/security-protocol-runtime-standard.md",
+    "docs/engineering/standards/outbound-http-client-standard.md",
+    "docs/engineering/standards/redis-key-ttl-failure-standard.md",
+    "docs/engineering/standards/testing-strategy-standard.md",
+    "docs/engineering/standards/maven-test-lifecycle-standard.md",
+    "docs/engineering/standards/testcontainers-smoke-acceptance-standard.md",
+    "docs/engineering/standards/ci-scope-quality-gate-standard.md",
+    "docs/engineering/standards/localization-locale-standard.md",
+    "docs/engineering/standards/timezone-date-time-standard.md",
+    "docs/engineering/standards/number-money-rounding-standard.md",
+    "docs/engineering/standards/measurement-unit-standard.md",
+    "docs/engineering/standards/user-preference-standard.md",
+    "docs/engineering/P1.6-S02-持久化历史例外清单.md",
+    "docs/adr/ADR-020-PostgreSQL物理Schema命名空间.md",
+    "docs/engineering/P1.6-S03-安全配置历史例外清单.md",
+    "docs/adr/ADR-021-运行时配置来源与Secret边界.md",
+    "docs/engineering/P1.6-S04-测试与CI历史例外清单.md",
+    "docs/adr/ADR-022-测试分层与CI质量门禁.md",
+    "docs/engineering/P1.6-S05-国际化与个性化现状清单.md",
+    "docs/adr/ADR-023-Locale时区与用户偏好边界.md",
+    "mom-architecture-tests/pom.xml",
+    "mom-architecture-tests/src/test/java/io/github/chrisshi/mom/architecture/MavenModuleDependencyArchitectureTest.java",
+    "mom-architecture-tests/src/test/java/io/github/chrisshi/mom/architecture/ServerPackageArchitectureTest.java",
+    "mom-architecture-tests/src/test/java/io/github/chrisshi/mom/architecture/PersistenceArchitectureTest.java",
+    "mom-architecture-tests/src/test/java/io/github/chrisshi/mom/architecture/PackageLayoutArchitectureTest.java",
+    "mom-architecture-tests/src/test/java/io/github/chrisshi/mom/architecture/RuntimeSecurityArchitectureTest.java",
 ]
 for relative in required_files:
     if not (root / relative).is_file():
@@ -43,6 +113,16 @@ try:
 except Exception as exc:
     errors.append(f"cannot parse root pom.xml: {exc}")
     values = {}
+
+try:
+    modules = {
+        (module.text or "").strip()
+        for module in tree.getroot().findall("m:modules/m:module", ns)
+    }
+    if "mom-architecture-tests" not in modules:
+        errors.append("mom-architecture-tests must be included in the root Maven reactor")
+except Exception as exc:
+    errors.append(f"cannot validate architecture-test reactor wiring: {exc}")
 
 expected_exact = {"java.version": "25"}
 for key, expected in expected_exact.items():
@@ -117,6 +197,7 @@ for relative in filter(None, tracked):
     if relative.startswith(iam_test_prefix):
         if relative.endswith("IntegrationTest.java"):
             errors.append(f"IAM default Surefire scope must not contain IntegrationTest: {relative}")
+        is_failsafe_test = relative.endswith(("IT.java", "ITCase.java"))
         external_runtime_markers = (
             "@Testcontainers", "PostgreSQLContainer", "GenericContainer<",
             "DockerImageName", "@DynamicPropertySource",
@@ -124,7 +205,8 @@ for relative in filter(None, tracked):
         mutating_sql = "JdbcTemplate" in text and re.search(
             r"\b(?:jdbc|jdbcTemplate)\.(?:update|execute|batchUpdate)\s*\(", text
         )
-        if any(marker in text for marker in external_runtime_markers) or mutating_sql:
+        if not is_failsafe_test and (
+                any(marker in text for marker in external_runtime_markers) or mutating_sql):
             errors.append(f"IAM unit-test scope must not start or mutate external data stores: {relative}")
 
 if errors:
@@ -139,5 +221,11 @@ for note in notes:
     print(f"- {note}")
 print("- no preview/internal API/module-escape violations")
 print("- no legacy Nacos bootstrap or disabled compatibility checks")
-print("- IAM default tests contain no external data-store integration tests")
+print("- IAM Surefire tests contain no external data-store integration tests; Failsafe *IT/*ITCase remains allowed")
+print("- S01-S15-E standards, package layout gate and Maven architecture-test module are wired")
 PY
+
+bash .github/scripts/validate-crud-baseline.sh
+bash .github/scripts/validate-schema-design-baseline.sh
+bash .github/scripts/validate-no-business-foreign-key.sh
+bash .github/scripts/validate-package-layout-baseline.sh

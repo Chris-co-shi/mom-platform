@@ -205,9 +205,8 @@ public final class OutboxPublisher {
                 ? OutboxStatus.DEAD
                 : OutboxStatus.RETRY;
         Instant nextAttemptAt = clock.instant().plus(calculateBackoff(nextRetryCount));
-        String errorSummary = exception.getClass().getSimpleName()
-                + ": "
-                + (exception.getMessage() == null ? "no message" : exception.getMessage());
+        // Broker/Feign 异常消息可能回显 Header、Token 或 Payload；持久化只保留低敏异常类型。
+        String errorSummary = exception.getClass().getSimpleName();
 
         boolean updated = repository.markFailure(
                 record.eventId(),

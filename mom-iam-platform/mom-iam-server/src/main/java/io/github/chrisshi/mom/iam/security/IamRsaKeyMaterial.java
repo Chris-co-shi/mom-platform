@@ -19,8 +19,17 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
-/** 从显式 PEM 资源加载 IAM RSA 密钥；生产环境绝不启动时随机生成。 */
+/**
+ * 从显式 PEM 资源加载 IAM RSA 密钥的 IAM Server 基础设施适配器。
+ *
+ * <p>该类型只依赖 Spring Resource 和 JCA，不生成、轮换或持久化密钥，也不改变 OAuth2/OIDC
+ * 协议配置。密钥缺失、格式错误、公私钥不匹配以及 {@code prod}/{@code production} 使用测试
+ * 密钥时均 Fail Fast；失败不会访问数据库、Redis 或远程密钥服务。此处同时拒绝两个生产 Profile，
+ * 避免别名造成安全校验旁路。</p>
+ */
 final class IamRsaKeyMaterial {
+    private static final Profiles PRODUCTION_PROFILES = Profiles.of("prod", "production");
+
     private IamRsaKeyMaterial() {
     }
 
@@ -44,7 +53,7 @@ final class IamRsaKeyMaterial {
     }
 
     static void requireProductionIssuer(URI issuer, Environment environment) {
-        if (environment.acceptsProfiles(Profiles.of("prod"))
+        if (environment.acceptsProfiles(PRODUCTION_PROFILES)
                 && !"https".equalsIgnoreCase(issuer.getScheme())) {
             throw new IllegalStateException("生产环境 IAM issuer 必须使用 HTTPS");
         }
@@ -82,7 +91,7 @@ final class IamRsaKeyMaterial {
 
     private static void rejectTestKeyInProduction(
             IamAuthorizationProperties.SigningKey key, Environment environment) {
-        if (!environment.acceptsProfiles(Profiles.of("prod"))) {
+        if (!environment.acceptsProfiles(PRODUCTION_PROFILES)) {
             return;
         }
         String privateDescription = key.getPrivateKeyLocation().getDescription();

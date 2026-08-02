@@ -1,45 +1,30 @@
 package io.github.chrisshi.mom.iam.web;
 
-import io.github.chrisshi.mom.core.context.CorrelationContext;
-import io.github.chrisshi.mom.core.security.ActorType;
-import io.github.chrisshi.mom.core.security.AuditActor;
-import io.github.chrisshi.mom.core.security.AuditContextExecutor;
-import io.github.chrisshi.mom.iam.security.IamAccountAuthenticationService;
-import io.github.chrisshi.mom.iam.security.IamClientAccessPolicyService;
-import io.github.chrisshi.mom.iam.security.IamSessionJwtIssuer;
+import io.github.chrisshi.mom.iam.application.authentication.IamFirstPartyLoginApplicationService;
+import io.github.chrisshi.mom.iam.security.IamAccessTokenIssuer;
 import io.github.chrisshi.mom.iam.security.IamSessionTokenService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
-import java.util.function.Supplier;
 
 /**
- * MOM 第一方客户端 JSON 认证入口。
+ * MOM 第一方客户端 JSON 认证 Web Adapter。
  *
- * <p>该控制器不替代 Spring Authorization Server 的标准 {@code /oauth2/**} 协议端点，而是为
- * MOM Admin、供应商门户、客户门户和移动端提供由各自前端承载登录界面的第一方契约。账号校验、
- * Client/user_type/Party/Mobile Access 入口策略、Session、Opaque Refresh Rotation、JWT 与撤销存储
- * 全部复用 P1.5 既有权威服务，不创建第二套认证状态。</p>
+ * <p>Path、Method、Request/Response DTO 和错误契约保持不变。控制器只做 JSON 绑定、既有输入校验、
+ * 请求元数据提取、Application Command 转换和响应映射；账号认证、Client Policy、审计、Session 与
+ * 初始 Token 签发由 {@link IamFirstPartyLoginApplicationService} 编排。</p>
  *
- * <p>密码只允许发送到本控制器的登录与首次改密端点；响应和异常均不得回显密码、摘要或 Refresh
- * Token。Access Token 与 Refresh Token 的客户端存储策略由各端运行时负责。</p>
- *
- * <p>JSON 登录在 Session 签发前不会向 Spring Security 上下文写入临时认证。凭据与 Client 入口策略
- * 校验成功后，控制器仅在当前同步调用范围内建立对应用户的显式审计上下文，确保首次改密和 Session
- * 写入保留真实操作人；异常退出时上下文由执行器恢复，不会泄漏到容器线程。</p>
+ * <p>Refresh 与 Logout 继续直接复用唯一的 Session Rotation/撤销核心，不创建第二套实现。密码只在
+ * 同步登录或首次改密调用链中传递，普通业务服务、Gateway 和前端响应均不可获得密码。</p>
  */
 @RestController
 @RequestMapping("/api/iam/auth")
@@ -47,65 +32,44 @@ import java.util.function.Supplier;
 public final class IamDirectAuthenticationController {
     private static final Set<String> FIRST_PARTY_SCOPES = Set.of("openid", "profile");
 
-    private final AuthenticationProvider authenticationProvider;
-    private final IamAccountAuthenticationService accounts;
-    private final IamClientAccessPolicyService clientAccess;
+    private final IamFirstPartyLoginApplicationService loginService;
     private final IamSessionTokenService sessions;
-    private final IamSessionJwtIssuer jwtIssuer;
-    private final AuditContextExecutor auditContextExecutor;
+    private final IamAccessTokenIssuer tokenIssuer;
 
+    /** 创建保持第一方 JSON 契约的薄 Web Adapter。 */
     public IamDirectAuthenticationController(
-            AuthenticationProvider authenticationProvider,
-            IamAccountAuthenticationService accounts,
-            IamClientAccessPolicyService clientAccess,
+            IamFirstPartyLoginApplicationService loginService,
             IamSessionTokenService sessions,
-            IamSessionJwtIssuer jwtIssuer,
-            AuditContextExecutor auditContextExecutor) {
-        this.authenticationProvider = authenticationProvider;
-        this.accounts = accounts;
-        this.clientAccess = clientAccess;
+            IamAccessTokenIssuer tokenIssuer) {
+        this.loginService = loginService;
         this.sessions = sessions;
-        this.jwtIssuer = jwtIssuer;
-        this.auditContextExecutor = auditContextExecutor;
+        this.tokenIssuer = tokenIssuer;
     }
 
-    /** 校验第一方账号与应用入口策略，并签发权威 Session、JWT Access Token 和 Opaque Refresh Token。 */
+    /** 校验第一方请求并映射 Application Service 的登录结果。 */
     @PostMapping("/login")
     public TokenResponse login(@RequestBody LoginRequest command, HttpServletRequest request) {
         requireLoginCommand(command);
-        authenticate(command.username(), command.password());
-        clientAccess.requireAuthorization(command.username(), command.clientId());
-        return runAsAuthenticatedUser(command.username(), command.clientId(), () -> {
-            accounts.recordSuccessfulLogin(command.username());
-            if (accounts.requiresPasswordChange(command.username())) {
-                throw new PasswordChangeRequiredException();
-            }
-            return issue(command.username(), command.clientId(), command.deviceName(), request);
-        });
+        IamFirstPartyLoginApplicationService.LoginResult result = loginService.login(
+                new IamFirstPartyLoginApplicationService.LoginCommand(
+                        command.username(), command.password(), command.clientId()),
+                metadata(command.deviceName(), request));
+        return tokenResponse(result);
     }
 
-    /**
-     * 使用当前临时密码完成首次改密，并在同一交互中签发新的第一方 Session。
-     *
-     * <p>必须再次校验当前密码，不能仅凭用户名修改凭证。修改密码前继续执行 Client 入口策略，避免
-     * 外部账号借由错误 Portal 完成登录。</p>
-     */
+    /** 再次校验临时密码并完成首次改密，响应仍使用既有 TokenResponse。 */
     @PostMapping("/password/change-required")
     public TokenResponse changeRequiredPassword(
             @RequestBody RequiredPasswordChangeRequest command,
             HttpServletRequest request) {
         requirePasswordChangeCommand(command);
-        authenticate(command.username(), command.currentPassword());
-        clientAccess.requireAuthorization(command.username(), command.clientId());
-        return runAsAuthenticatedUser(command.username(), command.clientId(), () -> {
-            if (!accounts.requiresPasswordChange(command.username())) {
-                throw new PasswordChangeNotRequiredException();
-            }
-            accounts.changeRequiredPassword(
-                    command.username(), command.newPassword(), command.confirmation());
-            accounts.recordSuccessfulLogin(command.username());
-            return issue(command.username(), command.clientId(), command.deviceName(), request);
-        });
+        IamFirstPartyLoginApplicationService.LoginResult result =
+                loginService.changeRequiredPassword(
+                        new IamFirstPartyLoginApplicationService.RequiredPasswordChangeCommand(
+                                command.username(), command.currentPassword(), command.newPassword(),
+                                command.confirmation(), command.clientId()),
+                        metadata(command.deviceName(), request));
+        return tokenResponse(result);
     }
 
     /** 消费当前 ACTIVE Refresh Token，执行 Rotation，并返回唯一后继 Token。 */
@@ -116,7 +80,7 @@ public final class IamDirectAuthenticationController {
         }
         IamSessionTokenService.Rotation rotation = sessions.rotate(
                 command.refreshToken(), command.clientId());
-        var accessToken = jwtIssuer.issue(
+        IamAccessTokenIssuer.IssuedAccessToken accessToken = tokenIssuer.issue(
                 rotation.authorization(),
                 rotation.sessionId(),
                 command.clientId(),
@@ -124,7 +88,7 @@ public final class IamDirectAuthenticationController {
                 rotation.accessExpiresAt(),
                 FIRST_PARTY_SCOPES);
         return tokenResponse(
-                accessToken.getTokenValue(),
+                accessToken.tokenValue(),
                 rotation.refreshToken(),
                 rotation.sessionId(),
                 rotation.issuedAt(),
@@ -149,62 +113,15 @@ public final class IamDirectAuthenticationController {
         return new LogoutResponse(true);
     }
 
-    private TokenResponse issue(
-            String username,
-            String clientId,
-            String deviceName,
-            HttpServletRequest request) {
-        IamSessionTokenService.InitialIssue initial = sessions.issueInitial(
-                username,
-                clientId,
-                request.getRemoteAddr(),
-                request.getHeader("User-Agent"),
-                normalizeDeviceName(deviceName));
-        var accessToken = jwtIssuer.issue(
-                initial.authorization(),
-                initial.sessionId(),
-                clientId,
-                initial.issuedAt(),
-                initial.accessExpiresAt(),
-                FIRST_PARTY_SCOPES);
+    private static TokenResponse tokenResponse(
+            IamFirstPartyLoginApplicationService.LoginResult result) {
         return tokenResponse(
-                accessToken.getTokenValue(),
-                initial.refreshToken(),
-                initial.sessionId(),
-                initial.issuedAt(),
-                initial.accessExpiresAt(),
-                initial.absoluteExpiresAt());
-    }
-
-    private void authenticate(String username, String password) {
-        try {
-            authenticationProvider.authenticate(
-                    UsernamePasswordAuthenticationToken.unauthenticated(username, password));
-        }
-        catch (AuthenticationException exception) {
-            if (exception instanceof BadCredentialsException) {
-                accounts.recordBadCredentials(username);
-            }
-            throw new InvalidCredentialsException();
-        }
-    }
-
-    /**
-     * 使用刚完成凭据与 Client 校验的用户身份执行认证状态写入。
-     *
-     * <p>该上下文只提供数据库审计所需的稳定用户 ID、用户类型、Client 与关联标识，不代表 Session
-     * 已经创建，也不授予额外权限。动作失败时异常原样传播，执行器负责恢复外层上下文。</p>
-     */
-    private <T> T runAsAuthenticatedUser(String username, String clientId, Supplier<T> action) {
-        var user = accounts.requireUser(username);
-        AuditActor actor = new AuditActor(
-                user.getId(),
-                ActorType.USER,
-                user.getUserType().name(),
-                clientId,
-                null,
-                CorrelationContext.currentId());
-        return auditContextExecutor.runAsActor(actor, action);
+                result.accessToken(),
+                result.refreshToken(),
+                result.sessionId(),
+                result.issuedAt(),
+                result.accessExpiresAt(),
+                result.sessionExpiresAt());
     }
 
     private static TokenResponse tokenResponse(
@@ -223,6 +140,15 @@ public final class IamDirectAuthenticationController {
                 sessionId,
                 accessExpiresAt,
                 sessionExpiresAt);
+    }
+
+    private static IamFirstPartyLoginApplicationService.RequestMetadata metadata(
+            String deviceName,
+            HttpServletRequest request) {
+        return new IamFirstPartyLoginApplicationService.RequestMetadata(
+                request.getRemoteAddr(),
+                request.getHeader("User-Agent"),
+                normalizeDeviceName(deviceName));
     }
 
     private static void requireLoginCommand(LoginRequest command) {
@@ -257,6 +183,7 @@ public final class IamDirectAuthenticationController {
         return normalized.length() <= 120 ? normalized : normalized.substring(0, 120);
     }
 
+    /** 第一方登录请求；字段名和类型属于既有公开契约。 */
     public record LoginRequest(
             String username,
             String password,
@@ -264,6 +191,7 @@ public final class IamDirectAuthenticationController {
             String deviceName) {
     }
 
+    /** 第一方首次改密请求；与普通登录请求保持语义隔离。 */
     public record RequiredPasswordChangeRequest(
             String username,
             String currentPassword,
@@ -273,9 +201,11 @@ public final class IamDirectAuthenticationController {
             String deviceName) {
     }
 
+    /** 第一方 Refresh 请求；继续复用 Session Rotation。 */
     public record RefreshRequest(String clientId, String refreshToken) {
     }
 
+    /** 第一方 Token 响应；不用于 OAuth2/OIDC 标准 Token Endpoint。 */
     public record TokenResponse(
             String accessToken,
             String refreshToken,
@@ -286,27 +216,11 @@ public final class IamDirectAuthenticationController {
             Instant sessionExpiresAt) {
     }
 
+    /** 第一方 Logout 响应。 */
     public record LogoutResponse(boolean revoked) {
     }
 
-    public static final class InvalidCredentialsException extends RuntimeException {
-        public InvalidCredentialsException() {
-            super("账号或密码错误，或账号当前不可用");
-        }
-    }
-
-    public static final class PasswordChangeRequiredException extends RuntimeException {
-        public PasswordChangeRequiredException() {
-            super("当前账号必须先修改临时密码");
-        }
-    }
-
-    public static final class PasswordChangeNotRequiredException extends RuntimeException {
-        public PasswordChangeNotRequiredException() {
-            super("当前账号不需要首次改密");
-        }
-    }
-
+    /** Web Adapter 的请求结构错误；不得包含密码或 Token 原文。 */
     public static final class InvalidAuthenticationRequestException extends RuntimeException {
         public InvalidAuthenticationRequestException(String message) {
             super(message);

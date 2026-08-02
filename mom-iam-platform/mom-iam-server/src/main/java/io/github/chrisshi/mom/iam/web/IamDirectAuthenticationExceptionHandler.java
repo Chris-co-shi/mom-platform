@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.iam.web;
 
+import io.github.chrisshi.mom.iam.application.authentication.IamFirstPartyLoginApplicationService;
 import io.github.chrisshi.mom.iam.security.IamClientAccessPolicyService;
 import io.github.chrisshi.mom.iam.security.IamSessionTokenService;
 import org.springframework.http.CacheControl;
@@ -13,17 +14,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice(assignableTypes = IamDirectAuthenticationController.class)
 public final class IamDirectAuthenticationExceptionHandler {
 
-    @ExceptionHandler(IamDirectAuthenticationController.InvalidCredentialsException.class)
+    @ExceptionHandler(IamFirstPartyLoginApplicationService.InvalidCredentialsException.class)
     ResponseEntity<ErrorResponse> invalidCredentials(RuntimeException exception) {
         return response(HttpStatus.UNAUTHORIZED, "invalid_credentials", exception.getMessage());
     }
 
-    @ExceptionHandler(IamDirectAuthenticationController.PasswordChangeRequiredException.class)
+    @ExceptionHandler(IamFirstPartyLoginApplicationService.PasswordChangeRequiredException.class)
     ResponseEntity<ErrorResponse> passwordChangeRequired(RuntimeException exception) {
         return response(HttpStatus.CONFLICT, "password_change_required", exception.getMessage());
     }
 
-    @ExceptionHandler(IamDirectAuthenticationController.PasswordChangeNotRequiredException.class)
+    @ExceptionHandler(IamFirstPartyLoginApplicationService.PasswordChangeNotRequiredException.class)
     ResponseEntity<ErrorResponse> passwordChangeNotRequired(RuntimeException exception) {
         return response(HttpStatus.CONFLICT, "password_change_not_required", exception.getMessage());
     }

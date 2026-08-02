@@ -22,5 +22,11 @@
       <groupId>org.springframework.cloud</groupId>
       <artifactId>spring-cloud-stream</artifactId>
     </dependency>
+    <dependency>
+      <groupId>io.github.chrisshi.mom</groupId>
+      <artifactId>mom-test</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>

@@ -1,7 +1,7 @@
 package io.github.chrisshi.mom.iam.bootstrap;
 
 import io.github.chrisshi.mom.core.security.AuditContextExecutor;
-import io.github.chrisshi.mom.iam.autoconfigure.IamPersistenceRepositoryAutoConfiguration;
+import io.github.chrisshi.mom.iam.configuration.IamPersistenceRepositoryAutoConfiguration;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamRoleMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserMapper;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserRoleMapper;

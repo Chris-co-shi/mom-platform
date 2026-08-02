@@ -50,7 +50,69 @@
 - PCS、WCS 保持独立仓库和部署边界；
 - MES、WMS、QMS、库存事实、批次谱系、Integration Hub 等 MOM 核心能力必须自主建模。
 
+模块职责、Server 包分层、HTTP API 和演进规则的详细权威来源为：
+
+- `docs/engineering/standards/module-layering-standard.md`；
+- `docs/engineering/standards/http-api-contract-standard.md`；
+- `docs/engineering/standards/api-evolution-idempotency-standard.md`。
+
+运行时配置、安全协议、出站 HTTP 与 Redis 规则的详细权威来源为：
+
+- `docs/engineering/standards/configuration-profile-secret-standard.md`；
+- `docs/engineering/standards/security-protocol-runtime-standard.md`；
+- `docs/engineering/standards/outbound-http-client-standard.md`；
+- `docs/engineering/standards/redis-key-ttl-failure-standard.md`。
+
+测试分层、Maven 生命周期与 CI 质量门禁的详细权威来源为：
+
+- `docs/engineering/standards/testing-strategy-standard.md`；
+- `docs/engineering/standards/maven-test-lifecycle-standard.md`；
+- `docs/engineering/standards/testcontainers-smoke-acceptance-standard.md`；
+- `docs/engineering/standards/ci-scope-quality-gate-standard.md`；
+
+数据访问、事务与审计生命周期的详细权威来源为：
+
+- `docs/engineering/standards/persistence-data-modeling-standard.md`；
+- `docs/engineering/standards/crud-application-standard.md`；
+- `docs/engineering/standards/multi-table-association-query-standard.md`；
+- `docs/engineering/standards/database-schema-design-standard.md`；
+- `docs/engineering/standards/transaction-consistency-standard.md`；
+- `docs/engineering/standards/audit-concurrency-lifecycle-standard.md`。
+
+Locale、时区、数字金额、计量单位与用户偏好的详细权威来源为：
+
+- `docs/engineering/standards/localization-locale-standard.md`；
+- `docs/engineering/standards/timezone-date-time-standard.md`；
+- `docs/engineering/standards/number-money-rounding-standard.md`；
+- `docs/engineering/standards/measurement-unit-standard.md`；
+- `docs/engineering/standards/user-preference-standard.md`。
+
+强制摘要：Web 只能适配 HTTP 并调用 Application；Application 负责用例、事务和业务授权；Domain
+不得依赖 Web、Infrastructure、Servlet、MyBatis、JDBC、Feign 或 Redis Template；Infrastructure
+实现 Port 并转换、脱敏底层异常；Configuration 只负责装配。新业务 API 不引入通用成功响应信封，
+不得改变 OAuth2/OIDC 标准错误；历史例外必须逐文件登记，不得用宽泛排除规避架构门禁。
+
+安全配置强制摘要：Base 不激活 Profile、不保存 Secret，正式 `prod`/`production` 对 Bootstrap、测试密钥、
+本地 Pepper、不安全 Cookie、缺失 Issuer/JWK/Refresh Pepper 和技术探针 Fail Fast；Nacos Discovery 与
+Config 分离，Nacos Config 不作为 Secret Manager，2025.1.x 只允许 `spring.config.import`。Gateway 与业务
+Resource Server 都验证 JWT，Gateway 不承担最终授权。Feign 必须有有限超时且写请求默认不自动重试；
+Redis 临时状态必须有 TTL，原始 Idempotency-Key 不 Trim、改大小写、归一化或写入 Redis Key/日志。
+
+测试强制摘要：Surefire 只运行快速 `*Test`/`*Tests`，Failsafe 在 `verify` 运行 `*IT`/`*ITCase`；
+Testcontainers、打包 JAR、真实基础设施和跨仓库 E2E 是不同证据层级。Nacos Discovery、Redis 幂等和
+Redis 限流必须为独立 Job，`skipped` 不得描述为成功，技术探针只有在调用方及等价替代证据齐备后才能删除。
+
+国际化强制摘要：跨服务 Locale 仅使用 BCP 47 Tag，初始支持 `zh-CN`、`en-US`；技术时间点使用
+`Instant`/`timestamptz`/RFC 3339，Factory 业务日期由 MDM 权威 IANA Zone ID 计算；精度敏感量值使用
+BigDecimal 和 Decimal String，不以 float/double 传输。System 拥有显示偏好，MDM 拥有 Factory 时区和
+单位换算，IAM 不拥有偏好且不得将其放入 Token。Locale、时区和显示单位都不是权限或业务事实。
+
 ## 4. 数据访问约束
+
+权威物理命名为数据库 `mom_platform`、每服务 `mom_<bounded-context>` Schema；禁止跨 Schema
+JOIN、外键和读写。事务默认位于 Application 公共方法，业务写与 Outbox、消费写与 Inbox 分别共享
+本地事务；自定义 SQL 必须参数化、显式处理审计/版本并检查 affected rows。已发布 Flyway Versioned
+Migration 不得修改或删除。SAS 官方 JDBC Store 保持协议特殊边界，不强制套用 MOM Entity 基类。
 
 - Java 技术主键统一使用 `String`，数据库使用 `varchar(19)`；禁止把 Snowflake 或 64 位整数 ID 作为 JSON Number 暴露给前端；
 - MyBatis-Plus 默认主键策略使用 `ASSIGN_ID`，业务编码、工单号、批次号等领域标识必须独立建模；
@@ -67,6 +129,47 @@
 - Mapper 不得通过 `IService/ServiceImpl` 直接升级为领域服务契约，事务边界应由显式 Application Service 定义；
 - Lombok 仅用于消除 getter、setter、构造器等机械代码，不得使用 `@Data` 自动生成实体 `equals/hashCode/toString`，避免触发懒加载、递归引用或错误身份语义；
 - 新增 Flyway 迁移后不得修改已经合并执行过的历史迁移文件，结构变更必须增加新版本迁移。
+
+### 4.1 持久化改动前置协议
+
+任何新增或修改 Migration、Table、Entity、Mapper、Mapper XML、Repository、Query Mapper、Application
+Service 或 Controller CRUD 前，AI 必须先输出并确认：
+
+1. 数据所有权；
+2. 表类型和生命周期；
+3. Entity 基类选择；
+4. 单表数据访问操作清单；
+5. MyBatis-Plus 可覆盖范围；
+6. 每条自定义 SQL 的技术必要性；
+7. 多表关系类型；
+8. 多表分页方式；
+9. 删除、禁用、归档策略；
+10. 无物理外键完整性方案；
+11. 事务和并发策略；
+12. 查询和索引映射；
+13. 测试证据。
+
+MOM 自主业务表、关系表、流水表、快照表和平台表禁止物理外键与物理级联；精确协议例外必须落实到
+具体文件和具体表。规范文件存在不等于验收完成；必须检查最终实现是否实际采用规范要求的技术路径。
+
+### 4.2 Package 与目录前置协议
+
+任何新增或移动 Entity、Mapper、QueryMapper、Row、Projection、Repository Adapter、Client Adapter、
+Messaging Adapter、Cache Adapter 或 Configuration 前，AI 必须先明确：
+
+1. 类型属于 Web、Application、Domain 还是 Infrastructure；
+2. 如果属于 Infrastructure，适配的是哪种外部技术；
+3. 如果属于 Persistence，职责是 Entity、Mapper、Repository 还是 Query；
+4. 为什么不能放入已有标准职责包；
+5. 是否会形成 `persistence.<feature>`；
+6. 是否存在类名冲突；
+7. 是否存在 XML、反射或配置字符串引用；
+8. 是否需要精确例外。
+
+不得因为某个业务能力需要 Entity、Mapper 和 Repository，就在 `infrastructure.persistence` 下为该业务能力
+创建独立 Feature 子包。Domain、Application、Web 按业务能力分包；Infrastructure 按 Adapter 类型分包；
+Persistence 只按 Entity、Mapper、Repository、Query、Converter、TypeHandler 技术职责分包。详细权威规则见
+`docs/engineering/standards/package-directory-architecture-standard.md`。
 
 ## 5. 消息与最终一致性约束
 

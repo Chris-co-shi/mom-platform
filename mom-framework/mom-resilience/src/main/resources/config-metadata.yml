@@ -1,0 +1,45 @@
+module: mom-resilience
+version: 1.0
+
+governance:
+  overridable: true
+  valuesFrozen: false
+  precedence:
+    - business-instance
+    - named-profile
+    - framework-default-profile
+  frozen:
+    - profile-structure
+    - circuit-breaker-instance-naming
+    - no-active-transaction
+  notFrozen:
+    - timeout-values
+    - circuit-breaker-thresholds
+    - bulkhead-capacity
+    - sampling-or-deployment-capacity
+
+profiles:
+  - name: default
+    owner: mom-framework
+    propertyPattern: resilience4j.*.configs.default.*
+    environmentVariablePattern: MOM_RESILIENCE_DEFAULT_*
+    overridable: true
+    valuesFrozen: false
+    retryDefault: disabled
+    failureMode: propagate-dependency-unavailable
+    metrics: resilience4j-micrometer
+  - name: system-query
+    owner: mom-system-platform
+    extends: default
+    propertyPattern: resilience4j.*.configs.system-query.*
+    environmentVariablePattern: SYSTEM_QUERY_*
+    overridable: true
+    valuesFrozen: false
+    retryDefault: disabled
+    failureMode: preserve-4xx-map-infrastructure-unavailable
+
+rules:
+  - post-auto-retry-forbidden
+  - fallback-must-not-return-fake-success
+  - feign-timeout-remains-client-configuration
+  - resilience-inside-transaction-forbidden

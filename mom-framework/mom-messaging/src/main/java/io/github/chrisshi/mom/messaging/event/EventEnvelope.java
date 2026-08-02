@@ -35,6 +35,44 @@ public record EventEnvelope(
         String payloadJson) {
 
     /**
+     * 使用生产方本地 EventType 创建跨服务信封。
+     *
+     * <p>构造后只保留稳定字符串 Code，不保存或序列化业务枚举类型。</p>
+     *
+     * @param eventId 事件唯一标识
+     * @param eventType 生产方 bounded context 的本地事件类型
+     * @param eventVersion 契约版本
+     * @param aggregateType 聚合类型
+     * @param aggregateId 聚合标识
+     * @param occurredAt 事实发生时间
+     * @param producer 生产服务
+     * @param correlationId 关联标识
+     * @param payloadJson 明确 JSON Payload
+     */
+    public EventEnvelope(
+            String eventId,
+            EventType eventType,
+            int eventVersion,
+            String aggregateType,
+            String aggregateId,
+            Instant occurredAt,
+            String producer,
+            String correlationId,
+            String payloadJson) {
+        this(
+                eventId,
+                Objects.requireNonNull(eventType, "eventType 不能为空").code(),
+                eventVersion,
+                aggregateType,
+                aggregateId,
+                occurredAt,
+                producer,
+                correlationId,
+                payloadJson
+        );
+    }
+
+    /**
      * 校验事件信封的最小可发布约束。
      *
      * @throws IllegalArgumentException 任一必填文本为空或版本号小于 1 时抛出

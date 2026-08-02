@@ -14,11 +14,15 @@ import java.util.Objects;
  * 原始请求幂等值只参与 SHA-256 摘要计算，不直接进入 Redis Key，避免订单号、批次号、外部单号
  * 或其他敏感业务标识暴露在监控、慢日志和运维命令中。</p>
  *
+ * <p>原始请求值是协议身份：不裁剪空白、不转换大小写、不执行 Unicode 归一化，也不静默截断。
+ * 因此 {@code "key"} 与 {@code " key "} 是不同身份。纯空白值仍被拒绝，防止无意义请求占位。</p>
+ *
  * <p>该类型是无状态且线程安全的，可以被单例复用。</p>
  */
 public final class RedisIdempotencyKeyFactory {
 
     private static final int MAX_SCOPE_LENGTH = 96;
+    private static final int MAX_REQUEST_KEY_LENGTH = 1024;
 
     private final String environment;
     private final String applicationName;
@@ -39,7 +43,8 @@ public final class RedisIdempotencyKeyFactory {
      *
      * @param scope 业务动作作用域
      * @param requestKey 原始幂等值
-     * @return 包含统一命名空间和 SHA-256 摘要的 Redis Key
+     * @return 包含统一命名空间和原始值 SHA-256 摘要的 Redis Key
+     * @throws IllegalArgumentException 原始值为空、仅含空白或超过 1024 个 Java 字符时抛出
      */
     public String create(String scope, String requestKey) {
         String normalizedScope = normalizeSegment(scope, "scope");
@@ -49,11 +54,14 @@ public final class RedisIdempotencyKeyFactory {
         if (requestKey == null || requestKey.isBlank()) {
             throw new IllegalArgumentException("幂等 requestKey 不能为空");
         }
+        if (requestKey.length() > MAX_REQUEST_KEY_LENGTH) {
+            throw new IllegalArgumentException("幂等 requestKey 长度不能超过 " + MAX_REQUEST_KEY_LENGTH);
+        }
         return "mom:%s:%s:idempotency:%s:%s".formatted(
                 environment,
                 applicationName,
                 normalizedScope,
-                sha256(requestKey.trim()));
+                sha256(requestKey));
     }
 
     /**

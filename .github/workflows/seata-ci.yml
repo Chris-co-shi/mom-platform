@@ -11,25 +11,24 @@ permissions:
 
 concurrency:
   group: seata-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   changes:
     name: Detect Seata scope
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       seata: ${{ steps.scope.outputs.seata }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Detect Seata-related changes
-        id: scope
-        shell: bash
+      - id: scope
         env:
           EVENT_NAME: ${{ github.event_name }}
+          PR_ACTION: ${{ github.event.action }}
+          PR_PREVIOUS_SHA: ${{ github.event.before }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PUSH_BASE_SHA: ${{ github.event.before }}
@@ -37,36 +36,33 @@ jobs:
           MANUAL_SCOPE: ${{ github.event_name == 'workflow_dispatch' && 'seata' || 'auto' }}
         run: bash .github/scripts/detect-ci-scope.sh
 
-  seata-at:
-    name: Controlled Seata AT smoke
+  framework-verification:
+    name: Seata framework verification
     needs: changes
     if: needs.changes.outputs.seata == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 25
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "25"
           cache: maven
-
-      - name: Package MDM and Integration applications
-        shell: bash
+      - name: Verify Seata integration module
         run: >-
           bash scripts/codex-mvn-test.sh
-          -DskipTests
-          -pl :mom-mdm-server,:mom-integration-server
-          -am package
-
-      - name: Run controlled Seata AT smoke test
-        shell: bash
-        run: bash .github/scripts/p01-s06-seata-at-smoke.sh
-
-      - name: Upload Seata diagnostics on failure
+          -pl mom-framework/mom-seata
+          -am verify
+      - name: Record retired fixture boundary
+        run: |
+          {
+            echo '### Seata acceptance boundary'
+            echo
+            echo 'The MDM/Integration Phase 01 dual-database fixture was retired.'
+            echo 'This workflow verifies the integration module only; a real short-transaction caller must restore TC and dual-database acceptance before Seata is adopted.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -74,22 +70,7 @@ jobs:
           path: |
             .codex/runtime/logs/**
             .codex/runtime/summaries/**
-            p01-s06-mdm-postgresql.log
-            p01-s06-integration-postgresql.log
-            p01-s06-seata-server.log
-            p01-s06-mdm-migration.log
-            p01-s06-integration-migration.log
-            p01-s06-mdm-migration-health.json
-            p01-s06-integration-migration-health.json
-            p01-s06-mdm-server.log
-            p01-s06-integration-server.log
-            p01-s06-mdm-health.json
-            p01-s06-integration-health.json
-            p01-s06-success-response.json
-            p01-s06-global-rollback-response.json
-            p01-s06-participant-failure-response.json
-            p01-s06-tc-outage-response.json
-            p01-s06-status.txt
             **/target/surefire-reports/**
+            **/target/failsafe-reports/**
           if-no-files-found: ignore
           include-hidden-files: true

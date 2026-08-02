@@ -21,3 +21,21 @@ gateway and bootstrap tests
 5. PostgreSQL 每服务独立 Schema，禁止跨 Schema JOIN 和跨域写入。
 6. `mom-framework` 不得包含 MES、WMS、QMS 等业务规则。
 7. PCS、WCS 独立仓库，不进入本 Reactor。
+
+## System Platform
+
+`mom-system-platform` 自 P1.6 S12 起登记为 `api/client/server` 三模块；S13 增加类型化非敏感参数，S14 增加非权威受限字典，S15-B 增加 Dynamic I18n 后端，S16 增加用户显示偏好与受限视图设置：
+
+- API 只暴露 Parameter Scope/Value Type/有效值，以及 Dictionary Active Option/Compatibility 只读契约；
+- Client 仅依赖自身 API 与 `mom-openfeign`，没有真实 Feign 接口；
+- Server 精确依赖自身 API、WebMVC、Data、Security、Tracing/Metrics、Nacos Discovery 与测试基础设施；
+- PostgreSQL `mom_system` 中 V1 Parameter、V2 Dictionary 两表与 V3 I18n 三表是各自唯一权威；V5 已移除历史业务 FK，关联完整性由 Application 校验、约束、索引、事务、孤儿诊断和 PostgreSQL IT 共同保证，禁止任何跨 Schema FK/JOIN；
+- Dictionary 只承载低频、无独立生命周期的稳定 Code 与 fallback Label，不得复制 IAM/MDM/WMS/EAM 权威对象；
+- Dynamic I18n 使用 Draft → 显式 Publish → 双 Locale 不可变 Release；Runtime 只读当前完整版本并支持 ETag/304，回滚创建新版本；
+- Preference 只保存 Locale、显示时区、Theme、Density、Page Size 和受限 View；当前用户只来自 JWT sub，Preference 不参与 Authorization；
+- `mom_system` V7 新增两张无物理 FK 表，使用 MyBatis-Plus Version CAS 和非删除 Reset；API 不暴露 userId/数据库 ID/任意 JSON；
+- Security 传递的 Redis 只检查 revoked sid，不是 System 业务存储或缓存；Server 不依赖 IAM Server、其他领域 Server、MQ、Outbox 或 Seata；
+- System 包不得访问 IAM Application、Web、Repository、Mapper、Infrastructure 或 Schema；
+- 当前有 GLOBAL/APPLICATION 参数、受限 Dictionary/Item、Dynamic I18n 和 S16 Preference；没有 Application Catalog、Menu、Audit Projection、Tree、Metadata、Alias、Dashboard 或 Favorites。
+
+POM XML 语义门禁与 ArchUnit 规则位于 `mom-architecture-tests`。ADR-025 仍是数据所有权的权威决策。

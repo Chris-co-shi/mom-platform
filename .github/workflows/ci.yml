@@ -15,25 +15,34 @@ on:
           - auto
           - none
           - all
-          - nacos-redis
+          - nacos
+          - redis
           - postgresql
           - seata
+          - messaging
+          - observability
 
 permissions:
   contents: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   changes:
     name: Detect infrastructure scope
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
-      nacos_redis: ${{ steps.scope.outputs.nacos_redis }}
+      nacos: ${{ steps.scope.outputs.nacos }}
+      redis_cache: ${{ steps.scope.outputs.redis_cache }}
+      redis_idempotency: ${{ steps.scope.outputs.redis_idempotency }}
+      redis_rate_limit: ${{ steps.scope.outputs.redis_rate_limit }}
       postgresql: ${{ steps.scope.outputs.postgresql }}
+      messaging: ${{ steps.scope.outputs.messaging }}
       seata: ${{ steps.scope.outputs.seata }}
+      observability: ${{ steps.scope.outputs.observability }}
       mode: ${{ steps.scope.outputs.mode }}
     steps:
       - name: Checkout
@@ -46,6 +55,7 @@ jobs:
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
+          PR_ACTION: ${{ github.event.action }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PUSH_BASE_SHA: ${{ github.event.before }}
@@ -86,12 +96,12 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: true
 
-  nacos-redis-smoke:
-    name: Nacos and Redis integration smoke
+  nacos-discovery-smoke:
+    name: Nacos discovery smoke
     needs: [changes, verify]
-    if: needs.changes.outputs.nacos_redis == 'true'
+    if: needs.changes.outputs.nacos == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -103,39 +113,169 @@ jobs:
           java-version: "25"
           cache: maven
 
-      - name: Package smoke-test applications
+      - name: Package discovery smoke applications
         shell: bash
         run: >-
           bash scripts/codex-mvn-test.sh
           -pl mom-gateway,mom-mdm-platform/mom-mdm-server,mom-integration-platform/mom-integration-server
           -am -DskipTests package
 
-      - name: Run Nacos and Redis infrastructure smoke test
+      - name: Run Nacos discovery smoke test
         shell: bash
-        run: bash .github/scripts/nacos-redis-smoke.sh
+        run: bash .github/scripts/nacos-discovery-smoke.sh
 
-      - name: Upload Nacos and Redis diagnostics on failure
+      - name: Upload Nacos discovery diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: nacos-redis-diagnostics
+          name: nacos-discovery-diagnostics
           path: |
             .codex/runtime/logs/**
             .codex/runtime/summaries/**
-            nacos-server.log
-            redis-server.log
-            mdm-server.log
-            integration-server.log
-            gateway-one.log
-            gateway-one-rate-limit.log
-            gateway-two-rate-limit.log
-            nacos-smoke-response.json
-            nacos-smoke-headers.txt
+            nacos-container-state.json
+            nacos-discovery-server.log
+            mdm-nacos-discovery.log
+            integration-nacos-discovery.log
+            gateway-nacos-discovery.log
+            nacos-discovery-response.json
+            nacos-discovery-headers.txt
+            nacos-discovery-outage.json
+            nacos-discovery-missing-instance.json
+          if-no-files-found: ignore
+          include-hidden-files: true
+
+  redis-idempotency-smoke:
+    name: Redis idempotency smoke
+    needs: [changes, verify]
+    if: needs.changes.outputs.redis_idempotency == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Package Integration application
+        shell: bash
+        run: >-
+          bash scripts/codex-mvn-test.sh
+          -pl mom-integration-platform/mom-integration-server
+          -am -DskipTests package
+
+      - name: Run Redis idempotency smoke test
+        shell: bash
+        run: bash .github/scripts/redis-idempotency-smoke.sh
+
+      - name: Upload Redis idempotency diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: redis-idempotency-diagnostics
+          path: |
+            .codex/runtime/logs/**
+            .codex/runtime/summaries/**
+            redis-idempotency-container-state.json
+            redis-idempotency-server.log
+            integration-redis-idempotency.log
             idempotency-first.json
             idempotency-duplicate.json
+            idempotency-case.json
+            idempotency-unicode.json
+            idempotency-space.json
+            idempotency-compact.json
+            redis-idempotency-failure.json
+          if-no-files-found: ignore
+          include-hidden-files: true
+
+  redis-cache:
+    name: Redis cache integration
+    needs: [changes, verify]
+    if: needs.changes.outputs.redis_cache == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Verify cache contract and real Redis recovery
+        shell: bash
+        run: >-
+          bash scripts/codex-mvn-test.sh
+          -pl mom-framework/mom-cache
+          -am verify
+
+      - name: Upload Redis cache diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: redis-cache-diagnostics
+          path: |
+            .codex/runtime/logs/**
+            .codex/runtime/summaries/**
+            mom-framework/mom-cache/target/surefire-reports/**
+            mom-framework/mom-cache/target/failsafe-reports/**
+          if-no-files-found: ignore
+          include-hidden-files: true
+
+  redis-rate-limit-smoke:
+    name: Redis rate-limit smoke
+    needs: [changes, verify]
+    if: needs.changes.outputs.redis_rate_limit == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Package Gateway application
+        shell: bash
+        run: >-
+          bash scripts/codex-mvn-test.sh
+          -pl mom-gateway
+          -am -DskipTests package
+
+      - name: Run Redis rate-limit smoke test
+        shell: bash
+        run: bash .github/scripts/redis-rate-limit-smoke.sh
+
+      - name: Upload Redis rate-limit diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: redis-rate-limit-diagnostics
+          path: |
+            .codex/runtime/logs/**
+            .codex/runtime/summaries/**
+            redis-rate-limit-container-state.json
+            redis-rate-limit-server.log
+            redis-rate-limit-downstream.log
+            gateway-one-redis-rate-limit.log
+            gateway-two-redis-rate-limit.log
             rate-limit-first.json
             rate-limit-second.json
-            redis-failure-response.json
+            redis-rate-limit-failure.json
+            rate-limit-recovery.json
+            redis-rate-limit-prometheus.txt
           if-no-files-found: ignore
           include-hidden-files: true
 
@@ -156,16 +296,20 @@ jobs:
           java-version: "25"
           cache: maven
 
-      - name: Package MDM application
+      - name: Package PostgreSQL applications
         shell: bash
         run: >-
           bash scripts/codex-mvn-test.sh
-          -pl mom-mdm-platform/mom-mdm-server
+          -pl mom-mdm-platform/mom-mdm-server,mom-system-platform/mom-system-server
           -am -DskipTests package
 
-      - name: Run PostgreSQL packaged application smoke test
+      - name: Run MDM PostgreSQL packaged smoke
         shell: bash
         run: bash .github/scripts/p01-s04-postgresql-smoke.sh
+
+      - name: Run System PostgreSQL packaged smoke
+        shell: bash
+        run: bash .github/scripts/system-postgresql-smoke.sh
 
       - name: Upload PostgreSQL diagnostics on failure
         if: failure()
@@ -182,6 +326,11 @@ jobs:
             mdm-data-probe-create.json
             mdm-data-probe-read.json
             mdm-postgresql-failure.json
+            system-postgresql-container.log
+            system-postgresql-server.log
+            system-postgresql-health.json
+            system-postgresql-schema.txt
+            system-postgresql-failure.json
           if-no-files-found: ignore
           include-hidden-files: true
 

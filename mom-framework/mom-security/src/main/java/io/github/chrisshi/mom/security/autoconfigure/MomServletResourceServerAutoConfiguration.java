@@ -1,6 +1,9 @@
 package io.github.chrisshi.mom.security.autoconfigure;
 
 import io.github.chrisshi.mom.security.authorization.MomAuthorizationService;
+import io.github.chrisshi.mom.security.revocation.MomRevokedSessionChecker;
+import io.github.chrisshi.mom.security.revocation.MomRevokedSessionFilter;
+import io.github.chrisshi.mom.security.revocation.infrastructure.RedisMomRevokedSessionChecker;
 import io.github.chrisshi.mom.security.token.MomJwtGrantedAuthoritiesConverter;
 import io.github.chrisshi.mom.security.token.MomJwtValidators;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -18,7 +21,9 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationProvider;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 /**
  * 可选的 Servlet 业务 Resource Server 自动配置。
@@ -51,6 +56,23 @@ public class MomServletResourceServerAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean
+    MomRevokedSessionChecker momRevokedSessionChecker(
+            StringRedisTemplate redis,
+            MomResourceServerProperties properties) {
+        properties.validate();
+        return new RedisMomRevokedSessionChecker(redis, properties.getRevokedSidKeyPrefix());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    MomRevokedSessionFilter momRevokedSessionFilter(
+            MomRevokedSessionChecker checker,
+            MomResourceServerProperties properties) {
+        return new MomRevokedSessionFilter(checker, properties.getPublicPaths());
+    }
+
+    @Bean
     @ConditionalOnMissingBean(JwtDecoder.class)
     JwtDecoder momJwtDecoder(MomResourceServerProperties properties) {
         properties.validate();
@@ -66,6 +88,7 @@ public class MomServletResourceServerAutoConfiguration {
             HttpSecurity http,
             JwtDecoder jwtDecoder,
             MomJwtGrantedAuthoritiesConverter authoritiesConverter,
+            MomRevokedSessionFilter revokedSessionFilter,
             MomResourceServerProperties properties) throws Exception {
         JwtAuthenticationConverter authenticationConverter = new JwtAuthenticationConverter();
         authenticationConverter.setJwtGrantedAuthoritiesConverter(authoritiesConverter);
@@ -80,7 +103,8 @@ public class MomServletResourceServerAutoConfiguration {
                 })
                 .oauth2ResourceServer(resourceServer -> resourceServer.jwt(jwt -> jwt
                         .decoder(jwtDecoder)
-                        .jwtAuthenticationConverter(authenticationConverter)));
+                        .jwtAuthenticationConverter(authenticationConverter)))
+                .addFilterAfter(revokedSessionFilter, BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 }

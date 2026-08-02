@@ -14,7 +14,8 @@ import java.util.regex.Pattern;
  * S02 数据库无法独立表达的 IAM 跨表领域约束。
  *
  * <p>该类型不访问数据库、不计算最终权限，也不实现登录或 Token 行为。Application Service 与后续管理 API
- * 在写入前复用这些纯函数，数据库继续负责唯一性、外键、枚举和时间区间等结构约束。</p>
+ * 在写入前复用这些纯函数；数据库负责唯一性、Check、索引和时间区间等结构约束，Application 负责本地
+ * 引用存在性与受控生命周期。IAM 自主业务表不依赖物理外键。</p>
  */
 public final class IamDomainRules {
 

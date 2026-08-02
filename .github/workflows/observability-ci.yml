@@ -4,59 +4,77 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: observability-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  tracing:
+  changes:
+    name: Detect observability scope
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 5
+    outputs:
+      observability: ${{ steps.scope.outputs.observability }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_ACTION: ${{ github.event.action }}
+          PR_PREVIOUS_SHA: ${{ github.event.before }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
+          MANUAL_SCOPE: ${{ github.event_name == 'workflow_dispatch' && 'observability' || 'auto' }}
+        run: bash .github/scripts/detect-ci-scope.sh
 
-      - name: Set up JDK 25
-        uses: actions/setup-java@v4
+  framework-verification:
+    name: Observability framework verification
+    needs: changes
+    if: needs.changes.outputs.observability == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "25"
           cache: maven
-
-      - name: Package traced applications
-        shell: bash
+      - name: Verify observability modules
+        run: >-
+          bash scripts/codex-mvn-test.sh
+          -pl mom-framework/mom-observation,mom-framework/mom-tracing,mom-framework/mom-logging,mom-framework/mom-metrics
+          -am verify
+      - name: Package representative applications
+        run: >-
+          bash scripts/codex-mvn-test.sh
+          -DskipTests -pl :mom-gateway,:mom-mdm-server,:mom-integration-server -am package
+      - name: Record retired fixture boundary
         run: |
-          set -o pipefail
-          mvn -B -ntp -DskipTests \
-            -pl :mom-gateway,:mom-mdm-server,:mom-integration-server \
-            -am package 2>&1 | tee observability-build.log
-
-      - name: Run OpenTelemetry and Tempo smoke test
-        shell: bash
-        run: GATEWAY_SECURITY_ENABLED=false bash .github/scripts/p01-s07-observability-smoke.sh
-
-      - name: Upload observability diagnostics on failure
+          {
+            echo '### Observability acceptance boundary'
+            echo
+            echo 'The fake Gateway -> Integration -> MDM probe chain was retired.'
+            echo 'Framework and packaged-application compatibility remain verified; the first real cross-service use case must restore end-to-end trace acceptance.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: observability-verification-diagnostics
           path: |
-            observability-build.log
-            p01-s07-nacos.log
-            p01-s07-redis.log
-            p01-s07-tempo.log
-            p01-s07-collector.log
-            p01-s07-gateway.log
-            p01-s07-integration.log
-            p01-s07-mdm.log
-            p01-s07-http-response.json
-            p01-s07-http-response-headers.txt
-            p01-s07-tempo-trace.json
-            p01-s07-collector-outage-response.json
-            p01-s07-status.txt
+            .codex/runtime/logs/**
+            .codex/runtime/summaries/**
             **/target/surefire-reports/**
+            **/target/failsafe-reports/**
           if-no-files-found: ignore
+          include-hidden-files: true

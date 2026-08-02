@@ -7,7 +7,7 @@ spring:
   datasource:
     url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_integration}&tcpKeepAlive=${POSTGRES_TCP_KEEP_ALIVE:true}&ApplicationName=${POSTGRES_APPLICATION_NAME:mom-integration-server}}
     username: ${POSTGRES_USERNAME:mom}
-    password: ${POSTGRES_PASSWORD:mom}
+    password: ${POSTGRES_PASSWORD:}
     hikari:
       pool-name: ${POSTGRES_POOL_NAME:mom-integration-hikari}
       minimum-idle: ${POSTGRES_MINIMUM_IDLE:1}
@@ -35,75 +35,19 @@ spring:
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
       timeout: ${REDIS_TIMEOUT:2s}
   cloud:
-    function:
-      definition: ${MOM_MESSAGE_FUNCTION_DEFINITION:}
     nacos:
       discovery:
         enabled: ${NACOS_DISCOVERY_ENABLED:false}
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:nacos}
+        password: ${NACOS_PASSWORD:}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
-    openfeign:
-      micrometer:
-        enabled: true
-      client:
-        config:
-          mom-mdm-server:
-            connect-timeout: ${MDM_CLIENT_CONNECT_TIMEOUT:2000}
-            read-timeout: ${MDM_CLIENT_READ_TIMEOUT:3000}
-            logger-level: basic
-    stream:
-      bindings:
-        momDomainEventConsumer-in-0:
-          destination: ${MOM_DOMAIN_EVENT_TOPIC:mom-domain-events-v1}
-          group: ${ROCKETMQ_CONSUMER_GROUP:mom-integration-v1}
-          content-type: application/json
-          consumer:
-            max-attempts: 1
-      rocketmq:
-        binder:
-          name-server: ${ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
-          enable-msg-trace: ${ROCKETMQ_ENABLE_MSG_TRACE:false}
-        bindings:
-          momDomainEventConsumer-in-0:
-            consumer:
-              push:
-                orderly: false
-                max-reconsume-times: ${ROCKETMQ_MAX_RECONSUME_TIMES:2}
-                consume-message-batch-max-size: 1
-
-seata:
-  enabled: ${SEATA_ENABLED:false}
-  application-id: ${spring.application.name}
-  tx-service-group: mom-p01-s06-tx-group
-  enable-auto-data-source-proxy: true
-  data-source-proxy-mode: AT
-  use-jdk-proxy: false
-  registry:
-    type: file
-  config:
-    type: file
-  service:
-    vgroup-mapping:
-      mom-p01-s06-tx-group: default
-    grouplist:
-      default: ${SEATA_SERVER_ADDR:127.0.0.1:8091}
-  client:
-    rm:
-      report-success-enable: true
-      table-meta-check-enable: true
 
 mom:
   technical-probe:
     enabled: ${MOM_TECHNICAL_PROBE_ENABLED:false}
-  integration:
-    message-consumer:
-      enabled: ${MOM_MESSAGE_CONSUMER_ENABLED:false}
-    seata-at-probe:
-      enabled: ${INTEGRATION_SEATA_AT_PROBE_ENABLED:false}
   idempotency:
     redis:
       environment: ${MOM_ENVIRONMENT:local}
@@ -114,11 +58,14 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,nacos-discovery,bindings
+        include: health,info,prometheus,nacos-discovery
   endpoint:
     health:
       probes:
         enabled: true
+  health:
+    redis:
+      enabled: ${MANAGEMENT_HEALTH_REDIS_ENABLED:true}
   tracing:
     sampling:
       probability: ${TRACING_SAMPLING_PROBABILITY:0.1}

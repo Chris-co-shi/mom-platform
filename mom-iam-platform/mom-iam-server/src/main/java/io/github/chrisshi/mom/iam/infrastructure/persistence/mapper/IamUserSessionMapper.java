@@ -12,7 +12,13 @@ import org.apache.ibatis.annotations.Update;
 import java.time.Instant;
 import java.util.List;
 
-/** IAM Session Mapper，所有 Rotation、撤销和重放判定更新保持数据库行锁与条件更新。 */
+/**
+ * IAM Session 的持久化 Mapper。
+ *
+ * <p>该类型位于 Infrastructure，只允许 IAM Session 单表读写和管理投影查询；Rotation、撤销和重放判定
+ * 通过行锁与条件更新保持并发语义，不负责开启事务。数据库不可用时异常向 Application 传播并回滚，禁止
+ * 跨 Schema 访问、远程调用或把 Token 材料加入管理投影。</p>
+ */
 @Mapper
 public interface IamUserSessionMapper extends MomBaseMapper<IamUserSessionEntity> {
 
@@ -58,8 +64,19 @@ public interface IamUserSessionMapper extends MomBaseMapper<IamUserSessionEntity
             """)
     List<String> selectActiveIdsByClient(@Param("clientId") String clientId);
 
-    /** @return 持有 {@code FOR UPDATE} 行锁的 Session 实体 */
-    @Select("SELECT * FROM iam_user_session WHERE id=#{sessionId} FOR UPDATE")
+    /**
+     * 按主键锁定 Session，供刷新与撤销事务串行化状态迁移。
+     *
+     * @param sessionId Session 技术主键
+     * @return 持有 {@code FOR UPDATE} 行锁的 Session；不存在时返回 {@code null}
+     */
+    @Select("""
+            SELECT id,user_id,client_id,channel,status,login_at,last_refresh_at,
+                   absolute_expires_at,latest_access_token_expires_at,
+                   ip_address,user_agent,device_name,revoked_at,revoked_by,revoke_reason,
+                   created_at,created_by,updated_at,updated_by,version
+              FROM iam_user_session WHERE id=#{sessionId} FOR UPDATE
+            """)
     IamUserSessionEntity selectForUpdate(@Param("sessionId") String sessionId);
 
     /** Refresh 成功后推进 Session 状态和版本。 */

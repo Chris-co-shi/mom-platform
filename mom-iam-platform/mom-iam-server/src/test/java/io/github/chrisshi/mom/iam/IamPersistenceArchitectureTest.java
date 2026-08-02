@@ -19,8 +19,8 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  */
 class IamPersistenceArchitectureTest {
 
-    private static final String AUTHORIZATION_SERVER_CONFIGURATION =
-            "io.github.chrisshi.mom.iam.security.IamAuthorizationServerConfiguration";
+    private static final String AUTHORIZATION_SERVER_PROTOCOL_CONFIGURATION =
+            "io.github.chrisshi.mom.iam.security.IamAuthorizationServerProtocolConfiguration";
 
     private final JavaClasses iamClasses = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
@@ -29,7 +29,7 @@ class IamPersistenceArchitectureTest {
     @Test
     void onlyOfficialAuthorizationServerAdapterMayDependOnSpringJdbc() {
         noClasses()
-                .that().doNotHaveFullyQualifiedName(AUTHORIZATION_SERVER_CONFIGURATION)
+                .that().doNotHaveFullyQualifiedName(AUTHORIZATION_SERVER_PROTOCOL_CONFIGURATION)
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "org.springframework.jdbc..")
                 .because("MOM 自有 IAM 持久化必须统一通过 MyBatis Mapper 与明确用途 Repository")

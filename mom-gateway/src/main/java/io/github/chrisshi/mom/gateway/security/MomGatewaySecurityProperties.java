@@ -1,6 +1,7 @@
 package io.github.chrisshi.mom.gateway.security;
 
 import io.github.chrisshi.mom.security.token.MomSecurityClaims;
+import io.github.chrisshi.mom.security.revocation.MomRevokedSessionKeys;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
@@ -14,7 +15,7 @@ public class MomGatewaySecurityProperties {
     private String issuerUri = "http://127.0.0.1:20100";
     private String jwkSetUri = "http://127.0.0.1:20100/oauth2/jwks";
     private Set<String> acceptedAudiences = new LinkedHashSet<>(MomSecurityClaims.publicClientIds());
-    private String revokedSidKeyPrefix = "mom:iam:revoked:sid:";
+    private String revokedSidKeyPrefix = MomRevokedSessionKeys.DEFAULT_PREFIX;
     private Duration redisTimeout = Duration.ofSeconds(2);
 
     public boolean isEnabled() { return enabled; }

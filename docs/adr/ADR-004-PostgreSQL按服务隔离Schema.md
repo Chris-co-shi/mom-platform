@@ -4,6 +4,8 @@
 - 日期：2026-07-18
 - 关联文档：[数据架构](../architecture/数据架构.md)
 
+> 物理 Schema 的 `mom_<bounded-context>` 命名由 [ADR-020](ADR-020-PostgreSQL物理Schema命名空间.md) 补充和更新；本 ADR 的服务隔离结论保持有效。
+
 ## 1. 背景
 
 V1 需要控制基础设施成本，同时保持领域数据归属和未来独立扩展能力。

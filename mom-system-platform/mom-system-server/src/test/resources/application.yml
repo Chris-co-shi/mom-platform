@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    hikari:
+      # SpringBootTest 验证正式 System DataSource 边界，不接受 Hikari 默认值漂移。
+      pool-name: mom-system-hikari
+      minimum-idle: 1
+      maximum-pool-size: 5
+      connection-timeout: 3000
+      validation-timeout: 2000
+      leak-detection-threshold: 0
+      connection-init-sql: SET TIME ZONE 'UTC'
+  flyway:
+    # S18 起共享 SpringBootTest 必须验证当前完整 V1～V9 Schema；历史升级路径由各隔离 Schema 测试覆盖。
+    target: 9
