@@ -14,7 +14,7 @@ import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserRoleM
 import java.time.Instant;
 import java.util.Optional;
 
-/** 内置管理员 Bootstrap 与 PLATFORM_ADMIN 不变量事实 Adapter。 */
+/** 内置管理员 Bootstrap、Recovery 与 PLATFORM_ADMIN 不变量事实 Adapter。 */
 public final class IamBuiltInAdministratorRepository
         implements IamPlatformAdministratorPort {
     private final IamUserMapper userMapper;
@@ -42,6 +42,11 @@ public final class IamBuiltInAdministratorRepository
         return Optional.ofNullable(userMapper.selectBootstrapIdentityByUsername(username));
     }
 
+    /** 恢复流程使用全局唯一用户名持有账号行锁。 */
+    public Optional<IamUserMapper.BootstrapIdentity> lockByUsername(String username) {
+        return Optional.ofNullable(userMapper.selectBootstrapIdentityByUsernameForUpdate(username));
+    }
+
     public void insertAdministrator(
             String userId, String username, String passwordHash, String displayName,
             String actor, Instant now) {
@@ -62,6 +67,20 @@ public final class IamBuiltInAdministratorRepository
         user.setVersion(0L);
         user.setDeleted(Boolean.FALSE);
         requireOne(userMapper.insert(user), "IAM built-in administrator insert failed");
+    }
+
+    /** 使用乐观锁原子恢复内置管理员凭证与可登录状态。 */
+    public void recoverAdministrator(
+            String userId,
+            String passwordHash,
+            boolean forcePasswordChange,
+            long expectedVersion,
+            String actor,
+            Instant now) {
+        requireOne(userMapper.recoverBuiltInAdministrator(
+                        userId, passwordHash, forcePasswordChange,
+                        expectedVersion, actor, now),
+                "IAM built-in administrator was concurrently modified or is not recoverable");
     }
 
     public void assignPlatformAdmin(

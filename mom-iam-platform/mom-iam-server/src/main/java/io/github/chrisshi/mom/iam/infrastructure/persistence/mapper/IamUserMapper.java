@@ -7,6 +7,7 @@ import io.github.chrisshi.mom.iam.domain.type.UserType;
 import io.github.chrisshi.mom.iam.infrastructure.persistence.entity.IamUserEntity;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.time.Instant;
@@ -41,6 +42,17 @@ public interface IamUserMapper extends MomBaseMapper<IamUserEntity> {
      * @return 不包含密码摘要的账号身份，未找到时为 null
      */
     BootstrapIdentity selectBootstrapIdentityByUsername(@Param("username") String username);
+
+    /** 恢复流程按用户名锁定不含凭证材料的系统账号身份。 */
+    @Select("""
+            SELECT id,username,user_type,status,password_change_required,system_account,
+                   failed_login_count,locked_until,version,deleted
+              FROM iam_user
+             WHERE username=#{username}
+             FOR UPDATE
+            """)
+    BootstrapIdentity selectBootstrapIdentityByUsernameForUpdate(
+            @Param("username") String username);
 
     /** 按客户端版本更新展示名并推进聚合版本。 */
     @Update("""
@@ -79,6 +91,25 @@ public interface IamUserMapper extends MomBaseMapper<IamUserEntity> {
             """)
     int resetPassword(@Param("userId") String userId, @Param("passwordHash") String passwordHash,
             @Param("version") long version, @Param("actor") String actor, @Param("now") Instant now);
+
+    /**
+     * 一次性恢复内置 admin；严格限制固定用户名、INTERNAL、系统账号和未删除记录。
+     */
+    @Update("""
+            UPDATE iam_user
+               SET password_hash=#{passwordHash},password_change_required=#{forcePasswordChange},
+                   failed_login_count=0,locked_until=NULL,status='ENABLED',
+                   updated_at=#{now},updated_by=#{actor},version=version+1
+             WHERE id=#{userId} AND username='admin' AND user_type='INTERNAL'
+               AND system_account=true AND deleted=false AND version=#{version}
+            """)
+    int recoverBuiltInAdministrator(
+            @Param("userId") String userId,
+            @Param("passwordHash") String passwordHash,
+            @Param("forcePasswordChange") boolean forcePasswordChange,
+            @Param("version") long version,
+            @Param("actor") String actor,
+            @Param("now") Instant now);
 
     /** 按客户端版本逻辑删除用户，并同步禁用账号。 */
     @Update("""
@@ -148,7 +179,7 @@ public interface IamUserMapper extends MomBaseMapper<IamUserEntity> {
     /**
      * Bootstrap 幂等与冲突判定投影。
      *
-     * <p>该投影刻意排除密码摘要，确保初始化路径不会读取、记录或返回凭证材料。</p>
+     * <p>该投影刻意排除密码摘要，确保初始化与恢复路径不会读取、记录或返回凭证材料。</p>
      */
     record BootstrapIdentity(
             String id,

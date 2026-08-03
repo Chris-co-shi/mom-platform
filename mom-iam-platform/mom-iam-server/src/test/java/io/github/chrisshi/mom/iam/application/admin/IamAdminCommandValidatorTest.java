@@ -9,8 +9,18 @@ import java.util.stream.IntStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** IAM 管理批量 ID 上限测试。 */
+/** IAM 管理密码下限与批量 ID 上限测试。 */
 class IamAdminCommandValidatorTest {
+    @Test
+    void initialPasswordMustAcceptSixAndRejectFiveCharacters() {
+        assertThat(IamAdminCommandValidator.requireInitialPassword("admin1"))
+                .isEqualTo("admin1");
+        assertThatThrownBy(() ->
+                IamAdminCommandValidator.requireInitialPassword("12345"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("6～200");
+    }
+
     @Test
     void normalizedIdsMustRejectUnboundedBatch() {
         assertThat(IamAdminCommandValidator.normalizedIds(ids(200), "roleIds"))

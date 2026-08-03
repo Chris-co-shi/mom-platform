@@ -10,11 +10,11 @@ server:
 
 spring:
   application:
-    name: mom-iam-platform
+    name: mom-iam-server
   datasource:
     url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_iam}&tcpKeepAlive=${POSTGRES_TCP_KEEP_ALIVE:true}&ApplicationName=${POSTGRES_APPLICATION_NAME:mom-iam-server}}
-    username: ${POSTGRES_USERNAME:postgres}
-    password: ${POSTGRES_PASSWORD:123456789}
+    username: ${POSTGRES_USERNAME:iam_app}
+    password: ${POSTGRES_PASSWORD:}
     hikari:
       pool-name: ${POSTGRES_POOL_NAME:mom-iam-hikari}
       minimum-idle: ${POSTGRES_MINIMUM_IDLE:1}
@@ -27,7 +27,7 @@ spring:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:123456789}
+      password: ${REDIS_PASSWORD:}
       database: ${REDIS_DATABASE:0}
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
       timeout: ${REDIS_COMMAND_TIMEOUT:2s}
@@ -43,10 +43,10 @@ spring:
   cloud:
     nacos:
       discovery:
-        enabled: ${NACOS_DISCOVERY_ENABLED:true}
+        enabled: ${NACOS_DISCOVERY_ENABLED:false}
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:123456789}
+        password: ${NACOS_PASSWORD:}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
@@ -54,10 +54,14 @@ spring:
 mom:
   iam:
     bootstrap:
-      enabled: ${IAM_BOOTSTRAP_ENABLED:true}
+      enabled: ${IAM_BOOTSTRAP_ENABLED:false}
       username: admin
-      password: ${IAM_BOOTSTRAP_PASSWORD:mamnan920130.}
+      password: ${IAM_BOOTSTRAP_PASSWORD:}
       display-name: ${IAM_BOOTSTRAP_DISPLAY_NAME:Platform Administrator}
+    recovery:
+      enabled: ${IAM_ADMIN_RECOVERY_ENABLED:false}
+      password: ${IAM_ADMIN_RECOVERY_PASSWORD:}
+      force-password-change: ${IAM_ADMIN_RECOVERY_FORCE_PASSWORD_CHANGE:false}
     admin:
       enabled: ${IAM_ADMIN_ENABLED:true}
     authorization:
@@ -66,7 +70,7 @@ mom:
       security:
         max-failed-attempts: ${IAM_MAX_FAILED_ATTEMPTS:5}
         lock-duration: ${IAM_LOCK_DURATION:15m}
-        minimum-password-length: ${IAM_MINIMUM_PASSWORD_LENGTH:12}
+        minimum-password-length: ${IAM_MINIMUM_PASSWORD_LENGTH:6}
       key:
         key-id: ${IAM_JWK_KEY_ID:mom-iam-local-2026}
         private-key-location: ${IAM_JWK_PRIVATE_KEY:}
