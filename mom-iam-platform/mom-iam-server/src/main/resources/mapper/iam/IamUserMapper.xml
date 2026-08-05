@@ -46,5 +46,6 @@
                failed_login_count, locked_until, version, deleted
           FROM iam_user
          WHERE username = #{username}
+         FOR UPDATE
     </select>
 </mapper>

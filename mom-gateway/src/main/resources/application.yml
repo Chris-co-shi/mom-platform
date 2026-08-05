@@ -10,16 +10,16 @@ spring:
       port: ${REDIS_PORT:6379}
       database: ${REDIS_DATABASE:0}
       username: ${REDIS_USERNAME:}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:123456789}
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
       timeout: ${REDIS_TIMEOUT:2s}
   cloud:
     nacos:
       discovery:
-        enabled: ${NACOS_DISCOVERY_ENABLED:false}
+        enabled: ${NACOS_DISCOVERY_ENABLED:true}
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:}
+        password: ${NACOS_PASSWORD:123456789}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
@@ -33,6 +33,10 @@ spring:
               uri: lb://mom-iam-server
               predicates:
                 - Path=/api/iam/**
+            - id: system-api
+              uri: lb://mom-system-server
+              predicates:
+                - Path=/api/system/**
             - id: integration-service
               uri: lb://mom-integration-server
               predicates:
@@ -50,7 +54,7 @@ spring:
 mom:
   gateway:
     technical-probe:
-      enabled: ${MOM_TECHNICAL_PROBE_ENABLED:false}
+      enabled: ${MOM_TECHNICAL_PROBE_ENABLED:true}
     security:
       enabled: ${GATEWAY_SECURITY_ENABLED:true}
       issuer-uri: ${IAM_ISSUER:http://127.0.0.1:20100}

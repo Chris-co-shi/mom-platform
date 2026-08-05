@@ -15,7 +15,7 @@ import org.testcontainers.utility.DockerImageName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** IAM V9 无物理外键与 V10 System Catalog Permission Seed 的真实 PostgreSQL 集成测试。 */
+/** IAM V9 无物理外键与 V10/V11 System 治理 Permission Seed 的真实 PostgreSQL 集成测试。 */
 @Testcontainers(disabledWithoutDocker = true)
 class IamAssociationIntegrityPostgresqlIT {
     private static final String SCHEMA = "mom_iam";
@@ -48,8 +48,8 @@ class IamAssociationIntegrityPostgresqlIT {
     }
 
     @Test
-    void freshMigrationMustRemoveBusinessForeignKeysAndSeedCatalogPermissions() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
+    void freshMigrationMustRemoveBusinessForeignKeysAndSeedSystemGovernancePermissions() {
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("11");
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM information_schema.table_constraints
                  WHERE table_schema=? AND constraint_type='FOREIGN KEY'
@@ -76,17 +76,43 @@ class IamAssociationIntegrityPostgresqlIT {
                    AND permission_row.code IN (
                      'system:catalog:read','system:catalog:write','system:catalog:publish')
                 """, Long.class)).isEqualTo(3L);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM mom_iam.iam_permission
+                 WHERE (code, domain_code, resource_code, action_code, risk_level) IN (
+                   ('system:i18n:read','system','i18n','read','LOW'),
+                   ('system:i18n:write','system','i18n','write','MEDIUM'),
+                   ('system:i18n:publish','system','i18n','publish','HIGH'))
+                   AND status='ENABLED' AND built_in=true AND deleted=false
+                """, Long.class)).isEqualTo(3L);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*)
+                  FROM mom_iam.iam_role_permission assignment
+                  JOIN mom_iam.iam_role role_row ON role_row.id=assignment.role_id
+                  JOIN mom_iam.iam_permission permission_row ON permission_row.id=assignment.permission_id
+                 WHERE role_row.code='PLATFORM_ADMIN'
+                   AND permission_row.code IN (
+                     'system:i18n:read','system:i18n:write','system:i18n:publish')
+                """, Long.class)).isEqualTo(3L);
     }
 
     @Test
-    void existingV8DatabaseMustUpgradeToV10() {
+    void existingV10DatabaseMustUpgradeToV11() {
         var dataSource = new DriverManagerDataSource(
                 POSTGRESQL.getJdbcUrl(), POSTGRESQL.getUsername(), POSTGRESQL.getPassword());
-        Flyway v8 = flyway(dataSource, UPGRADE_SCHEMA, "8");
-        v8.migrate();
+        Flyway v10 = flyway(dataSource, UPGRADE_SCHEMA, "10");
+        v10.migrate();
         Flyway latest = flyway(dataSource, UPGRADE_SCHEMA, null);
         latest.migrate();
-        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("10");
+        assertThat(latest.info().current().getVersion().getVersion()).isEqualTo("11");
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*)
+                  FROM mom_iam_upgrade.iam_role_permission assignment
+                  JOIN mom_iam_upgrade.iam_role role_row ON role_row.id=assignment.role_id
+                  JOIN mom_iam_upgrade.iam_permission permission_row ON permission_row.id=assignment.permission_id
+                 WHERE role_row.code='PLATFORM_ADMIN'
+                   AND permission_row.code IN (
+                     'system:i18n:read','system:i18n:write','system:i18n:publish')
+                """, Long.class)).isEqualTo(3L);
     }
 
     @Test

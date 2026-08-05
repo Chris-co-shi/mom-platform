@@ -50,6 +50,14 @@ class MomGatewayApplicationTest {
                     .block(Duration.ofSeconds(5));
             assertNotNull(routes);
 
+            RouteDefinition systemRoute = routes.stream()
+                    .filter(route -> "system-api".equals(route.getId()))
+                    .findFirst()
+                    .orElseThrow();
+            assertEquals(URI.create("lb://mom-system-server"), systemRoute.getUri());
+            assertTrue(systemRoute.getPredicates().stream()
+                    .anyMatch(predicate -> predicate.getArgs().containsValue("/api/system/**")));
+
             RouteDefinition integrationRoute = routes.stream()
                     .filter(route -> "integration-service".equals(route.getId()))
                     .findFirst()
