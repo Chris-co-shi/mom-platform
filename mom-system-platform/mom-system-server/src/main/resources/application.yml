@@ -6,8 +6,8 @@ spring:
     name: mom-system-server
   datasource:
     url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_system}&tcpKeepAlive=${POSTGRES_TCP_KEEP_ALIVE:true}&ApplicationName=${POSTGRES_APPLICATION_NAME:mom-system-server}}
-    username: ${POSTGRES_USERNAME:mom}
-    password: ${POSTGRES_PASSWORD:}
+    username: ${POSTGRES_USERNAME:postgres}
+    password: ${POSTGRES_PASSWORD:123456789}
     hikari:
       pool-name: ${POSTGRES_POOL_NAME:mom-system-hikari}
       minimum-idle: ${POSTGRES_MINIMUM_IDLE:1}
@@ -29,7 +29,7 @@ spring:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:123456789}
       database: ${REDIS_DATABASE:0}
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
       timeout: ${REDIS_COMMAND_TIMEOUT:2s}
@@ -52,10 +52,10 @@ spring:
         enable-semaphore-default-bulkhead: true
     nacos:
       discovery:
-        enabled: ${NACOS_DISCOVERY_ENABLED:false}
+        enabled: ${NACOS_DISCOVERY_ENABLED:true}
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:}
+        password: ${NACOS_PASSWORD:123456789}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
@@ -91,7 +91,7 @@ spring:
       rocketmq:
         binder:
           name-server: ${ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
-          enable-msg-trace: ${ROCKETMQ_ENABLE_MSG_TRACE:false}
+          enable-msg-trace: ${ROCKETMQ_ENABLE_MSG_TRACE:true}
         bindings:
           systemRuntimeEvents-out-0:
             producer:
@@ -157,7 +157,7 @@ mom:
   cache:
     environment: ${MOM_ENVIRONMENT:local}
     redis:
-      enabled: ${SYSTEM_RUNTIME_CACHE_ENABLED:false}
+      enabled: ${SYSTEM_RUNTIME_CACHE_ENABLED:true}
   iam:
     permission-reference:
       service-name: ${IAM_PERMISSION_REFERENCE_SERVICE_NAME:mom-iam-server}

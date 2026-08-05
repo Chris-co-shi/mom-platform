@@ -13,8 +13,8 @@ spring:
     name: mom-iam-server
   datasource:
     url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_iam}&tcpKeepAlive=${POSTGRES_TCP_KEEP_ALIVE:true}&ApplicationName=${POSTGRES_APPLICATION_NAME:mom-iam-server}}
-    username: ${POSTGRES_USERNAME:iam_app}
-    password: ${POSTGRES_PASSWORD:}
+    username: ${POSTGRES_USERNAME:postgres}
+    password: ${POSTGRES_PASSWORD:123456789}
     hikari:
       pool-name: ${POSTGRES_POOL_NAME:mom-iam-hikari}
       minimum-idle: ${POSTGRES_MINIMUM_IDLE:1}
@@ -27,7 +27,7 @@ spring:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:123456789}
       database: ${REDIS_DATABASE:0}
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
       timeout: ${REDIS_COMMAND_TIMEOUT:2s}
@@ -43,10 +43,10 @@ spring:
   cloud:
     nacos:
       discovery:
-        enabled: ${NACOS_DISCOVERY_ENABLED:false}
+        enabled: ${NACOS_DISCOVERY_ENABLED:true}
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:}
+        password: ${NACOS_PASSWORD:123456789}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
@@ -56,8 +56,14 @@ mom:
     bootstrap:
       enabled: ${IAM_BOOTSTRAP_ENABLED:false}
       username: admin
-      password: ${IAM_BOOTSTRAP_PASSWORD:}
+      password: ${IAM_BOOTSTRAP_PASSWORD:mamnan920130.}
       display-name: ${IAM_BOOTSTRAP_DISPLAY_NAME:Platform Administrator}
+    recovery:
+      enabled: ${IAM_ADMIN_RECOVERY_ENABLED:true}
+      username: admin
+      password: ${IAM_ADMIN_RECOVERY_PASSWORD:ChrisSxc920130.}
+      confirmation: ${IAM_ADMIN_RECOVERY_CONFIRMATION:RESET_ADMIN_CREDENTIAL}
+      force-password-change: ${IAM_ADMIN_RECOVERY_FORCE_PASSWORD_CHANGE:true}
     admin:
       enabled: ${IAM_ADMIN_ENABLED:true}
     authorization:

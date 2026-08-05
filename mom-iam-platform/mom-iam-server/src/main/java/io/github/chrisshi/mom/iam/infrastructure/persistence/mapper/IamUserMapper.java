@@ -35,10 +35,10 @@ public interface IamUserMapper extends MomBaseMapper<IamUserEntity> {
     IamAdminViews.UserView selectAdminForUpdate(@Param("userId") String userId);
 
     /**
-     * 按全局唯一用户名读取 Bootstrap 判定所需的非敏感身份字段。
+     * 按全局唯一用户名锁定 Bootstrap/Recovery 判定所需的非敏感身份字段。
      *
      * @param username 固定内置用户名
-     * @return 不包含密码摘要的账号身份，未找到时为 null
+     * @return 持有 {@code FOR UPDATE} 行锁且不包含密码摘要的账号身份，未找到时为 null
      */
     BootstrapIdentity selectBootstrapIdentityByUsername(@Param("username") String username);
 

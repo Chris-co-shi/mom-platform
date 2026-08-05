@@ -62,3 +62,6 @@ Remove-Item Env:IAM_BOOTSTRAP_PASSWORD
 5. 后续启动保持 `IAM_BOOTSTRAP_ENABLED=false` 或不设置该变量。
 
 Bootstrap 不提供 `/bootstrap`、`/init-admin` 或其他匿名 HTTP 初始化接口。
+
+已有内置管理员不会被 Bootstrap 更新。唯一管理员遗忘凭据时，必须使用
+[IAM 内置管理员一次性恢复](IAM内置管理员恢复.md)，不得通过重复启用 Bootstrap、删除账号或直接写数据库绕过审计。

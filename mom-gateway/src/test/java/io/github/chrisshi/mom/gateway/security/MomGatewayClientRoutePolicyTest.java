@@ -40,6 +40,29 @@ class MomGatewayClientRoutePolicyTest {
     }
 
     @Test
+    void systemRuntimeUsesClientUserMatrixAndAdminApiIsAdminOnly() {
+        assertTrue(policy.isAllowed(
+                "/api/system/preferences/me", authorization("mom-admin-web", "INTERNAL")));
+        assertTrue(policy.isAllowed(
+                "/api/system/preferences/me", authorization("mom-supplier-web", "SUPPLIER")));
+        assertTrue(policy.isAllowed(
+                "/api/system/i18n/applications/customer-portal/resources/runtime",
+                authorization("mom-customer-web", "CUSTOMER")));
+        assertTrue(policy.isAllowed(
+                "/api/system/preferences/me", authorization("mom-mobile-pda", "INTERNAL")));
+        assertFalse(policy.isAllowed(
+                "/api/system/preferences/me", authorization("mom-supplier-web", "INTERNAL")));
+        assertTrue(policy.isAllowed(
+                "/api/system/admin/i18n/resources", authorization("mom-admin-web", "INTERNAL")));
+        assertFalse(policy.isAllowed(
+                "/api/system/admin/i18n/resources", authorization("mom-mobile-pda", "INTERNAL")));
+        assertFalse(policy.isAllowed(
+                "/api/system/admin/i18n/resources", authorization("mom-supplier-web", "SUPPLIER")));
+        assertFalse(policy.isAllowed(
+                "/api/system/admin", authorization("mom-supplier-web", "SUPPLIER")));
+    }
+
+    @Test
     void unknownApiRoutesFailClosed() {
         assertFalse(policy.isAllowed("/api/unknown/resource", authorization("mom-admin-web", "INTERNAL")));
     }

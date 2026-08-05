@@ -29,6 +29,11 @@ class IamRuntimeSecureDefaultsTest {
             assertThat(environment.getProperty("spring.cloud.nacos.discovery.password")).isEmpty();
             assertThat(environment.getProperty("mom.iam.bootstrap.enabled", Boolean.class)).isFalse();
             assertThat(environment.getProperty("mom.iam.bootstrap.password")).isEmpty();
+            assertThat(environment.getProperty("mom.iam.recovery.enabled", Boolean.class)).isFalse();
+            assertThat(environment.getProperty("mom.iam.recovery.password")).isEmpty();
+            assertThat(environment.getProperty("mom.iam.recovery.confirmation")).isEmpty();
+            assertThat(environment.getProperty(
+                    "mom.iam.recovery.force-password-change", Boolean.class)).isTrue();
             assertThat(environment.getProperty("mom.iam.authorization.key.private-key-location"))
                     .isEmpty();
             assertThat(environment.getProperty("mom.iam.authorization.key.public-key-location"))
