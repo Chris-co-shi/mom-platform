@@ -1,6 +1,5 @@
 package io.github.chrisshi.mom.gateway.security;
 
-import io.github.chrisshi.mom.security.token.MomJwtGrantedAuthoritiesConverter;
 import io.github.chrisshi.mom.security.token.MomJwtValidators;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
