@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.DefaultOAuth2AuthenticatedPrincipal;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -148,7 +150,7 @@ class MomServletResourceServerTest {
 
         private static OAuth2AuthenticatedPrincipal principal(
             String userId,
-            List<SimpleGrantedAuthority> authorities
+            Collection<GrantedAuthority> authorities
         ) {
             return new DefaultOAuth2AuthenticatedPrincipal(
                 userId,
