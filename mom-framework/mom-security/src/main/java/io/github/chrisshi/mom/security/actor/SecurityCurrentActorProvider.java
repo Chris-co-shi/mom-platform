@@ -2,7 +2,6 @@ package io.github.chrisshi.mom.security.actor;
 
 import io.github.chrisshi.mom.core.security.ActorType;
 import io.github.chrisshi.mom.core.security.AuditActor;
-import io.github.chrisshi.mom.core.security.AuditContext;
 import io.github.chrisshi.mom.core.security.CurrentActorProvider;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -15,7 +14,7 @@ import java.util.Optional;
 /**
  * 从显式审计上下文或 Spring Security 上下文解析当前操作人。
  *
- * <p>显式 {@link AuditContext} 优先，确保定时任务、MQ Consumer 和测试可以建立 SYSTEM/ADMIN Actor。
+ * <p>优先，确保定时任务、MQ Consumer 和测试可以建立 SYSTEM/ADMIN Actor。
  * 没有显式 Actor 时，只接受已认证且非匿名的 Spring Security 身份。P1.5 S01 不根据 INTERNAL、任意角色或
  * Authority 自动升级为 ADMIN，也不实现 Token 签发、RBAC 或 Scope。</p>
  */
@@ -26,10 +25,6 @@ public final class SecurityCurrentActorProvider implements CurrentActorProvider 
      */
     @Override
     public Optional<AuditActor> findCurrentActor() {
-        Optional<AuditActor> explicitActor = AuditContext.findCurrentActor();
-        if (explicitActor.isPresent()) {
-            return explicitActor;
-        }
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null
@@ -38,15 +33,10 @@ public final class SecurityCurrentActorProvider implements CurrentActorProvider 
             return Optional.empty();
         }
 
-        Jwt jwt = extractJwt(authentication);
-        String actorId = jwt == null ? normalize(authentication.getName()) : normalize(jwt.getSubject());
-        if (actorId == null) {
-            return Optional.empty();
-        }
-
-        return Optional.of(new AuditActor(
-            actorId,
-            ActorType.USER));
+        String actorId = authentication.getName();
+        return Optional.of(
+            new AuditActor(actorId.trim(), ActorType.USER)
+        );
     }
 
     private static Jwt extractJwt(Authentication authentication) {
