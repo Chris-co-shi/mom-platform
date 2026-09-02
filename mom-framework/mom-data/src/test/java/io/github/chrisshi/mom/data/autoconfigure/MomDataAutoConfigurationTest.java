@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInt
 import io.github.chrisshi.mom.core.security.AuditContextExecutor;
 import io.github.chrisshi.mom.core.security.CurrentActorProvider;
 import io.github.chrisshi.mom.data.config.MomDataAuditProperties;
+import io.github.chrisshi.mom.data.config.MomDataAutoConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
