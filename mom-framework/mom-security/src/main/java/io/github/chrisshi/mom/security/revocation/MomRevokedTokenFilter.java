@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -29,20 +30,20 @@ import java.util.List;
  * <p>过滤器不信任任何 {@code X-MOM-*} Header，不查询 IAM HTTP API，不改变 JWT、Session、Redis Key、
  * TTL 或写入事务。实例无请求级可变状态，可被 Servlet 容器并发复用。</p>
  */
-public final class MomRevokedSessionFilter extends OncePerRequestFilter {
+public final class MomRevokedTokenFilter extends OncePerRequestFilter {
     private static final byte[] UNAVAILABLE_BODY =
             "{\"error\":\"revocation_store_unavailable\"}".getBytes(StandardCharsets.UTF_8);
 
-    private final MomRevokedSessionChecker checker;
+//    private final MomRevokedSessionChecker checker;
     private final List<RequestMatcher> publicPaths;
     private final BearerTokenAuthenticationEntryPoint authenticationEntryPoint =
             new BearerTokenAuthenticationEntryPoint();
 
     /** 创建只检查受保护路径的撤销过滤器。 */
-    public MomRevokedSessionFilter(
-            MomRevokedSessionChecker checker,
+    public MomRevokedTokenFilter(
+//            MomRevokedSessionChecker checker,
             List<String> publicPaths) {
-        this.checker = checker;
+//        this.checker = checker;
         this.publicPaths = publicPaths.stream()
                 .map(PathPatternRequestMatcher::pathPattern)
                 .map(RequestMatcher.class::cast)
@@ -51,50 +52,49 @@ public final class MomRevokedSessionFilter extends OncePerRequestFilter {
 
     /** 公开健康与错误路径不依赖 revoked sid 数据源。 */
     @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
+    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
         return publicPaths.stream().anyMatch(matcher -> matcher.matches(request));
     }
 
     /** 在 JWT 认证完成后执行撤销检查并保持既有业务授权链。 */
     @Override
     protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain) throws ServletException, IOException {
+        @NonNull HttpServletRequest request,
+        @NonNull HttpServletResponse response,
+        @NonNull FilterChain filterChain) throws ServletException, IOException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (!(authentication instanceof JwtAuthenticationToken jwtAuthentication)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String sessionId = jwtAuthentication.getToken().getClaimAsString("sid");
-        if (sessionId == null || sessionId.isBlank()) {
-            rejectInvalidToken(request, response, "Access Token 缺少 sid");
+        String tokenId = jwtAuthentication.getToken().getId();
+        if (tokenId == null || tokenId.isBlank()) {
+            rejectInvalidToken(request, response);
             return;
         }
-        try {
-            if (checker.isRevoked(sessionId)) {
-                rejectInvalidToken(request, response, "Session 已撤销");
-                return;
-            }
-        }
-        catch (MomRevocationStoreUnavailableException exception) {
-            rejectUnavailable(response);
-            return;
-        }
+//        try {
+////            if (checker.isRevoked(sessionId)) {
+////                rejectInvalidToken(request, response, "Session 已撤销");
+////                return;
+////            }
+//        }
+//        catch (MomRevocationStoreUnavailableException exception) {
+//            rejectUnavailable(response);
+//            return;
+//        }
         filterChain.doFilter(request, response);
     }
 
     private void rejectInvalidToken(
             HttpServletRequest request,
-            HttpServletResponse response,
-            String description) throws IOException, ServletException {
+            HttpServletResponse response) throws IOException, ServletException {
         SecurityContextHolder.clearContext();
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         authenticationEntryPoint.commence(
                 request,
                 response,
-                new OAuth2AuthenticationException(BearerTokenErrors.invalidToken(description)));
+                new OAuth2AuthenticationException(BearerTokenErrors.invalidToken("Access Token 缺少 sid")));
     }
 
     private static void rejectUnavailable(HttpServletResponse response) throws IOException {

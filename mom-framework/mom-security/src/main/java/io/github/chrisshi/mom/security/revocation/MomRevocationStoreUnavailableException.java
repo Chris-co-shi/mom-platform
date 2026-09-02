@@ -8,12 +8,16 @@ package io.github.chrisshi.mom.security.revocation;
  */
 public final class MomRevocationStoreUnavailableException extends RuntimeException {
 
-    /** 使用脱敏消息创建异常。 */
+    /**
+     * 使用脱敏消息创建异常。
+     */
     public MomRevocationStoreUnavailableException(String message) {
         super(message);
     }
 
-    /** 使用固定脱敏消息和底层原因创建异常。 */
+    /**
+     * 使用固定脱敏消息和底层原因创建异常。
+     */
     public MomRevocationStoreUnavailableException(Throwable cause) {
         super("revoked sid store unavailable", cause);
     }

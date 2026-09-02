@@ -2,7 +2,7 @@ package io.github.chrisshi.mom.security.autoconfigure;
 
 import io.github.chrisshi.mom.security.authorization.MomAuthorizationService;
 import io.github.chrisshi.mom.security.revocation.MomRevokedSessionChecker;
-import io.github.chrisshi.mom.security.revocation.MomRevokedSessionFilter;
+import io.github.chrisshi.mom.security.revocation.MomRevokedTokenFilter;
 import io.github.chrisshi.mom.security.revocation.infrastructure.RedisMomRevokedSessionChecker;
 import io.github.chrisshi.mom.security.token.MomSecurityClaims;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -72,10 +72,10 @@ public class MomServletResourceServerAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    MomRevokedSessionFilter momRevokedSessionFilter(
+    MomRevokedTokenFilter momRevokedSessionFilter(
         MomRevokedSessionChecker checker,
         MomResourceServerProperties properties) {
-        return new MomRevokedSessionFilter(checker, properties.getPublicPaths());
+        return new MomRevokedTokenFilter(checker, properties.getPublicPaths());
     }
 
     @Bean
@@ -94,7 +94,7 @@ public class MomServletResourceServerAutoConfiguration {
         HttpSecurity http,
         JwtDecoder jwtDecoder,
         JwtGrantedAuthoritiesConverter authoritiesConverter,
-        MomRevokedSessionFilter revokedSessionFilter,
+        MomRevokedTokenFilter revokedSessionFilter,
         MomResourceServerProperties properties) throws Exception {
         JwtAuthenticationConverter authenticationConverter = new JwtAuthenticationConverter();
         authenticationConverter.setJwtGrantedAuthoritiesConverter(authoritiesConverter);
