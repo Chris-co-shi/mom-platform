@@ -25,13 +25,13 @@ public final class RedisIdempotencyGuard implements IdempotencyGuard {
      * 创建 Redis 幂等保护器。
      *
      * @param redisTemplate 仅使用字符串序列化的 Redis 操作模板
-     * @param keyFactory 统一 Key 命名工厂
-     * @param properties Redis 故障策略和默认 TTL
+     * @param keyFactory    统一 Key 命名工厂
+     * @param properties    Redis 故障策略和默认 TTL
      */
     public RedisIdempotencyGuard(
-            StringRedisTemplate redisTemplate,
-            RedisIdempotencyKeyFactory keyFactory,
-            RedisIdempotencyProperties properties) {
+        StringRedisTemplate redisTemplate,
+        RedisIdempotencyKeyFactory keyFactory,
+        RedisIdempotencyProperties properties) {
         this.redisTemplate = Objects.requireNonNull(redisTemplate, "redisTemplate 不能为空");
         this.keyFactory = Objects.requireNonNull(keyFactory, "keyFactory 不能为空");
         this.properties = Objects.requireNonNull(properties, "properties 不能为空");
@@ -42,10 +42,10 @@ public final class RedisIdempotencyGuard implements IdempotencyGuard {
      */
     @Override
     public IdempotencyAcquireResult tryAcquire(
-            String scope,
-            String requestKey,
-            String ownerToken,
-            Duration ttl) {
+        String scope,
+        String requestKey,
+        String ownerToken,
+        Duration ttl) {
         String protectedKey = keyFactory.create(scope, requestKey);
         String normalizedOwnerToken = requireText(ownerToken, "ownerToken");
         Duration effectiveTtl = ttl == null ? properties.getDefaultTtl() : ttl;
@@ -55,10 +55,10 @@ public final class RedisIdempotencyGuard implements IdempotencyGuard {
 
         try {
             Boolean acquired = redisTemplate.opsForValue()
-                    .setIfAbsent(protectedKey, normalizedOwnerToken, effectiveTtl);
+                .setIfAbsent(protectedKey, normalizedOwnerToken, effectiveTtl);
             IdempotencyAcquireStatus status = Boolean.TRUE.equals(acquired)
-                    ? IdempotencyAcquireStatus.ACQUIRED
-                    : IdempotencyAcquireStatus.DUPLICATE;
+                ? IdempotencyAcquireStatus.ACQUIRED
+                : IdempotencyAcquireStatus.DUPLICATE;
             return new IdempotencyAcquireResult(status, protectedKey, effectiveTtl, null);
         } catch (DataAccessException exception) {
             return handleRedisFailure(protectedKey, effectiveTtl, exception);
@@ -69,19 +69,19 @@ public final class RedisIdempotencyGuard implements IdempotencyGuard {
      * 根据配置执行 Redis 故障策略。fail-open 必须显式返回 BYPASSED，避免上层误以为取得了正常占位。
      */
     private IdempotencyAcquireResult handleRedisFailure(
-            String protectedKey,
-            Duration ttl,
-            DataAccessException exception) {
+        String protectedKey,
+        Duration ttl,
+        DataAccessException exception) {
         if (properties.getFailureMode() == RedisFailureMode.FAIL_OPEN) {
             return new IdempotencyAcquireResult(
-                    IdempotencyAcquireStatus.BYPASSED,
-                    protectedKey,
-                    ttl,
-                    exception.getClass().getSimpleName());
+                IdempotencyAcquireStatus.BYPASSED,
+                protectedKey,
+                ttl,
+                exception.getClass().getSimpleName());
         }
         throw new IdempotencyUnavailableException(
-                "Redis 幂等保护不可用，已按 fail-closed 阻止业务继续执行",
-                exception);
+            "Redis 幂等保护不可用，已按 fail-closed 阻止业务继续执行",
+            exception);
     }
 
     /**

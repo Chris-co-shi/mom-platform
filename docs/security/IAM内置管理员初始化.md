@@ -1,67 +1,153 @@
-# IAM 内置管理员初始化
+# IAM 内置管理员初始化与恢复
 
-## 安全边界
+## 1. 安全边界
 
-- Bootstrap 默认关闭，只允许在非 `prod`、非 `production` Profile 使用。
-- 固定用户名为 `admin`，部署环境不能覆盖为其他用户名。
-- 临时密码只通过进程环境变量 `IAM_BOOTSTRAP_PASSWORD` 注入，不写入源码、Flyway、配置文件或仓库 `.env`。
-- 初始化只执行一次；已有系统账号时不会重置密码、状态、锁定计数、版本或角色。
-- 初始化完成后应停止进程，移除 Bootstrap 环境变量并以默认关闭状态重新启动。
+- 内置系统管理员用户名固定为 `admin`。
+- Bootstrap 和 Recovery 默认关闭，只允许在非 `prod`、非 `production` Profile 使用。
+- Bootstrap 与 Recovery 禁止同时启用。
+- 密码只能通过进程环境变量注入，不得写入源码、Flyway、`application.yml` 或仓库 `.env`。
+- 当前最低密码长度为 **6 位**；Bootstrap、Recovery 与 IAM 管理端初始/重置密码使用同一下限。
+- 日志不会输出密码或密码摘要。
+- 执行完成后必须停止进程，删除密码环境变量，并以默认关闭状态重新启动。
 
-## macOS / Linux
+## 2. Bootstrap：首次创建 admin
 
-先构建 IAM：
+Bootstrap 只在数据库中不存在 `admin` 时创建内置系统账号并赋予 `PLATFORM_ADMIN`。
+
+如果 `admin` 已经存在，Bootstrap 会输出：
+
+```text
+IAM built-in administrator already exists; bootstrap skipped
+```
+
+它不会覆盖现有密码、状态、锁定计数、版本或角色。忘记现有密码时请使用第 3 节 Recovery。
+
+### macOS / Linux
 
 ```bash
 mvn -pl mom-iam-platform/mom-iam-server -am package
-```
 
-再以一次性临时密码启动：
-
-```bash
 IAM_BOOTSTRAP_ENABLED=true \
-IAM_BOOTSTRAP_PASSWORD='<LOCAL_TEMPORARY_PASSWORD>' \
+IAM_BOOTSTRAP_PASSWORD='<TEMP_PASSWORD_6_PLUS>' \
+IAM_JWK_PRIVATE_KEY='file:/absolute/path/mom-iam-private.pem' \
+IAM_JWK_PUBLIC_KEY='file:/absolute/path/mom-iam-public.pem' \
+IAM_REFRESH_HMAC_PEPPER='<STABLE_RANDOM_PEPPER>' \
 java -jar mom-iam-platform/mom-iam-server/target/mom-iam-server-0.1.0-SNAPSHOT-exec.jar
 ```
 
-## Windows PowerShell
-
-先构建 IAM：
+### Windows PowerShell
 
 ```powershell
 mvn -pl mom-iam-platform/mom-iam-server -am package
-```
 
-再以一次性临时密码启动：
-
-```powershell
 $env:IAM_BOOTSTRAP_ENABLED = "true"
-$env:IAM_BOOTSTRAP_PASSWORD = "<LOCAL_TEMPORARY_PASSWORD>"
+$env:IAM_BOOTSTRAP_PASSWORD = "<TEMP_PASSWORD_6_PLUS>"
+$env:IAM_JWK_PRIVATE_KEY = "file:C:/absolute/path/mom-iam-private.pem"
+$env:IAM_JWK_PUBLIC_KEY = "file:C:/absolute/path/mom-iam-public.pem"
+$env:IAM_REFRESH_HMAC_PEPPER = "<STABLE_RANDOM_PEPPER>"
 java -jar mom-iam-platform/mom-iam-server/target/mom-iam-server-0.1.0-SNAPSHOT-exec.jar
 ```
 
-初始化日志只会显示：
+成功日志：
 
 ```text
 IAM built-in administrator initialized: username=admin
 ```
 
-日志不会显示密码或密码摘要。确认初始化成功后，停止进程并清除环境变量：
+Bootstrap 创建的账号默认要求首次改密。
 
-```powershell
-Remove-Item Env:IAM_BOOTSTRAP_ENABLED
-Remove-Item Env:IAM_BOOTSTRAP_PASSWORD
+## 3. Recovery：忘记现有 admin 密码
+
+Recovery 不删除、不重建 `admin`，也不创建第二个管理员。它会：
+
+1. 锁定现有 `admin` 与内置 `PLATFORM_ADMIN`；
+2. 确认 `admin` 是未删除的 INTERNAL 系统账号，并仍具有效 PLATFORM_ADMIN；
+3. 在一个 PostgreSQL 本地事务中替换密码摘要；
+4. 将账号恢复为 `ENABLED`；
+5. 清零登录失败次数并清除锁定时间；
+6. 推进账号聚合 Version；
+7. 事务提交后撤销现有 Session 与 Refresh Token。
+
+### macOS / Linux
+
+```bash
+mvn -pl mom-iam-platform/mom-iam-server -am package
+
+IAM_BOOTSTRAP_ENABLED=false \
+IAM_ADMIN_RECOVERY_ENABLED=true \
+IAM_ADMIN_RECOVERY_PASSWORD='<NEW_PASSWORD_6_PLUS>' \
+IAM_ADMIN_RECOVERY_FORCE_PASSWORD_CHANGE=false \
+IAM_JWK_PRIVATE_KEY='file:/absolute/path/mom-iam-private.pem' \
+IAM_JWK_PUBLIC_KEY='file:/absolute/path/mom-iam-public.pem' \
+IAM_REFRESH_HMAC_PEPPER='<CURRENT_STABLE_PEPPER>' \
+java -jar mom-iam-platform/mom-iam-server/target/mom-iam-server-0.1.0-SNAPSHOT-exec.jar
 ```
 
-## 首次登录
+### Windows PowerShell
 
-1. 启动 IAM、Gateway 与 MOM Admin。
-2. 使用用户名 `admin` 和一次性临时密码进入 IAM 登录页。
-3. IAM 检测到 `password_change_required=true` 后跳转 `/password/change`。
-4. 修改密码后继续原 Authorization Code + PKCE 请求并进入 MOM Admin。
-5. 后续启动保持 `IAM_BOOTSTRAP_ENABLED=false` 或不设置该变量。
+```powershell
+mvn -pl mom-iam-platform/mom-iam-server -am package
 
-Bootstrap 不提供 `/bootstrap`、`/init-admin` 或其他匿名 HTTP 初始化接口。
+$env:IAM_BOOTSTRAP_ENABLED = "false"
+$env:IAM_ADMIN_RECOVERY_ENABLED = "true"
+$env:IAM_ADMIN_RECOVERY_PASSWORD = "<NEW_PASSWORD_6_PLUS>"
+$env:IAM_ADMIN_RECOVERY_FORCE_PASSWORD_CHANGE = "false"
+$env:IAM_JWK_PRIVATE_KEY = "file:C:/absolute/path/mom-iam-private.pem"
+$env:IAM_JWK_PUBLIC_KEY = "file:C:/absolute/path/mom-iam-public.pem"
+$env:IAM_REFRESH_HMAC_PEPPER = "<CURRENT_STABLE_PEPPER>"
+java -jar mom-iam-platform/mom-iam-server/target/mom-iam-server-0.1.0-SNAPSHOT-exec.jar
+```
 
-已有内置管理员不会被 Bootstrap 更新。唯一管理员遗忘凭据时，必须使用
-[IAM 内置管理员一次性恢复](IAM内置管理员恢复.md)，不得通过重复启用 Bootstrap、删除账号或直接写数据库绕过审计。
+成功日志示例：
+
+```text
+IAM built-in administrator credential recovered: username=admin, sessionsRevoked=0, forcePasswordChange=false
+```
+
+日志中的 Session 数量可能大于 0，但不会包含密码、Token 或摘要。
+
+`IAM_ADMIN_RECOVERY_FORCE_PASSWORD_CHANGE=true` 时，新密码只作为临时密码，首次登录后仍需修改；本地直接恢复使用可设为 `false`。
+
+## 4. 本地 RSA Key 与 Pepper
+
+没有现成 Key 时，可在本地生成：
+
+```bash
+mkdir -p ~/.mom/iam
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
+  -out ~/.mom/iam/mom-iam-private.pem
+openssl rsa -pubout -in ~/.mom/iam/mom-iam-private.pem \
+  -out ~/.mom/iam/mom-iam-public.pem
+openssl rand -hex 32
+```
+
+最后一条命令输出可作为 `IAM_REFRESH_HMAC_PEPPER`。同一数据库已有 Refresh Token 时，应使用原有稳定 Pepper；随意更换会使旧 Refresh Token 全部失效。
+
+## 5. 执行后清理
+
+恢复成功后停止 IAM，并清除一次性变量。
+
+### macOS / Linux
+
+```bash
+unset IAM_ADMIN_RECOVERY_ENABLED
+unset IAM_ADMIN_RECOVERY_PASSWORD
+unset IAM_ADMIN_RECOVERY_FORCE_PASSWORD_CHANGE
+```
+
+### Windows PowerShell
+
+```powershell
+Remove-Item Env:IAM_ADMIN_RECOVERY_ENABLED -ErrorAction SilentlyContinue
+Remove-Item Env:IAM_ADMIN_RECOVERY_PASSWORD -ErrorAction SilentlyContinue
+Remove-Item Env:IAM_ADMIN_RECOVERY_FORCE_PASSWORD_CHANGE -ErrorAction SilentlyContinue
+```
+
+随后按正常配置重新启动 IAM。正常运行时：
+
+```text
+IAM_BOOTSTRAP_ENABLED=false
+IAM_ADMIN_RECOVERY_ENABLED=false
+```
+
+Bootstrap 和 Recovery 都不提供匿名 HTTP 初始化或密码重置端点。

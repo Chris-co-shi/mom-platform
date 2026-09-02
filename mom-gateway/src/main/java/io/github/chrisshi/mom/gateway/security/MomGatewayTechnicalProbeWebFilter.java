@@ -22,8 +22,8 @@ import java.util.Set;
 public final class MomGatewayTechnicalProbeWebFilter implements WebFilter, Ordered {
 
     private static final Set<String> TECHNICAL_PROBE_PATHS = Set.of(
-            "/api/integration/mdm-probe",
-            "/api/integration/idempotency-probe");
+        "/api/integration/mdm-probe",
+        "/api/integration/idempotency-probe");
 
     private final boolean enabled;
 
@@ -33,7 +33,7 @@ public final class MomGatewayTechnicalProbeWebFilter implements WebFilter, Order
      * @param enabled 是否允许受控 Smoke 访问历史技术探针；默认必须为 false
      */
     public MomGatewayTechnicalProbeWebFilter(
-            @Value("${mom.gateway.technical-probe.enabled:false}") boolean enabled) {
+        @Value("${mom.gateway.technical-probe.enabled:false}") boolean enabled) {
         this.enabled = enabled;
     }
 
@@ -41,7 +41,7 @@ public final class MomGatewayTechnicalProbeWebFilter implements WebFilter, Order
      * 在路由与限流之前隐藏默认关闭的技术探针。
      *
      * @param exchange 当前请求交换对象
-     * @param chain 后续 Gateway 过滤链
+     * @param chain    后续 Gateway 过滤链
      * @return 完成信号；拒绝时直接以 404 结束且不调用下游
      */
     @Override

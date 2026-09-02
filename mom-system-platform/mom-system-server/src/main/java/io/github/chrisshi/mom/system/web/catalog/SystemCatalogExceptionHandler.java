@@ -9,9 +9,11 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-/** Catalog HTTP 的稳定两字段脱敏错误映射。 */
+/**
+ * Catalog HTTP 的稳定两字段脱敏错误映射。
+ */
 @RestControllerAdvice(assignableTypes = {
-        SystemCatalogAdminController.class, SystemCatalogRuntimeController.class})
+    SystemCatalogAdminController.class, SystemCatalogRuntimeController.class})
 public class SystemCatalogExceptionHandler {
     @ExceptionHandler(SystemCatalogException.NotFound.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
@@ -44,11 +46,11 @@ public class SystemCatalogExceptionHandler {
     }
 
     @ExceptionHandler({IllegalArgumentException.class, HttpMessageNotReadableException.class,
-            MethodArgumentTypeMismatchException.class, MethodArgumentNotValidException.class})
+        MethodArgumentTypeMismatchException.class, MethodArgumentNotValidException.class})
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse invalid(Exception exception) {
         String message = exception instanceof IllegalArgumentException
-                ? exception.getMessage() : "请求参数格式非法";
+            ? exception.getMessage() : "请求参数格式非法";
         return error("invalid_request", message);
     }
 

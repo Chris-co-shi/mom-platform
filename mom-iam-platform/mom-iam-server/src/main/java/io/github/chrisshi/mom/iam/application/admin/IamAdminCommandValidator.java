@@ -30,8 +30,8 @@ public final class IamAdminCommandValidator {
     }
 
     public static String requireInitialPassword(String value) {
-        if (value == null || value.length() < 12 || value.length() > 200) {
-            throw new IllegalArgumentException("初始凭证长度必须为 12～200 个字符");
+        if (value == null || value.length() < 6 || value.length() > 200) {
+            throw new IllegalArgumentException("初始凭证长度必须为 6～200 个字符");
         }
         return value;
     }

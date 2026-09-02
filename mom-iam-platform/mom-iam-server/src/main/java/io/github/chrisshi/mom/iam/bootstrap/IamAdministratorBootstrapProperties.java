@@ -45,9 +45,9 @@ public class IamAdministratorBootstrapProperties {
             throw new IllegalStateException(
                     "IAM_BOOTSTRAP_PASSWORD is required when IAM bootstrap is enabled");
         }
-        if (password.length() < 12 || password.length() > 200) {
+        if (password.length() < 6 || password.length() > 200) {
             throw new IllegalStateException(
-                    "IAM_BOOTSTRAP_PASSWORD must contain 12 to 200 characters");
+                    "IAM_BOOTSTRAP_PASSWORD must contain 6 to 200 characters");
         }
         if (displayName == null || displayName.isBlank() || displayName.trim().length() > 200) {
             throw new IllegalStateException(

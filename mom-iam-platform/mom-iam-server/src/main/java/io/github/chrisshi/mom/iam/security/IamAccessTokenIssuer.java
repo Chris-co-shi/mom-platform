@@ -1,19 +1,11 @@
 package io.github.chrisshi.mom.iam.security;
 
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtClaimsSet;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
-import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 
 import java.time.Instant;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * 使用 IAM 现有 RSA JWK 与统一 Claims 规则签发内部 Access Token。
@@ -28,12 +20,14 @@ public final class IamAccessTokenIssuer {
     private final IamAuthorizationProperties authorizationProperties;
     private final IamJwtClaimsAssembler claimsAssembler;
 
-    /** 创建复用现有签名基础设施的 Access Token 签发器。 */
+    /**
+     * 创建复用现有签名基础设施的 Access Token 签发器。
+     */
     public IamAccessTokenIssuer(
-            JwtEncoder encoder,
-            AuthorizationServerSettings settings,
-            IamAuthorizationProperties authorizationProperties,
-            IamJwtClaimsAssembler claimsAssembler) {
+        JwtEncoder encoder,
+        AuthorizationServerSettings settings,
+        IamAuthorizationProperties authorizationProperties,
+        IamJwtClaimsAssembler claimsAssembler) {
         this.encoder = encoder;
         this.settings = settings;
         this.authorizationProperties = authorizationProperties;
@@ -43,44 +37,46 @@ public final class IamAccessTokenIssuer {
     /**
      * 签发带权威 sid 和授权 Claims 的 JWT。
      *
-     * @param context IAM 权威授权快照
+     * @param context   IAM 权威授权快照
      * @param sessionId 权威 Session ID
-     * @param clientId 已校验 Client ID
-     * @param issuedAt 签发时间
+     * @param clientId  已校验 Client ID
+     * @param issuedAt  签发时间
      * @param expiresAt 访问令牌绝对过期时间
-     * @param scopes 已批准 Scope
+     * @param scopes    已批准 Scope
      * @return 协议无关的内部签发结果
      */
     public IssuedAccessToken issue(
-            IamAuthorizationContext context,
-            String sessionId,
-            String clientId,
-            Instant issuedAt,
-            Instant expiresAt,
-            Set<String> scopes) {
+        IamAuthorizationContext context,
+        String sessionId,
+        String clientId,
+        Instant issuedAt,
+        Instant expiresAt,
+        Set<String> scopes) {
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
-                .issuer(settings.getIssuer())
-                .audience(List.of(clientId))
-                .issuedAt(issuedAt)
-                .notBefore(issuedAt)
-                .expiresAt(expiresAt)
-                .id(UUID.randomUUID().toString());
+            .issuer(Objects.requireNonNull(settings.getIssuer()))
+            .audience(List.of(clientId))
+            .issuedAt(issuedAt)
+            .notBefore(issuedAt)
+            .expiresAt(expiresAt)
+            .id(UUID.randomUUID().toString());
         claimsAssembler.applyIdentity(claims, context, clientId);
         claimsAssembler.applyAccessAuthorization(claims, context, sessionId);
         Jwt jwt = encoder.encode(JwtEncoderParameters.from(
-                JwsHeader.with(SignatureAlgorithm.RS256)
-                        .keyId(authorizationProperties.getKey().getKeyId())
-                        .build(),
-                claims.build()));
+            JwsHeader.with(SignatureAlgorithm.RS256)
+                .keyId(authorizationProperties.getKey().getKeyId())
+                .build(),
+            claims.build()));
         Set<String> orderedScopes = Collections.unmodifiableSet(new LinkedHashSet<>(scopes));
         return new IssuedAccessToken(jwt.getTokenValue(), issuedAt, expiresAt, orderedScopes);
     }
 
-    /** 内部签发结果；不包含 Refresh Token、HTTP 响应或 OAuth2 Request Context。 */
+    /**
+     * 内部签发结果；不包含 Refresh Token、HTTP 响应或 OAuth2 Request Context。
+     */
     public record IssuedAccessToken(
-            String tokenValue,
-            Instant issuedAt,
-            Instant expiresAt,
-            Set<String> scopes) {
+        String tokenValue,
+        Instant issuedAt,
+        Instant expiresAt,
+        Set<String> scopes) {
     }
 }

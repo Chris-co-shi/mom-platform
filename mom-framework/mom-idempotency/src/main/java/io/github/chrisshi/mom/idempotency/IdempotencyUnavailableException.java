@@ -12,7 +12,7 @@ public final class IdempotencyUnavailableException extends RuntimeException {
      * 创建幂等基础设施不可用异常。
      *
      * @param message 面向日志和上层错误映射的中文或可读错误描述
-     * @param cause 原始 Redis 访问异常
+     * @param cause   原始 Redis 访问异常
      */
     public IdempotencyUnavailableException(String message, Throwable cause) {
         super(message, cause);

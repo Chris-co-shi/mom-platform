@@ -33,11 +33,11 @@ public class MomMetricsAutoConfiguration {
     MeterRegistryCustomizer<MeterRegistry> momMetricsCommonTagsCustomizer(Environment environment) {
         String application = environment.getProperty("spring.application.name", "unknown-application");
         String deploymentEnvironment = environment.getProperty(
-                "mom.metrics.environment",
-                environment.getProperty("MOM_ENVIRONMENT", "local"));
+            "mom.metrics.environment",
+            environment.getProperty("MOM_ENVIRONMENT", "local"));
         return registry -> registry.config().commonTags(
-                "application", normalize(application, "unknown-application"),
-                "environment", normalize(deploymentEnvironment, "local"));
+            "application", normalize(application, "unknown-application"),
+            "environment", normalize(deploymentEnvironment, "local"));
     }
 
     private static String normalize(String value, String fallback) {

@@ -46,8 +46,8 @@ public class IamAuthorizationProperties {
                 || security.lockDuration.isNegative()) {
             throw new IllegalStateException("IAM 临时锁定时长必须为正数");
         }
-        if (security.minimumPasswordLength < 12 || security.minimumPasswordLength > 128) {
-            throw new IllegalStateException("IAM 最小密码长度必须在 12 到 128 之间");
+        if (security.minimumPasswordLength < 6 || security.minimumPasswordLength > 128) {
+            throw new IllegalStateException("IAM 最小密码长度必须在 6 到 128 之间");
         }
         if (key.keyId == null || key.keyId.isBlank()
                 || key.privateKeyLocation == null || key.publicKeyLocation == null) {
@@ -63,7 +63,7 @@ public class IamAuthorizationProperties {
     public static class AccountSecurity {
         private int maxFailedAttempts = 5;
         private Duration lockDuration = Duration.ofMinutes(15);
-        private int minimumPasswordLength = 12;
+        private int minimumPasswordLength = 6;
     }
 
     /** RSA 签名密钥配置。 */

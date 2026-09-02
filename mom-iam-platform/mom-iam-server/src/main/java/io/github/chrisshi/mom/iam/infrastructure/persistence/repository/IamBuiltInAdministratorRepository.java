@@ -2,7 +2,6 @@ package io.github.chrisshi.mom.iam.infrastructure.persistence.repository;
 
 import io.github.chrisshi.mom.iam.application.admin.model.IamAdminViews;
 import io.github.chrisshi.mom.iam.application.admin.port.IamPlatformAdministratorPort;
-import io.github.chrisshi.mom.iam.application.recovery.IamAdministratorRecoveryPort;
 import io.github.chrisshi.mom.iam.domain.role.IamRole;
 import io.github.chrisshi.mom.iam.domain.type.IamRecordStatus;
 import io.github.chrisshi.mom.iam.domain.type.UserType;
@@ -15,27 +14,13 @@ import io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamUserRoleM
 import java.time.Instant;
 import java.util.Optional;
 
-/**
- * 内置管理员 Bootstrap、Recovery 与 PLATFORM_ADMIN 不变量的 MyBatis Adapter。
- *
- * <p>该 Infrastructure 类型只依赖 IAM Mapper，并实现 Application/Domain Port；不承担事务、HTTP 或
- * 密码策略。Bootstrap 插入与 Recovery 更新均复用 IAM 唯一 DataSource，写入行数不是 1 时 Fail Closed。
- * 恢复读取通过 Mapper 行锁与版本 CAS 串行化并发实例，密码摘要只作为参数向下传递，不读取、记录或
- * 返回。PLATFORM_ADMIN 的有效性仍由既有用户、角色和关系事实查询判定。</p>
- */
+/** 内置管理员 Bootstrap、Recovery 与 PLATFORM_ADMIN 不变量事实 Adapter。 */
 public final class IamBuiltInAdministratorRepository
-        implements IamPlatformAdministratorPort, IamAdministratorRecoveryPort {
+        implements IamPlatformAdministratorPort {
     private final IamUserMapper userMapper;
     private final IamRoleMapper roleMapper;
     private final IamUserRoleMapper userRoleMapper;
 
-    /**
-     * 创建 Adapter。
-     *
-     * @param userMapper 用户单表 Mapper
-     * @param roleMapper 角色单表/Bootstrap 查询 Mapper
-     * @param userRoleMapper 用户角色关系 Mapper
-     */
     public IamBuiltInAdministratorRepository(
             IamUserMapper userMapper,
             IamRoleMapper roleMapper,
@@ -45,7 +30,6 @@ public final class IamBuiltInAdministratorRepository
         this.userRoleMapper = userRoleMapper;
     }
 
-    /** {@inheritDoc} */
     @Override
     public Optional<IamRole> lockPlatformAdminRole() {
         IamAdminViews.RoleView role = roleMapper.selectBuiltInPlatformAdminForUpdate();
@@ -54,53 +38,15 @@ public final class IamBuiltInAdministratorRepository
                 view.status(), view.builtIn(), view.description(), view.version()));
     }
 
-    /**
-     * 按固定用户名锁定并读取 Bootstrap 所需非敏感身份。
-     *
-     * @param username 内置管理员用户名
-     * @return 不含凭据材料的身份；不存在时为空
-     */
     public Optional<IamUserMapper.BootstrapIdentity> findByUsername(String username) {
         return Optional.ofNullable(userMapper.selectBootstrapIdentityByUsername(username));
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public Optional<AdministratorIdentity> lockByUsername(String username) {
-        return findByUsername(username).map(identity -> new AdministratorIdentity(
-                identity.id(), identity.username(), identity.userType(), identity.status(),
-                identity.systemAccount(), identity.version(), identity.deleted()));
+    /** 恢复流程使用全局唯一用户名持有账号行锁。 */
+    public Optional<IamUserMapper.BootstrapIdentity> lockByUsername(String username) {
+        return Optional.ofNullable(userMapper.selectBootstrapIdentityByUsernameForUpdate(username));
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public boolean hasEffectivePlatformAdministratorRole(String userId, Instant now) {
-        return isEffectivePlatformAdmin(userId, now);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void resetCredential(
-            String userId,
-            String credentialHash,
-            long expectedVersion,
-            String actor,
-            Instant now) {
-        requireOne(userMapper.resetPassword(
-                userId, credentialHash, expectedVersion, actor, now),
-                "IAM built-in administrator recovery update failed");
-    }
-
-    /**
-     * 插入固定内置管理员。
-     *
-     * @param userId 用户 ID
-     * @param username 固定用户名
-     * @param passwordHash 密码摘要，不得记录
-     * @param displayName 展示名称
-     * @param actor SYSTEM Actor Code
-     * @param now 当前 UTC 时间
-     */
     public void insertAdministrator(
             String userId, String username, String passwordHash, String displayName,
             String actor, Instant now) {
@@ -123,15 +69,20 @@ public final class IamBuiltInAdministratorRepository
         requireOne(userMapper.insert(user), "IAM built-in administrator insert failed");
     }
 
-    /**
-     * 为新内置管理员分配 PLATFORM_ADMIN 角色。
-     *
-     * @param relationId 关系 ID
-     * @param userId 用户 ID
-     * @param roleId 内置角色 ID
-     * @param actor SYSTEM Actor Code
-     * @param now 当前 UTC 时间
-     */
+    /** 使用乐观锁原子恢复内置管理员凭证与可登录状态。 */
+    public void recoverAdministrator(
+            String userId,
+            String passwordHash,
+            boolean forcePasswordChange,
+            long expectedVersion,
+            String actor,
+            Instant now) {
+        requireOne(userMapper.recoverBuiltInAdministrator(
+                        userId, passwordHash, forcePasswordChange,
+                        expectedVersion, actor, now),
+                "IAM built-in administrator was concurrently modified or is not recoverable");
+    }
+
     public void assignPlatformAdmin(
             String relationId, String userId, String roleId, String actor, Instant now) {
         IamUserRoleEntity relation = new IamUserRoleEntity();
@@ -148,13 +99,11 @@ public final class IamBuiltInAdministratorRepository
                 "IAM built-in administrator role insert failed");
     }
 
-    /** {@inheritDoc} */
     @Override
     public boolean isEffectivePlatformAdmin(String userId, Instant now) {
         return userRoleMapper.existsEffectivePlatformAdmin(userId, now);
     }
 
-    /** {@inheritDoc} */
     @Override
     public int countEffectivePlatformAdministrators(Instant now) {
         return userRoleMapper.countEffectivePlatformAdmins(now);

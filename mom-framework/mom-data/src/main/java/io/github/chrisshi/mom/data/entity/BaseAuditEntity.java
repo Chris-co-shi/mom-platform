@@ -17,11 +17,15 @@ import java.time.Instant;
 @Setter
 public abstract class BaseAuditEntity extends BaseCreatedEntity {
 
-    /** 最近一次持久化修改的 UTC 时间，由服务端在 INSERT/UPDATE 强制覆盖。 */
+    /**
+     * 最近一次持久化修改的 UTC 时间，由服务端在 INSERT/UPDATE 强制覆盖。
+     */
     @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private Instant updatedAt;
 
-    /** 最近修改 Actor ID，可保存用户 ID 或稳定 SYSTEM Actor Code。 */
+    /**
+     * 最近修改 Actor ID，可保存用户 ID 或稳定 SYSTEM Actor Code。
+     */
     @TableField(value = "updated_by", fill = FieldFill.INSERT_UPDATE)
     private String updatedBy;
 }

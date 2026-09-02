@@ -1,0 +1,436 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "IAM 与 MOM Framework 代码架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Chris-co-shi/mom-platform.git",
+      "revision": "0ed365fa0d0b98e5319ea137a4c99c071cbadd19"
+    },
+    "viewBox": [1060, 530]
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [40, 25],
+    "cols": 5,
+    "gapX": 45,
+    "gapY": 30,
+    "cellW": 160,
+    "cellH": 72
+  },
+  "components": [
+    {
+      "id": "callers",
+      "type": "external",
+      "label": "MOM 调用方",
+      "sublabel": "Gateway / Web / Mobile / 业务服务",
+      "size": [160, 72],
+      "row": 2,
+      "col": 0
+    },
+    {
+      "id": "iam-contracts",
+      "type": "cloud",
+      "label": "IAM API / Client",
+      "sublabel": "跨服务契约 + OpenFeign Adapter",
+      "tag": "mom-iam-api · mom-iam-client",
+      "sources": [
+        {
+          "path": "mom-iam-platform/mom-iam-api/src/main/java/io/github/chrisshi/mom/iam/api/IamPermissionReferenceContracts.java",
+          "label": "跨服务契约"
+        },
+        {
+          "path": "mom-iam-platform/mom-iam-client/src/main/java/io/github/chrisshi/mom/iam/client/IamPermissionReferenceClient.java",
+          "label": "Feign Client"
+        },
+        {
+          "path": "mom-iam-platform/mom-iam-client/pom.xml",
+          "label": "Client 依赖"
+        }
+      ],
+      "size": [160, 72],
+      "row": 2,
+      "col": 1
+    },
+    {
+      "id": "iam-web-security",
+      "type": "security",
+      "label": "Web / Security Adapter",
+      "sublabel": "REST · OAuth2/OIDC · JWT · Session",
+      "tag": "Servlet Runtime",
+      "sources": [
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/web/IamDirectAuthenticationController.java",
+          "label": "第一方认证入口"
+        },
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/web/admin/user/IamUserAdminController.java",
+          "label": "管理 REST Adapter"
+        },
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/security/IamAuthorizationServerConfiguration.java",
+          "label": "Authorization Server"
+        }
+      ],
+      "size": [160, 72],
+      "row": 2,
+      "col": 2
+    },
+    {
+      "id": "iam-application",
+      "type": "backend",
+      "label": "Application 用例层",
+      "sublabel": "认证 / 管理 / 恢复 / 权限引用",
+      "tag": "事务 · 授权 · 编排",
+      "sources": [
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/application/authentication/IamFirstPartyLoginApplicationService.java",
+          "label": "登录编排"
+        },
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/application/admin/IamUserAdminApplicationService.java",
+          "label": "用户管理用例"
+        },
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/application/permissionreference/IamPermissionReferenceApplicationService.java",
+          "label": "权限引用查询"
+        }
+      ],
+      "size": [160, 72],
+      "row": 2,
+      "col": 3
+    },
+    {
+      "id": "iam-domain",
+      "type": "backend",
+      "label": "Domain 模型与 Port",
+      "sublabel": "User · Role · Authorization · Policy",
+      "tag": "框架无关",
+      "sources": [
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/domain/user/IamUserAccount.java",
+          "label": "User 聚合"
+        },
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/domain/user/IamUserAccountRepository.java",
+          "label": "Repository Port"
+        },
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/domain/role/IamRole.java",
+          "label": "Role 聚合"
+        }
+      ],
+      "size": [160, 72],
+      "row": 3,
+      "col": 3
+    },
+    {
+      "id": "iam-infrastructure",
+      "type": "backend",
+      "label": "Infrastructure Adapter",
+      "sublabel": "MyBatis / JDBC · Redis 安全状态",
+      "tag": "Port 实现",
+      "sources": [
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/infrastructure/persistence/repository/MybatisIamUserAccountRepository.java",
+          "label": "MyBatis Repository"
+        },
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/configuration/IamPersistenceRepositoryAutoConfiguration.java",
+          "label": "Repository 装配"
+        },
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/security/IamRevokedSessionStore.java",
+          "label": "Redis 安全状态"
+        }
+      ],
+      "size": [160, 72],
+      "row": 3,
+      "col": 4
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "mom_platform / mom_iam",
+      "tag": "身份 · RBAC · Session · 审计",
+      "sources": [
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/resources/application.yml",
+          "label": "数据源与 Schema"
+        },
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/resources/db/migration/iam/V1__create_iam_identity_tables.sql",
+          "label": "身份表"
+        },
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/resources/db/migration/iam/V3__create_iam_oauth_session_tables.sql",
+          "label": "OAuth/Session 表"
+        }
+      ],
+      "size": [160, 72],
+      "row": 4,
+      "col": 3
+    },
+    {
+      "id": "redis",
+      "type": "database",
+      "label": "Redis",
+      "sublabel": "revoked SID 权威快速检查",
+      "tag": "TTL · Fail Closed",
+      "sources": [
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/security/IamRevokedSessionStore.java",
+          "label": "撤销状态 Store"
+        },
+        {
+          "path": "mom-framework/mom-security/src/main/java/io/github/chrisshi/mom/security/revocation/MomRevokedSessionKeys.java",
+          "label": "共享 Key 语义"
+        },
+        {
+          "path": "mom-iam-platform/mom-iam-server/src/main/resources/application.yml",
+          "label": "Redis 配置"
+        }
+      ],
+      "size": [160, 72],
+      "row": 4,
+      "col": 4
+    },
+    {
+      "id": "framework-edge",
+      "type": "security",
+      "label": "Framework 入口与安全",
+      "sublabel": "mom-webmvc · mom-security",
+      "tag": "mom-openfeign · JWT · RBAC",
+      "sources": [
+        {
+          "path": "mom-framework/mom-webmvc/src/main/java/io/github/chrisshi/mom/webmvc/autoconfigure/CorrelationWebMvcAutoConfiguration.java",
+          "label": "Servlet 关联标识"
+        },
+        {
+          "path": "mom-framework/mom-security/src/main/java/io/github/chrisshi/mom/security/autoconfigure/MomServletResourceServerAutoConfiguration.java",
+          "label": "Resource Server"
+        },
+        {
+          "path": "mom-framework/mom-openfeign/src/main/java/io/github/chrisshi/mom/openfeign/autoconfigure/CorrelationIdFeignAutoConfiguration.java",
+          "label": "Feign 传播"
+        }
+      ],
+      "size": [160, 72],
+      "row": 0,
+      "col": 1
+    },
+    {
+      "id": "framework-core",
+      "type": "cloud",
+      "label": "Framework Core",
+      "sublabel": "Correlation / Audit Context 契约",
+      "tag": "mom-core",
+      "sources": [
+        {
+          "path": "mom-framework/mom-core/src/main/java/io/github/chrisshi/mom/core/context/CorrelationContext.java",
+          "label": "Correlation Context"
+        },
+        {
+          "path": "mom-framework/mom-core/src/main/java/io/github/chrisshi/mom/core/security/AuditContextExecutor.java",
+          "label": "Audit Context"
+        },
+        {
+          "path": "mom-framework/mom-core/pom.xml",
+          "label": "零 Spring 业务基座"
+        }
+      ],
+      "size": [160, 72],
+      "row": 0,
+      "col": 2
+    },
+    {
+      "id": "framework-observability",
+      "type": "cloud",
+      "label": "Framework 可观测性",
+      "sublabel": "mom-observation · tracing · metrics",
+      "tag": "Micrometer · Boot 管理生命周期",
+      "sources": [
+        {
+          "path": "mom-framework/mom-tracing/src/main/java/io/github/chrisshi/mom/tracing/autoconfigure/MomTracingAutoConfiguration.java",
+          "label": "Trace 上下文"
+        },
+        {
+          "path": "mom-framework/mom-metrics/pom.xml",
+          "label": "Metrics 依赖"
+        },
+        {
+          "path": "mom-framework/mom-metrics/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports",
+          "label": "Metrics 自动配置入口"
+        }
+      ],
+      "size": [160, 72],
+      "row": 0,
+      "col": 3
+    },
+    {
+      "id": "framework-data",
+      "type": "database",
+      "label": "Framework Data",
+      "sublabel": "审计实体 · Mapper · 乐观锁 · JSONB",
+      "tag": "mom-data",
+      "sources": [
+        {
+          "path": "mom-framework/mom-data/pom.xml",
+          "label": "Data 模块依赖"
+        },
+        {
+          "path": "mom-framework/mom-data/src/main/java/io/github/chrisshi/mom/data/entity/BaseIdEntity.java",
+          "label": "最小实体基类"
+        },
+        {
+          "path": "mom-framework/mom-data/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports",
+          "label": "Data 自动配置入口"
+        }
+      ],
+      "size": [160, 72],
+      "row": 0,
+      "col": 4
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "mom-iam-platform：领域边界",
+      "wraps": ["iam-contracts", "iam-web-security", "iam-application", "iam-domain", "iam-infrastructure"],
+      "pad": 24
+    },
+    {
+      "kind": "region",
+      "label": "mom-framework：可复用技术基线",
+      "wraps": ["framework-edge", "framework-core", "framework-observability", "framework-data"],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    {
+      "id": "caller-to-contracts",
+      "from": "callers",
+      "to": "iam-contracts",
+      "label": "HTTP / OpenFeign",
+      "labelAt": [223, 315],
+      "variant": "emphasis"
+    },
+    {
+      "id": "contracts-to-web",
+      "from": "iam-contracts",
+      "to": "iam-web-security",
+      "label": "REST + OAuth2/OIDC",
+      "labelAt": [428, 315],
+      "variant": "security"
+    },
+    {
+      "id": "web-to-application",
+      "from": "iam-web-security",
+      "to": "iam-application",
+      "label": "Command / Query",
+      "labelAt": [633, 315],
+      "variant": "emphasis"
+    },
+    {
+      "id": "application-to-domain",
+      "from": "iam-application",
+      "to": "iam-domain",
+      "label": "领域规则与 Port",
+      "labelAt": [735, 315]
+    },
+    {
+      "id": "infrastructure-implements-domain",
+      "from": "iam-infrastructure",
+      "to": "iam-domain",
+      "label": "实现 Domain Port",
+      "labelAt": [770, 417],
+      "variant": "dashed"
+    },
+    {
+      "id": "infrastructure-to-postgres",
+      "from": "iam-infrastructure",
+      "to": "postgres",
+      "label": "MyBatis / JDBC",
+      "labelAt": [735, 519],
+      "variant": "emphasis"
+    },
+    {
+      "id": "infrastructure-to-redis",
+      "from": "iam-infrastructure",
+      "to": "redis",
+      "label": "revoked SID + TTL",
+      "labelAt": [940, 417],
+      "variant": "security"
+    },
+    {
+      "id": "framework-edge-to-contracts",
+      "from": "framework-edge",
+      "to": "iam-contracts",
+      "label": "Feign 关联标识传播",
+      "labelAt": [325, 111],
+      "variant": "dashed"
+    },
+    {
+      "id": "framework-edge-to-web",
+      "from": "framework-edge",
+      "to": "iam-web-security",
+      "label": "Servlet / JWT / RBAC 自动配置",
+      "variant": "security"
+    },
+    {
+      "id": "framework-core-to-application",
+      "from": "framework-core",
+      "to": "iam-application",
+      "label": "Audit / Correlation Context",
+      "variant": "dashed"
+    },
+    {
+      "id": "framework-observability-to-application",
+      "from": "framework-observability",
+      "to": "iam-application",
+      "label": "Trace / Meter 自动配置",
+      "labelAt": [735, 111],
+      "variant": "dashed"
+    },
+    {
+      "id": "framework-data-to-infrastructure",
+      "from": "framework-data",
+      "to": "iam-infrastructure",
+      "label": "Entity / Mapper / Audit / Lock",
+      "labelAt": [940, 111],
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "IAM 分层结论",
+      "items": [
+        "api/client/server 三模块分离；Server 内保持 Web → Application → Domain",
+        "Infrastructure 实现 Domain/Application Port，Configuration 仅负责装配",
+        "认证、管理、恢复和权限引用共享同一身份与授权事实"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "安全与状态",
+      "items": [
+        "Spring Authorization Server 与 Resource Server 在 IAM Servlet Runtime 内协作",
+        "PostgreSQL 是身份、RBAC、Session、Refresh 链与安全审计的权威存储",
+        "Redis 保存带 TTL 的 revoked SID；不可用时按安全语义 fail-closed"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Framework 使用边界",
+      "items": [
+        "IAM 直接使用 webmvc、security、data、tracing、metrics；Client 另用 openfeign",
+        "cache、idempotency、messaging、outbox、rate-limit、resilience 当前不是 IAM 直接依赖",
+        "data-permission、logging、observation、seata、test 当前主要是 POM/依赖边界或测试支撑"
+      ]
+    }
+  ]
+}

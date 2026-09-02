@@ -17,10 +17,14 @@ class IamRuntimeSecureDefaultsTest {
     void baseConfigurationMustBeEnvironmentNeutralAndSecureByDefault() {
         runner.run(context -> {
             Environment environment = context.getEnvironment();
+            assertThat(environment.getProperty("spring.application.name"))
+                    .isEqualTo("mom-iam-server");
             assertThat(environment.getProperty("spring.datasource.url"))
                     .contains("127.0.0.1")
                     .contains("/mom_platform?")
                     .contains("currentSchema=mom_iam");
+            assertThat(environment.getProperty("spring.datasource.username"))
+                    .isEqualTo("iam_app");
             assertThat(environment.getProperty("spring.datasource.password")).isEmpty();
             assertThat(environment.getProperty("spring.data.redis.host")).isEqualTo("127.0.0.1");
             assertThat(environment.getProperty("spring.data.redis.password")).isEmpty();
@@ -31,9 +35,11 @@ class IamRuntimeSecureDefaultsTest {
             assertThat(environment.getProperty("mom.iam.bootstrap.password")).isEmpty();
             assertThat(environment.getProperty("mom.iam.recovery.enabled", Boolean.class)).isFalse();
             assertThat(environment.getProperty("mom.iam.recovery.password")).isEmpty();
-            assertThat(environment.getProperty("mom.iam.recovery.confirmation")).isEmpty();
             assertThat(environment.getProperty(
-                    "mom.iam.recovery.force-password-change", Boolean.class)).isTrue();
+                    "mom.iam.recovery.force-password-change", Boolean.class)).isFalse();
+            assertThat(environment.getProperty(
+                    "mom.iam.authorization.security.minimum-password-length", Integer.class))
+                    .isEqualTo(6);
             assertThat(environment.getProperty("mom.iam.authorization.key.private-key-location"))
                     .isEmpty();
             assertThat(environment.getProperty("mom.iam.authorization.key.public-key-location"))

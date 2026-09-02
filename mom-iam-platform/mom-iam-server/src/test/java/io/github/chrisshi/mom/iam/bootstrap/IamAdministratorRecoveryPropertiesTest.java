@@ -6,68 +6,50 @@ import org.springframework.mock.env.MockEnvironment;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-/** 管理员恢复默认关闭、生产禁止、双开拒绝和显式确认规则单元测试。 */
+/** 一次性管理员恢复配置的默认关闭、六位下限和生产环境拒绝测试。 */
 class IamAdministratorRecoveryPropertiesTest {
 
     @Test
-    void disabledRecoveryMustNotRequireSecretOrConfirmation() {
-        assertDoesNotThrow(() -> new IamAdministratorRecoveryProperties()
-                .validate(new MockEnvironment(), false));
+    void disabledRecoveryMustNotRequirePassword() {
+        assertDoesNotThrow(() ->
+                new IamAdministratorRecoveryProperties().validate(new MockEnvironment()));
     }
 
     @Test
-    void enabledRecoveryMustRejectMissingPassword() {
-        var properties = enabledProperties();
-        properties.setPassword("");
+    void enabledRecoveryMustAcceptSixCharacterPassword() {
+        IamAdministratorRecoveryProperties properties = enabled("admin1");
+        assertDoesNotThrow(() -> properties.validate(new MockEnvironment()));
+    }
+
+    @Test
+    void enabledRecoveryMustRejectFiveCharacterPassword() {
+        IamAdministratorRecoveryProperties properties = enabled("12345");
         assertThrows(IllegalStateException.class,
-                () -> properties.validate(new MockEnvironment(), false));
+                () -> properties.validate(new MockEnvironment()));
     }
 
     @Test
-    void enabledRecoveryMustRejectMissingExplicitConfirmation() {
-        var properties = enabledProperties();
-        properties.setConfirmation("");
+    void enabledRecoveryMustRejectBlankPassword() {
+        IamAdministratorRecoveryProperties properties = enabled(" ");
         assertThrows(IllegalStateException.class,
-                () -> properties.validate(new MockEnvironment(), false));
+                () -> properties.validate(new MockEnvironment()));
     }
 
     @Test
-    void enabledRecoveryMustRejectBootstrapRunningAtTheSameTime() {
-        var properties = enabledProperties();
-        assertThrows(IllegalStateException.class,
-                () -> properties.validate(new MockEnvironment(), true));
+    void prodAndProductionProfilesMustRejectRecovery() {
+        for (String profile : new String[]{"prod", "production"}) {
+            IamAdministratorRecoveryProperties properties = enabled("admin1");
+            MockEnvironment environment = new MockEnvironment();
+            environment.setActiveProfiles(profile);
+            assertThrows(IllegalStateException.class,
+                    () -> properties.validate(environment));
+        }
     }
 
-    @Test
-    void enabledRecoveryMustRejectDisabledForcedChange() {
-        var properties = enabledProperties();
-        properties.setForcePasswordChange(false);
-        assertThrows(IllegalStateException.class,
-                () -> properties.validate(new MockEnvironment(), false));
-    }
-
-    @Test
-    void bothProductionProfileNamesMustRejectRecovery() {
-        var properties = enabledProperties();
-        var prod = new MockEnvironment();
-        prod.setActiveProfiles("prod");
-        var production = new MockEnvironment();
-        production.setActiveProfiles("production");
-        assertThrows(IllegalStateException.class, () -> properties.validate(prod, false));
-        assertThrows(IllegalStateException.class,
-                () -> properties.validate(production, false));
-    }
-
-    @Test
-    void explicitSafeNonProductionConfigurationMustPass() {
-        assertDoesNotThrow(() -> enabledProperties().validate(new MockEnvironment(), false));
-    }
-
-    private static IamAdministratorRecoveryProperties enabledProperties() {
-        var properties = new IamAdministratorRecoveryProperties();
+    private static IamAdministratorRecoveryProperties enabled(String password) {
+        IamAdministratorRecoveryProperties properties = new IamAdministratorRecoveryProperties();
         properties.setEnabled(true);
-        properties.setPassword("Test-Recovery-Secret-2026!");
-        properties.setConfirmation(IamAdministratorRecoveryProperties.REQUIRED_CONFIRMATION);
+        properties.setPassword(password);
         return properties;
     }
 }

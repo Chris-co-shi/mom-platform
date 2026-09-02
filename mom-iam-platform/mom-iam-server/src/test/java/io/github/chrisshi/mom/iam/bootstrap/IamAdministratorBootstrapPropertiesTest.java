@@ -6,13 +6,27 @@ import org.springframework.mock.env.MockEnvironment;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-/** Bootstrap 默认关闭、固定用户名、密码必填和双生产 Profile 拒绝规则单元测试。 */
+/** Bootstrap 默认关闭、固定用户名、六位密码下限和双生产 Profile 拒绝规则单元测试。 */
 class IamAdministratorBootstrapPropertiesTest {
 
     @Test
     void disabledBootstrapMustNotRequirePassword() {
         IamAdministratorBootstrapProperties properties = new IamAdministratorBootstrapProperties();
         assertDoesNotThrow(() -> properties.validate(new MockEnvironment()));
+    }
+
+    @Test
+    void enabledBootstrapMustAcceptSixCharacterPassword() {
+        IamAdministratorBootstrapProperties properties = enabledProperties();
+        assertDoesNotThrow(() -> properties.validate(new MockEnvironment()));
+    }
+
+    @Test
+    void enabledBootstrapMustRejectFiveCharacterPassword() {
+        IamAdministratorBootstrapProperties properties = enabledProperties();
+        properties.setPassword("12345");
+        assertThrows(IllegalStateException.class,
+                () -> properties.validate(new MockEnvironment()));
     }
 
     @Test
@@ -52,7 +66,7 @@ class IamAdministratorBootstrapPropertiesTest {
     private static IamAdministratorBootstrapProperties enabledProperties() {
         IamAdministratorBootstrapProperties properties = new IamAdministratorBootstrapProperties();
         properties.setEnabled(true);
-        properties.setPassword("Bootstrap-Temporary-Secret-2026!");
+        properties.setPassword("admin1");
         return properties;
     }
 }

@@ -13,10 +13,12 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
  */
 public interface MomBaseMapper<T> extends BaseMapper<T> {
 
-    /** Wrapper-only Update 始终被拒绝，防止静默绕过审计。 */
+    /**
+     * Wrapper-only Update 始终被拒绝，防止静默绕过审计。
+     */
     @Override
     default int update(Wrapper<T> updateWrapper) {
         throw new UnsupportedOperationException(
-                "Wrapper-only Update 不触发实体审计填充；请使用 update(entity, wrapper) 或显式审计 SQL");
+            "Wrapper-only Update 不触发实体审计填充；请使用 update(entity, wrapper) 或显式审计 SQL");
     }
 }
