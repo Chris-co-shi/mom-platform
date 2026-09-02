@@ -43,7 +43,7 @@ public final class IamScopeGuard {
             PartyType objectPartyType,
             String objectPartyId) {
         Objects.requireNonNull(context, "context");
-        if (objectFactoryId == null || !context.hasFactory(objectFactoryId)) {
+        if (!context.hasFactory(objectFactoryId)) {
             throw new ScopedResourceNotFoundException();
         }
         if (context.externalPartyBound()

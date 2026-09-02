@@ -16,12 +16,16 @@ import lombok.Setter;
 @Setter
 public abstract class BaseEntity extends BaseAuditEntity {
 
-    /** MyBatis-Plus 乐观锁版本号，新记录从零开始。 */
+    /**
+     * MyBatis-Plus 乐观锁版本号，新记录从零开始。
+     */
     @Version
     @TableField("version")
     private Long version = 0L;
 
-    /** 布尔逻辑删除标识：false 有效，true 已删除。 */
+    /**
+     * 布尔逻辑删除标识：false 有效，true 已删除。
+     */
     @TableLogic(value = "false", delval = "true")
     @TableField("deleted")
     private Boolean deleted = Boolean.FALSE;

@@ -20,7 +20,7 @@ public final class PostgresqlJsonbStringTypeHandler extends BaseTypeHandler<Stri
 
     @Override
     public void setNonNullParameter(
-            PreparedStatement statement, int index, String parameter, JdbcType jdbcType) throws SQLException {
+        PreparedStatement statement, int index, String parameter, JdbcType jdbcType) throws SQLException {
         PGobject jsonb = new PGobject();
         jsonb.setType("jsonb");
         jsonb.setValue(parameter);

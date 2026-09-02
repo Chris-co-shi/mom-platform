@@ -5,16 +5,16 @@ import java.time.Duration;
 /**
  * 幂等占位操作的结构化返回结果。
  *
- * @param status 幂等占位状态
- * @param protectedKey 已脱敏的 Redis Key；原始业务幂等值会先进行 SHA-256 摘要，避免敏感数据进入 Key
- * @param ttl 幂等键生存时间；仅表示本次占位使用的超时时间
+ * @param status        幂等占位状态
+ * @param protectedKey  已脱敏的 Redis Key；原始业务幂等值会先进行 SHA-256 摘要，避免敏感数据进入 Key
+ * @param ttl           幂等键生存时间；仅表示本次占位使用的超时时间
  * @param failureReason fail-open 绕过保护时的失败摘要；正常取得或重复时为空
  */
 public record IdempotencyAcquireResult(
-        IdempotencyAcquireStatus status,
-        String protectedKey,
-        Duration ttl,
-        String failureReason) {
+    IdempotencyAcquireStatus status,
+    String protectedKey,
+    Duration ttl,
+    String failureReason) {
 
     /**
      * 判断当前请求是否取得业务执行资格。
@@ -26,6 +26,6 @@ public record IdempotencyAcquireResult(
      */
     public boolean mayProceed() {
         return status == IdempotencyAcquireStatus.ACQUIRED
-                || status == IdempotencyAcquireStatus.BYPASSED;
+            || status == IdempotencyAcquireStatus.BYPASSED;
     }
 }

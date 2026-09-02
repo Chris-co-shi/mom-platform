@@ -13,19 +13,45 @@ import java.util.Objects;
  * <p>{@code payloadJson} 保存事件版本对应的 JSON 文本。使用文本而不是 Java 原生序列化可以避免类路径耦合，
  * 并允许消费者按 {@code eventType + eventVersion} 选择自己的反序列化模型。信封不可变，可安全在线程间共享。</p>
  *
- * @param eventId 事件全局唯一标识；重复投递时保持不变
- * @param eventType 稳定事件类型，例如 {@code mdm.technical-probe.created}
- * @param eventVersion 事件契约版本，从 1 开始递增
+ * @param eventId       事件全局唯一标识；重复投递时保持不变
+ * @param eventType     稳定事件类型，例如 {@code mdm.technical-probe.created}
+ * @param eventVersion  事件契约版本，从 1 开始递增
  * @param aggregateType 产生事件的聚合类型
- * @param aggregateId 产生事件的聚合技术标识
- * @param occurredAt 领域事实发生时间，统一为 UTC 时间点
- * @param producer 生产事件的稳定服务名
+ * @param aggregateId   产生事件的聚合技术标识
+ * @param occurredAt    领域事实发生时间，统一为 UTC 时间点
+ * @param producer      生产事件的稳定服务名
  * @param correlationId 关联同步请求、工作流或批处理的标识
- * @param payloadJson 事件业务负载 JSON；不得包含密钥、Token 或未脱敏敏感数据
+ * @param payloadJson   事件业务负载 JSON；不得包含密钥、Token 或未脱敏敏感数据
  */
 public record EventEnvelope(
+    String eventId,
+    String eventType,
+    int eventVersion,
+    String aggregateType,
+    String aggregateId,
+    Instant occurredAt,
+    String producer,
+    String correlationId,
+    String payloadJson) {
+
+    /**
+     * 使用生产方本地 EventType 创建跨服务信封。
+     *
+     * <p>构造后只保留稳定字符串 Code，不保存或序列化业务枚举类型。</p>
+     *
+     * @param eventId       事件唯一标识
+     * @param eventType     生产方 bounded context 的本地事件类型
+     * @param eventVersion  契约版本
+     * @param aggregateType 聚合类型
+     * @param aggregateId   聚合标识
+     * @param occurredAt    事实发生时间
+     * @param producer      生产服务
+     * @param correlationId 关联标识
+     * @param payloadJson   明确 JSON Payload
+     */
+    public EventEnvelope(
         String eventId,
-        String eventType,
+        EventType eventType,
         int eventVersion,
         String aggregateType,
         String aggregateId,
@@ -33,42 +59,16 @@ public record EventEnvelope(
         String producer,
         String correlationId,
         String payloadJson) {
-
-    /**
-     * 使用生产方本地 EventType 创建跨服务信封。
-     *
-     * <p>构造后只保留稳定字符串 Code，不保存或序列化业务枚举类型。</p>
-     *
-     * @param eventId 事件唯一标识
-     * @param eventType 生产方 bounded context 的本地事件类型
-     * @param eventVersion 契约版本
-     * @param aggregateType 聚合类型
-     * @param aggregateId 聚合标识
-     * @param occurredAt 事实发生时间
-     * @param producer 生产服务
-     * @param correlationId 关联标识
-     * @param payloadJson 明确 JSON Payload
-     */
-    public EventEnvelope(
-            String eventId,
-            EventType eventType,
-            int eventVersion,
-            String aggregateType,
-            String aggregateId,
-            Instant occurredAt,
-            String producer,
-            String correlationId,
-            String payloadJson) {
         this(
-                eventId,
-                Objects.requireNonNull(eventType, "eventType 不能为空").code(),
-                eventVersion,
-                aggregateType,
-                aggregateId,
-                occurredAt,
-                producer,
-                correlationId,
-                payloadJson
+            eventId,
+            Objects.requireNonNull(eventType, "eventType 不能为空").code(),
+            eventVersion,
+            aggregateType,
+            aggregateId,
+            occurredAt,
+            producer,
+            correlationId,
+            payloadJson
         );
     }
 
@@ -76,7 +76,7 @@ public record EventEnvelope(
      * 校验事件信封的最小可发布约束。
      *
      * @throws IllegalArgumentException 任一必填文本为空或版本号小于 1 时抛出
-     * @throws NullPointerException 发生时间为空时抛出
+     * @throws NullPointerException     发生时间为空时抛出
      */
     public EventEnvelope {
         eventId = requireText(eventId, "eventId");
@@ -95,7 +95,7 @@ public record EventEnvelope(
     /**
      * 校验并规范化信封文本字段。
      *
-     * @param value 原始字段值
+     * @param value     原始字段值
      * @param fieldName 用于异常消息的字段名
      * @return 去除首尾空白后的值
      * @throws IllegalArgumentException 值为空或仅包含空白时抛出

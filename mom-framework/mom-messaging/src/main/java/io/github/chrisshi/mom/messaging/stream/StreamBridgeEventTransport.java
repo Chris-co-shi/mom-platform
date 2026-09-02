@@ -38,10 +38,10 @@ public final class StreamBridgeEventTransport implements EventTransport {
      * 构造包含稳定 MOM Header 的 JSON 消息并同步交给指定 Binding。
      *
      * @param bindingName 已配置的输出 Binding 名称
-     * @param event 待发送事件信封
+     * @param event       待发送事件信封
      * @return Binding 接受消息返回 {@code true}
      * @throws IllegalArgumentException Binding 名称为空时抛出
-     * @throws RuntimeException Binder 或 Broker 发送失败时透传
+     * @throws RuntimeException         Binder 或 Broker 发送失败时透传
      */
     @Override
     public boolean send(String bindingName, EventEnvelope event) {
@@ -51,12 +51,12 @@ public final class StreamBridgeEventTransport implements EventTransport {
         Objects.requireNonNull(event, "event 不能为空");
 
         Message<EventEnvelope> message = MessageBuilder.withPayload(event)
-                .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.APPLICATION_JSON)
-                .setHeader(MomMessageHeaders.EVENT_ID, event.eventId())
-                .setHeader(MomMessageHeaders.EVENT_TYPE, event.eventType())
-                .setHeader(MomMessageHeaders.EVENT_VERSION, event.eventVersion())
-                .setHeader(MomMessageHeaders.CORRELATION_ID, event.correlationId())
-                .build();
+            .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.APPLICATION_JSON)
+            .setHeader(MomMessageHeaders.EVENT_ID, event.eventId())
+            .setHeader(MomMessageHeaders.EVENT_TYPE, event.eventType())
+            .setHeader(MomMessageHeaders.EVENT_VERSION, event.eventVersion())
+            .setHeader(MomMessageHeaders.CORRELATION_ID, event.correlationId())
+            .build();
         return streamBridge.send(bindingName.trim(), message);
     }
 }
