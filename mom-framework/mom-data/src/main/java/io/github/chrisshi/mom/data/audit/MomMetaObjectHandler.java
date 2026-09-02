@@ -3,7 +3,6 @@ package io.github.chrisshi.mom.data.audit;
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import io.github.chrisshi.mom.core.security.AuditActor;
 import io.github.chrisshi.mom.core.security.CurrentActorProvider;
-import io.github.chrisshi.mom.data.config.MomDataAuditProperties;
 import org.apache.ibatis.reflection.MetaObject;
 
 import java.time.Clock;
@@ -20,15 +19,15 @@ public final class MomMetaObjectHandler implements MetaObjectHandler {
 
     private final Clock clock;
     private final CurrentActorProvider actorProvider;
-    private final MomDataAuditProperties properties;
 
-    public MomMetaObjectHandler(Clock clock, CurrentActorProvider actorProvider, MomDataAuditProperties properties) {
+    public MomMetaObjectHandler(Clock clock, CurrentActorProvider actorProvider) {
         this.clock = Objects.requireNonNull(clock, "clock 不能为空");
         this.actorProvider = Objects.requireNonNull(actorProvider, "actorProvider 不能为空");
-        this.properties = Objects.requireNonNull(properties, "properties 不能为空");
     }
 
-    /** INSERT 时以服务端 Actor 和同一 UTC 时间强制覆盖四个审计字段。 */
+    /**
+     * INSERT 时以服务端 Actor 和同一 UTC 时间强制覆盖四个审计字段。
+     */
     @Override
     public void insertFill(MetaObject metaObject) {
         Objects.requireNonNull(metaObject, "metaObject 不能为空");
@@ -40,7 +39,9 @@ public final class MomMetaObjectHandler implements MetaObjectHandler {
         overwrite(metaObject, "updatedBy", actorId);
     }
 
-    /** UPDATE 时只覆盖最近修改时间和操作人，不修改创建审计字段。 */
+    /**
+     * UPDATE 时只覆盖最近修改时间和操作人，不修改创建审计字段。
+     */
     @Override
     public void updateFill(MetaObject metaObject) {
         Objects.requireNonNull(metaObject, "metaObject 不能为空");
@@ -49,9 +50,6 @@ public final class MomMetaObjectHandler implements MetaObjectHandler {
     }
 
     private String resolveActorId() {
-        if (properties.isFailOnMissingActor()) {
-            return actorProvider.requireCurrentActor().actorId();
-        }
         return actorProvider.findCurrentActor().map(AuditActor::actorId).orElse(null);
     }
 

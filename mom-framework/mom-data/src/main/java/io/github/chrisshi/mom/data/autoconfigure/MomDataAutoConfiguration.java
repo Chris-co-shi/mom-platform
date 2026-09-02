@@ -3,17 +3,13 @@ package io.github.chrisshi.mom.data.autoconfigure;
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInterceptor;
-import io.github.chrisshi.mom.core.security.AuditContext;
-import io.github.chrisshi.mom.core.security.AuditContextExecutor;
 import io.github.chrisshi.mom.core.security.CurrentActorProvider;
 import io.github.chrisshi.mom.data.audit.MomMetaObjectHandler;
-import io.github.chrisshi.mom.data.config.MomDataAuditProperties;
+import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 
 import java.time.Clock;
@@ -25,7 +21,7 @@ import java.time.Clock;
     afterName = "io.github.chrisshi.mom.security.autoconfigure.MomSecurityActorAutoConfiguration",
     beforeName = "com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration")
 @ConditionalOnClass(MybatisPlusInterceptor.class)
-@EnableConfigurationProperties(MomDataAuditProperties.class)
+//@EnableConfigurationProperties(MomDataAuditProperties.class)
 public class MomDataAutoConfiguration {
 
     /**
@@ -37,35 +33,33 @@ public class MomDataAutoConfiguration {
         return Clock.systemUTC();
     }
 
-    /**
-     * 提供显式 Actor 上下文执行器，不自动跨线程传播。
-     */
-    @Bean
-    @ConditionalOnMissingBean(AuditContextExecutor.class)
-    AuditContextExecutor auditContextExecutor() {
-        return new AuditContextExecutor();
-    }
-
-    /**
-     * 无安全 Provider 时只读取显式 AuditContext，仍不默认 SYSTEM。
-     */
-    @Bean
-    @ConditionalOnMissingBean(CurrentActorProvider.class)
-    CurrentActorProvider auditContextCurrentActorProvider() {
-        return AuditContext::findCurrentActor;
-    }
+//    /**
+//     * 提供显式 Actor 上下文执行器，不自动跨线程传播。
+//     */
+//    @Bean
+//    @ConditionalOnMissingBean(AuditContextExecutor.class)
+//    AuditContextExecutor auditContextExecutor() {
+//        return new AuditContextExecutor();
+//    }
+//
+//    /**
+//     * 无安全 Provider 时只读取显式 AuditContext，仍不默认 SYSTEM。
+//     */
+//    @Bean
+//    @ConditionalOnMissingBean(CurrentActorProvider.class)
+//    CurrentActorProvider auditContextCurrentActorProvider() {
+//        return AuditContext::findCurrentActor;
+//    }
 
     /**
      * 创建服务端受控的审计处理器。
      */
     @Bean
     @ConditionalOnMissingBean(MetaObjectHandler.class)
-    @ConditionalOnProperty(prefix = "mom.data.audit", name = "enabled", havingValue = "true", matchIfMissing = true)
     MetaObjectHandler momMetaObjectHandler(
         Clock clock,
-        CurrentActorProvider actorProvider,
-        MomDataAuditProperties properties) {
-        return new MomMetaObjectHandler(clock, actorProvider, properties);
+        CurrentActorProvider actorProvider) {
+        return new MomMetaObjectHandler(clock, actorProvider);
     }
 
     /**
@@ -84,7 +78,7 @@ public class MomDataAutoConfiguration {
     static BeanPostProcessor momOptimisticLockerInterceptorPostProcessor() {
         return new BeanPostProcessor() {
             @Override
-            public Object postProcessAfterInitialization(Object bean, String beanName) {
+            public Object postProcessAfterInitialization(@NonNull Object bean, @NonNull String beanName) {
                 if (bean instanceof MybatisPlusInterceptor interceptor
                     && interceptor.getInterceptors().stream()
                     .noneMatch(OptimisticLockerInnerInterceptor.class::isInstance)) {

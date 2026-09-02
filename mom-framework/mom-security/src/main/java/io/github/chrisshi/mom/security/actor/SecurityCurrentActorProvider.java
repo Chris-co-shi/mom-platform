@@ -1,6 +1,5 @@
 package io.github.chrisshi.mom.security.actor;
 
-import io.github.chrisshi.mom.core.context.CorrelationContext;
 import io.github.chrisshi.mom.core.security.ActorType;
 import io.github.chrisshi.mom.core.security.AuditActor;
 import io.github.chrisshi.mom.core.security.AuditContext;
@@ -22,7 +21,9 @@ import java.util.Optional;
  */
 public final class SecurityCurrentActorProvider implements CurrentActorProvider {
 
-    /** 按“显式 Actor → 已认证用户 → 空”的顺序解析。 */
+    /**
+     * 按“显式 Actor → 已认证用户 → 空”的顺序解析。
+     */
     @Override
     public Optional<AuditActor> findCurrentActor() {
         Optional<AuditActor> explicitActor = AuditContext.findCurrentActor();
@@ -32,8 +33,8 @@ public final class SecurityCurrentActorProvider implements CurrentActorProvider 
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null
-                || !authentication.isAuthenticated()
-                || authentication instanceof AnonymousAuthenticationToken) {
+            || !authentication.isAuthenticated()
+            || authentication instanceof AnonymousAuthenticationToken) {
             return Optional.empty();
         }
 
@@ -44,12 +45,8 @@ public final class SecurityCurrentActorProvider implements CurrentActorProvider 
         }
 
         return Optional.of(new AuditActor(
-                actorId,
-                ActorType.USER,
-                claim(jwt, "user_type"),
-                claim(jwt, "client_id"),
-                claim(jwt, "sid"),
-                CorrelationContext.currentId()));
+            actorId,
+            ActorType.USER));
     }
 
     private static Jwt extractJwt(Authentication authentication) {
