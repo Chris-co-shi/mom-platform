@@ -30,6 +30,7 @@ DANGEROUS_ENABLE_FLAGS = {
     "OTEL_TRACING_EXPORT_ENABLED",
     "IAM_ALLOW_TEST_KEY",
     "IAM_ALLOW_LOCAL_REFRESH_PEPPER",
+    "MOM_TECHNICAL_PROBE_ENABLED",
 }
 DANGEROUS_YAML_PATHS = {
     "mom.iam.bootstrap.enabled",
@@ -38,6 +39,7 @@ DANGEROUS_YAML_PATHS = {
     "management.tracing.export.otlp.enabled",
     "mom.iam.authorization.key.allow-test-key",
     "mom.iam.session.allow-local-pepper",
+    "mom.gateway.technical-probe.enabled",
 }
 SENSITIVE_YAML_KEYS = {
     "password",
@@ -183,7 +185,7 @@ mom:
     unsafe_cases = {
         "sensitive-env-nonempty-default": "password: ${POSTGRES_PASSWORD:<NON_EMPTY>}",
         "nonlocal-private-address-default": "host: 192.168.1.10",
-        "unsafe-feature-enabled-by-default": "enabled: ${IAM_BOOTSTRAP_ENABLED:true}",
+        "unsafe-feature-enabled-by-default": "enabled: ${MOM_TECHNICAL_PROBE_ENABLED:true}",
         "fixed-sensitive-value": "password: fixed-non-empty",
         "test-key-in-runtime-defaults": (
             "mom:\n  iam:\n    authorization:\n      key:\n"

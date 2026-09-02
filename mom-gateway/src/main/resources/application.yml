@@ -10,16 +10,16 @@ spring:
       port: ${REDIS_PORT:6379}
       database: ${REDIS_DATABASE:0}
       username: ${REDIS_USERNAME:}
-      password: ${REDIS_PASSWORD:123456789}
+      password: ${REDIS_PASSWORD:}
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
       timeout: ${REDIS_TIMEOUT:2s}
   cloud:
     nacos:
       discovery:
-        enabled: ${NACOS_DISCOVERY_ENABLED:true}
+        enabled: ${NACOS_DISCOVERY_ENABLED:false}
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:12345678}
+        password: ${NACOS_PASSWORD:}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
@@ -54,7 +54,7 @@ spring:
 mom:
   gateway:
     technical-probe:
-      enabled: ${MOM_TECHNICAL_PROBE_ENABLED:true}
+      enabled: ${MOM_TECHNICAL_PROBE_ENABLED:false}
     security:
       enabled: ${GATEWAY_SECURITY_ENABLED:true}
       issuer-uri: ${IAM_ISSUER:http://127.0.0.1:20100}
