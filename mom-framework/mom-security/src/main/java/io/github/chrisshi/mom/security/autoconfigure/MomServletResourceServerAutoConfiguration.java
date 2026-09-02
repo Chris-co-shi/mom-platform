@@ -4,7 +4,6 @@ import io.github.chrisshi.mom.security.authorization.MomAuthorizationService;
 import io.github.chrisshi.mom.security.revocation.MomRevokedSessionChecker;
 import io.github.chrisshi.mom.security.revocation.MomRevokedSessionFilter;
 import io.github.chrisshi.mom.security.revocation.infrastructure.RedisMomRevokedSessionChecker;
-import io.github.chrisshi.mom.security.token.MomJwtValidators;
 import io.github.chrisshi.mom.security.token.MomSecurityClaims;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -84,8 +83,8 @@ public class MomServletResourceServerAutoConfiguration {
     JwtDecoder momJwtDecoder(MomResourceServerProperties properties) {
         properties.validate();
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(properties.getJwkSetUri()).build();
-        decoder.setJwtValidator(MomJwtValidators.create(
-            properties.getIssuerUri(), properties.getAcceptedAudiences()));
+//        decoder.setJwtValidator(MomJwtValidators.create(
+//            properties.getIssuerUri(), properties.getAcceptedAudiences()));
         return decoder;
     }
 
