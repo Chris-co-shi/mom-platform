@@ -7,12 +7,14 @@ import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInt
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import io.github.chrisshi.mom.core.security.CurrentActorProvider;
 import io.github.chrisshi.mom.data.audit.MomMetaObjectHandler;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 
 import java.time.Clock;
+import java.util.Optional;
 
 /**
  * MOM 关系型数据访问、审计和乐观锁自动配置。
@@ -37,7 +39,9 @@ public class MomDataAutoConfiguration {
     @ConditionalOnMissingBean(MetaObjectHandler.class)
     MetaObjectHandler momMetaObjectHandler(
         Clock clock,
-        CurrentActorProvider actorProvider) {
+        ObjectProvider<CurrentActorProvider> providers) {
+        CurrentActorProvider actorProvider =
+            providers.getIfAvailable(() -> Optional::empty);
         return new MomMetaObjectHandler(clock, actorProvider);
     }
 

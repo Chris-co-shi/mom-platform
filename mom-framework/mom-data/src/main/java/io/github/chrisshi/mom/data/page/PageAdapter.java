@@ -14,7 +14,10 @@ import java.util.function.Function;
  **/
 public final class PageAdapter {
 
-    public static <T> Page<T> toPage(PageQuery<T> pageQuery) {
+    private PageAdapter() {
+    }
+
+    public static <E> Page<E> toPage(PageQuery<?> pageQuery) {
         return Page.of(pageQuery.pageNo(), pageQuery.pageSize());
     }
 

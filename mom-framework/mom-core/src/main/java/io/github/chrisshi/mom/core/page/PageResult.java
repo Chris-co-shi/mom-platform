@@ -9,4 +9,8 @@ public record PageResult<T>(
     long total,
     long totalPages
 ) {
+
+    public PageResult{
+        records = List.copyOf(records);
+    }
 }
