@@ -14,7 +14,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
  * <p>该配置只注册稳定的 {@link CurrentActorProvider} 解析边界，不配置登录、JWT 解码器、Authorization
  * Server、RBAC 或接口授权。应用可声明自己的 Provider 覆盖默认实现。</p>
  */
-@AutoConfiguration(beforeName = "io.github.chrisshi.mom.data.autoconfigure.MomDataAutoConfiguration")
+@AutoConfiguration
 @ConditionalOnClass(SecurityContextHolder.class)
 public class MomSecurityActorAutoConfiguration {
 
