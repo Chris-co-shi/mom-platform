@@ -191,7 +191,7 @@ def validate_scripts(root: pathlib.Path) -> list[Finding]:
     detector_text = detector.read_text(encoding="utf-8") if detector.exists() else ""
     for output in (
         "nacos", "redis_cache", "redis_idempotency", "redis_rate_limit", "postgresql",
-        "messaging", "seata", "observability",
+        "messaging",
     ):
         if not re.search(rf"emit\s+{output}\b", detector_text):
             findings.append(Finding("TB014", detector, output))

@@ -46,6 +46,10 @@ jobs:
           .github/scripts/nacos-discovery-smoke.sh
           .github/scripts/redis-idempotency-smoke.sh
           .github/scripts/redis-rate-limit-smoke.sh
+          .github/scripts/mdm-postgresql-smoke.sh
+          .github/scripts/system-postgresql-smoke.sh
+          .github/scripts/system-iam-client-credentials-smoke.sh
+          .github/scripts/system-rocketmq-runtime-event-smoke.sh
 
       - name: Validate Python syntax
         shell: bash
@@ -76,6 +80,17 @@ jobs:
         run: |
           set -o pipefail
           bash .github/scripts/validate-engineering-baseline.sh 2>&1 | tee engineering-baseline.log
+
+      - name: Validate observability configuration assets
+        shell: bash
+        run: |
+          test -s .github/observability/tempo-config.yml
+          test -s .github/observability/loki-config.yml
+          test -s .github/observability/prometheus.yml
+          test -s .github/observability/alloy-config.alloy
+          test -d .github/observability/grafana/provisioning
+          test -d .github/observability/grafana/dashboards
+          python3 -m json.tool .github/observability/grafana/dashboards/mom-platform-overview.json >/dev/null
 
       - name: Validate secure runtime defaults
         shell: bash

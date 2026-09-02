@@ -42,10 +42,10 @@ import java.util.UUID;
  * 消息。该降级不改变 Outbox 状态机、Inbox 事务或 Broker 失败语义。</p>
  */
 @AutoConfiguration(afterName = {
-        "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
-        "org.springframework.boot.jdbc.autoconfigure.JdbcTemplateAutoConfiguration",
-        "org.springframework.boot.transaction.autoconfigure.TransactionAutoConfiguration",
-        "io.github.chrisshi.mom.data.autoconfigure.MomDataAutoConfiguration"
+    "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
+    "org.springframework.boot.jdbc.autoconfigure.JdbcTemplateAutoConfiguration",
+    "org.springframework.boot.transaction.autoconfigure.TransactionAutoConfiguration",
+    "io.github.chrisshi.mom.data.autoconfigure.MomDataAutoConfiguration"
 })
 @ConditionalOnClass(JdbcTemplate.class)
 @ConditionalOnBean({JdbcTemplate.class, PlatformTransactionManager.class})
@@ -55,18 +55,18 @@ public class MomOutboxAutoConfiguration {
     /**
      * 创建 PostgreSQL Outbox 仓储。
      *
-     * @param jdbcTemplate 当前服务 JDBC 模板
+     * @param jdbcTemplate       当前服务 JDBC 模板
      * @param transactionManager 当前服务唯一本地事务管理器
      * @return 租约式 Outbox 仓储
      */
     @Bean
     @ConditionalOnMissingBean
     JdbcOutboxRepository momJdbcOutboxRepository(
-            JdbcTemplate jdbcTemplate,
-            PlatformTransactionManager transactionManager) {
+        JdbcTemplate jdbcTemplate,
+        PlatformTransactionManager transactionManager) {
         return new JdbcOutboxRepository(
-                jdbcTemplate,
-                new TransactionTemplate(transactionManager));
+            jdbcTemplate,
+            new TransactionTemplate(transactionManager));
     }
 
     /**
@@ -84,63 +84,63 @@ public class MomOutboxAutoConfiguration {
     /**
      * 创建 Inbox 消费幂等执行器。
      *
-     * @param jdbcTemplate 当前服务 JDBC 模板
-     * @param transactionManager 当前服务本地事务管理器
+     * @param jdbcTemplate          当前服务 JDBC 模板
+     * @param transactionManager    当前服务本地事务管理器
      * @param meterRegistryProvider 可选 Micrometer 指标注册表
      * @return Inbox 幂等执行器
      */
     @Bean
     @ConditionalOnMissingBean
     InboxDeduplicator momInboxDeduplicator(
-            JdbcTemplate jdbcTemplate,
-            PlatformTransactionManager transactionManager,
-            ObjectProvider<MeterRegistry> meterRegistryProvider) {
+        JdbcTemplate jdbcTemplate,
+        PlatformTransactionManager transactionManager,
+        ObjectProvider<MeterRegistry> meterRegistryProvider) {
         return new InboxDeduplicator(
-                jdbcTemplate,
-                new TransactionTemplate(transactionManager),
-                meterRegistryProvider.getIfAvailable());
+            jdbcTemplate,
+            new TransactionTemplate(transactionManager),
+            meterRegistryProvider.getIfAvailable());
     }
 
     /**
      * 创建启用后的租约式 Outbox 发布器。
      *
-     * @param repository Outbox 仓储
-     * @param transport Spring Cloud Stream 事件传输端口
-     * @param properties 发布参数
-     * @param clock 平台 UTC 时钟
-     * @param environment 应用环境，用于构造稳定可诊断的租约前缀
+     * @param repository                  Outbox 仓储
+     * @param transport                   Spring Cloud Stream 事件传输端口
+     * @param properties                  发布参数
+     * @param clock                       平台 UTC 时钟
+     * @param environment                 应用环境，用于构造稳定可诊断的租约前缀
      * @param observationRegistryProvider 可选 Micrometer Observation 注册表
-     * @param meterRegistryProvider 可选 Micrometer 指标注册表
+     * @param meterRegistryProvider       可选 Micrometer 指标注册表
      * @return Outbox 定时发布器
      */
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnProperty(
-            prefix = "mom.outbox.publisher",
-            name = "enabled",
-            havingValue = "true")
+        prefix = "mom.outbox.publisher",
+        name = "enabled",
+        havingValue = "true")
     OutboxPublisher momOutboxPublisher(
-            JdbcOutboxRepository repository,
-            EventTransport transport,
-            OutboxPublisherProperties properties,
-            Clock clock,
-            Environment environment,
-            ObjectProvider<ObservationRegistry> observationRegistryProvider,
-            ObjectProvider<MeterRegistry> meterRegistryProvider) {
+        JdbcOutboxRepository repository,
+        EventTransport transport,
+        OutboxPublisherProperties properties,
+        Clock clock,
+        Environment environment,
+        ObjectProvider<ObservationRegistry> observationRegistryProvider,
+        ObjectProvider<MeterRegistry> meterRegistryProvider) {
         String applicationName = environment.getProperty(
-                "spring.application.name",
-                "unknown-application");
+            "spring.application.name",
+            "unknown-application");
         String leaseOwner = applicationName + ":" + UUID.randomUUID();
         ObservationRegistry observationRegistry = observationRegistryProvider
-                .getIfAvailable(() -> ObservationRegistry.NOOP);
+            .getIfAvailable(() -> ObservationRegistry.NOOP);
         return new OutboxPublisher(
-                repository,
-                transport,
-                properties,
-                clock,
-                leaseOwner,
-                observationRegistry,
-                meterRegistryProvider.getIfAvailable());
+            repository,
+            transport,
+            properties,
+            clock,
+            leaseOwner,
+            observationRegistry,
+            meterRegistryProvider.getIfAvailable());
     }
 
     /**
@@ -149,9 +149,9 @@ public class MomOutboxAutoConfiguration {
     @Configuration(proxyBeanMethods = false)
     @EnableScheduling
     @ConditionalOnProperty(
-            prefix = "mom.outbox.publisher",
-            name = "enabled",
-            havingValue = "true")
+        prefix = "mom.outbox.publisher",
+        name = "enabled",
+        havingValue = "true")
     static class OutboxSchedulingConfiguration {
     }
 }

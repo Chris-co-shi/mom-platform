@@ -18,8 +18,6 @@ emit_scopes() {
   emit redis_rate_limit "$redis_rate_limit"
   emit postgresql "$postgresql"
   emit messaging "$messaging"
-  emit seata "$seata"
-  emit observability "$observability"
 }
 
 set_manual_scope() {
@@ -30,8 +28,6 @@ set_manual_scope() {
   redis_rate_limit=false
   postgresql=false
   messaging=false
-  seata=false
-  observability=false
 
   case "$scope" in
     all)
@@ -41,16 +37,12 @@ set_manual_scope() {
       redis_rate_limit=true
       postgresql=true
       messaging=true
-      seata=true
-      observability=true
       ;;
     none) ;;
     nacos) nacos=true ;;
     redis) redis_cache=true; redis_idempotency=true; redis_rate_limit=true ;;
     postgresql) postgresql=true ;;
     messaging) messaging=true ;;
-    seata) seata=true ;;
-    observability) observability=true ;;
     auto) return 1 ;;
     *) echo "Unsupported infrastructure scope: $scope" >&2; exit 2 ;;
   esac
@@ -75,8 +67,6 @@ emit_scope_summary() {
   emit_summary "- Redis Rate Limit: ${redis_rate_limit}"
   emit_summary "- PostgreSQL: ${postgresql}"
   emit_summary "- Messaging: ${messaging}"
-  emit_summary "- Seata: ${seata}"
-  emit_summary "- Observability: ${observability}"
 }
 
 if set_manual_scope "$MANUAL_SCOPE"; then exit 0; fi
@@ -121,8 +111,6 @@ redis_idempotency=false
 redis_rate_limit=false
 postgresql=false
 messaging=false
-seata=false
-observability=false
 
 # Scope detector 或主 CI 自身变化必须验证所有主 CI 基础设施分支，避免脚本修改跳过自身。
 if path_matches '(^\.github/scripts/detect-ci-scope\.sh$|^\.github/workflows/ci\.yml$)'; then
@@ -131,7 +119,7 @@ if path_matches '(^\.github/scripts/detect-ci-scope\.sh$|^\.github/workflows/ci\
   redis_idempotency=true
   redis_rate_limit=true
   postgresql=true
-  seata=true
+  messaging=true
 fi
 
 if path_matches '(^\.github/scripts/nacos-discovery-smoke\.sh$|^mom-gateway/|^mom-(mdm|integration)-platform/.*/(client|.*ServiceProbe)|/nacos/)'; then
@@ -146,17 +134,11 @@ fi
 if path_matches '(^\.github/scripts/redis-rate-limit-smoke\.sh$|^mom-framework/mom-rate-limit/|^mom-gateway/|/rate.?limit|RedisRate)'; then
   redis_rate_limit=true
 fi
-if path_matches '(^\.github/scripts/p01-s04-postgresql-smoke\.sh$|^mom-framework/(mom-data|mom-outbox)/|^mom-(mdm|integration)-platform/.*/src/(main|test)/resources/db/|/(mapper|repository|persistence)/|\.sql$)'; then
+if path_matches '(^\.github/scripts/(mdm|system)-postgresql-smoke\.sh$|^\.github/scripts/system-iam-client-credentials-smoke\.sh$|^mom-framework/(mom-data|mom-outbox)/|^mom-(mdm|integration|system)-platform/.*/src/(main|test)/resources/db/|/(mapper|repository|persistence)/|\.sql$)'; then
   postgresql=true
 fi
-if path_matches '(^\.github/workflows/messaging-ci\.yml$|^\.github/scripts/p01-s05-rocketmq-outbox-smoke\.sh$|^mom-framework/(mom-messaging|mom-outbox)/|/messaging/|rocketmq|outbox|inbox)'; then
+if path_matches '(^\.github/scripts/system-rocketmq-runtime-event-smoke\.sh$|^mom-framework/(mom-messaging|mom-outbox)/|/messaging/|rocketmq|outbox|inbox)'; then
   messaging=true
-fi
-if path_matches '(^\.github/workflows/seata-ci\.yml$|^\.github/scripts/p01-s06-seata-at-smoke\.sh$|^mom-framework/mom-seata/|/seata/|undo_log)'; then
-  seata=true
-fi
-if path_matches '(^\.github/workflows/observability(-stack)?-ci\.yml$|^\.github/scripts/.*observability.*smoke\.sh$|^mom-framework/(mom-observation|mom-tracing|mom-metrics|mom-logging)/|/observability/|/tracing/)'; then
-  observability=true
 fi
 
 emit_scopes

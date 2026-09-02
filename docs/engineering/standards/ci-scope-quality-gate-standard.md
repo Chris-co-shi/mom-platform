@@ -5,7 +5,7 @@
 
 ## 1. Scope 输出
 
-统一脚本输出 `nacos`、`redis_idempotency`、`redis_rate_limit`、`postgresql`、`messaging`、`seata`、`observability`。主 CI 的手动范围支持 `none/all/nacos/redis/postgresql/seata/messaging/observability`；`redis` 同时选择两个 Redis 证据，不重新合并 Job。
+统一脚本输出 `nacos`、`redis_cache`、`redis_idempotency`、`redis_rate_limit`、`postgresql`、`messaging`。主 CI 的手动范围支持 `none/all/nacos/redis/postgresql/messaging`；`redis` 同时选择三个 Redis 证据，不重新合并 Job。
 
 ## 2. Git 范围
 
@@ -14,11 +14,11 @@
 - main push：before → after；before 缺失/不可达时安全回退完整历史根 → after。
 - Manual `all`：全部基础设施范围。
 
-Scope Detector 或主 CI 自身修改触发主 CI 全部基础设施分支；各专项 Workflow 自身修改触发自身范围。文档与静态门禁脚本不因提及中间件而误触发运行时验收。
+Scope Detector 或主 CI 自身修改触发主 CI 全部基础设施分支。文档与静态门禁脚本不因提及中间件而误触发运行时验收。
 
 ## 3. 必需门禁
 
-每次 PR：Engineering Baseline、Fast Reactor Verify、ArchUnit、Secure Defaults、Persistence、Runtime Security、Test Baseline。条件门禁：PostgreSQL、Nacos Discovery、两个 Redis、Messaging、Seata、Observability 与 Stack。`skipped` 与 `success` 分开记录。
+每次 PR：Engineering Baseline、Fast Reactor Verify、ArchUnit、Secure Defaults、Persistence、Runtime Security、Test Baseline。条件门禁：PostgreSQL、Nacos Discovery、三个 Redis 与 Messaging Runtime Smoke。`skipped` 与 `success` 分开记录。可观测性配置资产由 Engineering Baseline 静态检查；Seata 当前没有生产调用方，不设置仅编译模块却宣称真实 AT 的独立门禁。未来采用 Seata 或恢复可观测性端到端结论前，必须先按相应 ADR 恢复真实基础设施验收。
 
 ## 4. Job 结构
 

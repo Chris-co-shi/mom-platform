@@ -18,9 +18,7 @@ on:
           - nacos
           - redis
           - postgresql
-          - seata
           - messaging
-          - observability
 
 permissions:
   contents: read
@@ -41,8 +39,6 @@ jobs:
       redis_rate_limit: ${{ steps.scope.outputs.redis_rate_limit }}
       postgresql: ${{ steps.scope.outputs.postgresql }}
       messaging: ${{ steps.scope.outputs.messaging }}
-      seata: ${{ steps.scope.outputs.seata }}
-      observability: ${{ steps.scope.outputs.observability }}
       mode: ${{ steps.scope.outputs.mode }}
     steps:
       - name: Checkout
@@ -56,6 +52,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_ACTION: ${{ github.event.action }}
+          PR_PREVIOUS_SHA: ${{ github.event.before }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PUSH_BASE_SHA: ${{ github.event.before }}
@@ -305,7 +302,7 @@ jobs:
 
       - name: Run MDM PostgreSQL packaged smoke
         shell: bash
-        run: bash .github/scripts/p01-s04-postgresql-smoke.sh
+        run: bash .github/scripts/mdm-postgresql-smoke.sh
 
       - name: Run System PostgreSQL packaged smoke
         shell: bash
@@ -334,12 +331,12 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: true
 
-  seata-verify:
-    name: Seata scoped verification
+  messaging-runtime-smoke:
+    name: System Runtime Event RocketMQ smoke
     needs: [changes, verify]
-    if: needs.changes.outputs.seata == 'true'
+    if: needs.changes.outputs.messaging == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -351,32 +348,36 @@ jobs:
           java-version: "25"
           cache: maven
 
-      - name: Verify Seata integration module
+      - name: Verify System Runtime Event delivery and cache invalidation
         shell: bash
-        run: >-
-          bash scripts/codex-mvn-test.sh
-          -pl mom-framework/mom-seata
-          -am verify
+        run: bash .github/scripts/system-rocketmq-runtime-event-smoke.sh
 
-      - name: Explain Seata integration boundary
+      - name: Record messaging acceptance evidence
+        if: success()
         shell: bash
         run: |
           {
-            echo "### Seata verification boundary"
+            echo "### System Runtime Event acceptance"
             echo
-            echo "This job validates the scoped Maven integration module only."
-            echo "A real TC plus two-database AT smoke test remains a separate explicit acceptance gate."
+            echo "- Signed MOM JWT, Resource Server authorization and audit actor"
+            echo "- Real System HTTP business write and PostgreSQL Outbox"
+            echo "- RocketMQ normal and duplicate delivery"
+            echo "- System Inbox idempotency and Redis cache invalidation"
+            echo "- Broker outage RETRY and recovery"
+            echo "- Redis outage PostgreSQL fallback in an isolated read-only instance"
+            echo "- Poison message RocketMQ DLQ"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload Seata diagnostics on failure
+      - name: Upload System Runtime Event diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: seata-diagnostics
+          name: system-runtime-event-diagnostics
           path: |
             .codex/runtime/logs/**
             .codex/runtime/summaries/**
-            **/target/surefire-reports/**
-            **/target/failsafe-reports/**
+            system-runtime-event-*.log
+            system-runtime-event-*.json
+            system-runtime-event-*.txt
           if-no-files-found: ignore
           include-hidden-files: true

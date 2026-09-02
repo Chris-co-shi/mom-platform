@@ -78,7 +78,7 @@ class BaselineTest(unittest.TestCase):
         (self.root / ".github/workflows/ci.yml").write_text(VALID_WORKFLOW, encoding="utf-8")
         detector = "\n".join(f"emit {name} false" for name in (
             "nacos", "redis_cache", "redis_idempotency", "redis_rate_limit", "postgresql",
-            "messaging", "seata", "observability",
+            "messaging",
         ))
         (self.root / ".github/scripts/detect-ci-scope.sh").write_text(detector, encoding="utf-8")
         for name in (
@@ -195,6 +195,19 @@ class ScopeDetectorTest(unittest.TestCase):
             self.assertEqual("true", result["redis_cache"])
             self.assertEqual("true", result["redis_idempotency"])
             self.assertEqual("true", result["redis_rate_limit"])
+
+    def test_manual_all_only_emits_supported_runtime_scopes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / ".github/scripts").mkdir(parents=True)
+            shutil.copy2(SCRIPT_DIR / "detect-ci-scope.sh", root / ".github/scripts/detect-ci-scope.sh")
+            result = self.run_detector(root, MANUAL_SCOPE="all")
+            self.assertEqual({
+                "nacos", "redis_cache", "redis_idempotency", "redis_rate_limit",
+                "postgresql", "messaging", "mode", "changed_count",
+            }, set(result))
+            self.assertNotIn("seata", result)
+            self.assertNotIn("observability", result)
 
     def test_incremental_idempotency_scope(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
