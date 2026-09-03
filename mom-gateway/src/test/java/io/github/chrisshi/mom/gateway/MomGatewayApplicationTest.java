@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.gateway;
 
+import io.github.chrisshi.mom.gateway.filter.BearerTokenGatewayWebFilter;
 import io.github.chrisshi.mom.gateway.filter.CorrelationIdGlobalFilter;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.WebApplicationType;
@@ -18,11 +19,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Gateway 本地启动、路由、关联标识和安全基础配置绑定测试。 */
+/** Gateway 本地启动、路由、关联标识和 Bearer 边缘检查基础配置测试。 */
 class MomGatewayApplicationTest {
 
     @Test
-    void gatewayStartsWithDiscoveryRouteAndCorrelationFilter() {
+    void gatewayStartsWithDiscoveryRouteAndEdgeFilters() {
         try (ConfigurableApplicationContext context = new SpringApplicationBuilder(MomGatewayApplication.class)
                 .web(WebApplicationType.REACTIVE)
                 .properties(
@@ -35,6 +36,7 @@ class MomGatewayApplicationTest {
             assertTrue(context.isActive());
             assertNotNull(context.getBean(HealthEndpoint.class));
             assertNotNull(context.getBean(CorrelationIdGlobalFilter.class));
+            assertNotNull(context.getBean(BearerTokenGatewayWebFilter.class));
 
             Environment environment = context.getEnvironment();
             assertEquals("127.0.0.1", environment.getProperty("spring.data.redis.host"));
