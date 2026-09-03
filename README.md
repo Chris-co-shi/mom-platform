@@ -13,17 +13,17 @@
   <img alt="Java" src="https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white">
   <img alt="Spring Boot" src="https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white">
   <img alt="Spring Cloud" src="https://img.shields.io/badge/Spring%20Cloud-2025.1-6DB33F?logo=spring&logoColor=white">
-  <img alt="Status" src="https://img.shields.io/badge/Status-P1.6%20S16%20Preference-0969DA">
+  <img alt="Status" src="https://img.shields.io/badge/Status-Mini%20Auth%20V1-0969DA">
 </p>
 
-[文档中心](docs/README.md) · [P1.6 治理计划](docs/plans/P1.6-IAM与System平台治理计划.md) · [P1.6 实施进度](docs/plans/P1.6-实施进度.md) · [P1.5 设计基线](docs/security/P1.5-认证与授权设计基线.md) · [V1 路线图](docs/plans/V1路线图.md) · [ADR](docs/adr/README.md)
+[文档中心](docs/README.md) · [Mini Auth V1 基线](docs/security/P1.5-认证与授权设计基线.md) · [ADR-040](docs/adr/ADR-040-Mini-Auth与Redis-Opaque-Token认证基线.md) · [ADR-041](docs/adr/ADR-041-Mini-Auth简化三层包结构.md) · [V1 路线图](docs/plans/V1路线图.md)
 
 </div>
 
 ---
 
 > [!IMPORTANT]
-> Phase 01 与 P1.5 已完成并合并。P1.6 S00～S15 已完成，S15-F 已完成技术探针退出；ADR-023/025/026/027 保持 Accepted。S16 已完成 System 用户显示偏好与受限视图设置后端，精确 Deferred 项见 S16 报告；S17 未开始，Phase 02 业务垂直切片未启动。
+> 当前项目正在以“先恢复可控性，再逐步演进”为原则收敛第一版架构。`mom-security` 的 Redis Opaque Token / Resource Server 基础链已经完成；Gateway 已移除旧 JWT/JWK/revoked-sid 认证链；`mom-auth-platform` 已建立模块、Schema、Flyway 核心表和管理员初始化脚本，下一步进入 User / Role / Permission / Login / Token / Logout 业务代码。
 
 ## 🌟 项目愿景
 
@@ -34,95 +34,42 @@
 - 库存事实流水、实时余额、预占与锁定。
 - PCS/WCS 异步命令、状态机、故障恢复和人工接管。
 - 外部系统接入、幂等、补偿、对账和链路追踪。
-- 统一认证、授权、Factory/Party Scope 与安全审计。
+- 简洁、可解释的认证授权与最终业务授权边界。
 - 三节点 k3s 下的部署、扩缩容、滚动升级和故障演练。
 
-### V1 端到端业务闭环
-
-```text
-供应商送货
-    ↓
-原料检验 ──→ 不合格处置
-    ↓
-原料入库
-    ↓
-生产计划与工单
-    ↓
-PCS 投料 / 混合 / 灌装
-    ↓
-成品检验与放行
-    ↓
-WCS 自动入库
-    ↓
-客户发运
-    ↓
-客诉 / 正反向追溯 / 模拟召回
-```
-
-## 🧭 系统全景
-
-```mermaid
-flowchart LR
-    Internal[INTERNAL / MOM Admin / PDA]
-    Supplier[SUPPLIER / Supplier Portal]
-    Customer[CUSTOMER / Customer Portal]
-    ERP[ERP Simulator]
-
-    Gateway[MOM API Gateway]
-
-    subgraph MOM[MOM Platform]
-        IAM[IAM / OAuth2 / OIDC]
-        MDM[MDM]
-        MES[MES]
-        WMS[WMS]
-        QMS[QMS]
-        INT[Integration Hub]
-        TRACE[Traceability]
-    end
-
-    Internal --> Gateway
-    Supplier --> Gateway
-    Customer --> Gateway
-    ERP --> Gateway
-    Gateway --> IAM
-    Gateway --> MDM
-    Gateway --> MES
-    Gateway --> WMS
-    Gateway --> QMS
-    Gateway --> INT
-    MES --> TRACE
-    WMS --> TRACE
-    QMS --> TRACE
-```
-
-## 🔐 P1.5 认证与授权
+## 🔐 Mini Auth V1
 
 当前权威结论：
 
-- 用户类型：`INTERNAL`、`SUPPLIER`、`CUSTOMER`。
-- Public Client：`mom-admin-web`、`mom-supplier-web`、`mom-customer-web`、`mom-mobile-pda`。
-- Authorization Code + PKCE S256 + OpenID Connect。
-- 不建设 BFF；Gateway API 使用 Bearer Access Token。
-- Access Token 为 10 分钟 JWT；Refresh Token 为 Opaque Token。
-- Web Token 只存在内存；Mobile Refresh Token 使用 Android 安全存储。
-- RBAC 使用 User → Role → Permission；P1.5 只实现 Factory Scope 与 Party Scope。
-- Gateway 负责协议与粗粒度入口安全，业务服务负责最终授权。
+- 最小授权模型：`User → Role → Permission`。
+- 用户通过第一方用户名密码登录。
+- Access Token 使用高熵随机 Opaque Token，不使用 JWT。
+- Token 认证快照存储在 Redis。
+- Redis Key 使用 `mom:token:{SHA-256(rawToken)}`。
+- Token Principal 只包含 `userId`、`authorities`、`expiresAt`。
+- Gateway 对 `/api/**` 做 Bearer 形态检查和 `X-MOM-*` Header 清洗，不查 Redis、不解析 Token。
+- 合法 `Authorization: Bearer <opaque-token>` 由 Gateway 原样转发。
+- 业务服务独立作为 Resource Server，通过 `OpaqueTokenIntrospector` 校验 Token。
+- 服务间同步调用后续传播原始 Bearer Credential，由目标 Resource Server 再次验证。
+- 最终业务权限由 `@PreAuthorize` 与业务领域规则共同决定。
+- Logout 直接删除 Token Store 记录，实现即时失效。
+- Redis 不可用时受保护 API Fail Closed。
 
-完整协议见 [P1.5 认证与授权设计基线](docs/security/P1.5-认证与授权设计基线.md)。
+当前 V1 明确不建设 Spring Authorization Server、JWT、Refresh Token、Session、OIDC、PKCE、OAuth Client 管理或 Factory/Party Scope 通用安全框架。
 
 ## 🧩 核心能力
 
 | 能力域 | V1 关注点 | 权威模块 |
 |---|---|---|
-| 身份与权限 | OAuth/OIDC、PKCE、用户、角色、权限、Factory/Party Scope、Session | `mom-iam-platform` |
-| 平台配置与体验 | S13 参数、S14 字典、S15-B Dynamic I18n 与 S16 用户显示偏好/受限视图设置后端已完成；应用目录与菜单未实现 | `mom-system-platform` |
-| 主数据 | 集团、工厂、物料、人员与 Party 核心身份、版本索引；供应商采购关系与客户销售关系分别由未来采购/SRM、销售/CRM 业务域拥有 | `mom-mdm-platform`（Party Core）；业务域 Planned Authority / Not Implemented |
+| 身份与权限 | User、Role、Permission、密码认证、Opaque Token、Logout | `mom-auth-platform` / `mom-security` |
+| 平台配置与体验 | 参数、字典、国际化、用户偏好、应用目录 | `mom-system-platform` |
+| 主数据 | 集团、工厂、物料、人员与基础主数据 | `mom-mdm-platform` |
 | 生产执行 | 工单、版本快照、投料、过程记录、报工 | `mom-mes-platform` |
 | 仓储库存 | 库位、容器、批次、预占、流水、余额、对账 | `mom-wms-platform` |
 | 质量管理 | 检验、放行、不合格处置、偏差、CAPA | `mom-qms-platform` |
 | 系统集成 | 外部接口、Outbox/Inbox、重试、补偿、对账 | `mom-integration-platform` |
 | 批次追溯 | 正向追溯、反向追溯、影响分析、模拟召回 | `mom-traceability-platform` |
-| 平台治理 | Gateway、Redis 限流、审计、链路追踪 | `mom-gateway` / `mom-framework` |
+| 平台治理 | Gateway、Cache、审计、链路追踪、通用 Framework | `mom-gateway` / `mom-framework` |
 
 ## 🛠️ 技术基线
 
@@ -131,10 +78,10 @@ flowchart LR
 | Java 运行时 | JDK 25 |
 | 应用框架 | Spring Boot 4.1.x、Spring Framework 7.x |
 | 微服务体系 | Spring Cloud 2025.1.x、Spring Cloud Alibaba 2025.1.x |
-| 身份认证 | Spring Authorization Server、OAuth 2.0/OIDC、PKCE（P1.5 已完成） |
+| 身份认证 | Spring Security Resource Server、Opaque Token、Redis Token Store |
 | 数据存储 | PostgreSQL，按服务独立 Schema |
-| 缓存与限流 | Redis、分布式令牌桶 |
-| 消息与一致性 | RocketMQ、Outbox/Inbox、幂等、Seata |
+| 缓存 | Caffeine + Redis |
+| 消息与一致性 | RocketMQ、Outbox/Inbox、幂等、Seata 按真实场景使用 |
 | 注册与配置 | Nacos |
 | 可观测性 | Micrometer、OpenTelemetry、Tempo、Prometheus、Loki、Grafana |
 | 部署环境 | 三节点 k3s |
@@ -151,9 +98,12 @@ mom-platform
 │   ├── mom-core
 │   ├── mom-security
 │   ├── mom-data
+│   ├── mom-cache
 │   └── ...
 ├── mom-gateway
-├── mom-iam-platform
+├── mom-auth-platform
+│   ├── mom-auth-api
+│   └── mom-auth-server
 ├── mom-system-platform
 ├── mom-mdm-platform
 ├── mom-mes-platform
@@ -166,17 +116,50 @@ mom-platform
 └── mom-architecture-tests
 ```
 
-每个核心领域平台统一分为 `*-api`、`*-client`、`*-server`。
+Mini Auth V1 当前采用简化三层：
 
-### 强制依赖规则
+```text
+io.github.chrisshi.mom.auth
+├── controller      对外 API / HTTP
+├── service         业务用例、聚合与事务
+└── infrastructure  数据库/MyBatis-Plus 与技术实现
+```
 
-- `*-api` 不暴露数据库 Entity、Mapper 或 Repository。
-- `*-server` 禁止依赖其他领域的 `*-server`。
-- 跨领域同步调用通过 `*-client`，异步协作通过领域事件。
-- PostgreSQL 每服务独立 Schema，禁止跨 Schema JOIN 和跨域写入。
-- `mom-framework` 不得包含 MES、WMS、QMS 等业务规则。
-- `mom-data` 不得依赖 `mom-security`。
-- PCS 与 WCS 保持独立仓库和独立部署边界。
+```text
+controller → service → infrastructure
+```
+
+`service` 就是当前业务聚合层，不再额外创建 `application` / `domain` 顶层包，也不为了形式化依赖倒置创建没有真实替换价值的接口。详见 [ADR-041](docs/adr/ADR-041-Mini-Auth简化三层包结构.md)。
+
+### 强制依赖原则
+
+- `mom-auth-api` 只暴露对外契约，不暴露数据库 Entity、Mapper 或 Repository。
+- Auth Controller 不直接访问 Mapper/Entity。
+- 业务服务不能直接访问其他服务的 Repository / Entity。
+- 跨服务调用通过公开 API 契约或事件完成。
+- PostgreSQL 每服务保持清晰数据所有权，禁止跨域写入。
+- `mom-framework` 不包含 MES、WMS、QMS 等业务规则。
+- `mom-data` 不依赖 `mom-security`。
+- Token 持久化通过 `MomTokenStore`，Auth 不直接知道 Redis Key / JSON / TTL。
+- PCS、WCS、LIMS 等外部系统保持独立系统边界。
+
+## 🗄️ Mini Auth 当前数据模型
+
+```text
+Schema: mom_auth
+
+V1__create_auth_core_tables.sql
+├── auth_user
+├── auth_role
+├── auth_permission
+├── auth_user_role
+└── auth_role_permission
+
+V2__seed_platform_admin.sql
+└── admin → PLATFORM_ADMIN
+```
+
+关系表遵守 ADR-026，不建立物理外键。完整说明见 [Mini Auth 数据库与代码分层](docs/architecture/Mini-Auth数据库与代码分层.md)。
 
 ## 🚀 快速开始
 
@@ -186,63 +169,45 @@ mom-platform
 - Maven 3.9.9+
 - Git
 
-### 验证 Maven Reactor
-
 ```bash
 mvn -B -ntp clean verify
 ```
 
-当前命令验证构建、模块依赖、基础测试、兼容性与架构门禁；P1.5 安全 E2E 已完成，Android Keystore、HTTPS App Link 与真机强杀恢复作为 Phase 02 Mobile 正式联调前置验收项。
+当前仓库仍处于架构收敛和业务闭环建设阶段；文档不得把尚未重新验证的旧 P1.5/P1.6 能力描述为当前已完成能力。
 
 ## 📚 文档导航
 
 | 分类 | 入口 | 说明 |
 |---|---|---|
-| 总览 | [文档中心](docs/README.md) | 全部文档导航与维护规则 |
-| 安全 | [P1.5 设计基线](docs/security/P1.5-认证与授权设计基线.md) | 跨仓库认证授权权威协议 |
-| 计划 | [P1.6 治理计划](docs/plans/P1.6-IAM与System平台治理计划.md) | S00～S19、阶段门禁与 Review 边界 |
-| 计划 | [P1.6 实施进度](docs/plans/P1.6-实施进度.md) | 当前 Slice 与动态证据入口 |
-| 计划 | [P1.5 实施计划](docs/plans/P1.5-认证与授权闭环计划.md) | S00～S12、职责矩阵与 DoD |
-| 计划 | [V1 路线图](docs/plans/V1路线图.md) | V1 阶段和交付目标 |
-| 计划 | [Phase 01 技术骨架](docs/plans/Phase-01-技术骨架计划.md) | 已完成基础与明确边界 |
-| 架构 | [安全架构](docs/architecture/安全架构.md) | 安全架构导航 |
-| 架构 | [系统上下文](docs/architecture/系统上下文.md) | MOM 与用户、ERP、PCS、WCS 的关系 |
-| 架构 | [服务端 Package 与目录架构规范](docs/engineering/standards/package-directory-architecture-standard.md) | bounded context Server 的业务能力分包与 Adapter-first 基线 |
-| 决策 | [ADR 索引](docs/adr/README.md) | 所有关键架构决策及状态 |
+| 总览 | [文档中心](docs/README.md) | 当前权威文档与历史资料入口 |
+| 安全 | [Mini Auth V1 基线](docs/security/P1.5-认证与授权设计基线.md) | 当前认证授权权威协议 |
+| 安全 | [安全架构](docs/architecture/安全架构.md) | Gateway、Token、Resource Server 与服务传播边界 |
+| 架构 | [Mini Auth 数据库与代码分层](docs/architecture/Mini-Auth数据库与代码分层.md) | Auth Schema、核心表与三层结构 |
+| 审计 | [CurrentActor 与数据审计](docs/architecture/CurrentActor与数据审计.md) | SecurityContext 到数据审计的稳定契约 |
+| 决策 | [ADR-040](docs/adr/ADR-040-Mini-Auth与Redis-Opaque-Token认证基线.md) | 当前认证运行时决策 |
+| 决策 | [ADR-041](docs/adr/ADR-041-Mini-Auth简化三层包结构.md) | Mini Auth 包结构决策 |
 
 ## 🗺️ 当前路线图
 
 | 阶段 | 目标 | 状态 |
 |---|---|---|
-| Phase 01 | JDK 25 + Boot 4 基础技术骨架与观测闭环 | ✅ 基础完成 |
-| P1.5 | 认证与授权闭环 | ✅ Completed / Merged（S00～S12） |
-| P1.6 | IAM 收敛与 System 平台治理 | 🚧 S00～S15 Completed；S15-F Completed；S16 Completed with Deferred items；S17 Not Started |
-| Phase 02 | 供应商送货、来料检验、PDA 入库、库存闭环 | ⏳ Not Started；不因 P1.6 治理视为已启动 |
-| Phase 03 | 生产工单、PCS 协同、半成品与成品批次 | ⏳ 计划中 |
-| Phase 04 | 成品放行、WCS 入库、客户发运、追溯和召回 | ⏳ 计划中 |
-
-## 🔗 MOM 项目仓库族
-
-| 仓库 | 职责 |
-|---|---|
-| `mom-platform` | MOM 后端、安全协议与通用 Framework |
-| `mom-web` | 管理端、供应商门户、客户门户及 Web Runtime |
-| `mom-mobile` | Android PDA、扫码、Mobile Auth 与离线命令 |
-| `pcs-platform` | 生产设备协同、协议适配和状态机 |
-| `wcs-platform` | 自动仓储调度、运输任务和设备恢复 |
-| `erp-simulator` | ERP/SAP 接口与异常场景模拟 |
-| `mom-infra` | k3s、中间件、可观测性和部署脚本 |
+| 基础骨架 | JDK 25 + Boot 4、core/data/security 等基础能力 | ✅ 已完成主要收敛 |
+| Mini Auth Security | Opaque Token、TokenStore、Introspector、Resource Server | ✅ 当前轮完成 |
+| Gateway Security | 移除旧 JWT 链、Bearer 边缘检查与 Header 清洗 | ✅ 当前轮完成 |
+| Mini Auth Persistence | `mom_auth`、5 张核心表、管理员初始化 | ✅ 骨架完成 |
+| Mini Auth Business | User、Role、Permission、Login、Token 签发、Logout | 🚧 下一步 |
+| Phase 02 | 供应商送货、来料检验、PDA 入库、库存闭环 | ⏳ 未启动 |
 
 ## 🧠 架构原则
 
-1. **领域优先**：业务边界不能由数据库表或通用 CRUD 框架反向定义。
-2. **服务端授权**：前端体验控制、请求 Header 和 Gateway 粗粒度判断不能替代业务服务最终授权。
-3. **事实优先**：库存、批次和质量结果以不可重复的业务事实为基础。
-4. **异步可恢复**：长流程默认使用消息、幂等、重试、补偿和对账。
-5. **集成有边界**：外部系统统一通过 Gateway 与 Integration Hub 接入。
-6. **可观测优先**：HTTP、Feign、MQ、任务和设备命令必须可以关联追踪。
-7. **原型先行**：Web 与 PDA 开发前必须完成流程、状态和原型设计。
-8. **开源合规**：标准依赖直接使用，机制学习后重构，领域内核自主实现。
+1. **可控优先**：第一版每个核心模块、Bean、依赖和调用链都必须能够解释和验证。
+2. **领域优先**：业务边界不能由数据库表或通用 CRUD 框架反向定义。
+3. **服务端授权**：Gateway 的 Bearer 形态检查不能替代业务服务真实 Token 认证和最终授权。
+4. **事实优先**：库存、批次和质量结果以不可重复的业务事实为基础。
+5. **异步可恢复**：长流程按真实需要使用消息、幂等、重试、补偿和对账。
+6. **集成有边界**：外部系统通过明确契约接入，不继承内部用户 Bearer。
+7. **可观测优先**：HTTP、服务间调用、MQ、任务和设备命令需要可关联追踪。
+8. **按需演进**：不为尚不存在的 OAuth/OIDC、SSO、Refresh、内部签名身份等需求提前建设复杂基础设施。
 
 ---
 

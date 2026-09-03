@@ -3,103 +3,108 @@
 - 状态：Accepted
 - 生效范围：正式 bounded context 的 `mom-*-server/src/main/java`
 - 决策关联：[ADR-027](../../adr/ADR-027-服务端包结构与基础设施适配器分层.md)
+- Mini Auth 精确例外：[ADR-041](../../adr/ADR-041-Mini-Auth简化三层包结构.md)
 
 ## 1. 标准结构与依赖方向
 
-正式 Server 使用混合 Package 组织：Web、Application、Domain 按业务能力或用例分包；Infrastructure 按
-外部 Adapter 类型分包。允许的顶层职责是 `web`、`application`、`domain`、`infrastructure` 和
-`configuration`，只在存在真实职责时创建。
+正式 Server 默认使用混合 Package 组织：Web、Application、Domain 按业务能力或用例分包；Infrastructure 按外部 Adapter 类型分包。默认依赖方向为 `Web → Application → Domain Port ← Infrastructure Adapter`。
 
-标准依赖方向为 `Web → Application → Domain Port ← Infrastructure Adapter`；Configuration 只装配。
-Domain 不依赖 Infrastructure，Application/Web 不直接依赖 Mapper，持久化实现不依赖 Web。禁止空目录、
-占位类型、无职责 `package-info.java` 和为了形式统一新增的抽象层。
+> `mom-auth-platform/mom-auth-server` 的 Mini Auth V1 不套用上述默认顶层结构，按 ADR-041 使用 `controller → service → infrastructure`。这是精确模块例外，不自动扩散到其他 bounded context。
 
-## 2. Web、Application 与 Domain
+## 2. 默认 Web、Application 与 Domain
 
-三层以业务语义为第一维度，例如 `web.dictionary`、`application.parameter`、`domain.i18n`。不得建立全局
-`web.controller/request/response`、`application.command/query/service`、`domain.entity/repository/service`
-替代业务能力。既有业务包只有在 Infrastructure 移动引发必要引用修复时才修改，本规范不授权业务重构。
+默认三层以业务语义为第一维度，例如 `web.dictionary`、`application.parameter`、`domain.i18n`。不得建立全局 `web.controller/request/response`、`application.command/query/service`、`domain.entity/repository/service` 替代业务能力。
 
-## 3. Infrastructure Adapter-first
+Mini Auth V1 例外：
 
-`infrastructure` 第一层只允许真实存在的 `persistence`、`client`、`messaging`、`cache`、`storage`。
-禁止 `infrastructure.parameter/dictionary/i18n/user/role/admin` 等业务 Feature。无法归类的新 Adapter 必须先
-完成精确设计审查，说明外部技术、依赖方向和失败策略，不得以 `common`、`support` 或 `impl` 逃避分类。
+```text
+io.github.chrisshi.mom.auth
+├── controller
+├── service
+└── infrastructure
+```
 
-远程调用进入 `infrastructure.client`；MQ、Outbox 发布和事件序列化进入 `infrastructure.messaging`；Redis/
-Caffeine 进入 `infrastructure.cache`；文件、对象和 Blob 进入 `infrastructure.storage`。Persistence Repository
-不得隐藏远程调用，Messaging/Cache/Storage 也不得直接成为 Web DTO 来源。
+其中 `service` 直接承担业务用例与聚合职责，不再创建 `application` 和 `domain` 顶层包。
 
-## 4. Persistence 职责包
+## 3. Infrastructure
+
+默认复杂 bounded context 的 `infrastructure` 继续按 `persistence`、`client`、`messaging`、`cache`、`storage` 等 Adapter 类型组织。
+
+Mini Auth V1 为保持第一版直观，允许：
+
+```text
+infrastructure
+├── entity
+└── mapper
+```
+
+仅在真实需要时再增加 `repository`、`query`、`configuration` 等技术子包，不创建空目录。
+
+## 4. Persistence 职责
 
 ### 4.1 Entity
 
-`@TableName`、正式数据库行模型和被 `MomBaseMapper<T>` 使用的类型必须位于
-`infrastructure.persistence.entity`。名称在 bounded context 内唯一并包含明确语义，例如
-`SystemDictionaryItemEntity`；禁止 `ItemEntity`、`RecordEntity`、`DataEntity`、`ConfigEntity` 等宽泛名称。
-Entity 不进入 Web/API，不依赖 Application/Web，且按数据能力选择最小基类。
+默认正式数据库行模型位于 `infrastructure.persistence.entity`。Mini Auth V1 例外位于 `infrastructure.entity`。
+
+无论哪种结构，Entity 不得直接作为 Web/API DTO。
 
 ### 4.2 Mapper
 
-普通 MyBatis/MyBatis-Plus Mapper 位于 `infrastructure.persistence.mapper`，默认继承 `MomBaseMapper`，
-负责 Entity 写模型的单表访问。它不承载业务事务、不返回 Web DTO、不跨 Schema、不依赖 Application/Web。
-存在一条自定义 SQL 不会把普通 Mapper 变成 Query Mapper。
+默认 Mapper 位于 `infrastructure.persistence.mapper`。Mini Auth V1 例外位于 `infrastructure.mapper`。
 
-### 4.3 Repository Adapter
+Mapper 只负责数据库访问，不承载业务事务、不返回 Controller DTO、不跨 Schema。
 
-Domain Repository Port 的 MyBatis/PostgreSQL 实现位于 `infrastructure.persistence.repository`，名称使用
-`Mybatis<Context><Capability>Repository` 或同等清晰形式。Adapter 编排 Mapper、隐藏 Wrapper/Page/Entity、
-完成 Domain 转换并映射底层异常；不得使用 `RepositoryImpl`、`BaseRepository`、`CommonRepository`、
-`DefaultRepository` 或通用泛型 Repository。简单转换保留为私有方法。
+### 4.3 Repository
 
-### 4.4 Query
+默认复杂 bounded context 可使用 Repository Adapter 隐藏 ORM 细节并实现 Domain Repository Port。
 
-多表列表、报表和专用读取投影位于 `infrastructure.persistence.query`，可包含 `XxxQueryMapper`、
-`XxxListRow`、`XxxDetailRow`、`XxxProjection`。Query Mapper 返回专用 Row/Projection，不把持久化 Entity
-直接返回 Web，并遵守 S15-D JOIN、分页、排序、上限、索引和 PostgreSQL 测试规则。普通 CRUD 不因查询 XML
-存在而迁回 XML。
+Mini Auth V1 不默认创建 Repository Port 或一对一 Repository Adapter。只有出现真实替换边界、复杂多表持久化或 ORM 细节开始污染 Service 时再引入。
 
-### 4.5 Converter 与 TypeHandler
+### 4.4 Query / Converter / TypeHandler
 
-只有多处复用且非平凡的 Entity/Domain 转换才创建 `persistence.converter`；禁止一表一 Converter、反射转换器
-和万能 Bean Copy。业务专用 TypeHandler 进入 `persistence.typehandler`；通用 PostgreSQL/JSONB TypeHandler
-保留在 `mom-framework/mom-data`，不得在各 context 复制。
+只有真实查询复杂度或多处复用转换出现时才增加对应包；禁止一表一 Converter、万能 Bean Copy 或占位 Query。
 
-`persistence` 下只允许 `entity`、`mapper`、`repository`、`query`、`converter`、`typehandler` 六类职责包，
-禁止再以 Parameter、Dictionary、I18n、User、Role、Admin 等 Feature 建立子包。
+通用 PostgreSQL/JSONB TypeHandler 继续保留在 `mom-framework/mom-data`。
 
 ## 5. Configuration
 
-bounded context 的 Spring 装配、Properties、MyBatis/Security/Runtime 配置优先位于顶层 `configuration`，不放
-`infrastructure.configuration`。配置只创建和连接 Bean，不实现业务用例或持久化逻辑。Framework
-AutoConfiguration 按 Framework 角色治理，不强制迁移；SAS 官方协议配置可精确登记，但不能授权新业务复制。
+默认 bounded context 的应用级 Spring 装配可位于顶层 `configuration`。
+
+Mini Auth V1 若只出现服务自身 Infrastructure 配置，可先放 `infrastructure.configuration`；不为了目录形式提前增加第四个顶层包。
 
 ## 6. 命名、可见性与引用
 
-文件路径必须与 `package` 完全一致，仓库不得存在重复 FQCN。移动后优先保持原可见性；只有 Spring/MyBatis、
-跨包 Port 或测试编译证明需要时才扩大，并在审计报告解释。不得新增旧 Package 代理类或复制文件保留双结构。
+文件路径必须与 `package` 完全一致，仓库不得存在重复 FQCN。移动必须同步 Java import、FQCN、Spring Bean/Import、`@MapperScan`、Component Scan、反射/序列化字符串、测试 Package、ArchUnit 和文档。
 
-移动必须同步 Java import、FQCN、Spring Bean/Import、`@MapperScan`、Component Scan、反射/序列化字符串、
-测试 Package、ArchUnit 和文档。重名使用清晰 context/业务前缀解决，不重新创建 Feature 子目录。
+不得新增旧 Package 代理类或复制文件保留双结构。
 
 ## 7. Mapper XML
 
-XML 默认保留 `src/main/resources/mapper/<context>/`，不为了视觉一致性修改加载机制。文件名必须与 Mapper
-接口一致；`namespace` 指向真实 Mapper/QueryMapper；`resultType`、`resultMap` 和 `typeHandler` 中的 FQCN
-同步更新；Query XML 使用 `*QueryMapper.xml`。禁止重复 Namespace、孤立 XML，以及普通 Mapper/Query Mapper
-职责混淆。只有既有递归扫描且确实提升清晰度时才评估资源子目录。
+XML 默认保留 `src/main/resources/mapper/<context>/`。Mini Auth V1 若普通 MyBatis-Plus CRUD 不需要 XML，则不创建 XML 占位文件。
 
 ## 8. 测试 Package 与例外治理
 
-测试可按被测业务能力组织，但路径与 Package 必须一致；package-private 访问测试随生产类型移动或改为公共
-契约测试，不得为测试方便无条件扩大生产可见性。正式 Package 移动至少验证 test-compile、模块 test/verify、
-相关 PostgreSQL IT、Mapper XML 加载和 Spring Bean 数量/名称。
+正式 Package 移动至少验证 test-compile、模块 test/verify、相关 PostgreSQL IT、Mapper 加载和 Spring Bean 数量/名称。
 
-例外必须精确到文件或类型，记录不同架构角色、风险、证据与退出条件。Framework、Gateway、API、Client 不
-套用 bounded context Server 模板，但仍审计是否承载正式业务持久化实现。禁止模块级、目录级或通配符排除。
+当前 Mini Auth V1 的例外由 ADR-041 精确到 `mom-auth-platform/mom-auth-server`；其他模块不得直接复制该例外。
 
-## 9. 新增代码验收
+## 9. Mini Auth 新增代码验收
 
-新增或移动 Entity、Mapper、QueryMapper、Row/Projection、Repository、Client/Messaging/Cache/Storage Adapter
-和 Configuration 前，必须填写 Package Layout 验收模板。规范文件和目录名称存在不等于验收完成；最终实现
-必须通过 Package Layout Baseline、ArchUnit、编译、行为测试与字符串引用扫描。
+- 顶层业务包只出现 `controller`、`service`、`infrastructure`；
+- Controller 不直接依赖 Mapper/Entity；
+- Infrastructure 不反向依赖 Controller；
+- 不使用 MyBatis-Plus `IService/ServiceImpl` 作为业务 Service；
+- 不创建只为形式满足 DIP 的空接口或一对一代理；
+- 业务事务、引用校验和关系编排可以从 Service 清晰追踪。
+
+## 10. Mini Auth 例外退出条件
+
+出现以下情况时，需要重新评估 ADR-041，而不是在三层结构中无序堆叠：
+
+- Auth 出现多个可替换持久化实现；
+- Service 中出现大量 ORM Wrapper/Page/Entity 泄漏；
+- 数据库、远程服务、消息等多种 Infrastructure 同时参与一个能力；
+- 单元测试难以隔离不可控外部依赖；
+- User/Role/Permission 之外出现明显独立聚合和复杂生命周期。
+
+在这些条件出现前，Mini Auth 保持简化三层，不提前恢复旧 IAM 的复杂分层。
