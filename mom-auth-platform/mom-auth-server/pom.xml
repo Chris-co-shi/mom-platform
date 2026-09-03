@@ -14,8 +14,9 @@
 
   <dependencies>
     <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-web</artifactId>
+      <groupId>io.github.chrisshi.mom</groupId>
+      <artifactId>mom-webmvc</artifactId>
+      <version>${project.version}</version>
     </dependency>
 
     <dependency>
