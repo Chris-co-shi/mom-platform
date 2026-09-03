@@ -40,11 +40,6 @@
     </dependency>
     <dependency>
       <groupId>io.github.chrisshi.mom</groupId>
-      <artifactId>mom-rate-limit</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.github.chrisshi.mom</groupId>
       <artifactId>mom-tracing</artifactId>
       <version>${project.version}</version>
     </dependency>
