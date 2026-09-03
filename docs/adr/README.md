@@ -45,7 +45,7 @@ ADR 用于记录重要架构决策的背景、候选方案、最终选择、后�
 | [ADR-021](ADR-021-运行时配置来源与Secret边界.md) | 运行时配置来源与 Secret 边界 | Accepted |
 | [ADR-022](ADR-022-测试分层与CI质量门禁.md) | 测试分层与 CI 质量门禁 | Accepted |
 | [ADR-023](ADR-023-Locale时区与用户偏好边界.md) | Locale、时区与用户偏好边界 | Accepted |
-| [ADR-024](ADR-024-PC-JSON与Mobile-PKCE-OIDC双通道.md) | PC JSON 与 Mobile PKCE/OIDC 双通道 | Accepted |
+| [ADR-024](ADR-024-PC-JSON与Mobile-PKCE-OIDC双通道.md) | PC JSON 与 Mobile PKCE/OIDC 双通道 | Superseded by ADR-040 for V1 auth runtime |
 | [ADR-025](ADR-025-IAM-System-MDM-WMS-EAM数据所有权边界.md) | IAM、System、MDM、WMS、EAM 数据所有权边界 | Accepted |
 | [ADR-026](ADR-026-MOM业务表禁止物理外键与关联完整性策略.md) | MOM 业务表禁止物理外键与关联完整性策略 | Accepted |
 | [ADR-027](ADR-027-服务端包结构与基础设施适配器分层.md) | 服务端包结构与基础设施适配器分层 | Accepted |
@@ -61,8 +61,35 @@ ADR 用于记录重要架构决策的背景、候选方案、最终选择、后�
 | [ADR-037](ADR-037-System消费Cache与Event-Framework.md) | System 消费 Cache/Event Framework | Accepted |
 | [ADR-038](ADR-038-Configuration-Metadata-Governance.md) | Configuration Metadata Governance | Accepted |
 | [ADR-039](ADR-039-MOM-Platform-Engineering-Governance.md) | MOM Platform Engineering Governance | Accepted |
+| [ADR-040](ADR-040-Mini-Auth与Redis-Opaque-Token认证基线.md) | Mini Auth 与 Redis Opaque Token 认证基线 | Accepted |
 
-## 4. 当前 P1.6 权威决策链
+## 4. 当前认证决策
+
+V1 当前认证运行时以 ADR-040 为权威：
+
+```text
+ADR-019 完整认证闭环
+→ ADR-024 PC JSON + Mobile PKCE/OIDC
+→ ADR-040 Mini Auth + Redis Opaque Token
+```
+
+其中 ADR-019、ADR-024 保留历史设计价值，但不再作为 Mini Auth V1 的运行时实现依据。
+
+当前 V1 明确采用：
+
+```text
+第一方账号密码认证
+→ 高熵 Opaque Access Token
+→ Redis Token Store
+→ Servlet Resource Server
+→ @PreAuthorize
+```
+
+不使用 JWT、Refresh Token、Session、Spring Authorization Server 或 OIDC。
+
+## 5. P1.6 历史权威决策链
+
+以下链路保留 P1.6 历史治理和平台设计价值，其中与 V1 认证运行时冲突的安全结论以 ADR-040 为准：
 
 ```text
 ADR-023 Locale/Timezone/Preference
@@ -84,7 +111,7 @@ ADR-023 Locale/Timezone/Preference
 → ADR-039 MOM Platform Engineering Governance
 ```
 
-## 5. 新建 ADR
+## 6. 新建 ADR
 
 复制 [ADR 模板](ADR-模板.md)，命名：
 
