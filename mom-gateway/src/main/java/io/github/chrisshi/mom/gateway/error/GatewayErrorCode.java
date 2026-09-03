@@ -1,13 +1,15 @@
 package io.github.chrisshi.mom.gateway.error;
 
+import io.github.chrisshi.mom.core.error.ErrorCode;
 import org.springframework.http.HttpStatus;
 
 /**
  * Gateway 对外稳定错误定义。
  *
- * <p>code 面向调用方保持稳定；messageKey 用于国际化解析；defaultMessage 只作为消息资源缺失时的中文兜底。</p>
+ * <p>实现平台 {@link ErrorCode} 契约；HTTP 状态仍由 Gateway 自己维护，不下沉到 mom-core。
+ * code 面向调用方保持稳定；messageKey 用于国际化解析；defaultMessage 只作为消息资源缺失时的中文兜底。</p>
  */
-public enum GatewayErrorCode {
+public enum GatewayErrorCode implements ErrorCode {
 
     MISSING_BEARER_TOKEN(
             HttpStatus.UNAUTHORIZED,
@@ -43,14 +45,17 @@ public enum GatewayErrorCode {
         return status;
     }
 
+    @Override
     public String code() {
         return code;
     }
 
+    @Override
     public String messageKey() {
         return messageKey;
     }
 
+    @Override
     public String defaultMessage() {
         return defaultMessage;
     }
