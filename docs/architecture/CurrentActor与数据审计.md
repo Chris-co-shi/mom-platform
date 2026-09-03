@@ -1,17 +1,26 @@
 # CurrentActor 与数据审计基础
 
-- 阶段：`P1.5 S01`
 - 状态：**Current / Implemented**
+- 生效日期：2026-09-03
 - 权威基线：[P1.5 认证与授权设计基线](../security/P1.5-认证与授权设计基线.md)
+- 安全架构：[安全架构](安全架构.md)
 
-## 1. 责任链
+## 1. 当前责任链
+
+当前实现只保留一条清晰责任链：
 
 ```text
-显式 AuditContext / Spring Security
-→ CurrentActorProvider
-→ AuditActor
-→ MomMetaObjectHandler
-→ created_at / created_by / updated_at / updated_by
+Spring Security SecurityContext
+        ↓
+SecurityCurrentActorProvider
+        ↓
+CurrentActorProvider
+        ↓
+AuditActor
+        ↓
+MomMetaObjectHandler
+        ↓
+created_at / created_by / updated_at / updated_by
 ```
 
 模块依赖固定为：
@@ -20,73 +29,220 @@
 mom-security → mom-core ← mom-data
 ```
 
-`mom-data` 不依赖 `mom-security`，不读取 JWT、SecurityContext 或 HTTP Header。
+`mom-data` 不依赖 `mom-security`，也不读取 Token、SecurityContext 或 HTTP Header。
 
 ## 2. Actor 模型
 
-- `USER`：普通已认证业务用户，默认认证身份类型。
-- `ADMIN`：调用方显式建立的管理操作上下文；不能仅因 `user_type=INTERNAL` 或拥有任意角色自动升级。
-- `SYSTEM`：定时任务、MQ Consumer、Outbox、同步或清理任务，必须使用稳定编码显式建立。
+V1 `ActorType` 只包含：
 
-`AuditActor` 只包含 `actorId`、`actorType`、`userType`、`clientId`、`sessionId`、`correlationId`，不包含 Role、Permission、Factory Scope 或 Party Scope。
-
-缺少 Actor 时，`requireCurrentActor()` 抛出 `AuditActorMissingException`。禁止默认 SYSTEM、用户 ID 0 或匿名用户。
-
-## 3. 显式 SYSTEM 与异步
-
-```java
-auditContextExecutor.runAsSystem(
-    "mom-wms-outbox-publisher",
-    () -> repository.save(...));
+```text
+USER
+SYSTEM
 ```
 
-上下文使用普通 ThreadLocal 和严格 `try/finally`：嵌套后恢复外层 Actor，异常后清理，线程池复用不残留。`@Async`、CompletableFuture、线程池、虚拟线程、MQ、定时任务和手工线程均不自动传播；代表用户异步执行时必须显式传递 `AuditActor`。Reactor/WebFlux 未来使用 Reactor Context 扩展，本 Slice 不安装全局 Hook。
+不再保留 `ADMIN` 这种会与 Role/Permission 概念混淆的 ActorType。
 
-## 4. 实体分类
+`AuditActor` 只包含：
 
-- `BaseIdEntity`：仅 String 技术主键。
-- `BaseCreatedEntity`：主键 + `createdAt/createdBy`。
-- `BaseAuditEntity`：再增加 `updatedAt/updatedBy`。
-- `BaseEntity`：再增加 `version/deleted`，适用于普通可更新业务实体。
-
-Outbox/Inbox、流水、快照、安全审计、OAuth 协议表和特殊状态表按自身语义建模，不强制继承完整 BaseEntity。
-
-## 5. 自动填充
-
-```yaml
-mom:
-  data:
-    audit:
-      enabled: true
-      fail-on-missing-actor: true
+```text
+actorId
+actorType
 ```
 
-INSERT 强制覆盖 `createdAt`、`createdBy`、`updatedAt`、`updatedBy`，同一次操作使用同一 UTC `Instant` 和 Actor。UPDATE 只覆盖 `updatedAt/updatedBy`，创建字段禁止写回。测试可替换 `Clock`。
+不包含：
 
-MetaObjectHandler 不处理 `factory_id`、`supplier_id`、`customer_id`、`party_id`、`user_id`、`client_id`、`session_id`、代表主体、业务状态时间或 Token 时间。
+- username；
+- userType；
+- clientId；
+- sessionId；
+- correlationId；
+- Role；
+- Permission；
+- Factory / Party Scope。
 
-## 6. 更新路径
+Actor 只回答：
 
-| 路径 | 规则 |
+> 谁执行了这次数据写入，以及它是 USER 还是 SYSTEM。
+
+## 3. CurrentActorProvider
+
+`mom-core` 定义：
+
+```text
+CurrentActorProvider
+```
+
+这是 `mom-data` 与具体认证框架之间的依赖倒置边界。
+
+业务认证如何取得当前用户，由 `mom-security` 适配；数据层只依赖抽象。
+
+## 4. SecurityCurrentActorProvider
+
+Servlet 用户请求默认通过 Spring Security 获取当前 Actor。
+
+逻辑：
+
+```text
+SecurityContextHolder.getContext().getAuthentication()
+        ↓
+Authentication == null
+或 !isAuthenticated()
+或 AnonymousAuthenticationToken
+        ↓
+Optional.empty()
+```
+
+认证有效时：
+
+```text
+Authentication#getName()
+        ↓
+actorId
+        ↓
+AuditActor(actorId, USER)
+```
+
+如果 `getName()` 为空或空白，同样返回 empty。
+
+## 5. 与 Opaque Token 的稳定契约
+
+`MomOpaqueTokenIntrospector` 创建 Spring Security Principal 时必须保证：
+
+```text
+Authentication#getName() == MomTokenPrincipal.userId
+```
+
+因此用户请求的数据审计链最终是：
+
+```text
+MomTokenPrincipal.userId
+        ↓
+DefaultOAuth2AuthenticatedPrincipal.name
+        ↓
+BearerTokenAuthentication#getName()
+        ↓
+SecurityCurrentActorProvider
+        ↓
+AuditActor.actorId
+```
+
+CurrentActor 不需要知道 Token 是 JWT 还是 Opaque Token，也不依赖 Redis。
+
+## 6. AutoConfiguration
+
+`MomSecurityActorAutoConfiguration` 默认注册：
+
+```text
+SecurityCurrentActorProvider
+        ↓
+CurrentActorProvider Bean
+```
+
+条件：
+
+- Spring Security `SecurityContextHolder` 在 classpath；
+- 应用没有自己提供 `CurrentActorProvider`。
+
+应用如果存在特殊 Actor 来源，可以显式提供自己的 `CurrentActorProvider`，framework 自动退让。
+
+## 7. SYSTEM Actor
+
+V1 保留 `SYSTEM` 类型用于未来：
+
+- Scheduler；
+- MQ Consumer；
+- Outbox Publisher；
+- 数据同步；
+- 系统清理任务。
+
+但当前 framework **不提供通用 `AuditContextExecutor`**，也不假设 ThreadLocal 自动传播。
+
+因此在真正出现后台写入场景前，不提前建设复杂的 SYSTEM 上下文传播框架。
+
+具体后台任务如何显式建立 SYSTEM Actor，应在对应业务场景落地时设计并测试。
+
+禁止在找不到用户 Actor 时静默回退成 SYSTEM。
+
+## 8. 实体分类
+
+当前数据实体层级：
+
+- `BaseIdEntity`：技术主键；
+- `BaseCreatedEntity`：增加 `createdAt/createdBy`；
+- `BaseAuditEntity`：增加 `updatedAt/updatedBy`；
+- `BaseEntity`：增加 `version/deleted`。
+
+特殊流水、快照、Outbox/Inbox 或其他具有独立语义的数据表，不强制继承完整 `BaseEntity`。
+
+## 9. 自动填充
+
+`MomMetaObjectHandler` 使用：
+
+- `Clock`；
+- `CurrentActorProvider`。
+
+普通 INSERT：
+
+```text
+createdAt
+createdBy
+updatedAt
+updatedBy
+```
+
+普通 UPDATE：
+
+```text
+updatedAt
+updatedBy
+```
+
+统一使用 UTC `Instant`。
+
+业务归属字段不得由 `MetaObjectHandler` 猜测或自动填充，例如：
+
+```text
+factory_id
+organization_id
+supplier_id
+customer_id
+user_id
+```
+
+这些字段必须由 Application / Domain 用例明确决定。
+
+## 10. 更新路径
+
+MyBatis-Plus 自动填充依赖真实 Entity。
+
+原则：
+
+| 路径 | V1 规则 |
 |---|---|
-| `mapper.insert(entity)` | 必须触发 INSERT 审计 |
-| `mapper.insert(collection)` | 每个实体必须触发 INSERT 审计 |
-| `updateById(entity)` | 触发 UPDATE 审计和乐观锁 |
-| `update(entity, wrapper)` | Entity 必须非空，触发 UPDATE 审计 |
-| `update(wrapper)` | `MomBaseMapper` 直接拒绝 |
-| 自定义 XML / 注解 SQL | SQL 显式写 `updated_at/updated_by` 并测试 |
-| JdbcTemplate / 原生 SQL | Repository 显式写审计字段并测试 |
+| `insert(entity)` | 触发 INSERT 审计 |
+| `updateById(entity)` | 触发 UPDATE 审计 |
+| `update(entity, wrapper)` | Entity 非空时允许审计 |
+| Wrapper-only Update | 不假设能自动获得完整审计 Actor |
+| 自定义 SQL | 显式处理必要审计字段并测试 |
 
-MyBatis-Plus 实体自动填充依赖非空 Entity，不能宣称 Wrapper-only Update 会自动审计。
+不要通过 ORM 技巧隐藏业务归属或安全判断。
 
-## 7. 乐观锁
+## 11. 当前边界总结
 
-自动配置复用现有 `MybatisPlusInterceptor` 链，并确保只存在一个 `OptimisticLockerInnerInterceptor`。新记录版本从 0 开始；更新成功后递增；过期版本更新返回 0 行。HTTP 409 映射留给后续 Slice。
+```text
+mom-core
+├── ActorType(USER, SYSTEM)
+├── AuditActor(actorId, actorType)
+├── AuditActorMissingException
+└── CurrentActorProvider
 
-## 8. P2 业务模块使用
+mom-security
+├── SecurityCurrentActorProvider
+└── MomSecurityActorAutoConfiguration
 
-1. 普通请求由后续 Resource Server 建立 SecurityContext。
-2. 后台任务和消息消费者必须用稳定 SYSTEM Code 包裹数据库写入。
-3. Application Service 负责 Factory、Party 和领域归属；ORM 不猜测。
-4. 特殊 SQL 必须显式审计。
-5. 测试通过 `runAsActor/runAsSystem` 固定 Actor，禁止关闭审计绕过。
+mom-data
+├── MomMetaObjectHandler
+└── MyBatis-Plus 数据基础设施
+```
+
+这条链保持协议中立：Token、Redis、HTTP 和 Spring Security 的具体实现都不会进入 `mom-core` 或 `mom-data`。
