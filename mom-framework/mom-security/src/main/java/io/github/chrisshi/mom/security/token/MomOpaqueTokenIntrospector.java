@@ -19,7 +19,7 @@ import java.util.Map;
  * 基于 MOM 内部令牌存储的 Opaque Token 内省器。
  *
  * <p>从 {@link MomTokenStore} 中查找令牌对应的认证快照，
- * 校验有效期后转换为 Spring Authorization Server 所需的
+ * 校验有效期后转换为 Spring Security Resource Server所需的
  * {@link OAuth2AuthenticatedPrincipal}。</p>
  *
  * @author 史偕成
@@ -39,7 +39,7 @@ public class MomOpaqueTokenIntrospector implements OpaqueTokenIntrospector {
      * @throws BadOpaqueTokenException 令牌不存在、已过期或格式非法时抛出
      */
     @Override
-    public @Nullable OAuth2AuthenticatedPrincipal introspect(@NonNull String token) {
+    public OAuth2AuthenticatedPrincipal introspect(String token) {
         MomTokenPrincipal principal = tokenStore.find(token)
             .orElseThrow(() -> new BadOpaqueTokenException("Invalid token"));
         if (!principal.expiresAt().isAfter(clock.instant())) {

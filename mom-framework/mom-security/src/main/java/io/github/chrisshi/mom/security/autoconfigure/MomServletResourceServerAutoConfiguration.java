@@ -1,5 +1,8 @@
 package io.github.chrisshi.mom.security.autoconfigure;
 
+import io.github.chrisshi.mom.security.token.MomOpaqueTokenIntrospector;
+import io.github.chrisshi.mom.security.token.MomTokenStore;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -14,6 +17,8 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
 import org.springframework.security.web.SecurityFilterChain;
 
+import java.time.Clock;
+
 /**
  * Servlet 业务服务的默认 Resource Server 安全配置。
  *
@@ -23,7 +28,9 @@ import org.springframework.security.web.SecurityFilterChain;
  *
  * <p>业务服务如有特殊 HTTP 安全策略，可以自行声明 {@link SecurityFilterChain}，此默认配置会自动退让。</p>
  */
-@AutoConfiguration(after = MomSecurityActorAutoConfiguration.class)
+@AutoConfiguration(
+    after = MomSecurityTokenAutoConfiguration.class
+)
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @ConditionalOnClass({SecurityFilterChain.class, OpaqueTokenIntrospector.class})
 @ConditionalOnProperty(
@@ -34,6 +41,20 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableConfigurationProperties(MomResourceServerProperties.class)
 @EnableMethodSecurity
 public class MomServletResourceServerAutoConfiguration {
+
+    @Bean
+    @ConditionalOnMissingBean(OpaqueTokenIntrospector.class)
+    OpaqueTokenIntrospector momOpaqueTokenIntrospector(
+        MomTokenStore tokenStore,
+        ObjectProvider<Clock> clockProvider
+    ) {
+        Clock clock = clockProvider.getIfAvailable(Clock::systemUTC);
+
+        return new MomOpaqueTokenIntrospector(
+            tokenStore,
+            clock
+        );
+    }
 
     @Bean("momResourceServerSecurityFilterChain")
     @ConditionalOnMissingBean(SecurityFilterChain.class)
