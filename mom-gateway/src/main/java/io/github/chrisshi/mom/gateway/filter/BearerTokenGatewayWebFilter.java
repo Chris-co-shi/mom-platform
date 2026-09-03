@@ -34,8 +34,8 @@ public final class BearerTokenGatewayWebFilter implements WebFilter, Ordered {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private static final Set<String> PUBLIC_API_PATHS = Set.of(
-        "/api/iam/auth/login",
-        "/api/auth/login"
+        "/api/auth/login",
+        "/api/auth/test"
     );
 
     @Override
@@ -44,8 +44,7 @@ public final class BearerTokenGatewayWebFilter implements WebFilter, Ordered {
         ServerHttpRequest request = sanitized.getRequest();
         String path = request.getPath().value();
 
-        if (!path.startsWith("/api/")
-            || HttpMethod.OPTIONS.equals(request.getMethod())
+        if (HttpMethod.OPTIONS.equals(request.getMethod())
             || PUBLIC_API_PATHS.contains(path)) {
             return chain.filter(sanitized);
         }

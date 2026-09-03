@@ -53,3 +53,11 @@ mybatis-plus:
 logging:
   pattern:
     correlation: "[trace_id=%X{traceId:-} span_id=%X{spanId:-}] "
+
+mom:
+  security:
+    resource-server:
+      enabled: true
+      public-paths:
+        - /auth/**
+        - /test
