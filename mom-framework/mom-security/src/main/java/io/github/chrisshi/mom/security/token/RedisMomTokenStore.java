@@ -2,7 +2,6 @@ package io.github.chrisshi.mom.security.token;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Clock;
@@ -20,10 +19,15 @@ public class RedisMomTokenStore implements MomTokenStore {
     private final StringRedisTemplate redisTemplate;
     private final JsonMapper jsonMapper;
     private final Clock clock;
+    private static final String TOKEN_KEY_PREFIX = "mom:token:";
+
+    private String key(String token) {
+        return TOKEN_KEY_PREFIX + MomTokenFingerprint.of(token);
+    }
 
     @Override
     public void store(String token, MomTokenPrincipal principal) {
-        requireToken(token);
+        MomTokenFingerprint.of(token);
         Objects.requireNonNull(principal, "principal");
         Duration ttl = Duration.between(
             clock.instant(),
@@ -42,7 +46,7 @@ public class RedisMomTokenStore implements MomTokenStore {
 
     @Override
     public Optional<MomTokenPrincipal> find(String token) {
-        requireToken(token);
+        MomTokenFingerprint.of(token);
         String json = redisTemplate.opsForValue().get(key(token));
         if (json == null) {
             return Optional.empty();
@@ -53,7 +57,7 @@ public class RedisMomTokenStore implements MomTokenStore {
 
     @Override
     public void remove(String token) {
-        requireToken(token);
+        MomTokenFingerprint.of(token);
         redisTemplate.delete(key(token));
     }
 }
