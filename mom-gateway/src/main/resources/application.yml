@@ -107,11 +107,6 @@ spring:
                     redis-rate-limiter.burstCapacity: ${GATEWAY_INTEGRATION_RATE_LIMIT_BURST_CAPACITY:10}
                     redis-rate-limiter.requestedTokens: ${GATEWAY_INTEGRATION_RATE_LIMIT_REQUESTED_TOKENS:1}
 
-mom:
-  gateway:
-    technical-probe:
-      enabled: ${MOM_TECHNICAL_PROBE_ENABLED:false}
-
 management:
   otlp:
     metrics:

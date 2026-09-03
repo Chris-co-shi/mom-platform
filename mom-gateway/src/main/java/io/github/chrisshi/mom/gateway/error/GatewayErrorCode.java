@@ -12,22 +12,22 @@ import org.springframework.http.HttpStatus;
 public enum GatewayErrorCode implements ErrorCode {
 
     MISSING_BEARER_TOKEN(
-            HttpStatus.UNAUTHORIZED,
-            "missing_bearer_token",
-            "gateway.error.missing-bearer-token",
-            "缺少 Bearer Token"),
+        HttpStatus.UNAUTHORIZED,
+        "missing_bearer_token",
+        "gateway.error.missing-bearer-token",
+        "缺少 Bearer Token"),
 
     INVALID_BEARER_TOKEN(
-            HttpStatus.UNAUTHORIZED,
-            "invalid_bearer_token",
-            "gateway.error.invalid-bearer-token",
-            "Bearer Token 格式非法"),
+        HttpStatus.UNAUTHORIZED,
+        "invalid_bearer_token",
+        "gateway.error.invalid-bearer-token",
+        "Bearer Token 格式非法"),
 
     RATE_LIMIT_UNAVAILABLE(
-            HttpStatus.SERVICE_UNAVAILABLE,
-            "rate_limit_unavailable",
-            "gateway.error.rate-limit-unavailable",
-            "网关限流基础设施暂时不可用");
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "rate_limit_unavailable",
+        "gateway.error.rate-limit-unavailable",
+        "网关限流基础设施暂时不可用");
 
     private final HttpStatus status;
     private final String code;
