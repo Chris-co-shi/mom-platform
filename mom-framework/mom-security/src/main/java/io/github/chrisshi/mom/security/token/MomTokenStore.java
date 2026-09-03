@@ -67,11 +67,26 @@ public interface MomTokenStore {
         }
     }
 
-
+    /**
+     * 根据原始令牌生成存储键。
+     *
+     * <p>将令牌经 SHA-256 哈希后拼接统一命名空间前缀，
+     * 避免在存储后端中暴露原始令牌明文，同时保证键长度固定。</p>
+     *
+     * @param token 原始令牌字符串
+     * @return 格式为 {@code mom:token:<sha256-hex>} 的存储键
+     */
     default String key(String token) {
         return TOKEN_KEY_PREFIX + sha256(token);
     }
 
+    /**
+     * 计算字符串的 SHA-256 摘要并以十六进制小写字符串返回。
+     *
+     * @param value 待摘要的原始字符串
+     * @return 64 位十六进制 SHA-256 摘要字符串
+     * @throws IllegalStateException 当运行环境不提供 SHA-256 算法时抛出（理论上不会发生）
+     */
     default String sha256(String value) {
         try {
             MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");

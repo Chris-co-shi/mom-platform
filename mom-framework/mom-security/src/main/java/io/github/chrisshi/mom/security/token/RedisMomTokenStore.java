@@ -14,7 +14,6 @@ import java.util.Optional;
  * @author 史偕成
  * @date 2026/09/03 09:43
  **/
-@Component
 @RequiredArgsConstructor
 public class RedisMomTokenStore implements MomTokenStore {
 
@@ -35,7 +34,7 @@ public class RedisMomTokenStore implements MomTokenStore {
         }
         String json = jsonMapper.writeValueAsString(principal);
         redisTemplate.opsForValue().set(
-            token,
+            key(token),
             json,
             ttl
         );
@@ -44,7 +43,7 @@ public class RedisMomTokenStore implements MomTokenStore {
     @Override
     public Optional<MomTokenPrincipal> find(String token) {
         requireToken(token);
-        String json = redisTemplate.opsForValue().get(token);
+        String json = redisTemplate.opsForValue().get(key(token));
         if (json == null) {
             return Optional.empty();
         }
