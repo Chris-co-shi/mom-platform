@@ -1,6 +1,6 @@
 package io.github.chrisshi.mom.gateway;
 
-import io.github.chrisshi.mom.gateway.filter.BearerTokenGatewayWebFilter;
+import io.github.chrisshi.mom.gateway.filter.BearerTokenGlobalFilter;
 import io.github.chrisshi.mom.gateway.filter.CorrelationIdGlobalFilter;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.WebApplicationType;
@@ -36,7 +36,7 @@ class MomGatewayApplicationTest {
             assertTrue(context.isActive());
             assertNotNull(context.getBean(HealthEndpoint.class));
             assertNotNull(context.getBean(CorrelationIdGlobalFilter.class));
-            assertNotNull(context.getBean(BearerTokenGatewayWebFilter.class));
+            assertNotNull(context.getBean(BearerTokenGlobalFilter.class));
 
             Environment environment = context.getEnvironment();
             assertEquals("127.0.0.1", environment.getProperty("spring.data.redis.host"));

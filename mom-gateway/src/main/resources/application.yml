@@ -31,11 +31,15 @@ spring:
             - id: iam-auth
               uri: lb://mom-auth-server
               predicates:
-                - Path=/api/auth/**
+                - Path=/auth/**
+              filters:
+                - StripPrefix=1
             - id: system-api
               uri: lb://mom-system-server
               predicates:
-                - Path=/api/system/**
+                - Path=/system/**
+              filters:
+                - StripPrefix=1
             - id: integration-service
               uri: lb://mom-integration-server
               predicates:
