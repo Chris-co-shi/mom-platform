@@ -41,7 +41,7 @@ public class MomServletResourceServerAutoConfiguration {
         HttpSecurity http,
         OpaqueTokenIntrospector introspector,
         MomResourceServerProperties properties
-    ) throws Exception {
+    ) {
 
         http
             .csrf(AbstractHttpConfigurer::disable)

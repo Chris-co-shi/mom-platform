@@ -18,7 +18,6 @@ public class MomResourceServerProperties {
 
     private List<String> publicPaths = List.of(
         "/actuator/health/**",
-        "/actuator/info",
         "/error"
     );
 
