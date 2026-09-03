@@ -28,6 +28,22 @@ spring:
           observability:
             enabled: true
           routes:
+            # 联调专用：/auth/test 默认每分钟只允许 1 次，便于手工稳定观察 429。
+            - id: auth-test
+              order: -20
+              uri: lb://mom-auth-server
+              predicates:
+                - Path=/auth/test
+              filters:
+                - StripPrefix=1
+                - name: RequestRateLimiter
+                  args:
+                    rate-limiter: "#{@momFailClosedRedisRateLimiter}"
+                    key-resolver: "#{@requestIdentityKeyResolver}"
+                    redis-rate-limiter.replenishRate: ${GATEWAY_AUTH_TEST_RATE_LIMIT_REPLENISH_RATE:1}
+                    redis-rate-limiter.burstCapacity: ${GATEWAY_AUTH_TEST_RATE_LIMIT_BURST_CAPACITY:60}
+                    redis-rate-limiter.requestedTokens: ${GATEWAY_AUTH_TEST_RATE_LIMIT_REQUESTED_TOKENS:60}
+
             # 登录接口独立限流：默认持续约 5 次/分钟，并允许瞬时 5 次突发。
             - id: auth-login
               order: -10
@@ -45,7 +61,7 @@ spring:
                     redis-rate-limiter.burstCapacity: ${GATEWAY_AUTH_LOGIN_RATE_LIMIT_BURST_CAPACITY:300}
                     redis-rate-limiter.requestedTokens: ${GATEWAY_AUTH_LOGIN_RATE_LIMIT_REQUESTED_TOKENS:60}
 
-            # Auth 常规 API；/auth/test 也使用此策略，便于当前联调验证。
+            # Auth 常规 API。
             - id: auth-api
               order: 0
               uri: lb://mom-auth-server
