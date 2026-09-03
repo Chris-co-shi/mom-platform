@@ -38,7 +38,6 @@
     <module>mom-dependencies</module>
     <module>mom-framework</module>
     <module>mom-gateway</module>
-    <module>mom-iam-platform</module>
     <module>mom-system-platform</module>
     <module>mom-mdm-platform</module>
     <module>mom-mes-platform</module>
@@ -49,7 +48,7 @@
     <module>mom-integration-platform</module>
     <module>mom-traceability-platform</module>
     <module>mom-architecture-tests</module>
-    <module>mom-auth</module>
+    <module>mom-auth-platform</module>
   </modules>
 
   <dependencyManagement>

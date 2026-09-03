@@ -100,21 +100,21 @@
         <artifactId>mom-bootstrap-tests</artifactId>
         <version>${project.version}</version>
       </dependency>
-      <dependency>
-        <groupId>io.github.chrisshi.mom</groupId>
-        <artifactId>mom-iam-api</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.github.chrisshi.mom</groupId>
-        <artifactId>mom-iam-client</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.github.chrisshi.mom</groupId>
-        <artifactId>mom-iam-server</artifactId>
-        <version>${project.version}</version>
-      </dependency>
+<!--      <dependency>-->
+<!--        <groupId>io.github.chrisshi.mom</groupId>-->
+<!--        <artifactId>mom-iam-api</artifactId>-->
+<!--        <version>${project.version}</version>-->
+<!--      </dependency>-->
+<!--      <dependency>-->
+<!--        <groupId>io.github.chrisshi.mom</groupId>-->
+<!--        <artifactId>mom-iam-client</artifactId>-->
+<!--        <version>${project.version}</version>-->
+<!--      </dependency>-->
+<!--      <dependency>-->
+<!--        <groupId>io.github.chrisshi.mom</groupId>-->
+<!--        <artifactId>mom-iam-server</artifactId>-->
+<!--        <version>${project.version}</version>-->
+<!--      </dependency>-->
       <dependency>
         <groupId>io.github.chrisshi.mom</groupId>
         <artifactId>mom-mdm-api</artifactId>
