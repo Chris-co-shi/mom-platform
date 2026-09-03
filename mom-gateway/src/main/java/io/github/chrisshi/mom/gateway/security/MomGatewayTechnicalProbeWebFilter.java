@@ -16,7 +16,7 @@ import java.util.Set;
  *
  * <p>通用 Integration 路由仍服务后续正式业务 API，但两个历史技术探针只有在受控 Smoke 显式设置
  * {@code mom.gateway.technical-probe.enabled=true} 时才允许转发。默认返回 404，避免生产环境通过路由结构
- * 推断或访问技术接口；该过滤器不承担业务 JWT、Permission 或 Scope 最终授权。</p>
+ * 推断或访问技术接口；该过滤器不承担 Token 认证或业务授权。</p>
  */
 @Component
 public final class MomGatewayTechnicalProbeWebFilter implements WebFilter, Ordered {
@@ -38,7 +38,7 @@ public final class MomGatewayTechnicalProbeWebFilter implements WebFilter, Order
     }
 
     /**
-     * 在路由与限流之前隐藏默认关闭的技术探针。
+     * 在 Bearer 边缘检查、限流和路由之前隐藏默认关闭的技术探针。
      *
      * @param exchange 当前请求交换对象
      * @param chain    后续 Gateway 过滤链
@@ -54,7 +54,7 @@ public final class MomGatewayTechnicalProbeWebFilter implements WebFilter, Order
     }
 
     /**
-     * 早于安全、限流和路由执行，确保关闭状态不会产生下游访问或 Redis 依赖。
+     * 早于 Bearer 边缘检查、限流和路由执行，确保关闭状态不会产生下游访问或 Redis 依赖。
      *
      * @return 最高优先级之后的稳定顺序
      */
@@ -63,4 +63,3 @@ public final class MomGatewayTechnicalProbeWebFilter implements WebFilter, Order
         return Ordered.HIGHEST_PRECEDENCE + 10;
     }
 }
-
