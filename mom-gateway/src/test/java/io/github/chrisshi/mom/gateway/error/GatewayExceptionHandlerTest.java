@@ -1,7 +1,6 @@
 package io.github.chrisshi.mom.gateway.error;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.context.support.StaticMessageSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
@@ -16,8 +15,7 @@ class GatewayExceptionHandlerTest {
     @Test
     void shouldSerializeStableErrorResponseWithoutHandwrittenJson() {
         GatewayExceptionHandler handler = new GatewayExceptionHandler(
-                JsonMapper.builder().build(),
-                new StaticMessageSource());
+                JsonMapper.builder().build());
         MockServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/mes/work-orders").build());
 

@@ -1,6 +1,5 @@
 package io.github.chrisshi.mom.gateway.error;
 
-import org.springframework.context.MessageSource;
 import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
@@ -11,23 +10,22 @@ import org.springframework.web.server.WebExceptionHandler;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.util.Locale;
-
 /**
  * Gateway 可预期异常的统一出口。
  *
- * <p>Filter 与限流组件只抛 {@link GatewayException}，不自行拼 JSON。这里统一完成状态码、稳定错误结构、
- * MessageSource 国际化解析和 JSON 序列化；未识别异常继续交给 Spring Cloud Gateway 默认错误处理链。</p>
+ * <p>Filter 与限流组件只抛 {@link GatewayException}，不自行拼 JSON。这里统一完成状态码、稳定错误结构和
+ * JSON 序列化；V1 直接使用 {@link GatewayErrorCode#defaultMessage()}。国际化只通过 ErrorCode 的
+ * messageKey 预留扩展点，当前不解析 Locale、不加载消息资源。</p>
+ *
+ * <p>未识别异常继续交给 Spring Cloud Gateway 默认错误处理链。</p>
  */
 @Component
 public final class GatewayExceptionHandler implements WebExceptionHandler, Ordered {
 
     private final JsonMapper jsonMapper;
-    private final MessageSource messageSource;
 
-    public GatewayExceptionHandler(JsonMapper jsonMapper, MessageSource messageSource) {
+    public GatewayExceptionHandler(JsonMapper jsonMapper) {
         this.jsonMapper = jsonMapper;
-        this.messageSource = messageSource;
     }
 
     @Override
@@ -38,13 +36,9 @@ public final class GatewayExceptionHandler implements WebExceptionHandler, Order
         }
 
         GatewayErrorCode error = gatewayException.errorCode();
-        Locale locale = exchange.getLocaleContext().getLocale();
-        String message = messageSource.getMessage(
-                error.messageKey(),
-                null,
-                error.defaultMessage(),
-                locale);
-        GatewayErrorResponse response = new GatewayErrorResponse(error.code(), message);
+        GatewayErrorResponse response = new GatewayErrorResponse(
+                error.code(),
+                error.defaultMessage());
         byte[] body = jsonMapper.writeValueAsBytes(response);
 
         exchange.getResponse().setStatusCode(error.status());
