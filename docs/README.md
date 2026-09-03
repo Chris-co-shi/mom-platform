@@ -2,7 +2,7 @@
 
 本目录是 `mom-platform` 的需求、计划、架构、安全协议和架构决策权威入口。
 
-> 当前代码收敛工作以 `fix/mini-auth` 为事实来源。认证与授权已经从旧完整 IAM / Authorization Server 方案收敛为 Mini Auth V1；Gateway 已删除旧 JWT/JWK/revoked-sid 认证链，当前只做 Bearer 边缘检查与 Header 清洗，真实 Token 认证由各 Resource Server 完成。
+> 当前代码收敛工作以 `fix/mini-auth` 为事实来源。认证与授权已经从旧完整 IAM / Authorization Server 方案收敛为 Mini Auth V1；Gateway 只做 Bearer 边缘检查、Header 清洗、路由与本地限流，真实 Token 认证由各 Resource Server 完成；`mom-openfeign` 只承担 MOM 内部同步 RPC 的上下文传播。
 
 ## 文档使用原则
 
@@ -15,12 +15,12 @@
 
 ## 当前阶段
 
-- `mom-core`：CurrentActor V1 已收敛。
+- `mom-core`：CurrentActor V1 已收敛；`ErrorCode` 提供稳定 `code/messageKey/defaultMessage` 契约，其中 `messageKey` 仅为未来国际化预留，V1 不启用消息解析框架。
 - `mom-data`：数据基础设施 V1 已收敛。
 - `mom-security`：Redis Opaque Token、TokenStore、Introspector、Servlet Resource Server 已收敛。
-- `mom-gateway`：旧 JWT/JWK/Audience/revoked-sid 链已移除；当前使用 Bearer 形态检查并原样转发 Authorization。
+- `mom-gateway`：旧 JWT/JWK/Audience/revoked-sid 链已移除；当前使用 Bearer 形态检查、`X-MOM-*` 清洗、Gateway 本地 Redis 限流与统一异常响应。
+- `mom-openfeign`：已收敛为 MOM 内部同步 RPC 基础设施，全局传播 Correlation ID 和当前 Servlet 请求中的原始 Bearer；不再依赖 `mom-resilience` 或预置 CircuitBreaker 命名策略。
 - `mom-auth-platform`：`mom-auth-api` / `mom-auth-server`、`mom_auth` Schema、5 张核心表和管理员初始化脚本已建立；业务代码下一步开始。
-- `mom-openfeign`：当前只有 Correlation ID 与 CircuitBreaker 命名，Bearer 传播尚未实现，暂时冻结等待单独技术决策。
 
 ## Mini Auth V1 当前权威文档
 
@@ -46,7 +46,11 @@ Redis MomTokenStore
 SecurityContext / @PreAuthorize
 ```
 
-服务间同步调用后续传播原始 Bearer Credential，由目标 Resource Server 再次验证；不传播可信 `X-MOM-USER/ROLE/PERMISSION` 结果 Header。
+MOM 内部同步调用通过 `mom-openfeign` 原样传播当前请求 Bearer，由目标 Resource Server 再次验证；不传播可信 `X-MOM-USER/ROLE/PERMISSION` 结果 Header。
+
+没有当前 Servlet 请求时，OpenFeign 不生成 Authorization，也不伪造系统 Token。后台任务、MQ Consumer、Scheduler 等未来若出现真实跨服务机器认证需求，再单独设计 SYSTEM/SERVICE 身份。
+
+SAP、LIMS、PCS、AGV 等第三方/外部系统调用不得复用 `mom-openfeign`，应通过 Integration Adapter、RestClient/WebClient 或厂商 SDK 建立独立认证边界。
 
 ## Mini Auth 当前代码结构
 
@@ -127,4 +131,4 @@ ADR-027/028 对其他 bounded context 继续有效；`mom-auth-server` V1 的精
 
 - [文档维护约定](文档维护约定.md)
 
-文档修改继续在 `agent/complete-chinese-docs` 分支完成；架构决策变化通过新 ADR 记录，不静默覆盖历史 ADR。
+当前收敛阶段的代码与对应 Current 文档应在 `fix/mini-auth` 上同步维护；架构决策变化通过 ADR 或明确的当前基线文档记录，不静默覆盖历史 ADR。

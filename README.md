@@ -23,7 +23,7 @@
 ---
 
 > [!IMPORTANT]
-> 当前项目正在以“先恢复可控性，再逐步演进”为原则收敛第一版架构。`mom-security` 的 Redis Opaque Token / Resource Server 基础链已经完成；Gateway 已移除旧 JWT/JWK/revoked-sid 认证链；`mom-auth-platform` 已建立模块、Schema、Flyway 核心表和管理员初始化脚本，下一步进入 User / Role / Permission / Login / Token / Logout 业务代码。
+> 当前项目正在以“先恢复可控性，再逐步演进”为原则收敛第一版架构。`mom-security` 的 Redis Opaque Token / Resource Server 基础链已经完成；Gateway 已收敛为 Bearer 边缘检查、Header 清洗、路由与 Gateway 本地限流；`mom-openfeign` 已收敛为 MOM 内部同步 RPC 的 Correlation ID 与原始 Bearer 传播基础设施；`mom-auth-platform` 已建立模块、Schema、Flyway 核心表和管理员初始化脚本，下一步进入 User / Role / Permission / Login / Token / Logout 业务代码。
 
 ## 🌟 项目愿景
 
@@ -47,15 +47,17 @@
 - Token 认证快照存储在 Redis。
 - Redis Key 使用 `mom:token:{SHA-256(rawToken)}`。
 - Token Principal 只包含 `userId`、`authorities`、`expiresAt`。
-- Gateway 对 `/api/**` 做 Bearer 形态检查和 `X-MOM-*` Header 清洗，不查 Redis、不解析 Token。
+- Gateway 做 Bearer 形态检查和 `X-MOM-*` Header 清洗，不查 Redis、不解析 Token。
 - 合法 `Authorization: Bearer <opaque-token>` 由 Gateway 原样转发。
 - 业务服务独立作为 Resource Server，通过 `OpaqueTokenIntrospector` 校验 Token。
-- 服务间同步调用后续传播原始 Bearer Credential，由目标 Resource Server 再次验证。
+- MOM 内部同步 OpenFeign 调用全局传播当前请求的原始 Bearer Credential，由目标 Resource Server 再次验证。
+- 没有当前 Servlet 请求时，Feign 不生成 Authorization；后台 SYSTEM/SERVICE 身份等真实需求出现后再扩展。
+- `mom-openfeign` 只用于 MOM 内部同步 RPC，SAP、LIMS、PCS、AGV 等外部系统调用不得复用该模块。
 - 最终业务权限由 `@PreAuthorize` 与业务领域规则共同决定。
 - Logout 直接删除 Token Store 记录，实现即时失效。
 - Redis 不可用时受保护 API Fail Closed。
 
-当前 V1 明确不建设 Spring Authorization Server、JWT、Refresh Token、Session、OIDC、PKCE、OAuth Client 管理或 Factory/Party Scope 通用安全框架。
+当前 V1 明确不建设 Spring Authorization Server、JWT、Refresh Token、Session、OIDC、PKCE、OAuth Client 管理、机器身份或 Factory/Party Scope 通用安全框架。
 
 ## 🧩 核心能力
 
@@ -69,7 +71,7 @@
 | 质量管理 | 检验、放行、不合格处置、偏差、CAPA | `mom-qms-platform` |
 | 系统集成 | 外部接口、Outbox/Inbox、重试、补偿、对账 | `mom-integration-platform` |
 | 批次追溯 | 正向追溯、反向追溯、影响分析、模拟召回 | `mom-traceability-platform` |
-| 平台治理 | Gateway、Cache、审计、链路追踪、通用 Framework | `mom-gateway` / `mom-framework` |
+| 平台治理 | Gateway、Security、OpenFeign、Cache、审计、链路追踪 | `mom-gateway` / `mom-framework` |
 
 ## 🛠️ 技术基线
 
@@ -79,6 +81,7 @@
 | 应用框架 | Spring Boot 4.1.x、Spring Framework 7.x |
 | 微服务体系 | Spring Cloud 2025.1.x、Spring Cloud Alibaba 2025.1.x |
 | 身份认证 | Spring Security Resource Server、Opaque Token、Redis Token Store |
+| 内部同步 RPC | Spring Cloud OpenFeign、Spring Cloud LoadBalancer |
 | 数据存储 | PostgreSQL，按服务独立 Schema |
 | 缓存 | Caffeine + Redis |
 | 消息与一致性 | RocketMQ、Outbox/Inbox、幂等、Seata 按真实场景使用 |
@@ -98,6 +101,7 @@ mom-platform
 │   ├── mom-core
 │   ├── mom-security
 │   ├── mom-data
+│   ├── mom-openfeign
 │   ├── mom-cache
 │   └── ...
 ├── mom-gateway
@@ -115,6 +119,8 @@ mom-platform
 ├── mom-traceability-platform
 └── mom-architecture-tests
 ```
+
+Gateway 的 Redis 限流实现属于 Gateway 本地基础设施，不再维护独立 `mom-rate-limit` Framework Module。
 
 Mini Auth V1 当前采用简化三层：
 
@@ -136,7 +142,8 @@ controller → service → infrastructure
 - `mom-auth-api` 只暴露对外契约，不暴露数据库 Entity、Mapper 或 Repository。
 - Auth Controller 不直接访问 Mapper/Entity。
 - 业务服务不能直接访问其他服务的 Repository / Entity。
-- 跨服务调用通过公开 API 契约或事件完成。
+- 跨服务同步调用通过 `*-client` + `mom-openfeign`，异步协作按真实业务需要使用事件/MQ。
+- `mom-openfeign` 只允许用于 MOM 内部同步 RPC；第三方/外部系统调用使用 Integration Adapter、RestClient/WebClient 或厂商 SDK。
 - PostgreSQL 每服务保持清晰数据所有权，禁止跨域写入。
 - `mom-framework` 不包含 MES、WMS、QMS 等业务规则。
 - `mom-data` 不依赖 `mom-security`。
@@ -193,7 +200,8 @@ mvn -B -ntp clean verify
 |---|---|---|
 | 基础骨架 | JDK 25 + Boot 4、core/data/security 等基础能力 | ✅ 已完成主要收敛 |
 | Mini Auth Security | Opaque Token、TokenStore、Introspector、Resource Server | ✅ 当前轮完成 |
-| Gateway Security | 移除旧 JWT 链、Bearer 边缘检查与 Header 清洗 | ✅ 当前轮完成 |
+| Gateway Security | Bearer 边缘检查、Header 清洗、本地限流与统一错误出口 | ✅ 当前轮完成 |
+| Internal RPC | OpenFeign Correlation ID + Bearer 传播、LoadBalancer、Micrometer | ✅ 当前轮完成 |
 | Mini Auth Persistence | `mom_auth`、5 张核心表、管理员初始化 | ✅ 骨架完成 |
 | Mini Auth Business | User、Role、Permission、Login、Token 签发、Logout | 🚧 下一步 |
 | Phase 02 | 供应商送货、来料检验、PDA 入库、库存闭环 | ⏳ 未启动 |
@@ -205,9 +213,9 @@ mvn -B -ntp clean verify
 3. **服务端授权**：Gateway 的 Bearer 形态检查不能替代业务服务真实 Token 认证和最终授权。
 4. **事实优先**：库存、批次和质量结果以不可重复的业务事实为基础。
 5. **异步可恢复**：长流程按真实需要使用消息、幂等、重试、补偿和对账。
-6. **集成有边界**：外部系统通过明确契约接入，不继承内部用户 Bearer。
+6. **集成有边界**：内部 OpenFeign 与外部系统调用技术边界分离，外部系统不继承内部用户 Bearer。
 7. **可观测优先**：HTTP、服务间调用、MQ、任务和设备命令需要可关联追踪。
-8. **按需演进**：不为尚不存在的 OAuth/OIDC、SSO、Refresh、内部签名身份等需求提前建设复杂基础设施。
+8. **按需演进**：不为尚不存在的 OAuth/OIDC、SSO、Refresh、SYSTEM/SERVICE 身份等需求提前建设复杂基础设施。
 
 ---
 
