@@ -27,7 +27,6 @@ public class RedisMomTokenStore implements MomTokenStore {
 
     @Override
     public void store(String token, MomTokenPrincipal principal) {
-        MomTokenFingerprint.of(token);
         Objects.requireNonNull(principal, "principal");
         Duration ttl = Duration.between(
             clock.instant(),
@@ -46,7 +45,6 @@ public class RedisMomTokenStore implements MomTokenStore {
 
     @Override
     public Optional<MomTokenPrincipal> find(String token) {
-        MomTokenFingerprint.of(token);
         String json = redisTemplate.opsForValue().get(key(token));
         if (json == null) {
             return Optional.empty();

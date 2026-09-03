@@ -1,9 +1,5 @@
 package io.github.chrisshi.mom.security.token;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.Optional;
 
 /**
@@ -19,8 +15,6 @@ import java.util.Optional;
  * @since 2026-09-03
  */
 public interface MomTokenStore {
-
-    String TOKEN_KEY_PREFIX = "mom:token:";
 
     /**
      * 存储令牌与对应的认证快照。
@@ -52,53 +46,4 @@ public interface MomTokenStore {
      */
     void remove(String token);
 
-//    /**
-//     * 校验令牌格式合法性，拒绝 {@code null} 或空白令牌。
-//     *
-//     * <p>作为默认方法供各实现在公开方法入口处统一前置校验，
-//     * 避免无效参数穿透到存储层。</p>
-//     *
-//     * @param token 待校验的原始令牌字符串
-//     * @throws IllegalArgumentException 当 {@code token} 为 {@code null} 或空白时抛出
-//     */
-//    default void requireToken(String token) {
-//        if (token == null || token.isBlank()) {
-//            throw new IllegalArgumentException("token 不能为空");
-//        }
-//    }
-//
-//    /**
-//     * 根据原始令牌生成存储键。
-//     *
-//     * <p>将令牌经 SHA-256 哈希后拼接统一命名空间前缀，
-//     * 避免在存储后端中暴露原始令牌明文，同时保证键长度固定。</p>
-//     *
-//     * @param token 原始令牌字符串
-//     * @return 格式为 {@code mom:token:<sha256-hex>} 的存储键
-//     */
-//    default String key(String token) {
-//        return TOKEN_KEY_PREFIX + sha256(token);
-//    }
-//
-//    /**
-//     * 计算字符串的 SHA-256 摘要并以十六进制小写字符串返回。
-//     *
-//     * @param value 待摘要的原始字符串
-//     * @return 64 位十六进制 SHA-256 摘要字符串
-//     * @throws IllegalStateException 当运行环境不提供 SHA-256 算法时抛出（理论上不会发生）
-//     */
-//    default String sha256(String value) {
-//        try {
-//            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
-//            byte[] hash = messageDigest.digest(
-//                value.getBytes(StandardCharsets.UTF_8)
-//            );
-//            return HexFormat.of().formatHex(hash);
-//        } catch (NoSuchAlgorithmException e) {
-//            throw new IllegalStateException(
-//                "SHA-256 algorithm unavailable",
-//                e
-//            );
-//        }
-//    }
 }
