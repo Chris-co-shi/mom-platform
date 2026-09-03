@@ -3,7 +3,7 @@ spring:
     name: mom-iam-server
   datasource:
     url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_iam}&tcpKeepAlive=${POSTGRES_TCP_KEEP_ALIVE:true}&ApplicationName=${POSTGRES_APPLICATION_NAME:mom-iam-server}}
-    username: ${POSTGRES_USERNAME:iam_app}
+    username: ${POSTGRES_USERNAME:mom_auth}
     password: ${POSTGRES_PASSWORD:}
     hikari:
       pool-name: ${POSTGRES_POOL_NAME:mom-iam-hikari}
