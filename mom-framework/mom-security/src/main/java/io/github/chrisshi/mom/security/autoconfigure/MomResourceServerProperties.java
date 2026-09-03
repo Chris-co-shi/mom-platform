@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * MOM 业务服务 Resource Server 的通用配置。
  *
- * <p>第一版采用 Redis-backed Opaque Token。认证数据的读取由
+ * <p>第一版采用 Opaque Token。认证数据的读取由
  * {@code OpaqueTokenIntrospector} 负责，因此这里不再承载 JWT Issuer、JWK、Audience
  * 或 Token 撤销存储等实现细节。</p>
  */

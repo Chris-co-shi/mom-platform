@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -22,14 +23,15 @@ import java.time.Clock;
 /**
  * Servlet 业务服务的默认 Resource Server 安全配置。
  *
- * <p>第一版使用 Redis-backed Opaque Token。Framework 负责提供大多数业务服务一致的安全基线：
+ * <p>第一版使用 Opaque Token。Framework 负责提供大多数业务服务一致的安全基线：
  * 无状态请求、公开路径、Bearer Token 认证与方法级授权。Token 的实际查询和认证信息构造由
  * {@link OpaqueTokenIntrospector} 完成。</p>
  *
  * <p>业务服务如有特殊 HTTP 安全策略，可以自行声明 {@link SecurityFilterChain}，此默认配置会自动退让。</p>
  */
 @AutoConfiguration(
-    after = MomSecurityTokenAutoConfiguration.class
+    after = MomSecurityTokenAutoConfiguration.class,
+    before = ServletWebSecurityAutoConfiguration.class
 )
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @ConditionalOnClass({SecurityFilterChain.class, OpaqueTokenIntrospector.class})
