@@ -55,17 +55,6 @@ mom:
   gateway:
     technical-probe:
       enabled: ${MOM_TECHNICAL_PROBE_ENABLED:false}
-    security:
-      enabled: ${GATEWAY_SECURITY_ENABLED:true}
-      issuer-uri: ${IAM_ISSUER:http://127.0.0.1:20100}
-      jwk-set-uri: ${IAM_JWK_SET_URI:http://127.0.0.1:20100/oauth2/jwks}
-      accepted-audiences:
-        - mom-admin-web
-        - mom-supplier-web
-        - mom-customer-web
-        - mom-mobile-pda
-      revoked-sid-key-prefix: ${IAM_REVOKED_SID_KEY_PREFIX:mom:iam:revoked:sid:}
-      redis-timeout: ${IAM_REVOKED_SID_REDIS_TIMEOUT:2s}
 
 management:
   otlp:
