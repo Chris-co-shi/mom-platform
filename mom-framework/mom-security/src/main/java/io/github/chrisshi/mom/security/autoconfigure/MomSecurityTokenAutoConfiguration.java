@@ -7,6 +7,8 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
+import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import tools.jackson.databind.json.JsonMapper;
@@ -23,7 +25,10 @@ import java.time.Clock;
  * @author 史偕成
  * @since 2026-09-03
  */
-@AutoConfiguration
+@AutoConfiguration(after = {
+    DataRedisAutoConfiguration.class,
+    JacksonAutoConfiguration.class
+})
 @ConditionalOnClass({
     StringRedisTemplate.class,
     JsonMapper.class

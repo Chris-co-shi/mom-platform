@@ -1,5 +1,7 @@
 package io.github.chrisshi.mom.security.autoconfigure;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
@@ -11,27 +13,17 @@ import java.util.List;
  * {@code OpaqueTokenIntrospector} 负责，因此这里不再承载 JWT Issuer、JWK、Audience
  * 或 Token 撤销存储等实现细节。</p>
  */
+@Getter
 @ConfigurationProperties("mom.security.resource-server")
 public class MomResourceServerProperties {
 
+    @Setter
     private boolean enabled;
 
     private List<String> publicPaths = List.of(
         "/actuator/health/**",
         "/error"
     );
-
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
-    public List<String> getPublicPaths() {
-        return publicPaths;
-    }
 
     public void setPublicPaths(List<String> publicPaths) {
         this.publicPaths = publicPaths == null ? List.of() : List.copyOf(publicPaths);

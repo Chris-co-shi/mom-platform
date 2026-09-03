@@ -43,8 +43,8 @@
 
     <!-- Jackson 3，只需要 databind -->
     <dependency>
-      <groupId>tools.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-jackson</artifactId>
     </dependency>
 
     <!-- mom-security 本身不是 Web Server -->
