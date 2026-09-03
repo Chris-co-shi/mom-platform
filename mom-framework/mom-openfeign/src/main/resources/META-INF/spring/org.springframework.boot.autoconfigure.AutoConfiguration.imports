@@ -1,1 +1,1 @@
-io.github.chrisshi.mom.openfeign.autoconfigure.CorrelationIdFeignAutoConfiguration
+io.github.chrisshi.mom.openfeign.autoconfigure.MomFeignAutoConfiguration
