@@ -5,16 +5,11 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>io.github.chrisshi.mom</groupId>
-    <artifactId>mom-platform</artifactId>
+    <artifactId>mom-auth</artifactId>
     <version>0.1.0-SNAPSHOT</version>
   </parent>
 
-  <artifactId>mom-auth</artifactId>
-  <packaging>pom</packaging>
-  <modules>
-    <module>mom-auth-api</module>
-    <module>mom-auth-server</module>
-  </modules>
+  <artifactId>mom-auth-api</artifactId>
 
 
 </project>
