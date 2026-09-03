@@ -28,19 +28,56 @@ spring:
           observability:
             enabled: true
           routes:
-            - id: iam-auth
+            # 登录接口独立限流：默认持续约 5 次/分钟，并允许瞬时 5 次突发。
+            - id: auth-login
+              order: -10
+              uri: lb://mom-auth-server
+              predicates:
+                - Path=/auth/login
+                - Method=POST
+              filters:
+                - StripPrefix=1
+                - name: RequestRateLimiter
+                  args:
+                    rate-limiter: "#{@momFailClosedRedisRateLimiter}"
+                    key-resolver: "#{@requestIdentityKeyResolver}"
+                    redis-rate-limiter.replenishRate: ${GATEWAY_AUTH_LOGIN_RATE_LIMIT_REPLENISH_RATE:5}
+                    redis-rate-limiter.burstCapacity: ${GATEWAY_AUTH_LOGIN_RATE_LIMIT_BURST_CAPACITY:300}
+                    redis-rate-limiter.requestedTokens: ${GATEWAY_AUTH_LOGIN_RATE_LIMIT_REQUESTED_TOKENS:60}
+
+            # Auth 常规 API；/auth/test 也使用此策略，便于当前联调验证。
+            - id: auth-api
+              order: 0
               uri: lb://mom-auth-server
               predicates:
                 - Path=/auth/**
               filters:
                 - StripPrefix=1
+                - name: RequestRateLimiter
+                  args:
+                    rate-limiter: "#{@momFailClosedRedisRateLimiter}"
+                    key-resolver: "#{@requestIdentityKeyResolver}"
+                    redis-rate-limiter.replenishRate: ${GATEWAY_AUTH_RATE_LIMIT_REPLENISH_RATE:10}
+                    redis-rate-limiter.burstCapacity: ${GATEWAY_AUTH_RATE_LIMIT_BURST_CAPACITY:20}
+                    redis-rate-limiter.requestedTokens: ${GATEWAY_AUTH_RATE_LIMIT_REQUESTED_TOKENS:1}
+
             - id: system-api
+              order: 0
               uri: lb://mom-system-server
               predicates:
                 - Path=/system/**
               filters:
                 - StripPrefix=1
+                - name: RequestRateLimiter
+                  args:
+                    rate-limiter: "#{@momFailClosedRedisRateLimiter}"
+                    key-resolver: "#{@requestIdentityKeyResolver}"
+                    redis-rate-limiter.replenishRate: ${GATEWAY_SYSTEM_RATE_LIMIT_REPLENISH_RATE:10}
+                    redis-rate-limiter.burstCapacity: ${GATEWAY_SYSTEM_RATE_LIMIT_BURST_CAPACITY:20}
+                    redis-rate-limiter.requestedTokens: ${GATEWAY_SYSTEM_RATE_LIMIT_REQUESTED_TOKENS:1}
+
             - id: integration-service
+              order: 0
               uri: lb://mom-integration-server
               predicates:
                 - Path=/api/integration/**
@@ -50,9 +87,9 @@ spring:
                   args:
                     rate-limiter: "#{@momFailClosedRedisRateLimiter}"
                     key-resolver: "#{@requestIdentityKeyResolver}"
-                    redis-rate-limiter.replenishRate: ${GATEWAY_RATE_LIMIT_REPLENISH_RATE:10}
-                    redis-rate-limiter.burstCapacity: ${GATEWAY_RATE_LIMIT_BURST_CAPACITY:20}
-                    redis-rate-limiter.requestedTokens: ${GATEWAY_RATE_LIMIT_REQUESTED_TOKENS:1}
+                    redis-rate-limiter.replenishRate: ${GATEWAY_INTEGRATION_RATE_LIMIT_REPLENISH_RATE:5}
+                    redis-rate-limiter.burstCapacity: ${GATEWAY_INTEGRATION_RATE_LIMIT_BURST_CAPACITY:10}
+                    redis-rate-limiter.requestedTokens: ${GATEWAY_INTEGRATION_RATE_LIMIT_REQUESTED_TOKENS:1}
 
 mom:
   gateway:
