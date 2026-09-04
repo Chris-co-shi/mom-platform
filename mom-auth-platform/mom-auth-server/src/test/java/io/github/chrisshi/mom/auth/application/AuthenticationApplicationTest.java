@@ -20,9 +20,10 @@ import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -84,11 +85,9 @@ class AuthenticationApplicationTest {
     void shouldHideUnknownUserAndWrongPasswordBehindSameError() {
         when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
 
-        assertThatThrownBy(() -> application.login("missing", "wrong-password"))
-            .isInstanceOf(AuthException.class)
-            .extracting(exception -> ((AuthException) exception).errorCode())
-            .isEqualTo(AuthErrorCode.INVALID_CREDENTIALS);
+        AuthException exception = expectAuthException(() -> application.login("missing", "wrong-password"));
 
+        assertThat(exception.errorCode()).isEqualTo(AuthErrorCode.INVALID_CREDENTIALS);
         verify(tokenStore, never()).store(any(), any());
     }
 
@@ -98,18 +97,39 @@ class AuthenticationApplicationTest {
         when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user);
         when(passwordEncoder.matches(eq("Admin@123456"), eq("{bcrypt}hash"))).thenReturn(true);
 
-        assertThatThrownBy(() -> application.login("admin", "Admin@123456"))
-            .isInstanceOf(AuthException.class)
-            .extracting(exception -> ((AuthException) exception).errorCode())
-            .isEqualTo(AuthErrorCode.ACCOUNT_DISABLED);
+        AuthException exception = expectAuthException(() -> application.login("admin", "Admin@123456"));
 
+        assertThat(exception.errorCode()).isEqualTo(AuthErrorCode.ACCOUNT_DISABLED);
         verify(tokenStore, never()).store(any(), any());
+    }
+
+    @Test
+    void shouldFailLoginWhenTokenStoreIsUnavailable() {
+        UserEntity user = user("1001", true);
+        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user);
+        when(passwordEncoder.matches("Admin@123456", "{bcrypt}hash")).thenReturn(true);
+        when(authenticationQueryMapper.selectAuthoritiesByUserId("1001")).thenReturn(List.of());
+        doThrow(new IllegalStateException("redis unavailable")).when(tokenStore).store(any(), any());
+
+        AuthException exception = expectAuthException(() -> application.login("admin", "Admin@123456"));
+
+        assertThat(exception.errorCode()).isEqualTo(AuthErrorCode.TOKEN_STORE_UNAVAILABLE);
     }
 
     @Test
     void shouldRemoveCurrentTokenOnLogout() {
         application.logout("opaque-token");
         verify(tokenStore).remove("opaque-token");
+    }
+
+    private static AuthException expectAuthException(Runnable action) {
+        try {
+            action.run();
+            fail("expected AuthException");
+            throw new AssertionError("unreachable");
+        } catch (AuthException exception) {
+            return exception;
+        }
     }
 
     private static UserEntity user(String id, boolean enabled) {
