@@ -55,9 +55,11 @@ logging:
     correlation: "[trace_id=%X{traceId:-} span_id=%X{spanId:-}] "
 
 mom:
+  auth:
+    access-token-ttl: ${MOM_AUTH_ACCESS_TOKEN_TTL:8h}
   security:
     resource-server:
       enabled: true
       public-paths:
-        - /auth/**
+        - /login
         - /test
