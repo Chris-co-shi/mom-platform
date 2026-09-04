@@ -2,109 +2,296 @@
 
 - 状态：Accepted
 - 生效范围：正式 bounded context 的 `mom-*-server/src/main/java`
-- 决策关联：[ADR-027](../../adr/ADR-027-服务端包结构与基础设施适配器分层.md)
-- Mini Auth 精确例外：[ADR-041](../../adr/ADR-041-Mini-Auth简化三层包结构.md)
+- 当前决策：[ADR-042](../../adr/ADR-042-MOM渐进式分层与对象模型.md)
+- 历史复杂分层参考：[ADR-027](../../adr/ADR-027-服务端包结构与基础设施适配器分层.md)
 
-## 1. 标准结构与依赖方向
+## 1. 默认结构与依赖方向
 
-正式 Server 默认使用混合 Package 组织：Web、Application、Domain 按业务能力或用例分包；Infrastructure 按外部 Adapter 类型分包。默认依赖方向为 `Web → Application → Domain Port ← Infrastructure Adapter`。
-
-> `mom-auth-platform/mom-auth-server` 的 Mini Auth V1 不套用上述默认顶层结构，按 ADR-041 使用 `controller → service → infrastructure`。这是精确模块例外，不自动扩散到其他 bounded context。
-
-## 2. 默认 Web、Application 与 Domain
-
-默认三层以业务语义为第一维度，例如 `web.dictionary`、`application.parameter`、`domain.i18n`。不得建立全局 `web.controller/request/response`、`application.command/query/service`、`domain.entity/repository/service` 替代业务能力。
-
-Mini Auth V1 例外：
+MOM 新增简单业务默认采用 Level 1：
 
 ```text
-io.github.chrisshi.mom.auth
+<root-package>
 ├── controller
-├── service
+├── application
 └── infrastructure
 ```
 
-其中 `service` 直接承担业务用例与聚合职责，不再创建 `application` 和 `domain` 顶层包。
+默认依赖方向：
 
-## 3. Infrastructure
+```text
+controller → application → infrastructure
+```
 
-默认复杂 bounded context 的 `infrastructure` 继续按 `persistence`、`client`、`messaging`、`cache`、`storage` 等 Adapter 类型组织。
+`web` 是已有模块或明确采用 Web Adapter 命名时的等价入站包名，不要求为了统一名称批量搬迁已有代码。
 
-Mini Auth V1 为保持第一版直观，允许：
+不再要求每个 bounded context 默认创建 `domain`、`port`、`repository`、`adapter`、`converter`、`configuration` 等目录。只有真实职责出现时再创建。
+
+## 2. Controller
+
+Controller 层负责 HTTP 边界：
+
+- 路由；
+- 请求参数绑定；
+- Bean Validation；
+- 认证主体接入；
+- 调用 Application；
+- HTTP 状态和 Response 契约；
+- 协议异常映射。
+
+Controller 不得直接依赖 Mapper、Repository、数据库 Entity、Redis Template 或远程基础设施实现。
+
+请求/响应对象在数量较少时可以直接位于 `controller`，数量增长后再创建：
+
+```text
+controller
+├── request
+└── response
+```
+
+禁止为了目录形式预先创建空包。
+
+## 3. Application
+
+Application 是业务用例层，负责：
+
+- 业务用例与关系编排；
+- 本地事务；
+- 引用完整性；
+- 业务授权；
+- 幂等；
+- 状态变更；
+- 查询结果组合；
+- 调用 Domain（存在时）或 Infrastructure。
+
+简单 Level 1 中，Application 可以直接依赖本 bounded context 的 Mapper、Entity、QueryMapper 或其他 Infrastructure 组件。不要为了形式满足 DIP 创建一对一 Repository Port/Adapter。
+
+类名优先使用业务能力 + `Application`：
+
+```text
+UserApplication
+RoleApplication
+PermissionApplication
+AuthenticationApplication
+```
+
+不使用 MyBatis-Plus `IService/ServiceImpl` 代替业务 Application。
+
+Application 内部只有在真实需要时才增加：
+
+```text
+application
+└── model
+    └── UserDetailView
+```
+
+`command`、`query`、`service` 等子包不是默认必建目录。
+
+## 4. Domain：按需出现
+
+只有出现明确领域不变量、状态机、复杂生命周期或跨实体业务规则时才创建 `domain`。
+
+一旦创建：
+
+- Domain 不依赖 Controller/Web；
+- Domain 不依赖 Infrastructure；
+- Domain 不依赖 MyBatis/JDBC/Feign/Redis；
+- Domain 只表达领域语义。
+
+不得为了“以后可能会复杂”创建空 Domain、贫血 Domain Wrapper 或只复制 Entity 字段的 Domain Object。
+
+## 5. Infrastructure
+
+Level 1 默认可以保持直接：
 
 ```text
 infrastructure
 ├── entity
-└── mapper
+├── mapper
+└── query          # 仅复杂查询出现时创建
 ```
 
-仅在真实需要时再增加 `repository`、`query`、`configuration` 等技术子包，不创建空目录。
+当外部技术种类明显增长后，再按 Adapter 类型升级：
 
-## 4. Persistence 职责
+```text
+infrastructure
+├── persistence
+│   ├── entity
+│   ├── mapper
+│   ├── query
+│   └── repository   # 仅真实需要
+├── client
+├── messaging
+├── cache
+└── storage
+```
 
-### 4.1 Entity
+Infrastructure 第一组织维度是技术职责。不得因为某个业务 Feature 同时需要 Entity、Mapper、Repository，就在 persistence 下复制一套 `persistence.<feature>.entity/mapper/repository` 烟囱。
 
-默认正式数据库行模型位于 `infrastructure.persistence.entity`。Mini Auth V1 例外位于 `infrastructure.entity`。
+## 6. Persistence 职责
 
-无论哪种结构，Entity 不得直接作为 Web/API DTO。
+### 6.1 Entity
 
-### 4.2 Mapper
+数据库行模型使用 `*Entity`。
 
-默认 Mapper 位于 `infrastructure.persistence.mapper`。Mini Auth V1 例外位于 `infrastructure.mapper`。
+允许位置：
 
-Mapper 只负责数据库访问，不承载业务事务、不返回 Controller DTO、不跨 Schema。
+```text
+infrastructure.entity
+```
 
-### 4.3 Repository
+或复杂 Persistence 结构中的：
 
-默认复杂 bounded context 可使用 Repository Adapter 隐藏 ORM 细节并实现 Domain Repository Port。
+```text
+infrastructure.persistence.entity
+```
 
-Mini Auth V1 不默认创建 Repository Port 或一对一 Repository Adapter。只有出现真实替换边界、复杂多表持久化或 ORM 细节开始污染 Service 时再引入。
+Entity 不得直接作为 HTTP/API Request/Response，也不得跨服务暴露。
 
-### 4.4 Query / Converter / TypeHandler
+### 6.2 Mapper
 
-只有真实查询复杂度或多处复用转换出现时才增加对应包；禁止一表一 Converter、万能 Bean Copy 或占位 Query。
+普通 MyBatis-Plus Mapper 使用 `*Mapper`。
 
-通用 PostgreSQL/JSONB TypeHandler 继续保留在 `mom-framework/mom-data`。
+允许位置：
 
-## 5. Configuration
+```text
+infrastructure.mapper
+```
 
-默认 bounded context 的应用级 Spring 装配可位于顶层 `configuration`。
+或：
 
-Mini Auth V1 若只出现服务自身 Infrastructure 配置，可先放 `infrastructure.configuration`；不为了目录形式提前增加第四个顶层包。
+```text
+infrastructure.persistence.mapper
+```
 
-## 6. 命名、可见性与引用
+Mapper 只负责数据访问，不承载完整业务事务和业务流程。
 
-文件路径必须与 `package` 完全一致，仓库不得存在重复 FQCN。移动必须同步 Java import、FQCN、Spring Bean/Import、`@MapperScan`、Component Scan、反射/序列化字符串、测试 Package、ArchUnit 和文档。
+### 6.3 Repository
 
-不得新增旧 Package 代理类或复制文件保留双结构。
+Repository 不是 Mapper 的必选包装层。
 
-## 7. Mapper XML
+只有出现以下情况才创建：
 
-XML 默认保留 `src/main/resources/mapper/<context>/`。Mini Auth V1 若普通 MyBatis-Plus CRUD 不需要 XML，则不创建 XML 占位文件。
+- 已有 Domain Repository Port；
+- ORM 细节明显污染业务模型；
+- 聚合加载/保存需要封装多个底层操作；
+- 存在真实可替换持久化实现；
+- 测试隔离收益已经明确。
 
-## 8. 测试 Package 与例外治理
+禁止一表一个只转发 Mapper 的 Repository Adapter。
 
-正式 Package 移动至少验证 test-compile、模块 test/verify、相关 PostgreSQL IT、Mapper 加载和 Spring Bean 数量/名称。
+### 6.4 Query
 
-当前 Mini Auth V1 的例外由 ADR-041 精确到 `mom-auth-platform/mom-auth-server`；其他模块不得直接复制该例外。
+只有复杂 JOIN、统计、组合分页、搜索或查询复用出现时创建 QueryMapper。
 
-## 9. Mini Auth 新增代码验收
+简单单表查询继续使用普通 Mapper，不创建占位 Query 包。
 
-- 顶层业务包只出现 `controller`、`service`、`infrastructure`；
+QueryMapper 的 SQL 原始结果可使用 `Row` / `Projection`，最终 Application 展示结果使用 `View`。多表 SQL 结果默认不是 DDD Aggregate。
+
+### 6.5 Converter / TypeHandler
+
+- Converter 只在转换规则复杂或多处复用时创建；
+- 禁止一表一 Converter；
+- 禁止万能 Bean Copy 抽象；
+- PostgreSQL/JSONB 等通用 TypeHandler 保持在 `mom-framework/mom-data`。
+
+## 7. 3 + 1 对象命名
+
+新增业务对象默认只使用以下架构语义：
+
+```text
+Request / Response
+Entity
+View
+Row / Projection    # 按需
+```
+
+不使用 `POJO` 作为架构角色；新增代码不默认使用 `DO`、`PO`、`BO`、`VO` 后缀。`DTO` 可以用于描述“传输对象”这个概念，但具体类型名称优先表达用途，例如 `CreateUserRequest` 而不是 `CreateUserRequestDTO`。
+
+跨层调用不自动要求创建新类型。只有真实协议边界、持久化边界、查询模型或领域语义存在时才增加对象。
+
+## 8. Configuration
+
+只有真实服务级 Bean 装配、Properties 或条件配置出现时才创建 `configuration`。
+
+简单 Infrastructure 自身配置可以先位于 `infrastructure.configuration`。不为顶层目录对称提前增加空 `configuration`。
+
+## 9. Mapper XML
+
+XML 默认保留：
+
+```text
+src/main/resources/mapper/<context>/
+```
+
+普通 MyBatis-Plus CRUD 不需要 XML 时，不创建 XML 占位文件。
+
+## 10. 命名、移动和测试
+
+文件路径必须与 `package` 完全一致，仓库不得存在重复 FQCN。移动必须同步：
+
+- Java import/FQCN；
+- Spring Bean/Import；
+- `@MapperScan`；
+- Component Scan；
+- XML namespace；
+- 反射/序列化字符串；
+- 测试 Package；
+- ArchUnit；
+- 文档。
+
+不得创建旧 Package 代理类长期保留双结构。
+
+## 11. Mini Auth 当前结构
+
+`mom-auth-platform/mom-auth-server` 明确采用：
+
+```text
+io.github.chrisshi.mom.auth
+├── AuthApplication
+├── controller
+│   ├── UserController
+│   ├── RoleController
+│   ├── PermissionController
+│   └── AuthenticationController
+├── application
+│   ├── UserApplication
+│   ├── RoleApplication
+│   ├── PermissionApplication
+│   └── AuthenticationApplication
+└── infrastructure
+    ├── entity
+    │   ├── UserEntity
+    │   ├── RoleEntity
+    │   ├── PermissionEntity
+    │   ├── UserRoleEntity
+    │   └── RolePermissionEntity
+    ├── mapper
+    │   ├── UserMapper
+    │   ├── RoleMapper
+    │   ├── PermissionMapper
+    │   ├── UserRoleMapper
+    │   └── RolePermissionMapper
+    └── query          # 仅复杂查询出现时创建
+```
+
+验收：
+
 - Controller 不直接依赖 Mapper/Entity；
-- Infrastructure 不反向依赖 Controller；
-- 不使用 MyBatis-Plus `IService/ServiceImpl` 作为业务 Service；
-- 不创建只为形式满足 DIP 的空接口或一对一代理；
-- 业务事务、引用校验和关系编排可以从 Service 清晰追踪。
+- Application 可以直接编排 Mapper/Entity；
+- 不使用 `IService/ServiceImpl` 作为业务层；
+- 不创建只为形式满足 DIP 的接口或一对一代理；
+- 多表查询只在真实需要时增加 QueryMapper/Row/View；
+- User/Role/Permission CRUD 与登录链能够从 Application 清晰追踪。
 
-## 10. Mini Auth 例外退出条件
+## 12. 升级条件
 
-出现以下情况时，需要重新评估 ADR-041，而不是在三层结构中无序堆叠：
+出现以下情况时评估从 Level 1 升级，而不是继续在三层中无序堆叠：
 
-- Auth 出现多个可替换持久化实现；
-- Service 中出现大量 ORM Wrapper/Page/Entity 泄漏；
+- 明确且复杂的领域状态机/不变量；
+- 多个可替换持久化或外部实现；
+- Application 中大量 ORM/SDK 类型扩散；
 - 数据库、远程服务、消息等多种 Infrastructure 同时参与一个能力；
 - 单元测试难以隔离不可控外部依赖；
-- User/Role/Permission 之外出现明显独立聚合和复杂生命周期。
+- 单一 Application 类持续膨胀且已形成独立聚合生命周期。
 
-在这些条件出现前，Mini Auth 保持简化三层，不提前恢复旧 IAM 的复杂分层。
+升级时只提取已经证明有价值的 Domain、Port、Repository 或 Adapter，不批量生成模板结构。

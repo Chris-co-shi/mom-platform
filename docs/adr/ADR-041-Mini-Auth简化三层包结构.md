@@ -1,12 +1,17 @@
 # ADR-041：Mini Auth 简化三层包结构
 
-- 状态：Accepted
+- 状态：Superseded by ADR-042
 - 提出日期：2026-09-03
 - 接受日期：2026-09-03
 - 决策人：Chris
 - 适用范围：`mom-auth-platform/mom-auth-server`
 - 关联决策：ADR-040、ADR-026
+- 后续决策：[ADR-042：MOM 渐进式分层与对象模型](ADR-042-MOM渐进式分层与对象模型.md)
 - 精确替代范围：ADR-027、ADR-028 在 `mom-auth-server` V1 内的强制分层与 Repository Port 要求
+
+> 本 ADR 保留 2026-09-03 从旧 IAM 复杂分层收敛到简化三层的历史决策。
+> 2026-09-04 起，ADR-042 将“简化三层”提升为 MOM 项目级渐进式架构原则，并将 Mini Auth 的业务层包名从 `service` 收敛为语义更明确的 `application`。
+> Mini Auth 当前有效结构请以 ADR-042 与 `docs/engineering/standards/package-directory-architecture-standard.md` 为准。
 
 ## 1. 背景
 
@@ -16,9 +21,9 @@
 
 因此 Mini Auth V1 单独采用更直接的三层结构。
 
-## 2. 决策
+## 2. 原决策
 
-`mom-auth-server` 顶层业务包固定为：
+`mom-auth-server` 当时冻结的顶层业务包为：
 
 ```text
 io.github.chrisshi.mom.auth
@@ -51,9 +56,9 @@ infrastructure
 
 Entity、Mapper、Wrapper、`IPage` 等 ORM 类型不得直接成为 Controller DTO。
 
-## 3. 依赖方向
+## 3. 原依赖方向
 
-Mini Auth V1 默认依赖方向：
+Mini Auth V1 当时默认依赖方向：
 
 ```text
 controller
@@ -65,7 +70,7 @@ infrastructure
 
 这是一种有意的简化三层架构，不宣称满足严格 Clean Architecture 或 Hexagonal Architecture。
 
-`service` 可以直接依赖本模块 Infrastructure 的持久化组件。当前不为了“形式上的依赖倒置”强制增加：
+`service` 可以直接依赖本模块 Infrastructure 的持久化组件。当时明确不为了“形式上的依赖倒置”强制增加：
 
 - Domain Repository Port；
 - Application Service 接口；
@@ -84,13 +89,13 @@ infrastructure
 - 普通单表 CRUD 优先使用框架现有能力；
 - 不使用 `IService` / `ServiceImpl` 充当业务 Service；
 - 不创建无业务价值的通用 `BaseRepository` / `CommonRepository`；
-- 多表关系、引用校验和事务由 `service` 明确编排。
+- 多表关系、引用校验和事务由业务层明确编排。
 
-ADR-026 继续完全生效：Auth 自主业务表和关系表不建立物理外键，引用完整性由 Service、本地事务、Unique/Check、索引和测试共同保证。
+ADR-026 继续完全生效：Auth 自主业务表和关系表不建立物理外键，引用完整性由业务层、本地事务、Unique/Check、索引和测试共同保证。
 
-## 5. 业务组织方式
+## 5. 原业务组织方式
 
-第一版不按 User/Role/Permission 在顶层重复三层目录，而是：
+第一版当时不按 User/Role/Permission 在顶层重复三层目录，而是：
 
 ```text
 controller
@@ -125,27 +130,31 @@ infrastructure
 
 正面结果：第一版目录和调用方向直观，减少无收益接口与转换，更容易逐步理解 User/Role/Permission CRUD 和登录链。
 
-代价：Service 对具体 Infrastructure 的编译期依赖更强，持久化替换不是零成本；如果 Auth 复杂度未来显著增长，需要重新引入更严格边界。当前明确接受这些代价。
+代价：业务层对具体 Infrastructure 的编译期依赖更强，持久化替换不是零成本；如果 Auth 复杂度未来显著增长，需要重新引入更严格边界。当前明确接受这些代价。
 
-## 7. 与旧 ADR 的关系
+## 7. 后续演进
 
-ADR-027、ADR-028 对其他正式 bounded context 继续保持原状态。
+ADR-042 保留本 ADR 的核心取舍：
 
-仅在 `mom-auth-platform/mom-auth-server` 的 Mini Auth V1 范围内，以本 ADR 为准：
+- 简单业务不预付完整 Clean/Hexagonal 架构成本；
+- 业务层允许直接使用本服务 Infrastructure；
+- 不创建无业务价值的 Repository Port/Adapter、Converter 和空接口；
+- 复杂度真实出现后再引入 Domain/Port/Adapter。
+
+同时 ADR-042 将业务层统一命名为：
 
 ```text
-ADR-027 / ADR-028 通用复杂分层
-            ↓
-ADR-041 Mini Auth 精确简化例外
+application
 ```
 
-该例外不得自动扩散到 MES、WMS、QMS、System 等其他服务。
+以避免 `service` 与 Spring `@Service`、MyBatis-Plus `IService`、Domain Service、Remote Service 等多重语义混淆。
 
-## 8. 验证
+## 8. 当前有效 Mini Auth 结构
 
-- `mom-auth-server` 顶层业务包只出现 `controller`、`service`、`infrastructure`；
-- Controller 不直接依赖 Mapper/Entity；
-- Infrastructure 不依赖 Controller；
-- 不引入 MyBatis-Plus `IService/ServiceImpl` 作为业务 Service；
-- 不创建仅为形式满足 DIP 的空接口或一对一代理；
-- Auth V1 的业务事务和关系完整性能够从 Service 代码直接追踪。
+当前结构不再使用本 ADR 的 `service` 包，而使用 ADR-042：
+
+```text
+controller → application → infrastructure
+```
+
+具体 Package、对象模型和升级条件以 ADR-042 及当前工程规范为准。
