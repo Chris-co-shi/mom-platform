@@ -1,52 +1,31 @@
 # Mini Auth 数据库与代码分层
 
 - 状态：Current
-- 生效日期：2026-09-03
 - 当前事实来源：`fix/mini-auth`
 - 模块：`mom-auth-platform/mom-auth-server`
 - 认证决策：[ADR-040](../adr/ADR-040-Mini-Auth与Redis-Opaque-Token认证基线.md)
-- 包结构决策：[ADR-041](../adr/ADR-041-Mini-Auth简化三层包结构.md)
+- 分层决策：[ADR-042](../adr/ADR-042-MOM渐进式分层与对象模型.md)
 - 数据关联决策：[ADR-026](../adr/ADR-026-MOM业务表禁止物理外键与关联完整性策略.md)
 
-## 1. 当前目标
+## 1. 当前目标与状态
 
-Mini Auth V1 只建设最小认证授权闭环：
+Mini Auth V1 已实现最小认证授权闭环：
 
 ```text
-User → Role → Permission → Login → Opaque Token → Resource Server
+User → Role → Permission → Login → Opaque Token → Resource Server → Logout
 ```
 
-当前不恢复旧 IAM 的 Employee/Party/Factory Scope、OAuth Client、Session、Refresh Token、OIDC、JWT 或安全审计平台。
+V1 不包含 Employee/Organization、OAuth Client、Session、Refresh Token、OIDC、JWT 或通用数据范围模型。
 
-## 2. PostgreSQL 与 Flyway
+## 2. 数据库
 
-Auth 复用 `mom_platform` PostgreSQL Database，使用独立 Schema：
+Auth 使用 PostgreSQL 独立 Schema：
 
 ```text
 mom_auth
 ```
 
-当前运行基线：
-
-```text
-spring.application.name = mom-auth-server
-DataSource Schema         = mom_auth
-Flyway Schema             = mom_auth
-Flyway Location           = classpath:db/migration/auth
-Java ID                   = String
-PostgreSQL ID             = varchar(19)
-Java 时间                 = Instant
-PostgreSQL 时间           = timestamptz
-```
-
-当前正式 Migration：
-
-```text
-V1__create_auth_core_tables.sql
-V2__seed_platform_admin.sql
-```
-
-## 3. V1 核心表
+核心表：
 
 | 表 | 作用 |
 |---|---|
@@ -56,158 +35,237 @@ V2__seed_platform_admin.sql
 | `auth_user_role` | 用户角色关系 |
 | `auth_role_permission` | 角色权限关系 |
 
-Token 不进入 PostgreSQL，由 `mom-security` 的 `MomTokenStore` 保存到 Redis。
-
-## 4. User
-
-`auth_user` 第一版业务字段：
+Flyway：
 
 ```text
-username
-password_hash
-display_name
-enabled
+V1__create_auth_core_tables.sql
+V2__seed_platform_admin.sql
+V3__seed_auth_management_permissions.sql
 ```
 
-并复用平台普通可更新实体审计字段：
+按 ADR-026 不建立物理外键；关系完整性由 Application、本地事务、唯一约束、索引和测试共同维护。
+
+Token 不保存到 PostgreSQL，由 `mom-security.MomTokenStore` 保存到 Redis。
+
+## 3. Entity
 
 ```text
-id
-created_at
-created_by
-updated_at
-updated_by
+UserEntity             extends BaseEntity
+RoleEntity             extends BaseEntity
+PermissionEntity       extends BaseEntity
+UserRoleEntity         extends BaseCreatedEntity
+RolePermissionEntity   extends BaseCreatedEntity
+```
+
+普通可更新实体具有：
+
+```text
+String id
+createdAt / createdBy
+updatedAt / updatedBy
 version
 deleted
 ```
 
-边界：
+关系表只需要 String ID 与创建审计，不机械继承乐观锁/逻辑删除。
 
-- User 表示系统登录账号，不等同于 Employee；
-- 不在 User 中保存 Role/Permission 集合；
-- 不保存 Session、Token、Refresh Token；
-- 不保存组织、工厂、供应商或客户主体；
-- `username` 全局唯一，Service 负责规范化；
-- `password_hash` 禁止进入 API、日志和 Trace。
+## 4. 代码分层
 
-## 5. Role 与 Permission
-
-`auth_role`：`code / name / description / enabled`。
-
-`auth_permission`：`code / name / description / enabled`。
-
-Permission Code 推荐使用稳定业务语义，例如：
-
-```text
-mes:work-order:create
-wms:inventory:adjust
-auth:user:read
-```
-
-运行时 Authority 可同时包含：
-
-```text
-ROLE_PLATFORM_ADMIN
-mes:work-order:create
-```
-
-## 6. 关系表
-
-```text
-auth_user_role
-├── user_id
-└── role_id
-
-auth_role_permission
-├── role_id
-└── permission_id
-```
-
-按照 ADR-026：不建立物理外键；保留组合唯一约束和查询索引；引用存在性、删除保护和多表事务由 `service` 层负责。
-
-## 7. 初始管理员
-
-`V2__seed_platform_admin.sql` 当前初始化：
-
-```text
-username = admin
-role     = PLATFORM_ADMIN
-admin → PLATFORM_ADMIN
-```
-
-不存在“角色名即超级权限”的代码绕过；Permission 仍应显式写入 `auth_permission` 与 `auth_role_permission`。
-
-该初始化只作为 local/dev 第一版基线，正式部署前必须重新评估公共默认凭据风险。
-
-## 8. 代码分层
+Mini Auth 按 ADR-042 使用 Level 1：
 
 ```text
 io.github.chrisshi.mom.auth
 ├── AuthApplication
 ├── controller
-├── service
+│   ├── request
+│   └── response
+├── application
+│   └── model
 └── infrastructure
+    ├── configuration
+    ├── entity
+    ├── mapper
+    └── query
 ```
 
-Controller 负责 HTTP；Service 负责业务聚合、事务、引用校验、登录和 Token 编排；Infrastructure 负责 MyBatis-Plus/PostgreSQL 技术实现。
-
-初始持久化结构：
+依赖：
 
 ```text
-infrastructure
-├── entity
-│   ├── UserEntity
-│   ├── RoleEntity
-│   ├── PermissionEntity
-│   ├── UserRoleEntity
-│   └── RolePermissionEntity
-└── mapper
-    ├── UserMapper
-    ├── RoleMapper
-    ├── PermissionMapper
-    ├── UserRoleMapper
-    └── RolePermissionMapper
+controller → application → infrastructure
 ```
 
-Repository、Query、Converter 等只有真实需要时才增加。
+Controller 不直接访问 Mapper/Entity；Application 可以直接依赖本 bounded context Mapper/Entity/QueryMapper。
 
-## 9. 依赖方向
+当前没有 Domain、Repository Port、Repository Adapter、Converter 或 MyBatis-Plus `IService/ServiceImpl`。
+
+## 5. 对象模型
+
+遵守 ADR-042 的 3+1 规则：
 
 ```text
-Controller → Service → Infrastructure
+Request / Response  HTTP 契约
+Entity              数据库行模型
+View                Application 输出
+Row / Projection    仅复杂 SQL 确实需要时出现
 ```
 
-不默认增加 Domain Port、Application Interface、Repository Port、一表一 Adapter 或一表一 Converter。
+当前 Login authority JOIN 直接返回 `List<String>`，因此没有为了形式创建只有一个字段的 Projection。
 
-同时禁止：Controller 直接调用 Mapper；Entity 直接作为外部 API DTO；MyBatis-Plus `IService/ServiceImpl` 充当业务 Service；跨服务共享 Mapper/Entity。
+## 6. Mapper 与 QueryMapper
 
-## 10. Token 与数据库边界
+普通单表持久化：
 
 ```text
-数据库加载 User / Role / Permission
-        ↓
-Service 聚合 authorities
-        ↓
-生成 Opaque Token
-        ↓
-MomTokenStore.store(token, principal)
-        ↓
-Redis
+UserMapper
+RoleMapper
+PermissionMapper
+UserRoleMapper
+RolePermissionMapper
 ```
 
-PostgreSQL 不保存 Access Token；Redis TokenStore 也不成为 User/Role/Permission 的权威数据源。
+均使用 `MomBaseMapper<T>`。
 
-## 11. 当前实现顺序
+复杂读取只有：
 
 ```text
-1. UserEntity / UserMapper
-2. User Service 与基础用户管理
-3. Role / Permission 持久化
-4. User-Role / Role-Permission 关系编排
-5. Login 与 PasswordEncoder
-6. authorities 聚合
-7. Opaque Token 签发
-8. Logout
-9. Gateway → Auth/业务服务联调
-10. 服务间 Token 传播联调
+AuthenticationQueryMapper
 ```
+
+它通过 XML JOIN：
+
+```text
+auth_user_role
+→ auth_role
+→ auth_role_permission
+→ auth_permission
+```
+
+输出已启用、未删除的：
+
+```text
+ROLE_<role.code>
+permission.code
+```
+
+QueryMapper 不继承 `MomBaseMapper<?>`，因为多表查询不存在一个真实单表 Entity 泛型。
+
+## 7. Application
+
+```text
+UserApplication
+RoleApplication
+PermissionApplication
+AuthenticationApplication
+```
+
+`UserApplication`：
+
+- username 创建时 `strip + lowercase(Locale.ROOT)`；
+- 密码写入前 BCrypt；
+- User CRUD；
+- 管理员密码重置；
+- User-Role 查询与整体替换；
+- 删除前检查 UserRole 引用。
+
+`RoleApplication`：Role CRUD、Role-Permission 查询/整体替换、删除引用保护。
+
+`PermissionApplication`：Permission CRUD、删除引用保护。
+
+`AuthenticationApplication`：密码认证、authority 聚合、Opaque Token 签发、TokenStore 写入与当前 Token Logout。
+
+## 8. 密码
+
+数据库只保存 `password_hash`。
+
+V1 使用：
+
+```text
+DelegatingPasswordEncoder
+└── bcrypt cost 12
+```
+
+编码格式：
+
+```text
+{bcrypt}$2...
+```
+
+密码不得进入 Response、日志、Trace 或审计事件，也不得自动 Trim/大小写转换。
+
+## 9. 管理权限
+
+平台管理员角色 `PLATFORM_ADMIN` 没有角色名后门。V3 显式授予：
+
+```text
+auth:user:read
+auth:user:write
+auth:role:read
+auth:role:write
+auth:permission:read
+auth:permission:write
+```
+
+Controller 通过 `@PreAuthorize` 使用这些稳定 Permission Code。
+
+## 10. 乐观锁、删除与关系
+
+User/Role/Permission 更新要求客户端携带当前 `version`；版本不匹配或并发更新失败返回 409。
+
+删除使用逻辑删除，但关系表采用物理删除。
+
+为了避免隐藏级联：
+
+- User 仍有 Role 时不能删除；
+- Role 仍被 User 使用或仍有 Permission 时不能删除；
+- Permission 仍被 Role 使用时不能删除。
+
+关系整体替换在本地事务中执行，目标 ID 必须先通过存在性校验。
+
+## 11. HTTP 路径与 Gateway
+
+Gateway：
+
+```text
+/auth/** → StripPrefix=1 → mom-auth-server
+```
+
+所以外部：
+
+```text
+/auth/login
+/auth/logout
+/auth/users
+/auth/roles
+/auth/permissions
+```
+
+对应 Auth Server：
+
+```text
+/login
+/logout
+/users
+/roles
+/permissions
+```
+
+仅 `/login` 与联调 `/test` 是 public path；`/logout` 和管理 API 均由 Resource Server 认证。
+
+## 12. 当前测试
+
+当前新增单元测试覆盖认证核心行为：
+
+- 有效凭据签发 256-bit Opaque Token；
+- 未知账号/错误密码统一认证失败；
+- disabled 用户拒绝登录；
+- TokenStore 故障 Login Fail Closed；
+- Logout 删除当前 Token；
+- V2 管理员 `{bcrypt}` 种子密码与当前 PasswordEncoder 兼容。
+
+由于当前执行环境无法解析 `github.com`，本轮无法在执行容器内实际运行 Maven；测试是否通过必须以开发机/CI 的真实 `mvn test` 结果为准。
+
+## 13. 已知 V1 边界
+
+已经签发的 Token 是登录时 authority 快照。User/Role/Permission 后续修改不会自动刷新已有 Token；当前只通过 Logout 或 TTL 到期失效。
+
+若后续出现“停用用户或撤权必须立即使其所有 Token 失效”的明确需求，再增加用户级 Token 撤销机制，而不是在 V1 预建完整 Session 子系统。
