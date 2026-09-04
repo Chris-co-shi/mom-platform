@@ -17,10 +17,13 @@ MAPPER_XML = re.compile(r"^mom-[^/]+-platform/mom-[^/]+-server/src/main/resource
 PACKAGE = re.compile(r"(?m)^\s*package\s+([a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)*)\s*;")
 TYPE = re.compile(r"\b(?:class|interface|enum|record)\s+([A-Za-z_$][\w$]*)\b")
 FQCN = re.compile(r"^(?:[a-zA-Z_$][\w$]*\.)+[A-Za-z_$][\w$]*$")
-ALLOWED_INFRASTRUCTURE = {"persistence", "client", "messaging", "cache", "storage"}
-ALLOWED_PERSISTENCE = {"entity", "mapper", "repository", "query", "converter", "typehandler"}
 
-# S15-E 阶段二已清空逐文件迁移例外；新增条目必须先有 Accepted ADR。
+LEVEL1_INFRASTRUCTURE = {"entity", "mapper", "query", "configuration"}
+ADAPTER_INFRASTRUCTURE = {"persistence", "client", "messaging", "cache", "storage"}
+ALLOWED_INFRASTRUCTURE = LEVEL1_INFRASTRUCTURE | ADAPTER_INFRASTRUCTURE
+ALLOWED_PERSISTENCE = {"entity", "mapper", "repository", "query", "converter", "typehandler"}
+LEVEL1_FLAT_PACKAGES = {"entity", "mapper", "query"}
+
 LEGACY_LAYOUT_EXCEPTIONS: frozenset[str] = frozenset()
 
 
@@ -35,8 +38,6 @@ class JavaType:
 
     @property
     def fqcn(self) -> str:
-        """返回完整类名。"""
-
         return f"{self.package}.{self.name}"
 
 
@@ -82,16 +83,38 @@ def classify(java: JavaType) -> str | None:
 
 
 def violation(report: Report, relative: str, message: str) -> None:
-    """只将阶段一逐文件存量降为迁移例外，新文件和扩大范围仍阻断。"""
-
     if relative in LEGACY_LAYOUT_EXCEPTIONS:
         report.exceptions.append(f"{relative}: {message}")
     else:
         report.errors.append(f"{relative}: {message}")
 
 
+def allowed_packages(java: JavaType, kind: str) -> set[str]:
+    """按 ADR-042 同时允许 Level 1 直连结构与复杂 Persistence Adapter 结构。"""
+
+    root = java.package.split(".infrastructure", 1)[0]
+    packages = {
+        "entity": {
+            root + ".infrastructure.entity",
+            root + ".infrastructure.persistence.entity",
+        },
+        "mapper": {
+            root + ".infrastructure.mapper",
+            root + ".infrastructure.persistence.mapper",
+        },
+        "query": {
+            root + ".infrastructure.query",
+            root + ".infrastructure.persistence.query",
+        },
+        "repository": {
+            root + ".infrastructure.persistence.repository",
+        },
+    }
+    return packages.get(kind, set())
+
+
 def check_java(relative: str, text: str, report: Report) -> JavaType | None:
-    """检查源码路径、package、职责包、Feature-first 和配置候选。"""
+    """检查源码路径、package、职责包和渐进式 Infrastructure 布局。"""
 
     match = MAIN_JAVA.fullmatch(relative) or TEST_JAVA.fullmatch(relative)
     if not match:
@@ -116,27 +139,25 @@ def check_java(relative: str, text: str, report: Report) -> JavaType | None:
         remainder = package.split(marker, 1)[1].split(".")
         first = remainder[0]
         if first not in ALLOWED_INFRASTRUCTURE:
-            violation(report, relative, f"Infrastructure 第一层必须为 Adapter 类型，发现 {first}")
+            violation(report, relative, f"Infrastructure 第一层必须为明确技术职责，发现 {first}")
+        if first in LEVEL1_FLAT_PACKAGES and len(remainder) > 1:
+            violation(report, relative, f"Level 1 {first} 必须扁平归位，禁止 Feature-first 子包 {remainder[1]}")
         if first == "persistence" and len(remainder) > 1 and remainder[1] not in ALLOWED_PERSISTENCE:
             violation(report, relative, f"Persistence 禁止 Feature-first 子包 {remainder[1]}")
         if remainder[:2] == ["persistence", "repository"] and len(remainder) > 2:
             violation(report, relative, f"Repository Adapter 必须扁平归位，发现子包 {remainder[2]}")
-        if remainder[:2] == ["persistence", "configuration"]:
-            violation(report, relative, "bounded context Configuration 应迁至顶层 configuration")
 
     kind = classify(java)
-    expected_suffix = {
-        "entity": ".infrastructure.persistence.entity",
-        "mapper": ".infrastructure.persistence.mapper",
-        "repository": ".infrastructure.persistence.repository",
-        "query": ".infrastructure.persistence.query",
-    }.get(kind)
-    if expected_suffix and package != package.split(".infrastructure", 1)[0] + expected_suffix:
-        violation(report, relative, f"{kind} 类型必须位于 {expected_suffix}")
+    if kind is not None:
+        allowed = allowed_packages(java, kind)
+        if allowed and package not in allowed:
+            violation(
+                report,
+                relative,
+                f"{kind} 类型位置非法，允许位置: {', '.join(sorted(allowed))}",
+            )
 
     clean = without_comments_and_literals(text)
-    if "@Configuration" in clean and package.endswith(".infrastructure.configuration"):
-        violation(report, relative, "正式服务 Spring Configuration 不应位于 infrastructure.configuration")
     if java.name.endswith("Repository") and "Mapper" in clean and kind is None:
         report.reviews.append(f"{relative}: 注入 Mapper 的 Repository 职责需人工确认")
     return java
@@ -163,9 +184,13 @@ def check_xml(relative: str, text: str, known: dict[str, JavaType], namespaces: 
     else:
         if pathlib.PurePosixPath(relative).stem != mapper.name:
             report.errors.append(f"{relative}: XML 文件名必须与 Mapper 接口 {mapper.name} 一致")
-        expected = ".infrastructure.persistence.query" if mapper.name.endswith("QueryMapper") else ".infrastructure.persistence.mapper"
-        if not mapper.package.endswith(expected):
-            violation(report, mapper.path, f"XML namespace 对应 Mapper 必须位于 {expected}")
+        kind = "query" if mapper.name.endswith("QueryMapper") else "mapper"
+        if mapper.package not in allowed_packages(mapper, kind):
+            violation(
+                report,
+                mapper.path,
+                f"XML namespace 对应 {kind} Mapper 位置不符合 ADR-042",
+            )
 
     for node in root.iter():
         for attribute in ("resultType", "typeHandler"):
@@ -176,8 +201,6 @@ def check_xml(relative: str, text: str, known: dict[str, JavaType], namespaces: 
 
 
 def git_files(root: pathlib.Path) -> list[str]:
-    """读取 tracked 与当前新增文件，确保门禁可在提交前运行。"""
-
     tracked = subprocess.check_output(["git", "ls-files"], cwd=root, text=True).splitlines()
     untracked = subprocess.check_output(
         ["git", "ls-files", "--others", "--exclude-standard"], cwd=root, text=True
@@ -186,8 +209,6 @@ def git_files(root: pathlib.Path) -> list[str]:
 
 
 def run(root: pathlib.Path, report: Report, files: list[str] | None = None) -> None:
-    """扫描全部正式 Server 主源码、测试源码和 Mapper XML。"""
-
     entries = files if files is not None else git_files(root)
     known: dict[str, JavaType] = {}
     simple_names: dict[tuple[str, str], str] = {}
@@ -216,8 +237,6 @@ def run(root: pathlib.Path, report: Report, files: list[str] | None = None) -> N
 
 
 def main(argv: list[str] | None = None) -> int:
-    """命令行入口；任何高置信违规均以非零状态阻断。"""
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=pathlib.Path, default=pathlib.Path.cwd())
     args = parser.parse_args(argv)
@@ -232,7 +251,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"- {error}")
         return 1
     print("PACKAGE_LAYOUT_BASELINE: PASSED")
-    print("- Java 路径/package、Persistence 职责包与 Mapper XML 引用已检查")
+    print("- Java 路径/package、Level 1/复杂 Persistence 职责包与 Mapper XML 引用已检查")
     for exception in report.exceptions:
         print(f"- MIGRATION_EXCEPTION: {exception}")
     for review in report.reviews:
