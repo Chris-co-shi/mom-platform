@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.chrisshi.mom.auth.infrastructure.query.AuthenticationQueryMapper">
+
+    <select id="selectAuthoritiesByUserId" resultType="java.lang.String">
+        SELECT authority
+        FROM (
+            SELECT 'ROLE_' || role.code AS authority
+            FROM auth_user_role user_role
+            JOIN auth_role role ON role.id = user_role.role_id
+            WHERE user_role.user_id = #{userId}
+              AND role.deleted = false
+              AND role.enabled = true
+
+            UNION
+
+            SELECT permission.code AS authority
+            FROM auth_user_role user_role
+            JOIN auth_role role ON role.id = user_role.role_id
+            JOIN auth_role_permission role_permission ON role_permission.role_id = role.id
+            JOIN auth_permission permission ON permission.id = role_permission.permission_id
+            WHERE user_role.user_id = #{userId}
+              AND role.deleted = false
+              AND role.enabled = true
+              AND permission.deleted = false
+              AND permission.enabled = true
+        ) authority_set
+        ORDER BY authority ASC
+    </select>
+
+</mapper>
