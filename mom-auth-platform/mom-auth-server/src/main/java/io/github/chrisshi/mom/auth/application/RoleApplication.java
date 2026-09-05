@@ -112,7 +112,7 @@ public class RoleApplication {
         if (permissionIds.isEmpty()) {
             return List.of();
         }
-        return permissionMapper.selectBatchIds(permissionIds).stream()
+        return permissionMapper.selectByIds(permissionIds).stream()
             .sorted(java.util.Comparator.comparing(PermissionEntity::getCode).thenComparing(PermissionEntity::getId))
             .map(PermissionView::from)
             .toList();
@@ -155,7 +155,7 @@ public class RoleApplication {
         if (permissionIds.isEmpty()) {
             return;
         }
-        List<PermissionEntity> permissions = permissionMapper.selectBatchIds(permissionIds);
+        List<PermissionEntity> permissions = permissionMapper.selectByIds(permissionIds);
         Set<String> found = permissions.stream().map(PermissionEntity::getId).collect(java.util.stream.Collectors.toSet());
         for (String permissionId : permissionIds) {
             if (!found.contains(permissionId)) {
