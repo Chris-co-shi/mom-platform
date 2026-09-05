@@ -4,6 +4,7 @@
 - 当前事实来源：`fix/mini-auth`
 - 最近更新：2026-09-05
 - 模块：`mom-auth-platform/mom-auth-server`
+- 模块代码约束：[`mom-auth-server/AGENTS.md`](../../mom-auth-platform/mom-auth-server/AGENTS.md)
 - 认证决策：[ADR-040](../adr/ADR-040-Mini-Auth与Redis-Opaque-Token认证基线.md)
 - 分层决策：[ADR-042](../adr/ADR-042-MOM渐进式分层与对象模型.md)
 - 数据关联决策：[ADR-026](../adr/ADR-026-MOM业务表禁止物理外键与关联完整性策略.md)
@@ -86,7 +87,9 @@ Row / Projection    仅复杂 SQL 确实需要时出现
 - `UserEntity` 不实现 `UserDetails`；
 - Spring Security Principal 使用独立 `AuthUserPrincipal`；
 - `Result<T>` 是 HTTP 返回信封，位于 `mom-webmvc`，不得成为 Application 返回模型；
-- 通用分页直接使用 `mom-core.PageResult<T>`，不得再增加只复制分页字段的 Auth 私有 View/Response。
+- 通用分页直接使用 `mom-core.PageResult<T>`，不得再增加只复制分页字段的 Auth 私有 View/Response；
+- 简单单表 Entity → View 统一由 `XxxView.from(XxxEntity)` 集中映射，不为机械字段复制引入 Converter/MapStruct；
+- Entity 不得反向依赖 Application View。
 
 ## 5. 分页
 
@@ -119,6 +122,7 @@ Controller PageResult.map(View → Response)
 - Auth Application 不自行计算 `offset`、`totalPages`，不手工复制 records；
 - User/Role/Permission 单表 Mapper 不再维护 `countActive()` 或自定义 `LIMIT/OFFSET` 分页 SQL；
 - 排序条件使用 MyBatis-Plus Wrapper 明确表达；
+- 批量主键查询使用当前 MyBatis-Plus `selectByIds(...)`，不继续使用已废弃的 `selectBatchIds(...)`；
 - 只有真实多表 JOIN/复杂读取才进入 `infrastructure.query`。
 
 对外统一：
@@ -229,7 +233,12 @@ Mini Auth 不要求逐行注释。必须注释的是“删除代码后无法从�
 - Spring Security 与 MOM Opaque Token 的责任边界；
 - V1 为什么账号锁定/过期/密码过期固定返回 true；
 - 安全相关行为（凭据清理、Token 存储等）；
+- PageAdapter/PageResult 的分页责任边界；
+- 简单 View 静态工厂为什么不再增加 Converter；
+- 删除业务资源时为什么必须做关系引用保护；
 - 未来维护者容易误判为遗漏的 V1 限制。
+
+所有新增或实质修改的公共类型与公共方法同时遵守根 `AGENTS.md` 和本模块 `mom-auth-server/AGENTS.md` 的中文 Javadoc 约束。
 
 禁止 `// 查询用户`、`// 判断为空` 这类只翻译代码的注释。
 
@@ -242,9 +251,12 @@ Mini Auth 不要求逐行注释。必须注释的是“删除代码后无法从�
 | HTTP 返回 | Response/ProblemDetail/204 混用 | Controller 统一 `Result<T>` + 真实 HTTP status |
 | 分页对象 | Auth 私有 PageView/OffsetPageResponse | 复用 `mom-core.PageResult<T>` |
 | 分页执行 | Application 手工 count/offset/totalPages + Mapper 自定义分页 SQL | MyBatis-Plus `selectPage` + `mom-data.PageAdapter.toPage/toResult` |
+| Entity/View 映射 | Application 分散私有 `toView()` | 简单映射统一 `XxxView.from(Entity)`，暂不新增 Converter |
+| 批量主键查询 | `selectBatchIds(...)` | 使用 MyBatis-Plus `selectByIds(...)` |
 | 登录认证 | Application 手工查用户、matches、enabled | Spring Security `AuthenticationManager/DaoAuthenticationProvider/UserDetailsService` |
 | Principal | 无独立登录 Principal | `AuthUserPrincipal`，与 `UserEntity` 分离 |
-| 注释 | 关键边界说明不足 | 只补设计原因、安全语义和 V1 边界 |
+| 注释 | 关键边界说明不足 | 公共类型/方法补中文 Javadoc，只解释职责、安全语义和 V1 边界 |
+| 修改约束 | 仅依赖仓库全局规则 | 新增 `mom-auth-server/AGENTS.md` 固化 Mini Auth 专属代码约束 |
 
 ### 分页纠偏记录
 
@@ -279,3 +291,17 @@ PageQuery
 分页本轮改为直接复用已存在的 `PageAdapter`；其职责是把 MyBatis-Plus Page/IPage 适配为平台 PageQuery/PageResult。
 
 当前执行环境若仍无法完成 Maven 依赖解析，则测试通过与否必须以后续开发机/CI 的真实执行结果为准。
+
+## 13. 模块代码约束落地
+
+`mom-auth-platform/mom-auth-server/AGENTS.md` 是本模块后续代码修改的直接执行约束，重点防止以下回退：
+
+- 删除或占位替换现有 Application 用例类；
+- Controller 直接访问 Mapper/Entity/TokenStore；
+- 为简单 CRUD 再造 Domain/Repository Port/Converter；
+- 手工复制 PageResult/PageAdapter 已提供的分页能力；
+- 重新手工实现用户名密码认证；
+- 为 PLATFORM_ADMIN 增加 Role bypass；
+- 在没有真实需求前扩展 JWT、Refresh Token、Session、OAuth Client 或 revoke-all。
+
+架构说明负责解释“为什么”，模块 `AGENTS.md` 负责约束“修改代码时必须怎么做”。

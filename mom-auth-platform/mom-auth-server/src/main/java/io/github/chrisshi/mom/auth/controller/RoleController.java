@@ -26,7 +26,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** 角色管理 HTTP API；业务规则和关系事务由 RoleApplication 负责。 */
+/**
+ * 角色管理 HTTP API。
+ *
+ * <p>Controller 只做协议适配和权限入口，角色生命周期、引用保护以及 Role-Permission 关系事务
+ * 统一由 {@link RoleApplication} 负责。授权端点始终基于 Permission，不为 PLATFORM_ADMIN 等角色硬编码旁路。</p>
+ */
 @RestController
 @RequestMapping("/roles")
 public class RoleController {
@@ -37,6 +42,12 @@ public class RoleController {
         this.roleApplication = roleApplication;
     }
 
+    /**
+     * 创建角色。
+     *
+     * @param request 已校验的角色创建请求
+     * @return 新建角色响应
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('auth:role:write')")
@@ -46,6 +57,13 @@ public class RoleController {
         )));
     }
 
+    /**
+     * 分页查询角色目录。
+     *
+     * @param pageNo 从 1 开始的页码
+     * @param pageSize 每页数量，最大 200
+     * @return 统一分页结果
+     */
     @GetMapping
     @PreAuthorize("hasAuthority('auth:role:read')")
     public Result<PageResult<RoleResponse>> list(
@@ -55,12 +73,25 @@ public class RoleController {
         return Result.success(roleApplication.list(pageNo, pageSize).map(RoleResponse::from));
     }
 
+    /**
+     * 查询单个角色。
+     *
+     * @param id 角色主键
+     * @return 角色响应
+     */
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('auth:role:read')")
     public Result<RoleResponse> get(@PathVariable String id) {
         return Result.success(RoleResponse.from(roleApplication.get(id)));
     }
 
+    /**
+     * 更新角色基本信息。
+     *
+     * @param id 角色主键
+     * @param request 包含乐观锁 version 的更新请求
+     * @return 更新后的角色响应
+     */
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('auth:role:write')")
     public Result<RoleResponse> update(@PathVariable String id, @Valid @RequestBody UpdateRoleRequest request) {
@@ -69,6 +100,12 @@ public class RoleController {
         )));
     }
 
+    /**
+     * 删除未被用户或 Permission 关系引用的角色。
+     *
+     * @param id 角色主键
+     * @return 空数据的统一成功结果
+     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('auth:role:write')")
     public Result<Void> delete(@PathVariable String id) {
@@ -76,12 +113,27 @@ public class RoleController {
         return Result.success();
     }
 
+    /**
+     * 查询角色当前拥有的 Permission。
+     *
+     * @param id 角色主键
+     * @return Permission 列表
+     */
     @GetMapping("/{id}/permissions")
     @PreAuthorize("hasAuthority('auth:role:read')")
     public Result<List<PermissionResponse>> permissions(@PathVariable String id) {
         return Result.success(roleApplication.permissions(id).stream().map(PermissionResponse::from).toList());
     }
 
+    /**
+     * 整体替换角色 Permission 关系。
+     *
+     * <p>关系变更不会主动刷新已经签发的 V1 Token authority 快照。</p>
+     *
+     * @param id 角色主键
+     * @param request 目标 Permission 主键集合
+     * @return 替换后的 Permission 列表
+     */
     @PutMapping("/{id}/permissions")
     @PreAuthorize("hasAuthority('auth:role:write')")
     public Result<List<PermissionResponse>> replacePermissions(

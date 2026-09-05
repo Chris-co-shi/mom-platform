@@ -5,8 +5,23 @@ import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
+/**
+ * 登录阶段的多表 authority 聚合查询。
+ *
+ * <p>该 Mapper 位于 infrastructure.query，是因为查询跨越 User-Role、Role、Role-Permission 和 Permission；
+ * 它不是单表 CRUD，也不需要伪装成某个 Entity 的 BaseMapper。返回值只需要最终 authority 字符串，
+ * 因此当前不额外创建无信息量的 Row/Projection。</p>
+ */
 @Mapper
 public interface AuthenticationQueryMapper {
 
+    /**
+     * 查询指定用户在当前数据库快照下拥有的 ROLE_* 与 Permission code。
+     *
+     * <p>结果用于登录时构建 authority 快照；角色/权限后续变更不会自动修改已经签发的 V1 Token。</p>
+     *
+     * @param userId MOM 用户主键
+     * @return 去重并按 SQL 约定稳定排序的 authority 字符串
+     */
     List<String> selectAuthoritiesByUserId(@Param("userId") String userId);
 }

@@ -22,7 +22,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Permission 管理 HTTP API；统一返回 Result，分页复用 mom-core PageResult。 */
+/**
+ * Permission 管理 HTTP API。
+ *
+ * <p>Controller 只负责 HTTP 协议和 `@PreAuthorize` 权限入口；Permission 生命周期、乐观锁和
+ * Role-Permission 引用保护由 {@link PermissionApplication} 负责。分页响应复用 mom-core PageResult。</p>
+ */
 @RestController
 @RequestMapping("/permissions")
 public class PermissionController {
@@ -33,6 +38,12 @@ public class PermissionController {
         this.permissionApplication = permissionApplication;
     }
 
+    /**
+     * 创建 Permission。
+     *
+     * @param request 已校验的 Permission 创建请求
+     * @return 新建 Permission 响应
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('auth:permission:write')")
@@ -42,6 +53,13 @@ public class PermissionController {
         )));
     }
 
+    /**
+     * 分页查询 Permission 目录。
+     *
+     * @param pageNo 从 1 开始的页码
+     * @param pageSize 每页数量，最大 200
+     * @return 统一分页结果
+     */
     @GetMapping
     @PreAuthorize("hasAuthority('auth:permission:read')")
     public Result<PageResult<PermissionResponse>> list(
@@ -51,12 +69,25 @@ public class PermissionController {
         return Result.success(permissionApplication.list(pageNo, pageSize).map(PermissionResponse::from));
     }
 
+    /**
+     * 查询单个 Permission。
+     *
+     * @param id Permission 主键
+     * @return Permission 响应
+     */
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('auth:permission:read')")
     public Result<PermissionResponse> get(@PathVariable String id) {
         return Result.success(PermissionResponse.from(permissionApplication.get(id)));
     }
 
+    /**
+     * 更新 Permission 基本信息。
+     *
+     * @param id Permission 主键
+     * @param request 包含乐观锁 version 的更新请求
+     * @return 更新后的 Permission 响应
+     */
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('auth:permission:write')")
     public Result<PermissionResponse> update(
@@ -68,6 +99,12 @@ public class PermissionController {
         )));
     }
 
+    /**
+     * 删除未被角色引用的 Permission。
+     *
+     * @param id Permission 主键
+     * @return 空数据的统一成功结果
+     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('auth:permission:write')")
     public Result<Void> delete(@PathVariable String id) {

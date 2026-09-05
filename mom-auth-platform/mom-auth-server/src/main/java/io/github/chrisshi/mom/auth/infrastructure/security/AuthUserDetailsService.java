@@ -12,10 +12,13 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * Spring Security 用户加载适配器。
+ * Spring Security 用户与 authority 加载适配器。
  *
- * <p>这里只负责把 MOM 用户、角色和 Permission 加载为 {@link UserDetails}；
- * 密码比对、enabled 状态检查以及认证异常语义由 DaoAuthenticationProvider 负责。</p>
+ * <p>该类只负责把 MOM 的 User + Role/Permission 查询结果组装为 {@link AuthUserPrincipal}；
+ * 密码比对、enabled 检查、凭据清理以及认证失败语义仍由 DaoAuthenticationProvider/ProviderManager 负责。</p>
+ *
+ * <p>用户单表读取使用 UserMapper，跨 User-Role-Permission 的 authority 聚合使用专用 QueryMapper，
+ * 不把多表 JOIN 塞回单表 Mapper。</p>
  */
 @Component
 public final class AuthUserDetailsService implements UserDetailsService {
@@ -28,13 +31,22 @@ public final class AuthUserDetailsService implements UserDetailsService {
         this.authenticationQueryMapper = authenticationQueryMapper;
     }
 
+    /**
+     * 按规范化后的用户名加载 Spring Security Principal。
+     *
+     * <p>用户不存在时抛出 {@link UsernameNotFoundException}；DaoAuthenticationProvider 默认会将其隐藏为
+     * BadCredentials，避免通过登录接口泄露账号是否存在。</p>
+     *
+     * @param username 已由 AuthenticationApplication 规范化的登录名
+     * @return 包含密码摘要、enabled 状态和 authority 的 AuthUserPrincipal
+     * @throws UsernameNotFoundException 用户不存在时抛出
+     */
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         UserEntity user = userMapper.selectOne(
             new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getUsername, username)
         );
         if (user == null) {
-            // DaoAuthenticationProvider 默认会把用户不存在隐藏为 BadCredentials，避免泄露账号存在性。
             throw new UsernameNotFoundException("用户不存在");
         }
 

@@ -20,14 +20,18 @@ import java.util.Base64;
 import java.util.Locale;
 
 /**
- * 登录与 Token 生命周期用例。
+ * 登录认证与当前 Opaque Token 生命周期用例。
  *
- * <p>用户名密码认证委托 Spring Security {@link AuthenticationManager}；该类不自行读取用户、
- * 不自行比较密码。认证成功后才进入 MOM 自有的 Opaque Token 生成与 Redis TokenStore。</p>
+ * <p>职责边界刻意分成两段：用户名密码的 Credential Authentication 完全委托 Spring Security
+ * {@link AuthenticationManager}；MOM 只在认证成功后生成并保存自己的 Redis-backed Opaque Token。
+ * 该类不得退回到手工查用户、PasswordEncoder.matches 或自行解释 enabled 状态。</p>
+ *
+ * <p>TokenStore 或认证基础设施不可用时统一 Fail Closed，不签发“降级 Token”。</p>
  */
 @Component
 public class AuthenticationApplication {
 
+    /** 256 bit 随机数，Base64URL 无填充编码后约 43 个字符。 */
     private static final int TOKEN_BYTES = 32;
 
     private final AuthenticationManager authenticationManager;
@@ -49,7 +53,15 @@ public class AuthenticationApplication {
     }
 
     /**
-     * 完成 Credential Authentication，并基于认证结果签发 MOM Opaque Token。
+     * 使用用户名密码完成 Spring Security 认证，并在成功后签发 MOM Opaque Token。
+     *
+     * <p>成功认证得到的 {@link AuthUserPrincipal} 只抽取稳定 userId 和 authority 快照写入 Token；
+     * username 与密码摘要都不会进入 Token Principal。TokenStore 写入失败时本次登录整体失败。</p>
+     *
+     * @param username 登录名；进入认证前统一去除首尾空白并转为小写
+     * @param password 明文密码，只交给 Spring Security 认证流程使用
+     * @return Bearer Token、类型和过期时间
+     * @throws AuthException 账号停用、凭据错误、认证基础设施异常或 TokenStore 不可用时抛出
      */
     public LoginView login(String username, String password) {
         String normalizedUsername = username.strip().toLowerCase(Locale.ROOT);
@@ -79,6 +91,7 @@ public class AuthenticationApplication {
         }
 
         if (!(authentication.getPrincipal() instanceof AuthUserPrincipal principal)) {
+            // Principal 类型不符合本模块约定说明认证链配置异常，不能尝试猜测身份继续签发 Token。
             throw new AuthException(AuthErrorCode.AUTHENTICATION_SERVICE_UNAVAILABLE);
         }
 
@@ -102,7 +115,12 @@ public class AuthenticationApplication {
     }
 
     /**
-     * 只注销当前已经通过 Resource Server 验证的 Opaque Token。
+     * 注销当前已经通过 Resource Server 验证的 Opaque Token。
+     *
+     * <p>V1 只支持删除当前 Token，不维护 user → token 索引，也不实现“踢掉全部会话”。</p>
+     *
+     * @param rawToken 当前请求携带的原始 Bearer Token
+     * @throws AuthException TokenStore 不可用时抛出并 Fail Closed
      */
     public void logout(String rawToken) {
         try {
@@ -116,6 +134,11 @@ public class AuthenticationApplication {
         }
     }
 
+    /**
+     * 生成不可预测的原始访问令牌。
+     *
+     * <p>这里只负责 raw token 随机性和传输编码；Redis Key 哈希、TTL 与存储故障策略由 MomTokenStore 负责。</p>
+     */
     private String generateToken() {
         byte[] bytes = new byte[TOKEN_BYTES];
         secureRandom.nextBytes(bytes);
