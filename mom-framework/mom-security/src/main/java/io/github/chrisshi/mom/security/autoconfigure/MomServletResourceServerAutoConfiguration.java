@@ -67,6 +67,7 @@ public class MomServletResourceServerAutoConfiguration {
     ) {
 
         http
+            .logout(AbstractHttpConfigurer::disable)
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)

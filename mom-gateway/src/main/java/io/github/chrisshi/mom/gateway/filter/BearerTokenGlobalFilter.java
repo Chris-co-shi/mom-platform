@@ -32,8 +32,7 @@ public final class BearerTokenGlobalFilter implements GlobalFilter, Ordered {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private static final Set<String> PUBLIC_API_PATHS = Set.of(
-            "/auth/login",
-            "/auth/test"
+            "/auth/login"
     );
 
     @Override

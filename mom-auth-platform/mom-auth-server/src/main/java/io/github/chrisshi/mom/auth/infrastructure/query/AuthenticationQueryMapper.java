@@ -2,6 +2,7 @@ package io.github.chrisshi.mom.auth.infrastructure.query;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 
@@ -23,5 +24,30 @@ public interface AuthenticationQueryMapper {
      * @param userId MOM 用户主键
      * @return 去重并按 SQL 约定稳定排序的 authority 字符串
      */
+    @Select("""
+        SELECT authority
+                FROM (
+                    SELECT 'ROLE_' || role.code AS authority
+                    FROM auth_user_role user_role
+                    JOIN auth_role role ON role.id = user_role.role_id
+                    WHERE user_role.user_id = #{userId}
+                      AND role.deleted = false
+                      AND role.enabled = true
+
+                    UNION
+
+                    SELECT permission.code AS authority
+                    FROM auth_user_role user_role
+                    JOIN auth_role role ON role.id = user_role.role_id
+                    JOIN auth_role_permission role_permission ON role_permission.role_id = role.id
+                    JOIN auth_permission permission ON permission.id = role_permission.permission_id
+                    WHERE user_role.user_id = #{userId}
+                      AND role.deleted = false
+                      AND role.enabled = true
+                      AND permission.deleted = false
+                      AND permission.enabled = true
+                ) authority_set
+                ORDER BY authority
+        """)
     List<String> selectAuthoritiesByUserId(@Param("userId") String userId);
 }
