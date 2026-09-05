@@ -25,7 +25,7 @@ public record PageResult<T>(
     /**
      * 保留分页元数据并转换记录类型，不引入任何 Web、持久化或框架层语义。
      */
-    public <R> PageResult<R> map(Function<? super T, ? extends R> mapper) {
+    public <R> PageResult<? extends R> map(Function<? super T, ? extends R> mapper) {
         Objects.requireNonNull(mapper, "mapper must not be null");
         return new PageResult<>(
             records.stream().map(mapper).toList(),

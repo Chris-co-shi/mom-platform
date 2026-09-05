@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.auth.controller;
+package io.github.chrisshi.mom.auth.infrastructure.configuration;
 
 import io.github.chrisshi.mom.auth.application.AuthErrorCode;
 import io.github.chrisshi.mom.auth.application.AuthException;

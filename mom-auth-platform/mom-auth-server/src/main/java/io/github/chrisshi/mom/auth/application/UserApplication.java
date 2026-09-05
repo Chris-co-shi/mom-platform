@@ -265,7 +265,7 @@ public class UserApplication {
     }
 
     private static void requireVersion(Long actual, long expected) {
-        if (actual == null || actual.longValue() != expected) {
+        if (actual == null || actual != expected) {
             throw new AuthException(AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
         }
     }

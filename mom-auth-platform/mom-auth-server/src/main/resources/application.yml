@@ -42,13 +42,12 @@ spring:
     validate-migration-naming: true
     clean-disabled: true
     baseline-on-migrate: false
-    url: jdbc:postgresql://127.0.0.1:5432/mom_platform
-    user: postgres
-    password: 12345678
 
 mybatis-plus:
   global-config:
     banner: false
+  configuration:
+    map-underscore-to-camel-case: true
 
 logging:
   pattern:
