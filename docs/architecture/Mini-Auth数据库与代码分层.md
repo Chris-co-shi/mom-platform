@@ -90,48 +90,65 @@ Row / Projection    仅复杂 SQL 确实需要时出现
 
 ## 5. 分页
 
-对外分页统一为：
+分页依赖方向固定为：
 
 ```text
-pageNo + pageSize
+HTTP pageNo/pageSize
         ↓
 Application
         ↓
-PageResult<T>
+PageQuery
+        ↓
+PageAdapter.toPage(...)
+        ↓
+MyBatis-Plus BaseMapper.selectPage(...)
+        ↓
+IPage<Entity>
+        ↓
+PageAdapter.toResult(page, Entity → View)
+        ↓
+PageResult<View>
+        ↓
+Controller PageResult.map(View → Response)
 ```
 
-`PageResult<T>`：
+职责边界：
+
+- `mom-core.PageResult<T>` 只表达框架无关分页结果，不依赖 MyBatis-Plus；
+- `mom-data.PageAdapter` 是 MyBatis-Plus `IPage/Page` 与 `PageResult/PageQuery` 之间唯一公共适配器；
+- Auth Application 不自行计算 `offset`、`totalPages`，不手工复制 records；
+- User/Role/Permission 单表 Mapper 不再维护 `countActive()` 或自定义 `LIMIT/OFFSET` 分页 SQL；
+- 排序条件使用 MyBatis-Plus Wrapper 明确表达；
+- 只有真实多表 JOIN/复杂读取才进入 `infrastructure.query`。
+
+对外统一：
 
 ```text
-records / pageNo / pageSize / total / totalPages
+Result<PageResult<UserResponse>>
+Result<PageResult<RoleResponse>>
+Result<PageResult<PermissionResponse>>
 ```
 
-Controller 可通过 `PageResult.map(...)` 完成 Application View → HTTP Response 的记录转换，同时保留分页元数据。
-
-Mapper 继续使用：
-
-```sql
-LIMIT #{limit} OFFSET #{offset}
-```
-
-这是数据库实现细节，不再泄露为 `/users?limit=&offset=` 形式的公共分页协议。
+HTTP 参数仍为 `pageNo/pageSize`，默认 `1/50`，最大 `200`。
 
 ## 6. 用户名密码认证
 
-认证职责现在拆为：
+认证职责固定为：
 
 ```text
 AuthenticationApplication
-        ↓
-AuthenticationManager
-        ↓
+        ↓ AuthenticationManager.authenticate
 ProviderManager
         ↓
 DaoAuthenticationProvider
         ├── AuthUserDetailsService
+        │      ├── UserMapper
+        │      └── AuthenticationQueryMapper
         └── PasswordEncoder
         ↓
 AuthUserPrincipal
+        ↓
+Authentication
 ```
 
 `AuthUserDetailsService`：加载 User + Role/Permission authorities。
@@ -147,7 +164,7 @@ password        仅认证阶段使用，成功后由 ProviderManager 清理
 Authorities     ROLE_* + permission.code
 ```
 
-`AuthenticationApplication` 不再直接注入 `UserMapper`、`AuthenticationQueryMapper`、`PasswordEncoder` 做手工密码认证，只接收认证完成的 Principal 并签发 Opaque Token。
+`AuthenticationApplication` 不直接注入 `UserMapper`、`AuthenticationQueryMapper`、`PasswordEncoder` 做手工密码认证，只调用 Spring Security `AuthenticationManager`，再基于认证成功的 Principal 签发 Opaque Token。
 
 ## 7. 密码与 Token
 
@@ -223,10 +240,27 @@ Mini Auth 不要求逐行注释。必须注释的是“删除代码后无法从�
 | 项目 | 旧实现 | 当前规范 |
 |---|---|---|
 | HTTP 返回 | Response/ProblemDetail/204 混用 | Controller 统一 `Result<T>` + 真实 HTTP status |
-| 分页 | `PageView` + `OffsetPageResponse` + limit/offset | `mom-core.PageResult<T>` + pageNo/pageSize |
+| 分页对象 | Auth 私有 PageView/OffsetPageResponse | 复用 `mom-core.PageResult<T>` |
+| 分页执行 | Application 手工 count/offset/totalPages + Mapper 自定义分页 SQL | MyBatis-Plus `selectPage` + `mom-data.PageAdapter.toPage/toResult` |
 | 登录认证 | Application 手工查用户、matches、enabled | Spring Security `AuthenticationManager/DaoAuthenticationProvider/UserDetailsService` |
 | Principal | 无独立登录 Principal | `AuthUserPrincipal`，与 `UserEntity` 分离 |
 | 注释 | 关键边界说明不足 | 只补设计原因、安全语义和 V1 边界 |
+
+### 分页纠偏记录
+
+初次收敛时虽然删除了 `PageView`，但仍在 Auth Application/Mapper 中重复实现了 `count + offset + totalPages + LIMIT/OFFSET`。该实现没有复用已经存在的 `mom-data.PageAdapter`，属于重复基础设施实现。
+
+本次继续纠偏：
+
+```text
+PageQuery
+→ PageAdapter.toPage
+→ BaseMapper.selectPage
+→ PageAdapter.toResult(page, mapper)
+→ PageResult
+```
+
+后续业务模块不得重新手工计算同类分页元数据；如果 MyBatis-Plus 分页能力不足，再基于真实复杂查询场景扩展 QueryMapper，而不是复制一套单表分页。
 
 明确未做：i18n 运行时转换、JWT、Refresh Token、Session、OAuth Client、SSO/OIDC、额外 Domain/Port/Adapter。
 
@@ -242,4 +276,6 @@ Mini Auth 不要求逐行注释。必须注释的是“删除代码后无法从�
 - TokenStore 故障 Fail Closed；
 - Logout 删除当前 Token。
 
-当前执行环境无法解析 `github.com`，因此本次修改不能在本地执行 Maven；测试通过与否必须以后续开发机/CI 的真实执行结果为准。
+分页本轮改为直接复用已存在的 `PageAdapter`；其职责是把 MyBatis-Plus Page/IPage 适配为平台 PageQuery/PageResult。
+
+当前执行环境若仍无法完成 Maven 依赖解析，则测试通过与否必须以后续开发机/CI 的真实执行结果为准。
