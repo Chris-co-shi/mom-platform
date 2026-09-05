@@ -1,6 +1,7 @@
 package io.github.chrisshi.mom.auth.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.auth.application.model.PermissionView;
 import io.github.chrisshi.mom.auth.application.model.RoleView;
 import io.github.chrisshi.mom.auth.infrastructure.entity.PermissionEntity;
@@ -11,7 +12,9 @@ import io.github.chrisshi.mom.auth.infrastructure.mapper.PermissionMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RoleMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RolePermissionMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.UserRoleMapper;
+import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
+import io.github.chrisshi.mom.data.page.PageAdapter;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,24 +58,22 @@ public class RoleApplication {
         } catch (DuplicateKeyException exception) {
             throw new AuthException(AuthErrorCode.ROLE_CODE_CONFLICT, AuthErrorCode.ROLE_CODE_CONFLICT.defaultMessage(), exception);
         }
-        return toView(entity);
+        return RoleView.from(entity);
     }
 
     public RoleView get(String id) {
-        return toView(requireRole(id));
+        return RoleView.from(requireRole(id));
     }
 
     public PageResult<RoleView> list(long pageNo, int pageSize) {
-        long total = roleMapper.countActive();
-        long totalPages = totalPages(total, pageSize);
-        if (total == 0 || pageNo > totalPages) {
-            return new PageResult<>(List.of(), pageNo, pageSize, total, totalPages);
-        }
-        long offset = (pageNo - 1) * pageSize;
-        List<RoleView> records = roleMapper.selectPage(pageSize, offset).stream()
-            .map(RoleApplication::toView)
-            .toList();
-        return new PageResult<>(records, pageNo, pageSize, total, totalPages);
+        Page<RoleEntity> page = PageAdapter.toPage(new PageQuery<>(null, pageNo, pageSize));
+        roleMapper.selectPage(
+            page,
+            new LambdaQueryWrapper<RoleEntity>()
+                .orderByAsc(RoleEntity::getCode)
+                .orderByAsc(RoleEntity::getId)
+        );
+        return PageAdapter.toResult(page, RoleView::from);
     }
 
     @Transactional
@@ -85,7 +86,7 @@ public class RoleApplication {
         if (roleMapper.updateById(entity) != 1) {
             throw new AuthException(AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
         }
-        return toView(entity);
+        return RoleView.from(entity);
     }
 
     @Transactional
@@ -113,7 +114,7 @@ public class RoleApplication {
         }
         return permissionMapper.selectBatchIds(permissionIds).stream()
             .sorted(java.util.Comparator.comparing(PermissionEntity::getCode).thenComparing(PermissionEntity::getId))
-            .map(RoleApplication::toPermissionView)
+            .map(PermissionView::from)
             .toList();
     }
 
@@ -171,27 +172,9 @@ public class RoleApplication {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    private static long totalPages(long total, int pageSize) {
-        return total == 0 ? 0 : ((total - 1) / pageSize) + 1;
-    }
-
     private static void requireVersion(Long actual, long expected) {
         if (actual == null || actual.longValue() != expected) {
             throw new AuthException(AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
         }
-    }
-
-    private static RoleView toView(RoleEntity entity) {
-        return new RoleView(
-            entity.getId(), entity.getCode(), entity.getName(), entity.getDescription(),
-            Boolean.TRUE.equals(entity.getEnabled()), entity.getVersion(), entity.getCreatedAt(), entity.getUpdatedAt()
-        );
-    }
-
-    private static PermissionView toPermissionView(PermissionEntity entity) {
-        return new PermissionView(
-            entity.getId(), entity.getCode(), entity.getName(), entity.getDescription(),
-            Boolean.TRUE.equals(entity.getEnabled()), entity.getVersion(), entity.getCreatedAt(), entity.getUpdatedAt()
-        );
     }
 }

@@ -1,6 +1,7 @@
 package io.github.chrisshi.mom.auth.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.auth.application.model.RoleView;
 import io.github.chrisshi.mom.auth.application.model.UserView;
 import io.github.chrisshi.mom.auth.infrastructure.entity.RoleEntity;
@@ -9,7 +10,9 @@ import io.github.chrisshi.mom.auth.infrastructure.entity.UserRoleEntity;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RoleMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.UserMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.UserRoleMapper;
+import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
+import io.github.chrisshi.mom.data.page.PageAdapter;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -57,24 +60,22 @@ public class UserApplication {
         } catch (DuplicateKeyException exception) {
             throw new AuthException(AuthErrorCode.USERNAME_CONFLICT, AuthErrorCode.USERNAME_CONFLICT.defaultMessage(), exception);
         }
-        return toView(entity);
+        return UserView.from(entity);
     }
 
     public UserView get(String id) {
-        return toView(requireUser(id));
+        return UserView.from(requireUser(id));
     }
 
     public PageResult<UserView> list(long pageNo, int pageSize) {
-        long total = userMapper.countActive();
-        long totalPages = totalPages(total, pageSize);
-        if (total == 0 || pageNo > totalPages) {
-            return new PageResult<>(List.of(), pageNo, pageSize, total, totalPages);
-        }
-        long offset = (pageNo - 1) * pageSize;
-        List<UserView> records = userMapper.selectPage(pageSize, offset).stream()
-            .map(UserApplication::toView)
-            .toList();
-        return new PageResult<>(records, pageNo, pageSize, total, totalPages);
+        Page<UserEntity> page = PageAdapter.toPage(new PageQuery<>(null, pageNo, pageSize));
+        userMapper.selectPage(
+            page,
+            new LambdaQueryWrapper<UserEntity>()
+                .orderByAsc(UserEntity::getUsername)
+                .orderByAsc(UserEntity::getId)
+        );
+        return PageAdapter.toResult(page, UserView::from);
     }
 
     @Transactional
@@ -86,7 +87,7 @@ public class UserApplication {
         if (userMapper.updateById(entity) != 1) {
             throw new AuthException(AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
         }
-        return toView(entity);
+        return UserView.from(entity);
     }
 
     @Transactional
@@ -97,7 +98,7 @@ public class UserApplication {
         if (userMapper.updateById(entity) != 1) {
             throw new AuthException(AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
         }
-        return toView(entity);
+        return UserView.from(entity);
     }
 
     @Transactional
@@ -122,7 +123,7 @@ public class UserApplication {
         }
         return roleMapper.selectBatchIds(roleIds).stream()
             .sorted(java.util.Comparator.comparing(RoleEntity::getCode).thenComparing(RoleEntity::getId))
-            .map(UserApplication::toRoleView)
+            .map(RoleView::from)
             .toList();
     }
 
@@ -178,38 +179,9 @@ public class UserApplication {
         return username.strip().toLowerCase(Locale.ROOT);
     }
 
-    private static long totalPages(long total, int pageSize) {
-        return total == 0 ? 0 : ((total - 1) / pageSize) + 1;
-    }
-
     private static void requireVersion(Long actual, long expected) {
         if (actual == null || actual.longValue() != expected) {
             throw new AuthException(AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
         }
-    }
-
-    private static UserView toView(UserEntity entity) {
-        return new UserView(
-            entity.getId(),
-            entity.getUsername(),
-            entity.getDisplayName(),
-            Boolean.TRUE.equals(entity.getEnabled()),
-            entity.getVersion(),
-            entity.getCreatedAt(),
-            entity.getUpdatedAt()
-        );
-    }
-
-    private static RoleView toRoleView(RoleEntity entity) {
-        return new RoleView(
-            entity.getId(),
-            entity.getCode(),
-            entity.getName(),
-            entity.getDescription(),
-            Boolean.TRUE.equals(entity.getEnabled()),
-            entity.getVersion(),
-            entity.getCreatedAt(),
-            entity.getUpdatedAt()
-        );
     }
 }

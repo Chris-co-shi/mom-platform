@@ -1,17 +1,18 @@
 package io.github.chrisshi.mom.auth.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.auth.application.model.PermissionView;
 import io.github.chrisshi.mom.auth.infrastructure.entity.PermissionEntity;
 import io.github.chrisshi.mom.auth.infrastructure.entity.RolePermissionEntity;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.PermissionMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RolePermissionMapper;
+import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
+import io.github.chrisshi.mom.data.page.PageAdapter;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 /** Permission 目录管理与引用保护。 */
 @Component
@@ -43,24 +44,22 @@ public class PermissionApplication {
                 exception
             );
         }
-        return toView(entity);
+        return PermissionView.from(entity);
     }
 
     public PermissionView get(String id) {
-        return toView(requirePermission(id));
+        return PermissionView.from(requirePermission(id));
     }
 
     public PageResult<PermissionView> list(long pageNo, int pageSize) {
-        long total = permissionMapper.countActive();
-        long totalPages = totalPages(total, pageSize);
-        if (total == 0 || pageNo > totalPages) {
-            return new PageResult<>(List.of(), pageNo, pageSize, total, totalPages);
-        }
-        long offset = (pageNo - 1) * pageSize;
-        List<PermissionView> records = permissionMapper.selectPage(pageSize, offset).stream()
-            .map(PermissionApplication::toView)
-            .toList();
-        return new PageResult<>(records, pageNo, pageSize, total, totalPages);
+        Page<PermissionEntity> page = PageAdapter.toPage(new PageQuery<>(null, pageNo, pageSize));
+        permissionMapper.selectPage(
+            page,
+            new LambdaQueryWrapper<PermissionEntity>()
+                .orderByAsc(PermissionEntity::getCode)
+                .orderByAsc(PermissionEntity::getId)
+        );
+        return PageAdapter.toResult(page, PermissionView::from);
     }
 
     @Transactional
@@ -73,7 +72,7 @@ public class PermissionApplication {
         if (permissionMapper.updateById(entity) != 1) {
             throw new AuthException(AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
         }
-        return toView(entity);
+        return PermissionView.from(entity);
     }
 
     @Transactional
@@ -113,20 +112,9 @@ public class PermissionApplication {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    private static long totalPages(long total, int pageSize) {
-        return total == 0 ? 0 : ((total - 1) / pageSize) + 1;
-    }
-
     private static void requireVersion(Long actual, long expected) {
         if (actual == null || actual.longValue() != expected) {
             throw new AuthException(AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
         }
-    }
-
-    private static PermissionView toView(PermissionEntity entity) {
-        return new PermissionView(
-            entity.getId(), entity.getCode(), entity.getName(), entity.getDescription(),
-            Boolean.TRUE.equals(entity.getEnabled()), entity.getVersion(), entity.getCreatedAt(), entity.getUpdatedAt()
-        );
     }
 }
