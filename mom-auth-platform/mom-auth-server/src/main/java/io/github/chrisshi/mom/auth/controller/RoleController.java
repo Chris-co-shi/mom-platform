@@ -1,13 +1,13 @@
 package io.github.chrisshi.mom.auth.controller;
 
 import io.github.chrisshi.mom.auth.application.RoleApplication;
-import io.github.chrisshi.mom.auth.application.model.PageView;
 import io.github.chrisshi.mom.auth.controller.request.CreateRoleRequest;
 import io.github.chrisshi.mom.auth.controller.request.ReplaceRolePermissionsRequest;
 import io.github.chrisshi.mom.auth.controller.request.UpdateRoleRequest;
-import io.github.chrisshi.mom.auth.controller.response.OffsetPageResponse;
 import io.github.chrisshi.mom.auth.controller.response.PermissionResponse;
 import io.github.chrisshi.mom.auth.controller.response.RoleResponse;
+import io.github.chrisshi.mom.core.page.PageResult;
+import io.github.chrisshi.mom.webmvc.response.Result;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/** 角色管理 HTTP API；业务规则和关系事务由 RoleApplication 负责。 */
 @RestController
 @RequestMapping("/roles")
 public class RoleController {
@@ -39,57 +40,58 @@ public class RoleController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('auth:role:write')")
-    public RoleResponse create(@Valid @RequestBody CreateRoleRequest request) {
-        return RoleResponse.from(roleApplication.create(
+    public Result<RoleResponse> create(@Valid @RequestBody CreateRoleRequest request) {
+        return Result.success(RoleResponse.from(roleApplication.create(
             request.code(), request.name(), request.description(), request.enabled()
-        ));
+        )));
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('auth:role:read')")
-    public OffsetPageResponse<RoleResponse> list(
-        @RequestParam(defaultValue = "50") @Min(1) @Max(200) int limit,
-        @RequestParam(defaultValue = "0") @Min(0) long offset
+    public Result<PageResult<RoleResponse>> list(
+        @RequestParam(defaultValue = "1") @Min(1) long pageNo,
+        @RequestParam(defaultValue = "50") @Min(1) @Max(200) int pageSize
     ) {
-        PageView<io.github.chrisshi.mom.auth.application.model.RoleView> page = roleApplication.list(limit, offset);
-        return new OffsetPageResponse<>(page.items().stream().map(RoleResponse::from).toList(), page.total(), limit, offset);
+        return Result.success(roleApplication.list(pageNo, pageSize).map(RoleResponse::from));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('auth:role:read')")
-    public RoleResponse get(@PathVariable String id) {
-        return RoleResponse.from(roleApplication.get(id));
+    public Result<RoleResponse> get(@PathVariable String id) {
+        return Result.success(RoleResponse.from(roleApplication.get(id)));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('auth:role:write')")
-    public RoleResponse update(@PathVariable String id, @Valid @RequestBody UpdateRoleRequest request) {
-        return RoleResponse.from(roleApplication.update(
+    public Result<RoleResponse> update(@PathVariable String id, @Valid @RequestBody UpdateRoleRequest request) {
+        return Result.success(RoleResponse.from(roleApplication.update(
             id, request.name(), request.description(), request.enabled(), request.version()
-        ));
+        )));
     }
 
     @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAuthority('auth:role:write')")
-    public void delete(@PathVariable String id) {
+    public Result<Void> delete(@PathVariable String id) {
         roleApplication.delete(id);
+        return Result.success();
     }
 
     @GetMapping("/{id}/permissions")
     @PreAuthorize("hasAuthority('auth:role:read')")
-    public List<PermissionResponse> permissions(@PathVariable String id) {
-        return roleApplication.permissions(id).stream().map(PermissionResponse::from).toList();
+    public Result<List<PermissionResponse>> permissions(@PathVariable String id) {
+        return Result.success(roleApplication.permissions(id).stream().map(PermissionResponse::from).toList());
     }
 
     @PutMapping("/{id}/permissions")
     @PreAuthorize("hasAuthority('auth:role:write')")
-    public List<PermissionResponse> replacePermissions(
+    public Result<List<PermissionResponse>> replacePermissions(
         @PathVariable String id,
         @Valid @RequestBody ReplaceRolePermissionsRequest request
     ) {
-        return roleApplication.replacePermissions(id, request.permissionIds()).stream()
-            .map(PermissionResponse::from)
-            .toList();
+        return Result.success(
+            roleApplication.replacePermissions(id, request.permissionIds()).stream()
+                .map(PermissionResponse::from)
+                .toList()
+        );
     }
 }

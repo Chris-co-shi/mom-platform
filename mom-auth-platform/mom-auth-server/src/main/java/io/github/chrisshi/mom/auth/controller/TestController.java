@@ -1,17 +1,15 @@
 package io.github.chrisshi.mom.auth.controller;
 
+import io.github.chrisshi.mom.webmvc.response.Result;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * @author 史偕成
- * @date 2026/09/03 17:25
- **/
+/** 仅用于 Gateway/Auth 联调与限流验证的公开测试端点。 */
 @RestController
 public class TestController {
 
     @GetMapping("/test")
-    public String test() {
-        return "hello world";
+    public Result<String> test() {
+        return Result.success("hello world");
     }
 }

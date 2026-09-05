@@ -1,17 +1,19 @@
 package io.github.chrisshi.mom.auth.application;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import io.github.chrisshi.mom.auth.application.model.LoginView;
 import io.github.chrisshi.mom.auth.infrastructure.configuration.AuthProperties;
-import io.github.chrisshi.mom.auth.infrastructure.entity.UserEntity;
-import io.github.chrisshi.mom.auth.infrastructure.mapper.UserMapper;
-import io.github.chrisshi.mom.auth.infrastructure.query.AuthenticationQueryMapper;
+import io.github.chrisshi.mom.auth.infrastructure.security.AuthUserPrincipal;
 import io.github.chrisshi.mom.security.token.MomTokenPrincipal;
 import io.github.chrisshi.mom.security.token.MomTokenStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.authentication.BadCredentialsException;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -22,7 +24,6 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -31,26 +32,20 @@ import static org.mockito.Mockito.when;
 
 class AuthenticationApplicationTest {
 
-    private static final Instant NOW = Instant.parse("2026-09-04T00:00:00Z");
+    private static final Instant NOW = Instant.parse("2026-09-05T00:00:00Z");
 
-    private UserMapper userMapper;
-    private AuthenticationQueryMapper authenticationQueryMapper;
-    private PasswordEncoder passwordEncoder;
+    private AuthenticationManager authenticationManager;
     private MomTokenStore tokenStore;
     private AuthenticationApplication application;
 
     @BeforeEach
     void setUp() {
-        userMapper = mock(UserMapper.class);
-        authenticationQueryMapper = mock(AuthenticationQueryMapper.class);
-        passwordEncoder = mock(PasswordEncoder.class);
+        authenticationManager = mock(AuthenticationManager.class);
         tokenStore = mock(MomTokenStore.class);
         AuthProperties properties = new AuthProperties();
         properties.setAccessTokenTtl(Duration.ofHours(8));
         application = new AuthenticationApplication(
-            userMapper,
-            authenticationQueryMapper,
-            passwordEncoder,
+            authenticationManager,
             tokenStore,
             properties,
             Clock.fixed(NOW, ZoneOffset.UTC)
@@ -58,23 +53,23 @@ class AuthenticationApplicationTest {
     }
 
     @Test
-    void shouldIssueOpaqueTokenForValidCredentials() {
-        UserEntity user = user("1001", true);
-        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user);
-        when(passwordEncoder.matches("Admin@123456", "{bcrypt}hash")).thenReturn(true);
-        when(authenticationQueryMapper.selectAuthoritiesByUserId("1001"))
-            .thenReturn(List.of("ROLE_PLATFORM_ADMIN", "auth:user:read"));
+    void shouldDelegateCredentialAuthenticationAndIssueOpaqueToken() {
+        AuthUserPrincipal principal = principal(true);
+        when(authenticationManager.authenticate(any(Authentication.class))).thenReturn(authenticated(principal));
 
         LoginView result = application.login(" Admin ", "Admin@123456");
+
+        ArgumentCaptor<Authentication> authenticationCaptor = ArgumentCaptor.forClass(Authentication.class);
+        verify(authenticationManager).authenticate(authenticationCaptor.capture());
+        assertThat(authenticationCaptor.getValue().getPrincipal()).isEqualTo("admin");
+        assertThat(authenticationCaptor.getValue().getCredentials()).isEqualTo("Admin@123456");
 
         assertThat(result.tokenType()).isEqualTo("Bearer");
         assertThat(result.accessToken()).hasSize(43);
         assertThat(result.expiresAt()).isEqualTo(NOW.plus(Duration.ofHours(8)));
 
-        ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<MomTokenPrincipal> principalCaptor = ArgumentCaptor.forClass(MomTokenPrincipal.class);
-        verify(tokenStore).store(tokenCaptor.capture(), principalCaptor.capture());
-        assertThat(tokenCaptor.getValue()).isEqualTo(result.accessToken());
+        verify(tokenStore).store(any(String.class), principalCaptor.capture());
         assertThat(principalCaptor.getValue().userId()).isEqualTo("1001");
         assertThat(principalCaptor.getValue().authorities())
             .containsExactly("ROLE_PLATFORM_ADMIN", "auth:user:read");
@@ -82,8 +77,9 @@ class AuthenticationApplicationTest {
     }
 
     @Test
-    void shouldHideUnknownUserAndWrongPasswordBehindSameError() {
-        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+    void shouldMapBadCredentialsToStableAuthError() {
+        when(authenticationManager.authenticate(any(Authentication.class)))
+            .thenThrow(new BadCredentialsException("bad credentials"));
 
         AuthException exception = expectAuthException(() -> application.login("missing", "wrong-password"));
 
@@ -92,10 +88,9 @@ class AuthenticationApplicationTest {
     }
 
     @Test
-    void shouldRejectDisabledAccountAfterPasswordVerification() {
-        UserEntity user = user("1001", false);
-        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user);
-        when(passwordEncoder.matches(eq("Admin@123456"), eq("{bcrypt}hash"))).thenReturn(true);
+    void shouldMapDisabledAccountFromSpringSecurity() {
+        when(authenticationManager.authenticate(any(Authentication.class)))
+            .thenThrow(new DisabledException("disabled"));
 
         AuthException exception = expectAuthException(() -> application.login("admin", "Admin@123456"));
 
@@ -104,11 +99,20 @@ class AuthenticationApplicationTest {
     }
 
     @Test
+    void shouldFailClosedWhenAuthenticationInfrastructureIsUnavailable() {
+        when(authenticationManager.authenticate(any(Authentication.class)))
+            .thenThrow(new InternalAuthenticationServiceException("database unavailable"));
+
+        AuthException exception = expectAuthException(() -> application.login("admin", "Admin@123456"));
+
+        assertThat(exception.errorCode()).isEqualTo(AuthErrorCode.AUTHENTICATION_SERVICE_UNAVAILABLE);
+        verify(tokenStore, never()).store(any(), any());
+    }
+
+    @Test
     void shouldFailLoginWhenTokenStoreIsUnavailable() {
-        UserEntity user = user("1001", true);
-        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user);
-        when(passwordEncoder.matches("Admin@123456", "{bcrypt}hash")).thenReturn(true);
-        when(authenticationQueryMapper.selectAuthoritiesByUserId("1001")).thenReturn(List.of());
+        AuthUserPrincipal principal = principal(true);
+        when(authenticationManager.authenticate(any(Authentication.class))).thenReturn(authenticated(principal));
         doThrow(new IllegalStateException("redis unavailable")).when(tokenStore).store(any(), any());
 
         AuthException exception = expectAuthException(() -> application.login("admin", "Admin@123456"));
@@ -122,6 +126,20 @@ class AuthenticationApplicationTest {
         verify(tokenStore).remove("opaque-token");
     }
 
+    private static UsernamePasswordAuthenticationToken authenticated(AuthUserPrincipal principal) {
+        return new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+    }
+
+    private static AuthUserPrincipal principal(boolean enabled) {
+        return new AuthUserPrincipal(
+            "1001",
+            "admin",
+            "{bcrypt}hash",
+            enabled,
+            List.of("ROLE_PLATFORM_ADMIN", "auth:user:read")
+        );
+    }
+
     private static AuthException expectAuthException(Runnable action) {
         try {
             action.run();
@@ -130,15 +148,5 @@ class AuthenticationApplicationTest {
         } catch (AuthException exception) {
             return exception;
         }
-    }
-
-    private static UserEntity user(String id, boolean enabled) {
-        UserEntity user = new UserEntity();
-        user.setId(id);
-        user.setUsername("admin");
-        user.setPasswordHash("{bcrypt}hash");
-        user.setDisplayName("平台管理员");
-        user.setEnabled(enabled);
-        return user;
     }
 }

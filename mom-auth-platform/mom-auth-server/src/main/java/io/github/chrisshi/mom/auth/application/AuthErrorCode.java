@@ -2,9 +2,20 @@ package io.github.chrisshi.mom.auth.application;
 
 import io.github.chrisshi.mom.core.error.ErrorCode;
 
+/**
+ * Mini Auth 稳定错误码。
+ *
+ * <p>code 是调用方可依赖的机器契约；messageKey 仅预留未来国际化能力，
+ * V1 不启用 MessageSource/Locale 转换。</p>
+ */
 public enum AuthErrorCode implements ErrorCode {
     INVALID_CREDENTIALS("auth.invalid_credentials", "auth.error.invalid-credentials", "用户名或密码错误"),
     ACCOUNT_DISABLED("auth.account_disabled", "auth.error.account-disabled", "账号已停用"),
+    AUTHENTICATION_SERVICE_UNAVAILABLE(
+        "auth.authentication_service_unavailable",
+        "auth.error.authentication-service-unavailable",
+        "认证服务暂时不可用"
+    ),
     RESOURCE_NOT_FOUND("auth.resource_not_found", "auth.error.resource-not-found", "资源不存在"),
     USERNAME_CONFLICT("auth.username_conflict", "auth.error.username-conflict", "用户名已存在"),
     ROLE_CODE_CONFLICT("auth.role_code_conflict", "auth.error.role-code-conflict", "角色编码已存在"),

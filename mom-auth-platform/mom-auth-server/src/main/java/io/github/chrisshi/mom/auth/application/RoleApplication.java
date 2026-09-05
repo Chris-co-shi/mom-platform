@@ -1,7 +1,6 @@
 package io.github.chrisshi.mom.auth.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import io.github.chrisshi.mom.auth.application.model.PageView;
 import io.github.chrisshi.mom.auth.application.model.PermissionView;
 import io.github.chrisshi.mom.auth.application.model.RoleView;
 import io.github.chrisshi.mom.auth.infrastructure.entity.PermissionEntity;
@@ -12,6 +11,7 @@ import io.github.chrisshi.mom.auth.infrastructure.mapper.PermissionMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RoleMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RolePermissionMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.UserRoleMapper;
+import io.github.chrisshi.mom.core.page.PageResult;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +20,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+/** 角色管理及 Role-Permission 关系编排。 */
 @Component
 public class RoleApplication {
 
@@ -61,9 +62,17 @@ public class RoleApplication {
         return toView(requireRole(id));
     }
 
-    public PageView<RoleView> list(int limit, long offset) {
-        List<RoleView> items = roleMapper.selectPage(limit, offset).stream().map(RoleApplication::toView).toList();
-        return new PageView<>(items, roleMapper.countActive());
+    public PageResult<RoleView> list(long pageNo, int pageSize) {
+        long total = roleMapper.countActive();
+        long totalPages = totalPages(total, pageSize);
+        if (total == 0 || pageNo > totalPages) {
+            return new PageResult<>(List.of(), pageNo, pageSize, total, totalPages);
+        }
+        long offset = (pageNo - 1) * pageSize;
+        List<RoleView> records = roleMapper.selectPage(pageSize, offset).stream()
+            .map(RoleApplication::toView)
+            .toList();
+        return new PageResult<>(records, pageNo, pageSize, total, totalPages);
     }
 
     @Transactional
@@ -160,6 +169,10 @@ public class RoleApplication {
         }
         String trimmed = value.strip();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static long totalPages(long total, int pageSize) {
+        return total == 0 ? 0 : ((total - 1) / pageSize) + 1;
     }
 
     private static void requireVersion(Long actual, long expected) {

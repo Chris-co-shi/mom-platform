@@ -2,28 +2,25 @@
 
 - 状态：Current
 - 当前事实来源：`fix/mini-auth`
+- 最近更新：2026-09-05
 - 模块：`mom-auth-platform/mom-auth-server`
 - 认证决策：[ADR-040](../adr/ADR-040-Mini-Auth与Redis-Opaque-Token认证基线.md)
 - 分层决策：[ADR-042](../adr/ADR-042-MOM渐进式分层与对象模型.md)
 - 数据关联决策：[ADR-026](../adr/ADR-026-MOM业务表禁止物理外键与关联完整性策略.md)
 
-## 1. 当前目标与状态
+## 1. 当前目标
 
-Mini Auth V1 已实现最小认证授权闭环：
+Mini Auth V1 保持最小闭环：
 
 ```text
 User → Role → Permission → Login → Opaque Token → Resource Server → Logout
 ```
 
-V1 不包含 Employee/Organization、OAuth Client、Session、Refresh Token、OIDC、JWT 或通用数据范围模型。
+不包含 Employee/Organization、OAuth Client、Session、Refresh Token、OIDC、JWT 或通用数据范围模型。
 
 ## 2. 数据库
 
-Auth 使用 PostgreSQL 独立 Schema：
-
-```text
-mom_auth
-```
+PostgreSQL Schema：`mom_auth`。
 
 核心表：
 
@@ -35,47 +32,14 @@ mom_auth
 | `auth_user_role` | 用户角色关系 |
 | `auth_role_permission` | 角色权限关系 |
 
-Flyway：
-
-```text
-V1__create_auth_core_tables.sql
-V2__seed_platform_admin.sql
-V3__seed_auth_management_permissions.sql
-```
-
 按 ADR-026 不建立物理外键；关系完整性由 Application、本地事务、唯一约束、索引和测试共同维护。
 
 Token 不保存到 PostgreSQL，由 `mom-security.MomTokenStore` 保存到 Redis。
 
-## 3. Entity
-
-```text
-UserEntity             extends BaseEntity
-RoleEntity             extends BaseEntity
-PermissionEntity       extends BaseEntity
-UserRoleEntity         extends BaseCreatedEntity
-RolePermissionEntity   extends BaseCreatedEntity
-```
-
-普通可更新实体具有：
-
-```text
-String id
-createdAt / createdBy
-updatedAt / updatedBy
-version
-deleted
-```
-
-关系表只需要 String ID 与创建审计，不机械继承乐观锁/逻辑删除。
-
-## 4. 代码分层
-
-Mini Auth 按 ADR-042 使用 Level 1：
+## 3. 当前代码分层
 
 ```text
 io.github.chrisshi.mom.auth
-├── AuthApplication
 ├── controller
 │   ├── request
 │   └── response
@@ -85,7 +49,8 @@ io.github.chrisshi.mom.auth
     ├── configuration
     ├── entity
     ├── mapper
-    └── query
+    ├── query
+    └── security
 ```
 
 依赖：
@@ -94,13 +59,20 @@ io.github.chrisshi.mom.auth
 controller → application → infrastructure
 ```
 
-Controller 不直接访问 Mapper/Entity；Application 可以直接依赖本 bounded context Mapper/Entity/QueryMapper。
+Controller 不直接访问 Mapper/Entity/Redis/PasswordEncoder；Application 可以直接依赖本 bounded context 的具体 Infrastructure。Mini Auth V1 不创建无业务价值的 Domain、Repository Port、Adapter、Converter 或 MyBatis-Plus `IService/ServiceImpl`。
 
-当前没有 Domain、Repository Port、Repository Adapter、Converter 或 MyBatis-Plus `IService/ServiceImpl`。
+`infrastructure/security` 存放 Spring Security 适配：
 
-## 5. 对象模型
+```text
+AuthUserDetailsService
+AuthUserPrincipal
+```
 
-遵守 ADR-042 的 3+1 规则：
+它们存在的理由是隔离 Spring Security 与数据库 Entity，而不是为了形成新的架构层。
+
+## 4. 对象模型
+
+继续遵守 ADR-042：
 
 ```text
 Request / Response  HTTP 契约
@@ -109,163 +81,165 @@ View                Application 输出
 Row / Projection    仅复杂 SQL 确实需要时出现
 ```
 
-当前 Login authority JOIN 直接返回 `List<String>`，因此没有为了形式创建只有一个字段的 Projection。
+新增约束：
 
-## 6. Mapper 与 QueryMapper
+- `UserEntity` 不实现 `UserDetails`；
+- Spring Security Principal 使用独立 `AuthUserPrincipal`；
+- `Result<T>` 是 HTTP 返回信封，位于 `mom-webmvc`，不得成为 Application 返回模型；
+- 通用分页直接使用 `mom-core.PageResult<T>`，不得再增加只复制分页字段的 Auth 私有 View/Response。
 
-普通单表持久化：
+## 5. 分页
+
+对外分页统一为：
 
 ```text
-UserMapper
-RoleMapper
-PermissionMapper
-UserRoleMapper
-RolePermissionMapper
+pageNo + pageSize
+        ↓
+Application
+        ↓
+PageResult<T>
 ```
 
-均使用 `MomBaseMapper<T>`。
-
-复杂读取只有：
+`PageResult<T>`：
 
 ```text
-AuthenticationQueryMapper
+records / pageNo / pageSize / total / totalPages
 ```
 
-它通过 XML JOIN：
+Controller 可通过 `PageResult.map(...)` 完成 Application View → HTTP Response 的记录转换，同时保留分页元数据。
 
-```text
-auth_user_role
-→ auth_role
-→ auth_role_permission
-→ auth_permission
+Mapper 继续使用：
+
+```sql
+LIMIT #{limit} OFFSET #{offset}
 ```
 
-输出已启用、未删除的：
+这是数据库实现细节，不再泄露为 `/users?limit=&offset=` 形式的公共分页协议。
+
+## 6. 用户名密码认证
+
+认证职责现在拆为：
 
 ```text
-ROLE_<role.code>
-permission.code
-```
-
-QueryMapper 不继承 `MomBaseMapper<?>`，因为多表查询不存在一个真实单表 Entity 泛型。
-
-## 7. Application
-
-```text
-UserApplication
-RoleApplication
-PermissionApplication
 AuthenticationApplication
+        ↓
+AuthenticationManager
+        ↓
+ProviderManager
+        ↓
+DaoAuthenticationProvider
+        ├── AuthUserDetailsService
+        └── PasswordEncoder
+        ↓
+AuthUserPrincipal
 ```
 
-`UserApplication`：
+`AuthUserDetailsService`：加载 User + Role/Permission authorities。
 
-- username 创建时 `strip + lowercase(Locale.ROOT)`；
-- 密码写入前 BCrypt；
-- User CRUD；
-- 管理员密码重置；
-- User-Role 查询与整体替换；
-- 删除前检查 UserRole 引用。
+`DaoAuthenticationProvider`：使用 Spring Security 原生能力完成密码验证和 enabled 状态检查。
 
-`RoleApplication`：Role CRUD、Role-Permission 查询/整体替换、删除引用保护。
+`AuthUserPrincipal`：
 
-`PermissionApplication`：Permission CRUD、删除引用保护。
+```text
+userId          稳定 MOM 身份
+username        登录名称
+password        仅认证阶段使用，成功后由 ProviderManager 清理
+Authorities     ROLE_* + permission.code
+```
 
-`AuthenticationApplication`：密码认证、authority 聚合、Opaque Token 签发、TokenStore 写入与当前 Token Logout。
+`AuthenticationApplication` 不再直接注入 `UserMapper`、`AuthenticationQueryMapper`、`PasswordEncoder` 做手工密码认证，只接收认证完成的 Principal 并签发 Opaque Token。
 
-## 8. 密码
+## 7. 密码与 Token
 
-数据库只保存 `password_hash`。
-
-V1 使用：
+密码继续使用：
 
 ```text
 DelegatingPasswordEncoder
-└── bcrypt cost 12
+└── BCrypt strength 12
 ```
 
-编码格式：
+编码格式：`{bcrypt}$2...`。
+
+认证成功后 MOM 自己负责：
 
 ```text
-{bcrypt}$2...
+SecureRandom 32 bytes
+→ Base64URL raw token
+→ MomTokenPrincipal(userId, authorities, expiresAt)
+→ MomTokenStore
+→ Redis
 ```
 
-密码不得进入 Response、日志、Trace 或审计事件，也不得自动 Trim/大小写转换。
+因此“使用 Spring Security 原生认证组件”不等于改用 Session/JWT，也不改变已有 Redis Opaque Token 架构。
 
-## 9. 管理权限
+## 8. HTTP 返回边界
 
-平台管理员角色 `PLATFORM_ADMIN` 没有角色名后门。V3 显式授予：
+Controller 统一：
 
 ```text
-auth:user:read
-auth:user:write
-auth:role:read
-auth:role:write
-auth:permission:read
-auth:permission:write
+Result<T>
+├── code
+├── message
+└── data
 ```
 
-Controller 通过 `@PreAuthorize` 使用这些稳定 Permission Code。
+规则：
 
-## 10. 乐观锁、删除与关系
+1. Controller 负责 Result 包装；
+2. Application 返回 View/PageResult/业务结果，不返回 Result；
+3. 创建接口仍可返回 HTTP 201；认证失败仍 401、权限/账号状态等继续使用真实 HTTP 状态；
+4. 删除/Logout 返回 `Result<Void>`，不再用 204 空响应破坏统一信封；
+5. Bean Validation 与业务异常也转换为 Result；
+6. V1 只使用默认消息，`messageKey` 继续仅作为国际化预留。
 
-User/Role/Permission 更新要求客户端携带当前 `version`；版本不匹配或并发更新失败返回 409。
+## 9. RBAC 与关系完整性
 
-删除使用逻辑删除，但关系表采用物理删除。
-
-为了避免隐藏级联：
-
-- User 仍有 Role 时不能删除；
-- Role 仍被 User 使用或仍有 Permission 时不能删除；
-- Permission 仍被 Role 使用时不能删除。
-
-关系整体替换在本地事务中执行，目标 ID 必须先通过存在性校验。
-
-## 11. HTTP 路径与 Gateway
-
-Gateway：
+运行时 authority：
 
 ```text
-/auth/** → StripPrefix=1 → mom-auth-server
+Role PLATFORM_ADMIN → ROLE_PLATFORM_ADMIN
+Permission auth:user:read → auth:user:read
 ```
 
-所以外部：
+User/Role/Permission 删除前检查关系引用，不做隐藏级联；关系整体替换在本地事务中完成。
 
-```text
-/auth/login
-/auth/logout
-/auth/users
-/auth/roles
-/auth/permissions
-```
+## 10. 注释规范
 
-对应 Auth Server：
+Mini Auth 不要求逐行注释。必须注释的是“删除代码后无法从语法直接恢复的设计意图”：
 
-```text
-/login
-/logout
-/users
-/roles
-/permissions
-```
+- 类在分层中的职责边界；
+- 为什么 UserEntity 与 UserDetails 分离；
+- Spring Security 与 MOM Opaque Token 的责任边界；
+- V1 为什么账号锁定/过期/密码过期固定返回 true；
+- 安全相关行为（凭据清理、Token 存储等）；
+- 未来维护者容易误判为遗漏的 V1 限制。
 
-仅 `/login` 与联调 `/test` 是 public path；`/logout` 和管理 API 均由 Resource Server 认证。
+禁止 `// 查询用户`、`// 判断为空` 这类只翻译代码的注释。
 
-## 12. 当前测试
+## 11. 2026-09-05 迭代更新
 
-当前新增单元测试覆盖认证核心行为：
+本轮从“能跑的 Mini Auth”继续向“可解释、可掌控”收敛：
 
-- 有效凭据签发 256-bit Opaque Token；
-- 未知账号/错误密码统一认证失败；
-- disabled 用户拒绝登录；
-- TokenStore 故障 Login Fail Closed；
-- Logout 删除当前 Token；
-- V2 管理员 `{bcrypt}` 种子密码与当前 PasswordEncoder 兼容。
+| 项目 | 旧实现 | 当前规范 |
+|---|---|---|
+| HTTP 返回 | Response/ProblemDetail/204 混用 | Controller 统一 `Result<T>` + 真实 HTTP status |
+| 分页 | `PageView` + `OffsetPageResponse` + limit/offset | `mom-core.PageResult<T>` + pageNo/pageSize |
+| 登录认证 | Application 手工查用户、matches、enabled | Spring Security `AuthenticationManager/DaoAuthenticationProvider/UserDetailsService` |
+| Principal | 无独立登录 Principal | `AuthUserPrincipal`，与 `UserEntity` 分离 |
+| 注释 | 关键边界说明不足 | 只补设计原因、安全语义和 V1 边界 |
 
-由于当前执行环境无法解析 `github.com`，本轮无法在执行容器内实际运行 Maven；测试是否通过必须以开发机/CI 的真实 `mvn test` 结果为准。
+明确未做：i18n 运行时转换、JWT、Refresh Token、Session、OAuth Client、SSO/OIDC、额外 Domain/Port/Adapter。
 
-## 13. 已知 V1 边界
+## 12. 测试状态说明
 
-已经签发的 Token 是登录时 authority 快照。User/Role/Permission 后续修改不会自动刷新已有 Token；当前只通过 Logout 或 TTL 到期失效。
+认证单元测试已同步为 `AuthenticationManager` 委托模型，并覆盖：
 
-若后续出现“停用用户或撤权必须立即使其所有 Token 失效”的明确需求，再增加用户级 Token 撤销机制，而不是在 V1 预建完整 Session 子系统。
+- username 规范化后交给 Spring Security；
+- 成功认证后签发 256-bit Opaque Token；
+- BadCredentials → 稳定认证失败错误；
+- Disabled → 账号停用错误；
+- Authentication Infrastructure 故障 Fail Closed；
+- TokenStore 故障 Fail Closed；
+- Logout 删除当前 Token。
+
+当前执行环境无法解析 `github.com`，因此本次修改不能在本地执行 Maven；测试通过与否必须以后续开发机/CI 的真实执行结果为准。

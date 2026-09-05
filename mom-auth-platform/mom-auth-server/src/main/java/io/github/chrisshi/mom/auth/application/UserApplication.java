@@ -1,7 +1,6 @@
 package io.github.chrisshi.mom.auth.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import io.github.chrisshi.mom.auth.application.model.PageView;
 import io.github.chrisshi.mom.auth.application.model.RoleView;
 import io.github.chrisshi.mom.auth.application.model.UserView;
 import io.github.chrisshi.mom.auth.infrastructure.entity.RoleEntity;
@@ -10,6 +9,7 @@ import io.github.chrisshi.mom.auth.infrastructure.entity.UserRoleEntity;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RoleMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.UserMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.UserRoleMapper;
+import io.github.chrisshi.mom.core.page.PageResult;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+/** 用户管理及 User-Role 关系编排。 */
 @Component
 public class UserApplication {
 
@@ -63,9 +64,17 @@ public class UserApplication {
         return toView(requireUser(id));
     }
 
-    public PageView<UserView> list(int limit, long offset) {
-        List<UserView> items = userMapper.selectPage(limit, offset).stream().map(UserApplication::toView).toList();
-        return new PageView<>(items, userMapper.countActive());
+    public PageResult<UserView> list(long pageNo, int pageSize) {
+        long total = userMapper.countActive();
+        long totalPages = totalPages(total, pageSize);
+        if (total == 0 || pageNo > totalPages) {
+            return new PageResult<>(List.of(), pageNo, pageSize, total, totalPages);
+        }
+        long offset = (pageNo - 1) * pageSize;
+        List<UserView> records = userMapper.selectPage(pageSize, offset).stream()
+            .map(UserApplication::toView)
+            .toList();
+        return new PageResult<>(records, pageNo, pageSize, total, totalPages);
     }
 
     @Transactional
@@ -167,6 +176,10 @@ public class UserApplication {
 
     private static String normalizeUsername(String username) {
         return username.strip().toLowerCase(Locale.ROOT);
+    }
+
+    private static long totalPages(long total, int pageSize) {
+        return total == 0 ? 0 : ((total - 1) / pageSize) + 1;
     }
 
     private static void requireVersion(Long actual, long expected) {

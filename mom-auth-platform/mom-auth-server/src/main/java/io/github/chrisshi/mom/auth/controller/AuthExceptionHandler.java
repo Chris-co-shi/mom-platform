@@ -3,12 +3,9 @@ package io.github.chrisshi.mom.auth.controller;
 import io.github.chrisshi.mom.auth.application.AuthErrorCode;
 import io.github.chrisshi.mom.auth.application.AuthException;
 import io.github.chrisshi.mom.auth.controller.response.FieldErrorResponse;
-import io.github.chrisshi.mom.core.context.CorrelationContext;
-import jakarta.servlet.http.HttpServletRequest;
+import io.github.chrisshi.mom.webmvc.response.Result;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -16,63 +13,43 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
-import java.net.URI;
 import java.util.List;
 
+/**
+ * Mini Auth HTTP 异常适配器。
+ *
+ * <p>异常继续使用真实 HTTP 状态码，同时响应体统一为 {@link Result}。
+ * V1 仅使用 ErrorCode.defaultMessage，不启用 MessageSource/Locale 转换。</p>
+ */
 @RestControllerAdvice(basePackages = "io.github.chrisshi.mom.auth.controller")
 public class AuthExceptionHandler {
 
     @ExceptionHandler(AuthException.class)
-    ResponseEntity<ProblemDetail> handleAuthException(AuthException exception, HttpServletRequest request) {
+    ResponseEntity<Result<Void>> handleAuthException(AuthException exception) {
         HttpStatus status = statusOf(exception.errorCode());
-        ProblemDetail problem = problem(status, exception.getMessage(), exception.errorCode().code(), request);
-        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(problem);
+        return ResponseEntity.status(status).body(
+            Result.failure(exception.errorCode().code(), exception.getMessage())
+        );
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    ResponseEntity<ProblemDetail> handleBodyValidation(MethodArgumentNotValidException exception, HttpServletRequest request) {
+    ResponseEntity<Result<List<FieldErrorResponse>>> handleBodyValidation(MethodArgumentNotValidException exception) {
         List<FieldErrorResponse> fieldErrors = exception.getBindingResult().getFieldErrors().stream()
             .map(AuthExceptionHandler::toFieldError)
             .toList();
-        ProblemDetail problem = problem(
-            HttpStatus.BAD_REQUEST,
-            "请求参数校验失败",
-            "request.validation_failed",
-            request
+        return ResponseEntity.badRequest().body(
+            Result.failure("request.validation_failed", "请求参数校验失败", fieldErrors)
         );
-        problem.setProperty("fieldErrors", fieldErrors);
-        return ResponseEntity.badRequest().contentType(MediaType.APPLICATION_PROBLEM_JSON).body(problem);
     }
 
     @ExceptionHandler(HandlerMethodValidationException.class)
-    ResponseEntity<ProblemDetail> handleMethodValidation(
-        HandlerMethodValidationException exception,
-        HttpServletRequest request
-    ) {
+    ResponseEntity<Result<List<FieldErrorResponse>>> handleMethodValidation(HandlerMethodValidationException exception) {
         List<FieldErrorResponse> fieldErrors = exception.getAllErrors().stream()
             .map(AuthExceptionHandler::toMethodFieldError)
             .toList();
-        ProblemDetail problem = problem(
-            HttpStatus.BAD_REQUEST,
-            "请求参数校验失败",
-            "request.validation_failed",
-            request
+        return ResponseEntity.badRequest().body(
+            Result.failure("request.validation_failed", "请求参数校验失败", fieldErrors)
         );
-        problem.setProperty("fieldErrors", fieldErrors);
-        return ResponseEntity.badRequest().contentType(MediaType.APPLICATION_PROBLEM_JSON).body(problem);
-    }
-
-    private static ProblemDetail problem(HttpStatus status, String detail, String code, HttpServletRequest request) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
-        problem.setTitle(status.getReasonPhrase());
-        problem.setType(URI.create("https://mom.example/problems/" + code.replace('.', '-')));
-        problem.setInstance(URI.create(request.getRequestURI()));
-        problem.setProperty("code", code);
-        String correlationId = CorrelationContext.currentId();
-        if (correlationId != null && !correlationId.isBlank()) {
-            problem.setProperty("correlationId", correlationId);
-        }
-        return problem;
     }
 
     private static FieldErrorResponse toFieldError(FieldError error) {
@@ -97,7 +74,7 @@ public class AuthExceptionHandler {
             case RESOURCE_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case USERNAME_CONFLICT, ROLE_CODE_CONFLICT, PERMISSION_CODE_CONFLICT,
                  RESOURCE_REFERENCED, OPTIMISTIC_LOCK_CONFLICT -> HttpStatus.CONFLICT;
-            case TOKEN_STORE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
+            case AUTHENTICATION_SERVICE_UNAVAILABLE, TOKEN_STORE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
         };
     }
 }

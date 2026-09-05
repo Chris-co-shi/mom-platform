@@ -1,18 +1,19 @@
 package io.github.chrisshi.mom.auth.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import io.github.chrisshi.mom.auth.application.model.PageView;
 import io.github.chrisshi.mom.auth.application.model.PermissionView;
 import io.github.chrisshi.mom.auth.infrastructure.entity.PermissionEntity;
 import io.github.chrisshi.mom.auth.infrastructure.entity.RolePermissionEntity;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.PermissionMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RolePermissionMapper;
+import io.github.chrisshi.mom.core.page.PageResult;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+/** Permission 目录管理与引用保护。 */
 @Component
 public class PermissionApplication {
 
@@ -49,11 +50,17 @@ public class PermissionApplication {
         return toView(requirePermission(id));
     }
 
-    public PageView<PermissionView> list(int limit, long offset) {
-        List<PermissionView> items = permissionMapper.selectPage(limit, offset).stream()
+    public PageResult<PermissionView> list(long pageNo, int pageSize) {
+        long total = permissionMapper.countActive();
+        long totalPages = totalPages(total, pageSize);
+        if (total == 0 || pageNo > totalPages) {
+            return new PageResult<>(List.of(), pageNo, pageSize, total, totalPages);
+        }
+        long offset = (pageNo - 1) * pageSize;
+        List<PermissionView> records = permissionMapper.selectPage(pageSize, offset).stream()
             .map(PermissionApplication::toView)
             .toList();
-        return new PageView<>(items, permissionMapper.countActive());
+        return new PageResult<>(records, pageNo, pageSize, total, totalPages);
     }
 
     @Transactional
@@ -104,6 +111,10 @@ public class PermissionApplication {
         }
         String trimmed = value.strip();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static long totalPages(long total, int pageSize) {
+        return total == 0 ? 0 : ((total - 1) / pageSize) + 1;
     }
 
     private static void requireVersion(Long actual, long expected) {
