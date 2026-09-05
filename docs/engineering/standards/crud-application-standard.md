@@ -21,7 +21,7 @@ Infrastructure Mapper / QueryMapper
 
 - Controller/Web：HTTP 绑定、认证接入、Bean Validation、Request/Response、状态码；
 - Application：业务授权、事务、幂等、引用校验、关系编排、状态变更和查询组合；
-- Infrastructure：Entity、Mapper、SQL、Redis/Feign/消息等具体实现。
+- Infrastructure：Entity、Mapper、SQL、Repository、Redis/Feign/消息等具体实现。
 
 Level 1 中 Application **允许直接依赖本 bounded context 的 Mapper、Entity 和具体 Infrastructure**。项目不再为了形式上的依赖倒置强制增加 Domain Repository Port、Repository Adapter 或只做转发的 Application Service 接口。
 
@@ -38,7 +38,7 @@ Controller 仍禁止直接依赖 Mapper/Repository/Entity、声明业务事务�
 - Delete：默认不是 Disable 的别名，执行引用保护、保留期和审计检查；
 - Archive：只有真实历史生命周期需要时引入，保留可追踪、完整性验证和恢复/查询入口。
 
-禁止使用通用 `BaseCrudController`、`BaseCrudService`、泛型 Repository、MyBatis-Plus `IService/ServiceImpl` 统一所有领域生命周期。
+禁止使用通用 `BaseCrudController`、`BaseCrudService`、自定义泛型业务 Repository、MyBatis-Plus `IService/ServiceImpl` 统一所有领域生命周期。这里的“自定义泛型业务 Repository”不等同于 MyBatis-Plus `CrudRepository`；后者是可选的 Infrastructure 复用基类，是否引入按第 6 节判断。
 
 ## 3. 3 + 1 对象模型
 
@@ -94,13 +94,87 @@ Application 对 Entity 的直接使用是当前 Level 1 有意接受的简化，
 - MyBatis-Plus `Page` 仅限 Infrastructure/Application 内部，不能进入 Web/API；
 - 按能力选择 `BaseIdEntity`、`BaseAuditEntity`、`BaseEntity`。
 
+MyBatis-Plus 3.5.17 的 `BaseMapper` 已提供批量主键查询/删除以及 Batch 写能力。批量场景优先评估原生能力，不得因为“需要批量”就机械增加 `CrudRepository`：
+
+```text
+selectByIds(ids)
+deleteByIds(ids)
+insert(entities [, batchSize])
+updateById(entities [, batchSize])
+insertOrUpdate(entities [, batchSize])
+```
+
+其中 Batch 写返回 `List<BatchResult>`；当业务正确性要求确认每项执行结果时，不得只调用后忽略结果。`insertOrUpdate` 只有在业务语义明确允许“存在更新、不存在新增”时才能使用，不能用技术便利替代 Create/Update 的业务规则。
+
 MyBatis-Plus 能清晰表达的操作禁止新增 XML、注解 SQL、重复 Mapper 方法、JdbcTemplate/JdbcClient/NamedParameterJdbcTemplate/SimpleJdbcInsert、`java.sql` 或第二套 JDBC Repository。
 
 Wrapper-only Update 可能跳过实体自动填充；涉及审计/version 时应传 Entity 或显式写全并检查行数，不得静默漏填。
 
 自定义 SQL 仅用于 DSL 不适合的数据库特性或有界多表查询，必须参数化、显式列、说明必要性、处理审计/version、检查 affected rows，并有 PostgreSQL 证据。
 
-## 6. 写入编排
+## 6. Mapper 与 CrudRepository 的选择
+
+### 6.1 默认：Application 直接使用 Mapper
+
+当数据访问只是普通单表 CRUD、分页、批量主键操作或一次性 Wrapper 查询时，保持：
+
+```text
+Application → XxxMapper
+```
+
+不要自动增加：
+
+```text
+XxxRepository extends CrudRepository<XxxMapper, XxxEntity>
+```
+
+“官方提供了 Repository”“项目可能以后变复杂”“需要批量写入”“想让命名更像 Repository”都不是充分理由。
+
+### 6.2 可选：具体 CrudRepository
+
+Level 1 并不禁止 MyBatis-Plus `CrudRepository`。当同一实体的数据访问已经出现**可复用的持久化职责**时，可以引入具体 Repository：
+
+```text
+Application
+    ↓
+XxxRepository extends CrudRepository<XxxMapper, XxxEntity>
+    ↓
+XxxMapper
+```
+
+成立信号包括：
+
+- 多个用例重复相同的数据访问组合，而这些组合属于持久化技术语义，不是业务规则；
+- 需要集中管理批次切分、batchSize、批量执行结果检查、数据库异常转换等技术策略；
+- 同一实体出现多种重复的查询/更新持久化模式，继续散落在 Application 会明显增加数据访问噪音；
+- Repository 已经拥有自己的非平凡方法和可复用职责，而不是只继承 `CrudRepository` 的空壳类。
+
+Level 1 的具体 `XxxRepository` 属于 Infrastructure，可以被 Application 直接依赖，不要求为了它再增加接口。
+
+禁止的模式是“一表一个空 Repository”：
+
+```java
+@Repository
+public class UserRepository extends CrudRepository<UserMapper, UserEntity> {
+}
+```
+
+如果该类没有当前真实职责，只是把 `selectById` 改名为 `getById`、把 `insert` 改名为 `save`，继续直接使用 Mapper。
+
+### 6.3 Level 2/3：Domain Repository Port
+
+当真实 Domain/Port 边界出现后，Repository Port 必须框架无关。此时 Infrastructure Adapter 可以内部继承 `CrudRepository` 复用 MyBatis-Plus 能力，但 Domain/Application 面向的是业务契约而不是 `IRepository`。
+
+因此必须区分：
+
+```text
+CrudRepository              Infrastructure 技术复用
+Domain Repository Port      业务/领域契约
+```
+
+二者不能因为都叫 Repository 就混为同一抽象。
+
+## 7. 写入编排与批量操作
 
 多表写、关系维护和引用完整性由 Application 在明确本地事务中编排。例如 User 分配 Role：
 
@@ -126,9 +200,22 @@ MybatisUserRoleRepository
 
 除非这些抽象已经有独立业务或技术价值。
 
-## 7. 事务、幂等与并发
+批量操作统一要求：
+
+1. 优先使用当前 MyBatis-Plus `BaseMapper` 已有 Batch/ByIds API；
+2. Application 公共方法定义业务事务，批量技术 API 不改变事务所有权；
+3. 每个批量用例必须定义最大条目数，超限拒绝或显式分片，禁止无界 Collection；
+4. 批量写必须定义整体原子性还是允许部分成功；
+5. 重复 ID、重复业务键、空集合和不存在 ID 的语义必须明确；
+6. 需要分片时保持稳定顺序并考虑死锁/锁顺序；
+7. 批量查询避免循环 N+1，优先 `selectByIds`、集合条件或专用有界 Query；
+8. 只有当批量策略本身被多个用例复用时，才考虑把批次切分和执行细节收进 `CrudRepository`。
+
+## 8. 事务、幂等与并发
 
 写事务默认位于 Application 公共方法，传播为 `REQUIRED`。
+
+即使 `CrudRepository.saveBatch/saveOrUpdateBatch/updateBatchById` 自身声明事务，业务原子性仍由外层 Application 定义；不得把 Repository 方法上的 `@Transactional` 误认为完整业务事务边界。
 
 多表业务写、Outbox INSERT 必须按用例要求共享同一 DataSource 和事务；事务内禁止 RocketMQ、设备动作、人工等待和无界远程调用。
 
@@ -136,11 +223,11 @@ MybatisUserRoleRepository
 
 乐观锁通过 Entity + `@Version` 或明确条件更新完成；冲突返回稳定 409，不泄露 SQL/约束名。
 
-所有写入必须检查 affected rows。批量操作定义条目数、单项/整体原子性、重复项语义、锁顺序、超时和失败结果；禁止无界批量和循环远程 N+1。
+所有写入必须检查 affected rows 或等价 Batch 执行结果。批量操作定义条目数、单项/整体原子性、重复项语义、锁顺序、超时和失败结果；禁止无界批量和循环远程 N+1。
 
-## 8. 查询
+## 9. 查询
 
-### 8.1 简单单表查询
+### 9.1 简单单表查询
 
 直接使用普通 Mapper：
 
@@ -150,7 +237,7 @@ Application → Mapper → Entity → View/结果
 
 不创建占位 Query Service、QueryMapper、Projection 或 Repository。
 
-### 8.2 复杂多表查询
+### 9.2 复杂多表查询
 
 当存在真实 JOIN、组合分页、统计、搜索或查询复用时：
 
@@ -168,13 +255,13 @@ View
 
 多表组合结果默认是 Read Model / View，不因关联多张表就称为 DDD Aggregate。
 
-### 8.3 Response 与 View
+### 9.3 Response 与 View
 
 Application 优先返回具有业务语义的 View/Result；Controller 根据 HTTP 契约决定是否转换为独立 Response。
 
 如果 View 与 HTTP 返回形状完全一致、没有基础设施信息且该接口不需要独立协议演进，可以直接作为返回模型，避免只做字段复制的一对一 Response；如果是公开稳定 API、跨模块契约、字段命名/兼容需要独立演进，则必须保留独立 Response/API DTO。
 
-## 9. 分页和排序
+## 10. 分页和排序
 
 分页请求必须有服务端最大 page size、稳定且唯一的次级排序；MyBatis `Page` 不进入公开 Web/API。
 
@@ -182,9 +269,14 @@ Application 优先返回具有业务语义的 View/Result；Controller 根据 HT
 
 一对多分页遵守多表关联规范，禁止直接分页展开后的重复 JOIN 行再解释为主对象页。
 
-## 10. Domain / Repository 升级条件
+## 11. Domain / Repository 升级条件
 
-出现以下信号时，再评估提取 Domain 或 Repository Port：
+必须分别判断“具体持久化 Repository”与“Domain Repository Port”：
+
+- 仅出现可复用持久化技术逻辑时，可以在 Level 1 引入具体 `XxxRepository extends CrudRepository`；
+- 出现业务不变量、聚合一致性、多个实现、ORM 隔离或测试替换等真正架构边界时，再升级 Domain Repository Port。
+
+Domain/Port 升级信号包括：
 
 - Application 出现大量重复状态判断或业务不变量；
 - 多实体必须作为一致性边界共同变化；
@@ -192,18 +284,18 @@ Application 优先返回具有业务语义的 View/Result；Controller 根据 HT
 - 聚合保存需要封装多个持久化动作；
 - 存在多个真实持久化实现；
 - 单元测试确实需要替换不可控基础设施；
-- 同一规则被多个用例重复使用。
+- 同一业务规则被多个用例重复使用。
 
 升级只提取已经存在的复杂度，不提前建立空抽象。
 
-## 11. 审计与错误模型
+## 12. 审计与错误模型
 
 CurrentActor 与统一 MetaObjectHandler 填充审计；缺少可信 Actor 的业务写 fail closed。自定义 SQL 显式写审计字段。
 
 公开错误稳定区分 400 校验、404 不存在、409 唯一/版本/状态冲突、503/504 依赖故障，禁止回显 SQL、连接信息、约束原文、Token 或 Secret。
 
-## 12. 验收证据
+## 13. 验收证据
 
-每个 CRUD Slice 按真实能力覆盖：成功、Bean Validation、唯一冲突、引用不存在、乐观冲突、affected rows、删除/停用/归档保护、幂等重放、批量上限、事务回滚、分页与排序、审计填充、PostgreSQL 特性。
+每个 CRUD Slice 按真实能力覆盖：成功、Bean Validation、唯一冲突、引用不存在、乐观冲突、affected rows/BatchResult、删除/停用/归档保护、幂等重放、批量上限、事务回滚、分页与排序、审计填充、PostgreSQL 特性。
 
 不是所有简单 CRUD 都必须机械制造每一种异常场景；测试范围应与实际生命周期、并发和协议承诺匹配。规范文件存在不等于验收完成，最终实现必须真实采用声明的技术路径。

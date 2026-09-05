@@ -94,7 +94,7 @@ Entity 不得进入 `*-api`/`*-client`，不得直接作为公开 HTTP Request/R
 
 禁止 Lombok `@Data` 和敏感全字段 `toString()`。
 
-## 5. Mapper、Repository 与 Application
+## 5. Mapper、CrudRepository、Domain Repository 与 Application
 
 ### 5.1 Mapper 是默认数据访问入口
 
@@ -103,7 +103,7 @@ Entity 不得进入 `*-api`/`*-client`，不得直接作为公开 HTTP Request/R
 - 位于 `infrastructure.mapper` 或 `infrastructure.persistence.mapper`；
 - 默认继承 `MomBaseMapper<Entity>`；
 - 不承担业务授权、完整事务编排、状态机或跨聚合规则；
-- MyBatis-Plus 已能表达的普通 CRUD 不新增重复 Mapper 方法、注解 SQL或 XML。
+- MyBatis-Plus 已能表达的普通 CRUD/Batch 不新增重复 Mapper 方法、注解 SQL 或 XML。
 
 Level 1 Application 可以直接依赖本 bounded context 的 Mapper 和 Entity：
 
@@ -113,24 +113,32 @@ Controller → Application → Mapper → Entity
 
 这是 ADR-042 明确接受的简化，不属于架构违规。Controller 仍不得直接依赖 Mapper/Entity。
 
-### 5.2 Repository 不是必选包装层
+### 5.2 具体 CrudRepository 是可选 Infrastructure，不是必选包装层
 
 不要因为存在 Mapper 就自动创建：
 
 ```text
-XxxRepository
-MybatisXxxRepository
-XxxRepositoryPort
+XxxRepository extends CrudRepository<XxxMapper, XxxEntity>
 ```
 
-只有以下复杂度真实出现时才引入 Repository：
+MyBatis-Plus `CrudRepository` 不是 DDD Repository，也不是 Domain Port。它是建立在 Mapper 之上的具体 Infrastructure 复用基类，主要提供 `IRepository` 风格 API、Batch 执行及相关便利能力。
 
-- 已有 Domain Aggregate 需要框架无关持久化契约；
-- 聚合加载/保存需要封装多个 Mapper；
-- ORM 细节明显污染业务模型；
-- 存在多个真实持久化实现；
-- 单元测试需要替换不可控持久化边界；
-- Repository 能表达稳定的领域读取/保存语义，而不是 Mapper 方法改名转发。
+Level 1 允许在出现真实持久化复用后引入具体 `XxxRepository`，不要求额外接口。成立信号包括：
+
+- 多个用例重复同一组持久化技术操作；
+- 需要集中管理 batchSize、分片、BatchResult 检查或数据库异常转换等技术策略；
+- 数据访问噪音已经明显挤占 Application，而提取后能形成稳定的可复用持久化职责；
+- Repository 拥有当前真实方法和行为，不是零逻辑继承空壳。
+
+以下理由不足以单独引入 `CrudRepository`：
+
+- “每张表都应该有 Repository”；
+- “官方提供了 CrudRepository”；
+- “名字比 Mapper 更像分层”；
+- “以后可能换数据库”；
+- “需要批量操作”。
+
+其中“需要批量操作”不是充分理由，是因为 MyBatis-Plus 3.5.17 `BaseMapper` 已经直接提供批量查询、删除、插入、按 ID 更新和 insert-or-update 能力。
 
 ### 5.3 Domain Repository Port（Level 2/3）
 
@@ -142,10 +150,9 @@ XxxRepositoryPort
 - Application 定义事务、授权和用例编排；
 - Controller 不得直接依赖 Mapper 或具体 Adapter。
 
-### 5.4 Repository Adapter（按需）
+### 5.4 CrudRepository 在 Level 2/3 的使用
 
-已经明确需要 Domain Repository Port，且一个主要 Mapper 对应一个主要 Entity、普通单表 CRUD 是主要路径时，
-Infrastructure Adapter 可以复用 MyBatis-Plus `CrudRepository`：
+已经明确需要 Domain Repository Port，且一个主要 Mapper 对应一个主要 Entity、普通单表 CRUD 是主要路径时，Infrastructure Adapter 可以内部复用 MyBatis-Plus `CrudRepository`：
 
 ```java
 @Repository
@@ -155,7 +162,15 @@ public class MybatisExampleRepository
 }
 ```
 
-`CrudRepository` 是 Infrastructure 实现复用机制，不是全项目默认层，也不是 Domain 契约。
+此时 `CrudRepository` 仍然只是 Adapter 的技术实现细节，不能向 Domain 暴露。
+
+因此项目统一区分：
+
+```text
+BaseMapper                    默认数据访问能力
+XxxRepository/CrudRepository  可选具体持久化封装
+Domain Repository Port        Level 2/3 框架无关业务契约
+```
 
 ### 5.5 继续禁止的通用 Service
 
@@ -168,7 +183,7 @@ public class MybatisExampleRepository
 
 ## 6. QueryMapper 与多表查询
 
-简单单表查询继续使用普通 Mapper。
+简单单表查询继续使用普通 Mapper 或已经因真实复用而存在的具体 Repository。
 
 只有 JOIN、统计、组合分页、搜索或复杂数据库能力真实出现时，再创建：
 
@@ -198,28 +213,44 @@ QueryMapper 不要求继承 `MomBaseMapper`，因为它不是普通 Entity CRUD 
 
 ### 7.1 默认实现
 
-普通 Insert、Update、Delete、主键读取、单表等值/范围过滤、计数、固定排序和分页优先使用：
+普通 Insert、Update、Delete、主键读取、单表等值/范围过滤、计数、固定排序、分页和基础批量操作优先使用：
 
 - `MomBaseMapper`；
 - Entity；
 - `LambdaQueryWrapper` / `LambdaUpdateWrapper`；
 - MyBatis-Plus 插件和字段 TypeHandler；
-- 已经进入 Level 2/3 且符合条件时，可由 Repository Adapter 内部复用 `CrudRepository`。
+- 已因真实持久化复用而存在的具体 `CrudRepository`。
 
-MOM 新增或实质修改的业务模块不得为这些能力新增 Mapper XML，也不得为了“SQL 可见”“格式统一”创建重复
-注解查询方法。Wrapper 条件必须使用类型安全字段引用；动态排序必须先映射到服务端白名单。
+MOM 新增或实质修改的业务模块不得为这些能力新增 Mapper XML，也不得为了“SQL 可见”“格式统一”创建重复注解查询方法。Wrapper 条件必须使用类型安全字段引用；动态排序必须先映射到服务端白名单。
 
-### 7.2 System Platform 零 XML 门禁
+### 7.2 BaseMapper 批量能力与事务边界
 
-`mom-system-server/src/main/resources/mapper` 必须为空。Parameter、Dictionary、Dynamic I18n 和 Preference 的
-既有正式持久化路径统一使用 MyBatis-Plus。PostgreSQL advisory lock 允许保留受控固定参数化语句；JSONB 使用
-Framework TypeHandler；历史聚合按已有 Accepted 决策执行。
+当前 MyBatis-Plus 3.5.17 基线下，优先使用：
 
-### 7.3 自定义数据库能力
+```text
+selectByIds(ids)
+deleteByIds(ids)
+insert(entities [, batchSize])
+updateById(entities [, batchSize])
+insertOrUpdate(entities [, batchSize])
+```
 
-确实需要 CTE、窗口函数、批量 Upsert、`SKIP LOCKED` 等 MyBatis-Plus 无法稳定表达的能力时，必须先完成
-逐语句设计审查。短且固定的参数化语句可使用注解；复杂多表查询可使用专用 QueryMapper/XML。XML 不是普通
-CRUD 的默认选择，也不能成为绕过 Entity、审计、逻辑删除或乐观锁的第二套持久化体系。
+规则：
+
+1. Batch 能力不等于业务事务；业务事务默认仍位于 Application 公共方法；
+2. `insert/updateById/insertOrUpdate(Collection)` 返回 `List<BatchResult>`，需要检查结果的用例不得静默丢弃；
+3. `insertOrUpdate` 必须符合业务语义，不能因为方便而绕过唯一性、状态机、版本或显式 Create/Update 规则；
+4. 批量查询/写入必须定义上限，超限采用拒绝、分页或显式分片；
+5. 批量写定义整体原子性、部分失败、重复项和不存在 ID 的处理语义；
+6. 只有批量切分/策略在多个用例间形成复用时，才把其收敛进具体 `CrudRepository`。
+
+### 7.3 System Platform 零 XML 门禁
+
+`mom-system-server/src/main/resources/mapper` 必须为空。Parameter、Dictionary、Dynamic I18n 和 Preference 的既有正式持久化路径统一使用 MyBatis-Plus。PostgreSQL advisory lock 允许保留受控固定参数化语句；JSONB 使用 Framework TypeHandler；历史聚合按已有 Accepted 决策执行。
+
+### 7.4 自定义数据库能力
+
+确实需要 CTE、窗口函数、数据库特有批量 Upsert、`SKIP LOCKED` 等 MyBatis-Plus 无法稳定表达的能力时，必须先完成逐语句设计审查。短且固定的参数化语句可使用注解；复杂多表查询可使用专用 QueryMapper/XML。XML 不是普通 CRUD 的默认选择，也不能成为绕过 Entity、审计、逻辑删除或乐观锁的第二套持久化体系。
 
 SQL 统一要求：
 
@@ -254,13 +285,15 @@ SQL 统一要求：
 
 ## 10. 架构升级触发
 
-只有以下情况真实出现时，才从 Mapper 直达路径升级 Repository/Port：
+从 Mapper 直达路径增加一个具体 `CrudRepository`，**不自动意味着** bounded context 已经升级到 Level 2/3；它可以只是 Level 1 的 Infrastructure 重构。
 
-- 多个实现；
-- 聚合持久化；
-- ORM 污染业务；
+升级到 Domain Repository Port 的触发仍然是：
+
+- 多个真实持久化实现；
+- 聚合持久化与领域一致性边界；
+- ORM 明显污染业务模型；
 - 测试替换收益；
-- 复杂持久化语义需要稳定契约。
+- 复杂持久化语义需要框架无关稳定契约。
 
 “更符合 DDD”“以后可能换数据库”“每张表都应该有 Repository”不是充分理由。
 
@@ -276,6 +309,8 @@ SQL 统一要求：
 框架事实来源：
 
 - [MyBatis-Plus 持久层接口](https://baomidou.com/guides/data-interface/)
+- [MyBatis-Plus BaseMapper 3.5.17 源码](https://github.com/baomidou/mybatis-plus/blob/v3.5.17/mybatis-plus-core/src/main/java/com/baomidou/mybatisplus/core/mapper/BaseMapper.java)
+- [MyBatis-Plus CrudRepository 3.5.17 源码](https://github.com/baomidou/mybatis-plus/blob/v3.5.17/mybatis-plus-spring/src/main/java/com/baomidou/mybatisplus/spring/repository/CrudRepository.java)
 - [PostgreSQL 17 Schemas](https://www.postgresql.org/docs/17/ddl-schemas.html)
 - [PostgreSQL 17 Constraints](https://www.postgresql.org/docs/17/ddl-constraints.html)
 - [PostgreSQL 17 JSON Types](https://www.postgresql.org/docs/17/datatype-json.html)
