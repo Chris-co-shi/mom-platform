@@ -121,7 +121,7 @@ public class UserApplication {
         if (roleIds.isEmpty()) {
             return List.of();
         }
-        return roleMapper.selectBatchIds(roleIds).stream()
+        return roleMapper.selectByIds(roleIds).stream()
             .sorted(java.util.Comparator.comparing(RoleEntity::getCode).thenComparing(RoleEntity::getId))
             .map(RoleView::from)
             .toList();
@@ -166,7 +166,7 @@ public class UserApplication {
         if (roleIds.isEmpty()) {
             return;
         }
-        List<RoleEntity> roles = roleMapper.selectBatchIds(roleIds);
+        List<RoleEntity> roles = roleMapper.selectByIds(roleIds);
         Set<String> found = roles.stream().map(RoleEntity::getId).collect(java.util.stream.Collectors.toSet());
         for (String roleId : roleIds) {
             if (!found.contains(roleId)) {
