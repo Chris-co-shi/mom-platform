@@ -45,7 +45,7 @@ import java.util.UUID;
     "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
     "org.springframework.boot.jdbc.autoconfigure.JdbcTemplateAutoConfiguration",
     "org.springframework.boot.transaction.autoconfigure.TransactionAutoConfiguration",
-    "io.github.chrisshi.mom.data.autoconfigure.MomDataAutoConfiguration"
+    "io.github.chrisshi.mom.data.config.MomDataAutoConfiguration"
 })
 @ConditionalOnClass(JdbcTemplate.class)
 @ConditionalOnBean({JdbcTemplate.class, PlatformTransactionManager.class})

@@ -9,17 +9,16 @@ spring:
       host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6379}
       database: ${REDIS_DATABASE:0}
-      username: ${REDIS_USERNAME:}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:123456789}
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
       timeout: ${REDIS_TIMEOUT:2s}
   cloud:
     nacos:
       discovery:
-        enabled: ${NACOS_DISCOVERY_ENABLED:false}
+        enabled: ${NACOS_DISCOVERY_ENABLED:true}
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:}
+        password: ${NACOS_PASSWORD:12345678}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
@@ -29,15 +28,72 @@ spring:
           observability:
             enabled: true
           routes:
-            - id: iam-api
-              uri: lb://mom-iam-server
+            # 联调专用：/auth/test 默认每分钟只允许 1 次，便于手工稳定观察 429。
+#            - id: auth-test
+#              order: -20
+#              uri: lb://mom-auth-server
+#              predicates:
+#                - Path=/auth/test
+#              filters:
+#                - StripPrefix=1
+#                - name: RequestRateLimiter
+#                  args:
+#                    rate-limiter: "#{@momFailClosedRedisRateLimiter}"
+#                    key-resolver: "#{@requestIdentityKeyResolver}"
+#                    redis-rate-limiter.replenishRate: ${GATEWAY_AUTH_TEST_RATE_LIMIT_REPLENISH_RATE:1}
+#                    redis-rate-limiter.burstCapacity: ${GATEWAY_AUTH_TEST_RATE_LIMIT_BURST_CAPACITY:60}
+#                    redis-rate-limiter.requestedTokens: ${GATEWAY_AUTH_TEST_RATE_LIMIT_REQUESTED_TOKENS:60}
+
+            # 登录接口独立限流：默认持续约 5 次/分钟，并允许瞬时 5 次突发。
+            - id: auth-login
+              order: -10
+              uri: lb://mom-auth-server
               predicates:
-                - Path=/api/iam/**
+                - Path=/auth/login
+                - Method=POST
+              filters:
+                - StripPrefix=1
+                - name: RequestRateLimiter
+                  args:
+                    rate-limiter: "#{@momFailClosedRedisRateLimiter}"
+                    key-resolver: "#{@requestIdentityKeyResolver}"
+                    redis-rate-limiter.replenishRate: ${GATEWAY_AUTH_LOGIN_RATE_LIMIT_REPLENISH_RATE:5}
+                    redis-rate-limiter.burstCapacity: ${GATEWAY_AUTH_LOGIN_RATE_LIMIT_BURST_CAPACITY:300}
+                    redis-rate-limiter.requestedTokens: ${GATEWAY_AUTH_LOGIN_RATE_LIMIT_REQUESTED_TOKENS:60}
+
+            # Auth 常规 API。
+            - id: auth-api
+              order: 0
+              uri: lb://mom-auth-server
+              predicates:
+                - Path=/auth/**
+              filters:
+                - StripPrefix=1
+                - name: RequestRateLimiter
+                  args:
+                    rate-limiter: "#{@momFailClosedRedisRateLimiter}"
+                    key-resolver: "#{@requestIdentityKeyResolver}"
+                    redis-rate-limiter.replenishRate: ${GATEWAY_AUTH_RATE_LIMIT_REPLENISH_RATE:10}
+                    redis-rate-limiter.burstCapacity: ${GATEWAY_AUTH_RATE_LIMIT_BURST_CAPACITY:20}
+                    redis-rate-limiter.requestedTokens: ${GATEWAY_AUTH_RATE_LIMIT_REQUESTED_TOKENS:1}
+
             - id: system-api
+              order: 0
               uri: lb://mom-system-server
               predicates:
-                - Path=/api/system/**
+                - Path=/system/**
+              filters:
+                - StripPrefix=1
+                - name: RequestRateLimiter
+                  args:
+                    rate-limiter: "#{@momFailClosedRedisRateLimiter}"
+                    key-resolver: "#{@requestIdentityKeyResolver}"
+                    redis-rate-limiter.replenishRate: ${GATEWAY_SYSTEM_RATE_LIMIT_REPLENISH_RATE:10}
+                    redis-rate-limiter.burstCapacity: ${GATEWAY_SYSTEM_RATE_LIMIT_BURST_CAPACITY:20}
+                    redis-rate-limiter.requestedTokens: ${GATEWAY_SYSTEM_RATE_LIMIT_REQUESTED_TOKENS:1}
+
             - id: integration-service
+              order: 0
               uri: lb://mom-integration-server
               predicates:
                 - Path=/api/integration/**
@@ -47,25 +103,9 @@ spring:
                   args:
                     rate-limiter: "#{@momFailClosedRedisRateLimiter}"
                     key-resolver: "#{@requestIdentityKeyResolver}"
-                    redis-rate-limiter.replenishRate: ${GATEWAY_RATE_LIMIT_REPLENISH_RATE:10}
-                    redis-rate-limiter.burstCapacity: ${GATEWAY_RATE_LIMIT_BURST_CAPACITY:20}
-                    redis-rate-limiter.requestedTokens: ${GATEWAY_RATE_LIMIT_REQUESTED_TOKENS:1}
-
-mom:
-  gateway:
-    technical-probe:
-      enabled: ${MOM_TECHNICAL_PROBE_ENABLED:false}
-    security:
-      enabled: ${GATEWAY_SECURITY_ENABLED:true}
-      issuer-uri: ${IAM_ISSUER:http://127.0.0.1:20100}
-      jwk-set-uri: ${IAM_JWK_SET_URI:http://127.0.0.1:20100/oauth2/jwks}
-      accepted-audiences:
-        - mom-admin-web
-        - mom-supplier-web
-        - mom-customer-web
-        - mom-mobile-pda
-      revoked-sid-key-prefix: ${IAM_REVOKED_SID_KEY_PREFIX:mom:iam:revoked:sid:}
-      redis-timeout: ${IAM_REVOKED_SID_REDIS_TIMEOUT:2s}
+                    redis-rate-limiter.replenishRate: ${GATEWAY_INTEGRATION_RATE_LIMIT_REPLENISH_RATE:5}
+                    redis-rate-limiter.burstCapacity: ${GATEWAY_INTEGRATION_RATE_LIMIT_BURST_CAPACITY:10}
+                    redis-rate-limiter.requestedTokens: ${GATEWAY_INTEGRATION_RATE_LIMIT_REQUESTED_TOKENS:1}
 
 management:
   otlp:

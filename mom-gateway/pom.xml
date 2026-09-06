@@ -19,11 +19,6 @@
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>io.github.chrisshi.mom</groupId>
-      <artifactId>mom-security</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
       <groupId>org.springframework.cloud</groupId>
       <artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
     </dependency>
@@ -37,24 +32,11 @@
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-security</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-actuator</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.github.chrisshi.mom</groupId>
-      <artifactId>mom-rate-limit</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.github.chrisshi.mom</groupId>
@@ -70,11 +52,6 @@
       <groupId>io.github.chrisshi.mom</groupId>
       <artifactId>mom-logging</artifactId>
       <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.springframework.security</groupId>
-      <artifactId>spring-security-test</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.github.chrisshi.mom</groupId>

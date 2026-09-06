@@ -52,7 +52,9 @@
 
 模块职责、Server 包分层、HTTP API 和演进规则的详细权威来源为：
 
+- `docs/adr/ADR-042-MOM渐进式分层与对象模型.md`；
 - `docs/engineering/standards/module-layering-standard.md`；
+- `docs/engineering/standards/package-directory-architecture-standard.md`；
 - `docs/engineering/standards/http-api-contract-standard.md`；
 - `docs/engineering/standards/api-evolution-idempotency-standard.md`。
 
@@ -87,15 +89,21 @@ Locale、时区、数字金额、计量单位与用户偏好的详细权威来�
 - `docs/engineering/standards/measurement-unit-standard.md`；
 - `docs/engineering/standards/user-preference-standard.md`。
 
-强制摘要：Web 只能适配 HTTP 并调用 Application；Application 负责用例、事务和业务授权；Domain
-不得依赖 Web、Infrastructure、Servlet、MyBatis、JDBC、Feign 或 Redis Template；Infrastructure
-实现 Port 并转换、脱敏底层异常；Configuration 只负责装配。新业务 API 不引入通用成功响应信封，
-不得改变 OAuth2/OIDC 标准错误；历史例外必须逐文件登记，不得用宽泛排除规避架构门禁。
+强制摘要：新增简单业务默认采用 `controller/web → application → infrastructure`。Controller/Web 只能适配
+HTTP 并调用 Application，禁止直接访问 Mapper/Repository/Entity；Application 负责用例、事务、业务授权、
+引用校验和关系编排，Level 1 允许直接依赖本 bounded context 的 Mapper/Entity/Infrastructure。Domain 不是
+默认占位层，只在真实状态机、不变量、复杂生命周期出现时引入；一旦存在，Domain 不得依赖 Web、
+Infrastructure、Servlet、MyBatis、JDBC、Feign 或 Redis Template。Port/Adapter 只在真实替换边界、多个外部
+实现或测试隔离收益已经出现时引入。新增对象遵守 `Request/Response + Entity + View + 按需 Row/Projection`
+的 3+1 语义，不因“跨层”机械创建 DO/PO/BO/VO、Command、Converter、Repository Port 或一对一 Adapter。
+多表 JOIN 返回对象默认是 Read Model/View/Projection，不自动等于 DDD Aggregate。已有通过 ADR 冻结的
+Level 2/3 模块可以继续保持更严格边界，不为目录统一做无业务收益的降级搬迁。
 
 安全配置强制摘要：Base 不激活 Profile、不保存 Secret，正式 `prod`/`production` 对 Bootstrap、测试密钥、
-本地 Pepper、不安全 Cookie、缺失 Issuer/JWK/Refresh Pepper 和技术探针 Fail Fast；Nacos Discovery 与
-Config 分离，Nacos Config 不作为 Secret Manager，2025.1.x 只允许 `spring.config.import`。Gateway 与业务
-Resource Server 都验证 JWT，Gateway 不承担最终授权。Feign 必须有有限超时且写请求默认不自动重试；
+本地 Pepper、不安全 Cookie 和缺失关键安全配置 Fail Fast；Nacos Discovery 与 Config 分离，Nacos Config
+不作为 Secret Manager，2025.1.x 只允许 `spring.config.import`。V1 认证以 ADR-040 为准：Auth 签发
+Redis-backed Opaque Access Token，业务 Resource Server 独立验证 Token；Gateway 默认原样转发 Bearer Token，
+不作为唯一认证点，也不默认重复访问 Redis 做第二次认证。Feign 必须有有限超时且写请求默认不自动重试；
 Redis 临时状态必须有 TTL，原始 Idempotency-Key 不 Trim、改大小写、归一化或写入 Redis Key/日志。
 
 测试强制摘要：Surefire 只运行快速 `*Test`/`*Tests`，Failsafe 在 `verify` 运行 `*IT`/`*ITCase`；
@@ -126,14 +134,14 @@ Migration 不得修改或删除。SAS 官方 JDBC Store 保持协议特殊边界
 - PgJDBC 连接必须启用 TCP Keepalive，并使用稳定的 `ApplicationName` 便于在 `pg_stat_activity` 中识别服务连接；
 - `maxLifetime`、`keepaliveTime` 只有在数据库代理、网络设备或基础设施连接寿命明确后才能覆盖默认值；泄漏检测默认关闭，仅限诊断环境临时开启；
 - 外部遗留数据库、报表库或读副本属于多数据源例外，必须新增 ADR，并显式定义 Bean、Mapper、事务、只读、一致性、健康检查和故障策略；
-- Mapper 不得通过 `IService/ServiceImpl` 直接升级为领域服务契约，事务边界应由显式 Application Service 定义；
+- Mapper 不得通过 `IService/ServiceImpl` 直接升级为领域服务契约，事务边界应由显式 Application 定义；
 - Lombok 仅用于消除 getter、setter、构造器等机械代码，不得使用 `@Data` 自动生成实体 `equals/hashCode/toString`，避免触发懒加载、递归引用或错误身份语义；
 - 新增 Flyway 迁移后不得修改已经合并执行过的历史迁移文件，结构变更必须增加新版本迁移。
 
 ### 4.1 持久化改动前置协议
 
 任何新增或修改 Migration、Table、Entity、Mapper、Mapper XML、Repository、Query Mapper、Application
-Service 或 Controller CRUD 前，AI 必须先输出并确认：
+或 Controller CRUD 前，AI 必须先输出并确认：
 
 1. 数据所有权；
 2. 表类型和生命周期；
@@ -155,21 +163,21 @@ MOM 自主业务表、关系表、流水表、快照表和平台表禁止物理�
 ### 4.2 Package 与目录前置协议
 
 任何新增或移动 Entity、Mapper、QueryMapper、Row、Projection、Repository Adapter、Client Adapter、
-Messaging Adapter、Cache Adapter 或 Configuration 前，AI 必须先明确：
+Messaging Adapter、Cache Adapter、Domain 或 Configuration 前，AI 必须先明确：
 
-1. 类型属于 Web、Application、Domain 还是 Infrastructure；
-2. 如果属于 Infrastructure，适配的是哪种外部技术；
-3. 如果属于 Persistence，职责是 Entity、Mapper、Repository 还是 Query；
+1. 当前能力处于 Level 1、Level 2 还是 Level 3，为什么；
+2. 类型属于 Controller/Web、Application、按需 Domain 还是 Infrastructure；
+3. 如果属于 Infrastructure，适配的是数据库、查询、HTTP、消息、缓存、存储中的哪种技术职责；
 4. 为什么不能放入已有标准职责包；
-5. 是否会形成 `persistence.<feature>`；
+5. 新建 Domain/Repository/Port/Adapter/Converter 是否有真实复杂度触发，而不是目录占位；
 6. 是否存在类名冲突；
 7. 是否存在 XML、反射或配置字符串引用；
-8. 是否需要精确例外。
+8. 是否需要精确例外或既有 Level 2/3 规则仍然生效。
 
-不得因为某个业务能力需要 Entity、Mapper 和 Repository，就在 `infrastructure.persistence` 下为该业务能力
-创建独立 Feature 子包。Domain、Application、Web 按业务能力分包；Infrastructure 按 Adapter 类型分包；
-Persistence 只按 Entity、Mapper、Repository、Query、Converter、TypeHandler 技术职责分包。详细权威规则见
-`docs/engineering/standards/package-directory-architecture-standard.md`。
+简单 Level 1 Infrastructure 允许直接使用 `infrastructure.entity`、`infrastructure.mapper`、按需
+`infrastructure.query`；技术种类和文件数量增长后再升级为 `infrastructure.persistence/client/messaging/cache`
+等 Adapter 类型目录。不得因为某个业务能力需要 Entity、Mapper 和 Repository，就在 persistence 下为该业务
+能力复制 Feature 烟囱。详细权威规则见 `docs/engineering/standards/package-directory-architecture-standard.md`。
 
 ## 5. 消息与最终一致性约束
 

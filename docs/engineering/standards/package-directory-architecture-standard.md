@@ -2,104 +2,296 @@
 
 - 状态：Accepted
 - 生效范围：正式 bounded context 的 `mom-*-server/src/main/java`
-- 决策关联：[ADR-027](../../adr/ADR-027-服务端包结构与基础设施适配器分层.md)
+- 当前决策：[ADR-042](../../adr/ADR-042-MOM渐进式分层与对象模型.md)
+- 历史复杂分层参考：[ADR-027](../../adr/ADR-027-服务端包结构与基础设施适配器分层.md)
 
-## 1. 标准结构与依赖方向
+## 1. 默认结构与依赖方向
 
-正式 Server 使用混合 Package 组织：Web、Application、Domain 按业务能力或用例分包；Infrastructure 按
-外部 Adapter 类型分包。允许的顶层职责是 `web`、`application`、`domain`、`infrastructure` 和
-`configuration`，只在存在真实职责时创建。
+MOM 新增简单业务默认采用 Level 1：
 
-标准依赖方向为 `Web → Application → Domain Port ← Infrastructure Adapter`；Configuration 只装配。
-Domain 不依赖 Infrastructure，Application/Web 不直接依赖 Mapper，持久化实现不依赖 Web。禁止空目录、
-占位类型、无职责 `package-info.java` 和为了形式统一新增的抽象层。
+```text
+<root-package>
+├── controller
+├── application
+└── infrastructure
+```
 
-## 2. Web、Application 与 Domain
+默认依赖方向：
 
-三层以业务语义为第一维度，例如 `web.dictionary`、`application.parameter`、`domain.i18n`。不得建立全局
-`web.controller/request/response`、`application.command/query/service`、`domain.entity/repository/service`
-替代业务能力。既有业务包只有在 Infrastructure 移动引发必要引用修复时才修改，本规范不授权业务重构。
+```text
+controller → application → infrastructure
+```
 
-## 3. Infrastructure Adapter-first
+`web` 是已有模块或明确采用 Web Adapter 命名时的等价入站包名，不要求为了统一名称批量搬迁已有代码。
 
-`infrastructure` 第一层只允许真实存在的 `persistence`、`client`、`messaging`、`cache`、`storage`。
-禁止 `infrastructure.parameter/dictionary/i18n/user/role/admin` 等业务 Feature。无法归类的新 Adapter 必须先
-完成精确设计审查，说明外部技术、依赖方向和失败策略，不得以 `common`、`support` 或 `impl` 逃避分类。
+不再要求每个 bounded context 默认创建 `domain`、`port`、`repository`、`adapter`、`converter`、`configuration` 等目录。只有真实职责出现时再创建。
 
-远程调用进入 `infrastructure.client`；MQ、Outbox 发布和事件序列化进入 `infrastructure.messaging`；Redis/
-Caffeine 进入 `infrastructure.cache`；文件、对象和 Blob 进入 `infrastructure.storage`。Persistence Repository
-不得隐藏远程调用，Messaging/Cache/Storage 也不得直接成为 Web DTO 来源。
+## 2. Controller
 
-## 4. Persistence 职责包
+Controller 层负责 HTTP 边界：
 
-### 4.1 Entity
+- 路由；
+- 请求参数绑定；
+- Bean Validation；
+- 认证主体接入；
+- 调用 Application；
+- HTTP 状态和 Response 契约；
+- 协议异常映射。
 
-`@TableName`、正式数据库行模型和被 `MomBaseMapper<T>` 使用的类型必须位于
-`infrastructure.persistence.entity`。名称在 bounded context 内唯一并包含明确语义，例如
-`SystemDictionaryItemEntity`；禁止 `ItemEntity`、`RecordEntity`、`DataEntity`、`ConfigEntity` 等宽泛名称。
-Entity 不进入 Web/API，不依赖 Application/Web，且按数据能力选择最小基类。
+Controller 不得直接依赖 Mapper、Repository、数据库 Entity、Redis Template 或远程基础设施实现。
 
-### 4.2 Mapper
+请求/响应对象在数量较少时可以直接位于 `controller`，数量增长后再创建：
 
-普通 MyBatis/MyBatis-Plus Mapper 位于 `infrastructure.persistence.mapper`，默认继承 `MomBaseMapper`，
-负责 Entity 写模型的单表访问。它不承载业务事务、不返回 Web DTO、不跨 Schema、不依赖 Application/Web。
-存在一条自定义 SQL 不会把普通 Mapper 变成 Query Mapper。
+```text
+controller
+├── request
+└── response
+```
 
-### 4.3 Repository Adapter
+禁止为了目录形式预先创建空包。
 
-Domain Repository Port 的 MyBatis/PostgreSQL 实现位于 `infrastructure.persistence.repository`，名称使用
-`Mybatis<Context><Capability>Repository` 或同等清晰形式。Adapter 编排 Mapper、隐藏 Wrapper/Page/Entity、
-完成 Domain 转换并映射底层异常；不得使用 `RepositoryImpl`、`BaseRepository`、`CommonRepository`、
-`DefaultRepository` 或通用泛型 Repository。简单转换保留为私有方法。
+## 3. Application
 
-### 4.4 Query
+Application 是业务用例层，负责：
 
-多表列表、报表和专用读取投影位于 `infrastructure.persistence.query`，可包含 `XxxQueryMapper`、
-`XxxListRow`、`XxxDetailRow`、`XxxProjection`。Query Mapper 返回专用 Row/Projection，不把持久化 Entity
-直接返回 Web，并遵守 S15-D JOIN、分页、排序、上限、索引和 PostgreSQL 测试规则。普通 CRUD 不因查询 XML
-存在而迁回 XML。
+- 业务用例与关系编排；
+- 本地事务；
+- 引用完整性；
+- 业务授权；
+- 幂等；
+- 状态变更；
+- 查询结果组合；
+- 调用 Domain（存在时）或 Infrastructure。
 
-### 4.5 Converter 与 TypeHandler
+简单 Level 1 中，Application 可以直接依赖本 bounded context 的 Mapper、Entity、QueryMapper 或其他 Infrastructure 组件。不要为了形式满足 DIP 创建一对一 Repository Port/Adapter。
 
-只有多处复用且非平凡的 Entity/Domain 转换才创建 `persistence.converter`；禁止一表一 Converter、反射转换器
-和万能 Bean Copy。业务专用 TypeHandler 进入 `persistence.typehandler`；通用 PostgreSQL/JSONB TypeHandler
-保留在 `mom-framework/mom-data`，不得在各 context 复制。
+类名优先使用业务能力 + `Application`：
 
-`persistence` 下只允许 `entity`、`mapper`、`repository`、`query`、`converter`、`typehandler` 六类职责包，
-禁止再以 Parameter、Dictionary、I18n、User、Role、Admin 等 Feature 建立子包。
+```text
+UserApplication
+RoleApplication
+PermissionApplication
+AuthenticationApplication
+```
 
-## 5. Configuration
+不使用 MyBatis-Plus `IService/ServiceImpl` 代替业务 Application。
 
-bounded context 的 Spring 装配、Properties、MyBatis/Security/Runtime 配置优先位于顶层 `configuration`，不放
-`infrastructure.configuration`。配置只创建和连接 Bean，不实现业务用例或持久化逻辑。Framework
-AutoConfiguration 按 Framework 角色治理，不强制迁移；SAS 官方协议配置可精确登记，但不能授权新业务复制。
+Application 内部只有在真实需要时才增加：
 
-## 6. 命名、可见性与引用
+```text
+application
+└── model
+    └── UserDetailView
+```
 
-文件路径必须与 `package` 完全一致，仓库不得存在重复 FQCN。移动后优先保持原可见性；只有 Spring/MyBatis、
-跨包 Port 或测试编译证明需要时才扩大，并在审计报告解释。不得新增旧 Package 代理类或复制文件保留双结构。
+`command`、`query`、`service` 等子包不是默认必建目录。
 
-移动必须同步 Java import、FQCN、Spring Bean/Import、`@MapperScan`、Component Scan、反射/序列化字符串、
-测试 Package、ArchUnit 和文档。重名使用清晰 context/业务前缀解决，不重新创建 Feature 子目录。
+## 4. Domain：按需出现
 
-## 7. Mapper XML
+只有出现明确领域不变量、状态机、复杂生命周期或跨实体业务规则时才创建 `domain`。
 
-XML 默认保留 `src/main/resources/mapper/<context>/`，不为了视觉一致性修改加载机制。文件名必须与 Mapper
-接口一致；`namespace` 指向真实 Mapper/QueryMapper；`resultType`、`resultMap` 和 `typeHandler` 中的 FQCN
-同步更新；Query XML 使用 `*QueryMapper.xml`。禁止重复 Namespace、孤立 XML，以及普通 Mapper/Query Mapper
-职责混淆。只有既有递归扫描且确实提升清晰度时才评估资源子目录。
+一旦创建：
 
-## 8. 测试 Package 与例外治理
+- Domain 不依赖 Controller/Web；
+- Domain 不依赖 Infrastructure；
+- Domain 不依赖 MyBatis/JDBC/Feign/Redis；
+- Domain 只表达领域语义。
 
-测试可按被测业务能力组织，但路径与 Package 必须一致；package-private 访问测试随生产类型移动或改为公共
-契约测试，不得为测试方便无条件扩大生产可见性。正式 Package 移动至少验证 test-compile、模块 test/verify、
-相关 PostgreSQL IT、Mapper XML 加载和 Spring Bean 数量/名称。
+不得为了“以后可能会复杂”创建空 Domain、贫血 Domain Wrapper 或只复制 Entity 字段的 Domain Object。
 
-例外必须精确到文件或类型，记录不同架构角色、风险、证据与退出条件。Framework、Gateway、API、Client 不
-套用 bounded context Server 模板，但仍审计是否承载正式业务持久化实现。禁止模块级、目录级或通配符排除。
+## 5. Infrastructure
 
-## 9. 新增代码验收
+Level 1 默认可以保持直接：
 
-新增或移动 Entity、Mapper、QueryMapper、Row/Projection、Repository、Client/Messaging/Cache/Storage Adapter
-和 Configuration 前，必须填写 Package Layout 验收模板。规范文件和目录名称存在不等于验收完成；最终实现
-必须通过 Package Layout Baseline、ArchUnit、编译、行为测试与字符串引用扫描。
+```text
+infrastructure
+├── entity
+├── mapper
+└── query          # 仅复杂查询出现时创建
+```
+
+当外部技术种类明显增长后，再按 Adapter 类型升级：
+
+```text
+infrastructure
+├── persistence
+│   ├── entity
+│   ├── mapper
+│   ├── query
+│   └── repository   # 仅真实需要
+├── client
+├── messaging
+├── cache
+└── storage
+```
+
+Infrastructure 第一组织维度是技术职责。不得因为某个业务 Feature 同时需要 Entity、Mapper、Repository，就在 persistence 下复制一套 `persistence.<feature>.entity/mapper/repository` 烟囱。
+
+## 6. Persistence 职责
+
+### 6.1 Entity
+
+数据库行模型使用 `*Entity`。
+
+允许位置：
+
+```text
+infrastructure.entity
+```
+
+或复杂 Persistence 结构中的：
+
+```text
+infrastructure.persistence.entity
+```
+
+Entity 不得直接作为 HTTP/API Request/Response，也不得跨服务暴露。
+
+### 6.2 Mapper
+
+普通 MyBatis-Plus Mapper 使用 `*Mapper`。
+
+允许位置：
+
+```text
+infrastructure.mapper
+```
+
+或：
+
+```text
+infrastructure.persistence.mapper
+```
+
+Mapper 只负责数据访问，不承载完整业务事务和业务流程。
+
+### 6.3 Repository
+
+Repository 不是 Mapper 的必选包装层。
+
+只有出现以下情况才创建：
+
+- 已有 Domain Repository Port；
+- ORM 细节明显污染业务模型；
+- 聚合加载/保存需要封装多个底层操作；
+- 存在真实可替换持久化实现；
+- 测试隔离收益已经明确。
+
+禁止一表一个只转发 Mapper 的 Repository Adapter。
+
+### 6.4 Query
+
+只有复杂 JOIN、统计、组合分页、搜索或查询复用出现时创建 QueryMapper。
+
+简单单表查询继续使用普通 Mapper，不创建占位 Query 包。
+
+QueryMapper 的 SQL 原始结果可使用 `Row` / `Projection`，最终 Application 展示结果使用 `View`。多表 SQL 结果默认不是 DDD Aggregate。
+
+### 6.5 Converter / TypeHandler
+
+- Converter 只在转换规则复杂或多处复用时创建；
+- 禁止一表一 Converter；
+- 禁止万能 Bean Copy 抽象；
+- PostgreSQL/JSONB 等通用 TypeHandler 保持在 `mom-framework/mom-data`。
+
+## 7. 3 + 1 对象命名
+
+新增业务对象默认只使用以下架构语义：
+
+```text
+Request / Response
+Entity
+View
+Row / Projection    # 按需
+```
+
+不使用 `POJO` 作为架构角色；新增代码不默认使用 `DO`、`PO`、`BO`、`VO` 后缀。`DTO` 可以用于描述“传输对象”这个概念，但具体类型名称优先表达用途，例如 `CreateUserRequest` 而不是 `CreateUserRequestDTO`。
+
+跨层调用不自动要求创建新类型。只有真实协议边界、持久化边界、查询模型或领域语义存在时才增加对象。
+
+## 8. Configuration
+
+只有真实服务级 Bean 装配、Properties 或条件配置出现时才创建 `configuration`。
+
+简单 Infrastructure 自身配置可以先位于 `infrastructure.configuration`。不为顶层目录对称提前增加空 `configuration`。
+
+## 9. Mapper XML
+
+XML 默认保留：
+
+```text
+src/main/resources/mapper/<context>/
+```
+
+普通 MyBatis-Plus CRUD 不需要 XML 时，不创建 XML 占位文件。
+
+## 10. 命名、移动和测试
+
+文件路径必须与 `package` 完全一致，仓库不得存在重复 FQCN。移动必须同步：
+
+- Java import/FQCN；
+- Spring Bean/Import；
+- `@MapperScan`；
+- Component Scan；
+- XML namespace；
+- 反射/序列化字符串；
+- 测试 Package；
+- ArchUnit；
+- 文档。
+
+不得创建旧 Package 代理类长期保留双结构。
+
+## 11. Mini Auth 当前结构
+
+`mom-auth-platform/mom-auth-server` 明确采用：
+
+```text
+io.github.chrisshi.mom.auth
+├── AuthApplication
+├── controller
+│   ├── UserController
+│   ├── RoleController
+│   ├── PermissionController
+│   └── AuthenticationController
+├── application
+│   ├── UserApplication
+│   ├── RoleApplication
+│   ├── PermissionApplication
+│   └── AuthenticationApplication
+└── infrastructure
+    ├── entity
+    │   ├── UserEntity
+    │   ├── RoleEntity
+    │   ├── PermissionEntity
+    │   ├── UserRoleEntity
+    │   └── RolePermissionEntity
+    ├── mapper
+    │   ├── UserMapper
+    │   ├── RoleMapper
+    │   ├── PermissionMapper
+    │   ├── UserRoleMapper
+    │   └── RolePermissionMapper
+    └── query          # 仅复杂查询出现时创建
+```
+
+验收：
+
+- Controller 不直接依赖 Mapper/Entity；
+- Application 可以直接编排 Mapper/Entity；
+- 不使用 `IService/ServiceImpl` 作为业务层；
+- 不创建只为形式满足 DIP 的接口或一对一代理；
+- 多表查询只在真实需要时增加 QueryMapper/Row/View；
+- User/Role/Permission CRUD 与登录链能够从 Application 清晰追踪。
+
+## 12. 升级条件
+
+出现以下情况时评估从 Level 1 升级，而不是继续在三层中无序堆叠：
+
+- 明确且复杂的领域状态机/不变量；
+- 多个可替换持久化或外部实现；
+- Application 中大量 ORM/SDK 类型扩散；
+- 数据库、远程服务、消息等多种 Infrastructure 同时参与一个能力；
+- 单元测试难以隔离不可控外部依赖；
+- 单一 Application 类持续膨胀且已形成独立聚合生命周期。
+
+升级时只提取已经证明有价值的 Domain、Port、Repository 或 Adapter，不批量生成模板结构。

@@ -1,7 +1,6 @@
 package io.github.chrisshi.mom.integration.interfaces.rest;
 
 import io.github.chrisshi.mom.core.context.CorrelationContext;
-import io.github.chrisshi.mom.core.context.IdempotencyHeaders;
 import io.github.chrisshi.mom.idempotency.IdempotencyAcquireResult;
 import io.github.chrisshi.mom.idempotency.IdempotencyAcquireStatus;
 import io.github.chrisshi.mom.idempotency.IdempotencyGuard;

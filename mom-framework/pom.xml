@@ -22,7 +22,6 @@
     <module>mom-tracing</module>
     <module>mom-logging</module>
     <module>mom-metrics</module>
-    <module>mom-rate-limit</module>
     <module>mom-test</module>
   </modules>
 </project>

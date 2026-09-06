@@ -11,7 +11,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
  *
  * @param <T> 持久化实体类型
  */
-public interface MomBaseMapper<T> extends BaseMapper<T> {
+public interface MomBaseMapper<T> extends  BaseMapper<T> {
 
     /**
      * Wrapper-only Update 始终被拒绝，防止静默绕过审计。

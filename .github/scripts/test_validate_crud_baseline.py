@@ -43,6 +43,12 @@ class CrudBaselineTest(unittest.TestCase):
         report = self.check("application/item/ItemService.java", "import a.b.ItemMapper; class ItemService {}")
         self.assertTrue(report.errors)
 
+    def test_level_one_auth_application_mapper_dependency_is_allowed(self):
+        report = module.Report()
+        path = "mom-auth-platform/mom-auth-server/src/main/java/io/github/chrisshi/mom/auth/application/UserApplication.java"
+        module.check_java_file(path, "import io.github.chrisshi.mom.auth.infrastructure.persistence.UserMapper; class UserApplication {}", report)
+        self.assertEqual([], report.errors)
+
     def test_domain_mybatis_dependency_is_rejected(self):
         report = self.check("domain/item/Item.java", "import com.baomidou.mybatisplus.core.conditions.Wrapper; class Item {}")
         self.assertTrue(report.errors)
