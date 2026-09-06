@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 class CorrelationIdGlobalFilterTest {
 
@@ -54,6 +55,28 @@ class CorrelationIdGlobalFilterTest {
         assertEquals(correlationId, forwarded.get().getRequest().getHeaders()
                 .getFirst(CorrelationHeaders.CORRELATION_ID));
         assertEquals(correlationId, exchange.getResponse().getHeaders()
+                .getFirst(CorrelationHeaders.CORRELATION_ID));
+    }
+
+    @Test
+    void replacesOversizedOrUnsafeCorrelationId() {
+        String invalidCorrelationId = "unsafe value/" + "x".repeat(80);
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/integration/mdm-probe")
+                        .header(CorrelationHeaders.CORRELATION_ID, invalidCorrelationId)
+                        .build());
+        AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
+
+        filter.filter(exchange, current -> {
+            forwarded.set(current);
+            return Mono.empty();
+        }).block();
+
+        String actual = forwarded.get().getRequest().getHeaders()
+                .getFirst(CorrelationHeaders.CORRELATION_ID);
+        assertNotEquals(invalidCorrelationId, actual);
+        assertFalse(actual == null || actual.isBlank());
+        assertEquals(actual, exchange.getResponse().getHeaders()
                 .getFirst(CorrelationHeaders.CORRELATION_ID));
     }
 }

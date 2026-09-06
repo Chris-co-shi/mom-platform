@@ -2,14 +2,19 @@ package io.github.chrisshi.mom.gateway;
 
 import io.github.chrisshi.mom.gateway.filter.BearerTokenGlobalFilter;
 import io.github.chrisshi.mom.gateway.filter.CorrelationIdGlobalFilter;
+import io.github.chrisshi.mom.gateway.filter.InternalHeaderSanitizingGlobalFilter;
+import io.github.chrisshi.mom.gateway.ratelimit.TrustedClientIpResolver;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
 import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
+import org.springframework.cloud.gateway.config.GlobalCorsProperties;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpMethod;
+import org.springframework.web.cors.CorsConfiguration;
 
 import java.net.URI;
 import java.time.Duration;
@@ -26,17 +31,18 @@ class MomGatewayApplicationTest {
     void gatewayStartsWithDiscoveryRouteAndEdgeFilters() {
         try (ConfigurableApplicationContext context = new SpringApplicationBuilder(MomGatewayApplication.class)
                 .web(WebApplicationType.REACTIVE)
-                .properties(
-                        "server.port=0",
-                        "spring.main.banner-mode=off",
-                        "spring.cloud.nacos.discovery.enabled=false",
-                        "spring.cloud.nacos.config.enabled=false",
-                        "management.endpoints.enabled-by-default=true")
-                .run()) {
+                .run(
+                        "--server.port=0",
+                        "--spring.main.banner-mode=off",
+                        "--spring.cloud.nacos.discovery.enabled=false",
+                        "--spring.cloud.nacos.config.enabled=false",
+                        "--management.endpoints.enabled-by-default=true")) {
             assertTrue(context.isActive());
             assertNotNull(context.getBean(HealthEndpoint.class));
             assertNotNull(context.getBean(CorrelationIdGlobalFilter.class));
             assertNotNull(context.getBean(BearerTokenGlobalFilter.class));
+            assertNotNull(context.getBean(InternalHeaderSanitizingGlobalFilter.class));
+            assertNotNull(context.getBean(TrustedClientIpResolver.class));
 
             Environment environment = context.getEnvironment();
             assertEquals("127.0.0.1", environment.getProperty("spring.data.redis.host"));
@@ -45,6 +51,19 @@ class MomGatewayApplicationTest {
             assertEquals("", environment.getProperty("spring.cloud.nacos.discovery.password"));
             assertEquals("false", environment.getProperty("management.otlp.metrics.export.enabled"));
             assertEquals("false", environment.getProperty("management.tracing.export.otlp.enabled"));
+            assertEquals("true", environment.getProperty(
+                    "spring.cloud.gateway.server.webflux.globalcors.add-to-simple-url-handler-mapping"));
+
+            CorsConfiguration cors = context.getBean(GlobalCorsProperties.class)
+                    .getCorsConfigurations()
+                    .get("/**");
+            assertNotNull(cors);
+            assertEquals(List.of("http://localhost:5173"), cors.getAllowedOrigins());
+            assertTrue(cors.getAllowedMethods().contains(HttpMethod.GET.name()));
+            assertEquals(List.of("Authorization", "Content-Type", "X-Correlation-Id"),
+                    cors.getAllowedHeaders());
+            assertEquals(List.of("X-Correlation-Id"), cors.getExposedHeaders());
+            assertEquals(false, cors.getAllowCredentials());
 
             RouteDefinitionLocator locator = context.getBean(RouteDefinitionLocator.class);
             List<RouteDefinition> routes = locator.getRouteDefinitions()
@@ -59,6 +78,8 @@ class MomGatewayApplicationTest {
             assertEquals(URI.create("lb://mom-system-server"), systemRoute.getUri());
             assertTrue(systemRoute.getPredicates().stream()
                     .anyMatch(predicate -> predicate.getArgs().containsValue("/api/system/**")));
+            assertTrue(systemRoute.getFilters().stream()
+                    .noneMatch(filter -> "StripPrefix".equals(filter.getName())));
 
             RouteDefinition integrationRoute = routes.stream()
                     .filter(route -> "integration-service".equals(route.getId()))

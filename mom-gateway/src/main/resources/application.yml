@@ -9,16 +9,16 @@ spring:
       host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6379}
       database: ${REDIS_DATABASE:0}
-      password: ${REDIS_PASSWORD:123456789}
+      password: ${REDIS_PASSWORD:}
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
       timeout: ${REDIS_TIMEOUT:2s}
   cloud:
     nacos:
       discovery:
-        enabled: ${NACOS_DISCOVERY_ENABLED:true}
+        enabled: ${NACOS_DISCOVERY_ENABLED:false}
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:12345678}
+        password: ${NACOS_PASSWORD:}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
@@ -27,6 +27,26 @@ spring:
         webflux:
           observability:
             enabled: true
+          globalcors:
+            add-to-simple-url-handler-mapping: true
+            cors-configurations:
+              '[/**]':
+                allowed-origins: ${MOM_GATEWAY_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+                allowed-methods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+                allowed-headers:
+                  - Authorization
+                  - Content-Type
+                  - X-Correlation-Id
+                exposed-headers:
+                  - X-Correlation-Id
+                allow-credentials: false
+                max-age: 3600
           routes:
             # 联调专用：/auth/test 默认每分钟只允许 1 次，便于手工稳定观察 429。
 #            - id: auth-test
@@ -81,9 +101,8 @@ spring:
               order: 0
               uri: lb://mom-system-server
               predicates:
-                - Path=/system/**
+                - Path=/api/system/**
               filters:
-                - StripPrefix=1
                 - name: RequestRateLimiter
                   args:
                     rate-limiter: "#{@momFailClosedRedisRateLimiter}"
@@ -106,6 +125,12 @@ spring:
                     redis-rate-limiter.replenishRate: ${GATEWAY_INTEGRATION_RATE_LIMIT_REPLENISH_RATE:5}
                     redis-rate-limiter.burstCapacity: ${GATEWAY_INTEGRATION_RATE_LIMIT_BURST_CAPACITY:10}
                     redis-rate-limiter.requestedTokens: ${GATEWAY_INTEGRATION_RATE_LIMIT_REQUESTED_TOKENS:1}
+
+mom:
+  gateway:
+    client-ip:
+      # 逗号分隔的 IPv4 CIDR；正式环境只配置实际 Nginx/LB 出口地址。
+      trusted-proxies: ${MOM_GATEWAY_TRUSTED_PROXIES:}
 
 management:
   otlp:

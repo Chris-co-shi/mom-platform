@@ -10,6 +10,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.util.regex.Pattern;
+
 /**
  * Gateway 全局关联标识 Filter。
  *
@@ -23,6 +25,9 @@ import reactor.core.publisher.Mono;
 @Component
 public final class CorrelationIdGlobalFilter implements GlobalFilter, Ordered {
 
+    private static final int MAX_CORRELATION_ID_LENGTH = 64;
+    private static final Pattern ALLOWED_CORRELATION_ID_CHARACTERS = Pattern.compile("[A-Za-z0-9._:-]+");
+
     /**
      * 为请求解析或生成关联标识，并传播到下游与响应 Header。
      *
@@ -32,7 +37,7 @@ public final class CorrelationIdGlobalFilter implements GlobalFilter, Ordered {
      */
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        String correlationId = CorrelationContext.resolveOrGenerate(
+        String correlationId = resolveCorrelationId(
                 exchange.getRequest().getHeaders().getFirst(CorrelationHeaders.CORRELATION_ID));
 
         ServerHttpRequest request = exchange.getRequest()
@@ -44,6 +49,19 @@ public final class CorrelationIdGlobalFilter implements GlobalFilter, Ordered {
         return chain.filter(exchange.mutate().request(request).build());
     }
 
+    private static String resolveCorrelationId(String candidate) {
+        if (candidate == null) {
+            return CorrelationContext.resolveOrGenerate(null);
+        }
+        String normalized = candidate.trim();
+        if (normalized.isEmpty()
+                || normalized.length() > MAX_CORRELATION_ID_LENGTH
+                || !ALLOWED_CORRELATION_ID_CHARACTERS.matcher(normalized).matches()) {
+            return CorrelationContext.resolveOrGenerate(null);
+        }
+        return normalized;
+    }
+
     /**
      * 在路由、鉴权和限流前建立关联标识，便于后续组件记录统一日志。
      *
@@ -51,6 +69,6 @@ public final class CorrelationIdGlobalFilter implements GlobalFilter, Ordered {
      */
     @Override
     public int getOrder() {
-        return Ordered.HIGHEST_PRECEDENCE + 20;
+        return Ordered.HIGHEST_PRECEDENCE + 30;
     }
 }

@@ -18,8 +18,17 @@ class GatewayArchitectureTest {
                 .dependOnClassesThat()
                 .resideInAnyPackage(
                         "org.springframework.web.servlet..",
-                        "io.github.chrisshi.mom.webmvc..")
+                        "io.github.chrisshi.mom.webmvc..",
+                        "jakarta.servlet..",
+                        "javax.servlet..")
                 .because("MOM Gateway is a WebFlux application and must not pull in the servlet stack")
+                .check(gatewayClasses);
+
+        noClasses()
+                .should()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName("java.lang.ThreadLocal")
+                .because("Reactor request processing must not store request context in ThreadLocal")
                 .check(gatewayClasses);
     }
 }

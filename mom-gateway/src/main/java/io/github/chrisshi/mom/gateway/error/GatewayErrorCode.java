@@ -11,12 +11,6 @@ import org.springframework.http.HttpStatus;
  */
 public enum GatewayErrorCode implements ErrorCode {
 
-    MISSING_BEARER_TOKEN(
-        HttpStatus.UNAUTHORIZED,
-        "missing_bearer_token",
-        "gateway.error.missing-bearer-token",
-        "缺少 Bearer Token"),
-
     INVALID_BEARER_TOKEN(
         HttpStatus.UNAUTHORIZED,
         "invalid_bearer_token",
