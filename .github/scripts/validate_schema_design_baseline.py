@@ -22,6 +22,11 @@ KNOWN_CONTEXTS = {"iam", "mdm", "mes", "wms", "qms", "ems", "eam", "integration"
 
 # 已发布表的精确历史基线；只跳过既有 CREATE TABLE，不授权新增表复制旧设计。
 LEGACY_TABLES = {
+    ("mom-auth-platform/mom-auth-server/src/main/resources/db/migration/auth/V1__create_auth_core_tables.sql", "auth_user"),
+    ("mom-auth-platform/mom-auth-server/src/main/resources/db/migration/auth/V1__create_auth_core_tables.sql", "auth_role"),
+    ("mom-auth-platform/mom-auth-server/src/main/resources/db/migration/auth/V1__create_auth_core_tables.sql", "auth_permission"),
+    ("mom-auth-platform/mom-auth-server/src/main/resources/db/migration/auth/V1__create_auth_core_tables.sql", "auth_user_role"),
+    ("mom-auth-platform/mom-auth-server/src/main/resources/db/migration/auth/V1__create_auth_core_tables.sql", "auth_role_permission"),
     ("mom-integration-platform/mom-integration-server/src/main/resources/db/migration/integration/V1__create_inbox_and_message_receipt.sql", "mom_inbox_event"),
     ("mom-integration-platform/mom-integration-server/src/main/resources/db/migration/integration/V1__create_inbox_and_message_receipt.sql", "technical_message_receipt"),
     ("mom-integration-platform/mom-integration-server/src/main/resources/db/migration/integration/V2__create_seata_at_probe.sql", "undo_log"),

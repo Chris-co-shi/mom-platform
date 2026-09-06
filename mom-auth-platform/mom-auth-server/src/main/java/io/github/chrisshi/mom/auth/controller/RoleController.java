@@ -1,6 +1,7 @@
 package io.github.chrisshi.mom.auth.controller;
 
 import io.github.chrisshi.mom.auth.application.RoleApplication;
+import io.github.chrisshi.mom.auth.controller.request.ChangeStatusRequest;
 import io.github.chrisshi.mom.auth.controller.request.CreateRoleRequest;
 import io.github.chrisshi.mom.auth.controller.request.ReplaceRolePermissionsRequest;
 import io.github.chrisshi.mom.auth.controller.request.UpdateRoleRequest;
@@ -98,6 +99,40 @@ public class RoleController {
         return Result.success(RoleResponse.from(roleApplication.update(
             id, request.name(), request.description(), request.enabled(), request.version()
         )));
+    }
+
+    /**
+     * 启用角色，使其可被新的用户角色关系分配。
+     *
+     * @param id 角色主键
+     * @param request 包含乐观锁 version 的状态变更请求
+     * @return 启用后的角色响应
+     */
+    @PutMapping("/{id}/enable")
+    @PreAuthorize("hasAuthority('auth:role:write')")
+    public Result<RoleResponse> enable(
+        @PathVariable String id,
+        @Valid @RequestBody ChangeStatusRequest request
+    ) {
+        return Result.success(RoleResponse.from(roleApplication.enable(id, request.version())));
+    }
+
+    /**
+     * 停用角色，阻止其被新分配并从后续登录授权中排除。
+     *
+     * <p>该操作不修改已签发 Token 中的 authority 快照。</p>
+     *
+     * @param id 角色主键
+     * @param request 包含乐观锁 version 的状态变更请求
+     * @return 停用后的角色响应
+     */
+    @PutMapping("/{id}/disable")
+    @PreAuthorize("hasAuthority('auth:role:write')")
+    public Result<RoleResponse> disable(
+        @PathVariable String id,
+        @Valid @RequestBody ChangeStatusRequest request
+    ) {
+        return Result.success(RoleResponse.from(roleApplication.disable(id, request.version())));
     }
 
     /**

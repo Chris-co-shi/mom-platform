@@ -1,6 +1,7 @@
 package io.github.chrisshi.mom.auth.controller;
 
 import io.github.chrisshi.mom.auth.application.UserApplication;
+import io.github.chrisshi.mom.auth.controller.request.ChangeStatusRequest;
 import io.github.chrisshi.mom.auth.controller.request.CreateUserRequest;
 import io.github.chrisshi.mom.auth.controller.request.ReplaceUserRolesRequest;
 import io.github.chrisshi.mom.auth.controller.request.ResetUserPasswordRequest;
@@ -120,6 +121,40 @@ public class UserController {
         return Result.success(UserResponse.from(
             userApplication.resetPassword(id, request.newPassword(), request.version())
         ));
+    }
+
+    /**
+     * 启用用户后续的新登录能力。
+     *
+     * @param id 用户主键
+     * @param request 包含乐观锁 version 的状态变更请求
+     * @return 启用后的用户响应
+     */
+    @PutMapping("/{id}/enable")
+    @PreAuthorize("hasAuthority('auth:user:write')")
+    public Result<UserResponse> enable(
+        @PathVariable String id,
+        @Valid @RequestBody ChangeStatusRequest request
+    ) {
+        return Result.success(UserResponse.from(userApplication.enable(id, request.version())));
+    }
+
+    /**
+     * 停用用户后续的新登录能力。
+     *
+     * <p>该操作不回收用户已签发的 V1 Opaque Token。</p>
+     *
+     * @param id 用户主键
+     * @param request 包含乐观锁 version 的状态变更请求
+     * @return 停用后的用户响应
+     */
+    @PutMapping("/{id}/disable")
+    @PreAuthorize("hasAuthority('auth:user:write')")
+    public Result<UserResponse> disable(
+        @PathVariable String id,
+        @Valid @RequestBody ChangeStatusRequest request
+    ) {
+        return Result.success(UserResponse.from(userApplication.disable(id, request.version())));
     }
 
     /**

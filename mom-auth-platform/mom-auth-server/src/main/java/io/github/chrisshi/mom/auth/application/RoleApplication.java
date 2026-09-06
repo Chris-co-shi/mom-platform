@@ -32,6 +32,8 @@ import java.util.Set;
 @Component
 public class RoleApplication {
 
+    private static final int MAX_PERMISSION_SELECTION = 200;
+
     private final RoleMapper roleMapper;
     private final UserRoleMapper userRoleMapper;
     private final RolePermissionMapper rolePermissionMapper;
@@ -126,10 +128,38 @@ public class RoleApplication {
         entity.setName(name.strip());
         entity.setDescription(trimNullable(description));
         entity.setEnabled(enabled);
-        if (roleMapper.updateById(entity) != 1) {
-            throw new AuthException(AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
-        }
+        requireUpdateSucceeded(id, roleMapper.updateById(entity));
         return RoleView.from(entity);
+    }
+
+    /**
+     * 启用角色，使其可被新的用户角色关系分配并参与后续登录授权。
+     *
+     * <p>重复启用不执行无意义 UPDATE；状态变更不刷新已签发 Token 的 authority 快照。</p>
+     *
+     * @param id 角色主键
+     * @param version 客户端读取到的乐观锁版本
+     * @return 启用后的角色视图
+     * @throws AuthException 角色不存在或版本冲突时抛出
+     */
+    @Transactional
+    public RoleView enable(String id, long version) {
+        return changeEnabled(id, true, version);
+    }
+
+    /**
+     * 停用角色，阻止其被新的用户角色关系分配并从后续登录授权中排除。
+     *
+     * <p>V1 不回收或修改已签发 Token 中的角色与 Permission 快照。</p>
+     *
+     * @param id 角色主键
+     * @param version 客户端读取到的乐观锁版本
+     * @return 停用后的角色视图
+     * @throws AuthException 角色不存在或版本冲突时抛出
+     */
+    @Transactional
+    public RoleView disable(String id, long version) {
+        return changeEnabled(id, false, version);
     }
 
     /**
@@ -153,7 +183,7 @@ public class RoleApplication {
         if (userReferences > 0 || permissionReferences > 0) {
             throw new AuthException(AuthErrorCode.RESOURCE_REFERENCED, "角色仍存在用户或权限关系，请先解除关联");
         }
-        roleMapper.deleteById(id);
+        requireUpdateSucceeded(id, roleMapper.deleteById(id));
     }
 
     /**
@@ -180,28 +210,34 @@ public class RoleApplication {
     /**
      * 整体替换角色的 Permission 关系。
      *
-     * <p>所有目标 Permission 必须先验证存在，随后在同一事务中删除旧关系并写入新关系。
-     * 该操作不会主动刷新既有 Token 中的 authority 快照。</p>
+     * <p>先限制单次最多 200 个目标，再验证所有 Permission 存在且已启用，随后在同一事务中
+     * 删除旧关系并写入新关系。该操作不会主动刷新既有 Token 中的 authority 快照。</p>
      *
      * @param roleId 角色主键
      * @param requestedPermissionIds 目标 Permission 主键集合
      * @return 替换后的 Permission 列表
-     * @throws AuthException 角色或任一 Permission 不存在时抛出
+     * @throws AuthException 角色/Permission 不存在、Permission 已停用或目标数量超限时抛出
      */
     @Transactional
     public List<PermissionView> replacePermissions(String roleId, List<String> requestedPermissionIds) {
         requireRole(roleId);
+        if (requestedPermissionIds.size() > MAX_PERMISSION_SELECTION) {
+            throw new AuthException(AuthErrorCode.RELATION_SELECTION_TOO_LARGE);
+        }
         Set<String> permissionIds = new LinkedHashSet<>(requestedPermissionIds);
         validatePermissions(permissionIds);
 
         rolePermissionMapper.delete(
             new LambdaQueryWrapper<RolePermissionEntity>().eq(RolePermissionEntity::getRoleId, roleId)
         );
-        for (String permissionId : permissionIds) {
+        List<RolePermissionEntity> relations = permissionIds.stream().map(permissionId -> {
             RolePermissionEntity relation = new RolePermissionEntity();
             relation.setRoleId(roleId);
             relation.setPermissionId(permissionId);
-            rolePermissionMapper.insert(relation);
+            return relation;
+        }).toList();
+        if (!relations.isEmpty()) {
+            rolePermissionMapper.insert(relations);
         }
         return permissions(roleId);
     }
@@ -232,6 +268,30 @@ public class RoleApplication {
                 throw new AuthException(AuthErrorCode.RESOURCE_NOT_FOUND, "权限不存在: " + permissionId);
             }
         }
+        if (permissions.stream().anyMatch(permission -> !Boolean.TRUE.equals(permission.getEnabled()))) {
+            throw new AuthException(AuthErrorCode.PERMISSION_DISABLED);
+        }
+    }
+
+    private RoleView changeEnabled(String id, boolean enabled, long version) {
+        RoleEntity entity = requireRole(id);
+        requireVersion(entity.getVersion(), version);
+        if (Boolean.valueOf(enabled).equals(entity.getEnabled())) {
+            return RoleView.from(entity);
+        }
+        entity.setEnabled(enabled);
+        requireUpdateSucceeded(id, roleMapper.updateById(entity));
+        return RoleView.from(entity);
+    }
+
+    private void requireUpdateSucceeded(String id, int affectedRows) {
+        if (affectedRows == 1) {
+            return;
+        }
+        if (roleMapper.selectById(id) == null) {
+            throw new AuthException(AuthErrorCode.RESOURCE_NOT_FOUND, "角色不存在");
+        }
+        throw new AuthException(AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
     }
 
     private static String trimNullable(String value) {

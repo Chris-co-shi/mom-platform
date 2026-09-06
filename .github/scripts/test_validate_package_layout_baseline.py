@@ -110,6 +110,23 @@ class PackageLayoutBaselineTest(unittest.TestCase):
         )
         self.assertTrue(report.errors)
 
+    def test_legacy_layout_exception_is_exact(self):
+        report = module.Report()
+        path = "mom-auth-platform/mom-auth-server/src/main/java/io/github/chrisshi/mom/auth/infrastructure/security/AuthUserPrincipal.java"
+        module.check_java(
+            path,
+            "package io.github.chrisshi.mom.auth.infrastructure.security; class AuthUserPrincipal {}",
+            report,
+        )
+        self.assertEqual([], report.errors)
+        self.assertEqual(1, len(report.exceptions))
+
+        _, new_file_report = self.check(
+            "infrastructure/security/NewSecurityAdapter.java",
+            "package io.github.chrisshi.mom.demo.infrastructure.security; class NewSecurityAdapter {}",
+        )
+        self.assertTrue(new_file_report.errors)
+
     def test_framework_file_is_outside_bounded_context_scope(self):
         report = module.Report()
         java = module.check_java(

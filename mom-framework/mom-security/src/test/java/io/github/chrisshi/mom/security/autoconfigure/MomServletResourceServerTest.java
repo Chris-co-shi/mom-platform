@@ -20,6 +20,7 @@ import org.springframework.security.oauth2.server.resource.introspection.OpaqueT
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -29,6 +30,7 @@ import java.util.Map;
 
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -98,6 +100,16 @@ class MomServletResourceServerTest {
         org.assertj.core.api.Assertions.assertThat(introspector.checks).isZero();
     }
 
+    @Test
+    void validBearerLogoutMustReachBusinessControllerInsteadOfDefaultLogoutFilter() throws Exception {
+        mockMvc.perform(post("/logout")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer valid-read-token"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("logged-out"));
+
+        org.assertj.core.api.Assertions.assertThat(introspector.checks).isEqualTo(1);
+    }
+
     @SpringBootConfiguration
     @EnableAutoConfiguration
     @Import(ProtectedController.class)
@@ -121,6 +133,11 @@ class MomServletResourceServerTest {
         @GetMapping("/public")
         Map<String, String> publicEndpoint() {
             return Map.of("status", "ok");
+        }
+
+        @PostMapping("/logout")
+        Map<String, String> logout() {
+            return Map.of("status", "logged-out");
         }
     }
 

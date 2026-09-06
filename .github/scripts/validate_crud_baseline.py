@@ -29,6 +29,12 @@ APPLICATION_EXCEPTIONS = {
     "mom-integration-platform/mom-integration-server/src/main/java/io/github/chrisshi/mom/integration/application/IntegrationSeataAtParticipantService.java",
 }
 
+# ADR-042 明确允许简单 Level 1 模块的 Application 直接依赖本 bounded context 的
+# Mapper/Entity。Mini Auth 已按该级别冻结，仍由 Controller 与 Domain 的独立规则防止越层。
+LEVEL_ONE_APPLICATION_PREFIXES = (
+    "mom-auth-platform/mom-auth-server/src/main/java/io/github/chrisshi/mom/auth/application/",
+)
+
 
 @dataclass
 class Report:
@@ -83,7 +89,8 @@ def check_java_file(path: str, text: str, report: Report) -> None:
         if "org.springframework.transaction.annotation.Transactional" in imported:
             report.errors.append(f"Controller 禁止声明事务: {path}")
 
-    if "/application/" in path and path not in APPLICATION_EXCEPTIONS:
+    is_level_one_application = any(path.startswith(prefix) for prefix in LEVEL_ONE_APPLICATION_PREFIXES)
+    if "/application/" in path and path not in APPLICATION_EXCEPTIONS and not is_level_one_application:
         bad = sorted(item for item in imported if ".infrastructure.persistence." in item or item.endswith("Mapper"))
         if bad:
             report.errors.append(f"Application 禁止直接依赖 Mapper/Entity: {path} -> {bad[0]}")

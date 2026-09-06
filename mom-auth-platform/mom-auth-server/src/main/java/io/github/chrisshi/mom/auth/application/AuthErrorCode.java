@@ -20,6 +20,13 @@ public enum AuthErrorCode implements ErrorCode {
     USERNAME_CONFLICT("auth.username_conflict", "auth.error.username-conflict", "用户名已存在"),
     ROLE_CODE_CONFLICT("auth.role_code_conflict", "auth.error.role-code-conflict", "角色编码已存在"),
     PERMISSION_CODE_CONFLICT("auth.permission_code_conflict", "auth.error.permission-code-conflict", "权限编码已存在"),
+    ROLE_DISABLED("auth.role_disabled", "auth.error.role-disabled", "已停用角色不能分配给用户"),
+    PERMISSION_DISABLED("auth.permission_disabled", "auth.error.permission-disabled", "已停用权限不能分配给角色"),
+    RELATION_SELECTION_TOO_LARGE(
+        "auth.relation_selection_too_large",
+        "auth.error.relation-selection-too-large",
+        "单次最多可分配 200 个关系对象"
+    ),
     RESOURCE_REFERENCED("auth.resource_referenced", "auth.error.resource-referenced", "资源仍被引用，不能删除"),
     OPTIMISTIC_LOCK_CONFLICT("auth.optimistic_lock_conflict", "auth.error.optimistic-lock-conflict", "数据已被其他操作修改，请刷新后重试"),
     TOKEN_STORE_UNAVAILABLE("auth.token_store_unavailable", "auth.error.token-store-unavailable", "认证令牌服务暂时不可用");

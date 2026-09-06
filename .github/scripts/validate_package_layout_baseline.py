@@ -24,7 +24,10 @@ ALLOWED_INFRASTRUCTURE = LEVEL1_INFRASTRUCTURE | ADAPTER_INFRASTRUCTURE
 ALLOWED_PERSISTENCE = {"entity", "mapper", "repository", "query", "converter", "typehandler"}
 LEVEL1_FLAT_PACKAGES = {"entity", "mapper", "query"}
 
-LEGACY_LAYOUT_EXCEPTIONS: frozenset[str] = frozenset()
+LEGACY_LAYOUT_EXCEPTIONS: frozenset[str] = frozenset({
+    "mom-auth-platform/mom-auth-server/src/main/java/io/github/chrisshi/mom/auth/infrastructure/security/AuthUserDetailsService.java",
+    "mom-auth-platform/mom-auth-server/src/main/java/io/github/chrisshi/mom/auth/infrastructure/security/AuthUserPrincipal.java",
+})
 
 
 @dataclass

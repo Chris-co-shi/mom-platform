@@ -111,10 +111,38 @@ public class PermissionApplication {
         entity.setName(name.strip());
         entity.setDescription(trimNullable(description));
         entity.setEnabled(enabled);
-        if (permissionMapper.updateById(entity) != 1) {
-            throw new AuthException(AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
-        }
+        requireUpdateSucceeded(id, permissionMapper.updateById(entity));
         return PermissionView.from(entity);
+    }
+
+    /**
+     * 启用 Permission，使其可被新的角色权限关系分配并参与后续登录授权。
+     *
+     * <p>重复启用不执行无意义 UPDATE；状态变更不刷新已签发 Token 的 authority 快照。</p>
+     *
+     * @param id Permission 主键
+     * @param version 客户端读取到的乐观锁版本
+     * @return 启用后的 Permission 视图
+     * @throws AuthException Permission 不存在或版本冲突时抛出
+     */
+    @Transactional
+    public PermissionView enable(String id, long version) {
+        return changeEnabled(id, true, version);
+    }
+
+    /**
+     * 停用 Permission，阻止其被新的角色权限关系分配并从后续登录授权中排除。
+     *
+     * <p>V1 不回收或修改已签发 Token 中的 Permission 快照。</p>
+     *
+     * @param id Permission 主键
+     * @param version 客户端读取到的乐观锁版本
+     * @return 停用后的 Permission 视图
+     * @throws AuthException Permission 不存在或版本冲突时抛出
+     */
+    @Transactional
+    public PermissionView disable(String id, long version) {
+        return changeEnabled(id, false, version);
     }
 
     /**
@@ -134,7 +162,7 @@ public class PermissionApplication {
         if (references > 0) {
             throw new AuthException(AuthErrorCode.RESOURCE_REFERENCED, "权限仍被角色引用，请先解除角色权限关系");
         }
-        permissionMapper.deleteById(id);
+        requireUpdateSucceeded(id, permissionMapper.deleteById(id));
     }
 
     private PermissionEntity requirePermission(String id) {
@@ -152,6 +180,27 @@ public class PermissionApplication {
         if (count > 0) {
             throw new AuthException(AuthErrorCode.PERMISSION_CODE_CONFLICT);
         }
+    }
+
+    private PermissionView changeEnabled(String id, boolean enabled, long version) {
+        PermissionEntity entity = requirePermission(id);
+        requireVersion(entity.getVersion(), version);
+        if (Boolean.valueOf(enabled).equals(entity.getEnabled())) {
+            return PermissionView.from(entity);
+        }
+        entity.setEnabled(enabled);
+        requireUpdateSucceeded(id, permissionMapper.updateById(entity));
+        return PermissionView.from(entity);
+    }
+
+    private void requireUpdateSucceeded(String id, int affectedRows) {
+        if (affectedRows == 1) {
+            return;
+        }
+        if (permissionMapper.selectById(id) == null) {
+            throw new AuthException(AuthErrorCode.RESOURCE_NOT_FOUND, "权限不存在");
+        }
+        throw new AuthException(AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
     }
 
     private static String trimNullable(String value) {

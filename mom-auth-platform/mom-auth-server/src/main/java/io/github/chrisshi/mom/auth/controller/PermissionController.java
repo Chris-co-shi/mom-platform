@@ -1,6 +1,7 @@
 package io.github.chrisshi.mom.auth.controller;
 
 import io.github.chrisshi.mom.auth.application.PermissionApplication;
+import io.github.chrisshi.mom.auth.controller.request.ChangeStatusRequest;
 import io.github.chrisshi.mom.auth.controller.request.CreatePermissionRequest;
 import io.github.chrisshi.mom.auth.controller.request.UpdatePermissionRequest;
 import io.github.chrisshi.mom.auth.controller.response.PermissionResponse;
@@ -97,6 +98,40 @@ public class PermissionController {
         return Result.success(PermissionResponse.from(permissionApplication.update(
             id, request.name(), request.description(), request.enabled(), request.version()
         )));
+    }
+
+    /**
+     * 启用 Permission，使其可被新的角色权限关系分配。
+     *
+     * @param id Permission 主键
+     * @param request 包含乐观锁 version 的状态变更请求
+     * @return 启用后的 Permission 响应
+     */
+    @PutMapping("/{id}/enable")
+    @PreAuthorize("hasAuthority('auth:permission:write')")
+    public Result<PermissionResponse> enable(
+        @PathVariable String id,
+        @Valid @RequestBody ChangeStatusRequest request
+    ) {
+        return Result.success(PermissionResponse.from(permissionApplication.enable(id, request.version())));
+    }
+
+    /**
+     * 停用 Permission，阻止其被新分配并从后续登录授权中排除。
+     *
+     * <p>该操作不修改已签发 Token 中的 authority 快照。</p>
+     *
+     * @param id Permission 主键
+     * @param request 包含乐观锁 version 的状态变更请求
+     * @return 停用后的 Permission 响应
+     */
+    @PutMapping("/{id}/disable")
+    @PreAuthorize("hasAuthority('auth:permission:write')")
+    public Result<PermissionResponse> disable(
+        @PathVariable String id,
+        @Valid @RequestBody ChangeStatusRequest request
+    ) {
+        return Result.success(PermissionResponse.from(permissionApplication.disable(id, request.version())));
     }
 
     /**

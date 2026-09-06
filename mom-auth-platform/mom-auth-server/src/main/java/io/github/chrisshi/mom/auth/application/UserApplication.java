@@ -35,6 +35,8 @@ import java.util.Set;
 @Component
 public class UserApplication {
 
+    private static final int MAX_ROLE_SELECTION = 200;
+
     private final UserMapper userMapper;
     private final UserRoleMapper userRoleMapper;
     private final RoleMapper roleMapper;
@@ -130,11 +132,40 @@ public class UserApplication {
         requireVersion(entity.getVersion(), version);
         entity.setDisplayName(displayName.strip());
         entity.setEnabled(enabled);
-        if (userMapper.updateById(entity) != 1) {
-            // 即使读取时版本一致，也必须检查 UPDATE affected rows，覆盖并发写入窗口。
-            throw new AuthException(AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
-        }
+        requireUpdateSucceeded(id, userMapper.updateById(entity));
         return UserView.from(entity);
+    }
+
+    /**
+     * 启用用户后续的新登录能力。
+     *
+     * <p>相同状态的重复请求不执行无意义 UPDATE；启用只影响后续登录，
+     * 不刷新已签发 Token 中的 authority 快照。</p>
+     *
+     * @param id 用户主键
+     * @param version 客户端读取到的乐观锁版本
+     * @return 启用后的用户视图
+     * @throws AuthException 用户不存在或版本冲突时抛出
+     */
+    @Transactional
+    public UserView enable(String id, long version) {
+        return changeEnabled(id, true, version);
+    }
+
+    /**
+     * 停用用户后续的新登录能力。
+     *
+     * <p>V1 保持 Token authority snapshot 语义：停用用户不回收已签发 Token，
+     * 已有 Token 继续到 Logout 或 TTL 到期。</p>
+     *
+     * @param id 用户主键
+     * @param version 客户端读取到的乐观锁版本
+     * @return 停用后的用户视图
+     * @throws AuthException 用户不存在或版本冲突时抛出
+     */
+    @Transactional
+    public UserView disable(String id, long version) {
+        return changeEnabled(id, false, version);
     }
 
     /**
@@ -153,9 +184,7 @@ public class UserApplication {
         UserEntity entity = requireUser(id);
         requireVersion(entity.getVersion(), version);
         entity.setPasswordHash(passwordEncoder.encode(newPassword));
-        if (userMapper.updateById(entity) != 1) {
-            throw new AuthException(AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
-        }
+        requireUpdateSucceeded(id, userMapper.updateById(entity));
         return UserView.from(entity);
     }
 
@@ -177,7 +206,7 @@ public class UserApplication {
         if (references > 0) {
             throw new AuthException(AuthErrorCode.RESOURCE_REFERENCED, "用户仍分配有角色，请先解除角色关系");
         }
-        userMapper.deleteById(id);
+        requireUpdateSucceeded(id, userMapper.deleteById(id));
     }
 
     /**
@@ -204,28 +233,35 @@ public class UserApplication {
     /**
      * 整体替换用户角色关系。
      *
-     * <p>先校验所有目标角色存在，再在同一事务中删除旧关系并写入新关系；输入重复角色会被去重。
-     * 该操作不负责刷新已经签发 Token 中的 authority 快照。</p>
+     * <p>先限制单次最多 200 个目标，再校验所有角色存在且已启用，最后在同一事务中
+     * 删除旧关系并写入新关系；输入重复角色会被去重。该操作不负责刷新已经签发 Token 中的
+     * authority 快照。</p>
      *
      * @param userId 用户主键
      * @param requestedRoleIds 目标角色主键集合
      * @return 替换后的角色列表
-     * @throws AuthException 用户或任一目标角色不存在时抛出
+     * @throws AuthException 用户/角色不存在、角色已停用或目标数量超限时抛出
      */
     @Transactional
     public List<RoleView> replaceRoles(String userId, List<String> requestedRoleIds) {
         requireUser(userId);
+        if (requestedRoleIds.size() > MAX_ROLE_SELECTION) {
+            throw new AuthException(AuthErrorCode.RELATION_SELECTION_TOO_LARGE);
+        }
         Set<String> roleIds = new LinkedHashSet<>(requestedRoleIds);
         validateRoles(roleIds);
 
         userRoleMapper.delete(
             new LambdaQueryWrapper<UserRoleEntity>().eq(UserRoleEntity::getUserId, userId)
         );
-        for (String roleId : roleIds) {
+        List<UserRoleEntity> relations = roleIds.stream().map(roleId -> {
             UserRoleEntity relation = new UserRoleEntity();
             relation.setUserId(userId);
             relation.setRoleId(roleId);
-            userRoleMapper.insert(relation);
+            return relation;
+        }).toList();
+        if (!relations.isEmpty()) {
+            userRoleMapper.insert(relations);
         }
         return roles(userId);
     }
@@ -258,6 +294,30 @@ public class UserApplication {
                 throw new AuthException(AuthErrorCode.RESOURCE_NOT_FOUND, "角色不存在: " + roleId);
             }
         }
+        if (roles.stream().anyMatch(role -> !Boolean.TRUE.equals(role.getEnabled()))) {
+            throw new AuthException(AuthErrorCode.ROLE_DISABLED);
+        }
+    }
+
+    private UserView changeEnabled(String id, boolean enabled, long version) {
+        UserEntity entity = requireUser(id);
+        requireVersion(entity.getVersion(), version);
+        if (Boolean.valueOf(enabled).equals(entity.getEnabled())) {
+            return UserView.from(entity);
+        }
+        entity.setEnabled(enabled);
+        requireUpdateSucceeded(id, userMapper.updateById(entity));
+        return UserView.from(entity);
+    }
+
+    private void requireUpdateSucceeded(String id, int affectedRows) {
+        if (affectedRows == 1) {
+            return;
+        }
+        if (userMapper.selectById(id) == null) {
+            throw new AuthException(AuthErrorCode.RESOURCE_NOT_FOUND, "用户不存在");
+        }
+        throw new AuthException(AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
     }
 
     private static String normalizeUsername(String username) {
