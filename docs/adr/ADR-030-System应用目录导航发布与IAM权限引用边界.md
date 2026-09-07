@@ -1,10 +1,11 @@
 # ADR-030：System 应用目录、导航发布与 IAM 权限引用边界
 
-- 状态：Accepted
+- 状态：Superseded by ADR-043
 - 日期：2026-08-01
 - 决策人：Chris
 - 关联 Slice：P1.6 S17
 - 关联 ADR：ADR-025、ADR-026、ADR-027、ADR-028、ADR-029
+- 历史说明：保留 S17 的设计与验证证据；Application Catalog/Navigation 不属于 System V1
 
 ## 1. 背景
 

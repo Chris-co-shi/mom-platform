@@ -5,9 +5,7 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.Test;
 
-import java.util.Locale;
 import java.util.Set;
-import java.util.stream.Stream;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
@@ -45,7 +43,6 @@ class ServerPackageArchitectureTest {
         noClasses()
                 .that().resideInAnyPackage(
                         "io.github.chrisshi.mom.iam.application..",
-                        "io.github.chrisshi.mom.system.application..",
                         "io.github.chrisshi.mom.mdm.application..",
                         "io.github.chrisshi.mom.integration.application..",
                         "io.github.chrisshi.mom.mes.application..",
@@ -73,119 +70,20 @@ class ServerPackageArchitectureTest {
                 .check(productionClasses);
     }
 
-    /** System 的 Web 和 Application 不得反向穿透到内部实现。 */
+    /** System Level 1 Controller 不得穿透到 Infrastructure；Application 允许直接依赖本地 Mapper/Entity。 */
     @Test
     void systemWebAndApplicationMustFollowLayerDirection() {
         noClasses()
-                .that().resideInAnyPackage("io.github.chrisshi.mom.system.web..")
+                .that().resideInAnyPackage("io.github.chrisshi.mom.system.controller..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "io.github.chrisshi.mom.system.infrastructure..",
                         "io.github.chrisshi.mom.system.domain..")
-                .because("System Web 只能通过 Application 进入用例")
-                .allowEmptyShould(true)
-                .check(productionClasses);
-
-        noClasses()
-                .that().resideInAnyPackage("io.github.chrisshi.mom.system.application..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "io.github.chrisshi.mom.system.web..",
-                        "io.github.chrisshi.mom.system.infrastructure..")
-                .because("System Application 不得依赖入站 Adapter 或基础设施实现")
+                .because("System Controller 只能通过 Application 进入用例")
                 .allowEmptyShould(true)
                 .check(productionClasses);
     }
 
-    /** System Parameter Domain Port 与规则不得出现 Spring 或 MyBatis 技术依赖。 */
-    @Test
-    void systemParameterDomainMustRemainSpringAndMybatisIndependent() {
-        noClasses()
-                .that().resideInAnyPackage("io.github.chrisshi.mom.system.domain.parameter..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "org.springframework..", "com.baomidou.mybatisplus..", "org.apache.ibatis..")
-                .because("Parameter Domain 聚合、规则和 Repository Port 必须保持技术无关")
-                .check(productionClasses);
-    }
-
-    /** Parameter Controller 只能通过 Application 用例进入业务，不得直接接触 Domain 或持久化。 */
-    @Test
-    void systemParameterControllerMustOnlyEnterThroughApplication() {
-        noClasses()
-                .that().resideInAnyPackage("io.github.chrisshi.mom.system.web.parameter..")
-                .and().haveSimpleNameEndingWith("Controller")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "io.github.chrisshi.mom.system.domain..",
-                        "io.github.chrisshi.mom.system.infrastructure..")
-                .because("Parameter Controller 只负责 HTTP、安全注解与 Application DTO 映射")
-                .check(productionClasses);
-    }
-
-    /** Dictionary Domain Port 与规则不得出现 Spring 或 MyBatis 技术依赖。 */
-    @Test
-    void systemDictionaryDomainMustRemainSpringAndMybatisIndependent() {
-        noClasses()
-                .that().resideInAnyPackage("io.github.chrisshi.mom.system.domain.dictionary..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "org.springframework..", "com.baomidou.mybatisplus..", "org.apache.ibatis..")
-                .because("Dictionary Domain 聚合、规则和 Repository Port 必须保持技术无关")
-                .check(productionClasses);
-    }
-
-    /** Dictionary Controller 只能通过对应 Application 用例进入业务。 */
-    @Test
-    void systemDictionaryControllerMustOnlyEnterThroughDictionaryApplication() {
-        noClasses()
-                .that().resideInAnyPackage("io.github.chrisshi.mom.system.web.dictionary..")
-                .and().haveSimpleNameEndingWith("Controller")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "io.github.chrisshi.mom.system.domain..",
-                        "io.github.chrisshi.mom.system.infrastructure..",
-                        "io.github.chrisshi.mom.system.application.parameter..")
-                .because("Dictionary Controller 只能依赖 Dictionary Application 与稳定 API 契约")
-                .check(productionClasses);
-    }
-
-    /** Parameter、Dictionary 与 Dynamic I18n 领域边界不得反向引用其他能力的实现层。 */
-    @Test
-    void systemParameterAndDictionaryDomainsMustRemainMutuallyBounded() {
-        noClasses()
-                .that().resideInAnyPackage("io.github.chrisshi.mom.system.domain.dictionary..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "io.github.chrisshi.mom.system.application.parameter..")
-                .because("Dictionary Domain 不引用 Parameter Application 或持久化实现")
-                .check(productionClasses);
-        noClasses()
-                .that().resideInAnyPackage("io.github.chrisshi.mom.system.domain.parameter..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "io.github.chrisshi.mom.system.application.dictionary..")
-                .because("Parameter Domain 不引用 Dictionary Application 或持久化实现")
-                .check(productionClasses);
-        noClasses()
-                .that().resideInAnyPackage("io.github.chrisshi.mom.system.domain.i18n..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "io.github.chrisshi.mom.system.application.parameter..",
-                        "io.github.chrisshi.mom.system.application.dictionary..")
-                .because("Dynamic I18n Domain 不引用 Parameter/Dictionary Application 或持久化实现")
-                .check(productionClasses);
-    }
-
-    /** Dynamic I18n Controller 只能通过对应 Application 用例进入业务。 */
-    @Test
-    void systemI18nControllerMustOnlyEnterThroughI18nApplication() {
-        noClasses()
-                .that().resideInAnyPackage("io.github.chrisshi.mom.system.web.i18n..")
-                .and().haveSimpleNameEndingWith("Controller")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "io.github.chrisshi.mom.system.domain..",
-                        "io.github.chrisshi.mom.system.infrastructure..",
-                        "io.github.chrisshi.mom.system.application.parameter..",
-                        "io.github.chrisshi.mom.system.application.dictionary..")
-                .because("Dynamic I18n Controller 只能依赖 Dynamic I18n Application")
-                .check(productionClasses);
-    }
-
-    /**
-     * S17 允许 System 拥有 Application Catalog 与 Navigation Metadata，但仍禁止形成第二 IAM 或主数据权威。
-     */
+    /** System 只拥有平台字典、支持 Locale 与 system.* 文案，不得形成第二 IAM 或主数据权威。 */
     @Test
     void systemMustNotDefineIamOrMasterDataAuthorityObjects() {
         Set<String> forbidden = Set.of(
@@ -198,59 +96,8 @@ class ServerPackageArchitectureTest {
                 .map(javaClass -> javaClass.getName())
                 .toList();
         org.assertj.core.api.Assertions.assertThat(violations)
-                .as("System Catalog 只能引用 IAM/主数据稳定 Code，不得定义权威对象")
+                .as("System V1 不得定义 IAM 或主数据权威对象")
                 .isEmpty();
-    }
-
-    /** Catalog 只能保存元数据和稳定 Reference，不得承载可执行客户端实现或 IAM Assignment。 */
-    @Test
-    void systemCatalogMustNotExposeExecutableClientArtifactsOrIamAssignments() {
-        Set<String> forbiddenSegments = Set.of(
-                "component", "layout", "javascript", "html", "dynamicimport",
-                "roleid", "roleids", "permissionid", "permissionids", "userid",
-                "factoryid", "partyid", "clientsecret", "accesstoken", "refreshtoken");
-        var violations = productionClasses.stream()
-                .filter(javaClass -> javaClass.getPackageName().contains(".system.")
-                        && (javaClass.getPackageName().contains(".catalog")
-                        || javaClass.getSimpleName().contains("SystemCatalogContracts")))
-                .flatMap(javaClass -> Stream.concat(
-                        Stream.of(javaClass.getSimpleName()),
-                        javaClass.getAllFields().stream().map(field -> field.getName())))
-                .filter(name -> forbiddenSegments.stream().anyMatch(segment ->
-                        name.toLowerCase(Locale.ROOT).contains(segment)))
-                .toList();
-        org.assertj.core.api.Assertions.assertThat(violations)
-                .as("Catalog 不得返回 Component/Layout/Script 或保存 IAM Assignment")
-                .isEmpty();
-    }
-
-    /** Preference Domain 不得依赖 SecurityContext、Web、MyBatis、Redis 或 Jackson Infrastructure。 */
-    @Test
-    void systemPreferenceDomainMustRemainSecurityAndAdapterIndependent() {
-        noClasses()
-                .that().resideInAnyPackage("io.github.chrisshi.mom.system.domain.preference..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "org.springframework.security..", "org.springframework.web..", "jakarta.servlet..",
-                        "com.baomidou.mybatisplus..", "org.apache.ibatis..", "org.springframework.data.redis..",
-                        "tools.jackson..", "io.github.chrisshi.mom.system.infrastructure..")
-                .because("Preference Domain 只表达类型化白名单、默认和版本规则")
-                .check(productionClasses);
-    }
-
-    /** Preference Controller 只能通过对应 Application 用例进入业务。 */
-    @Test
-    void systemPreferenceControllerMustOnlyEnterThroughPreferenceApplication() {
-        noClasses()
-                .that().resideInAnyPackage("io.github.chrisshi.mom.system.web.preference..")
-                .and().haveSimpleNameEndingWith("Controller")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        "io.github.chrisshi.mom.system.domain..",
-                        "io.github.chrisshi.mom.system.infrastructure..",
-                        "io.github.chrisshi.mom.system.application.parameter..",
-                        "io.github.chrisshi.mom.system.application.dictionary..",
-                        "io.github.chrisshi.mom.system.application.i18n..")
-                .because("Preference Controller 只能依赖 Preference Application 和稳定 API 契约")
-                .check(productionClasses);
     }
 
     /** System 不得引用 IAM 的内部 Application、Web、Repository、Mapper 或 Infrastructure。 */
@@ -298,47 +145,6 @@ class ServerPackageArchitectureTest {
                 .orShould().haveSimpleNameEndingWith("Configuration")
                 .because("API 模块只承载跨服务稳定契约")
                 .check(productionClasses);
-    }
-
-    /** System Preference API 契约不得暴露用户引用或数据库技术主键。 */
-    @Test
-    void systemPreferenceApiMustNotExposeIdentityOrDatabaseIds() {
-        Set<String> forbidden = Set.of("userId", "databaseId", "id");
-        var violations = productionClasses.stream()
-                .filter(javaClass -> javaClass.getPackageName().equals("io.github.chrisshi.mom.system.api"))
-                .filter(javaClass -> javaClass.getSimpleName().contains("UserPreference")
-                        || javaClass.getSimpleName().contains("UserViewSetting"))
-                .flatMap(javaClass -> Stream.concat(
-                        javaClass.getAllFields().stream().map(field -> field.getName()),
-                        javaClass.getMethods().stream().map(method -> method.getName())))
-                .filter(forbidden::contains)
-                .toList();
-
-        org.assertj.core.api.Assertions.assertThat(violations)
-                .as("Preference API 不得暴露 userId/databaseId/id")
-                .isEmpty();
-    }
-
-    /** Preference 模型不得定义授权、Scope、Token、Session 或 Factory 偏好成员。 */
-    @Test
-    void systemPreferenceMustNotModelAuthorizationOrFactoryScope() {
-        Set<String> forbiddenSegments = Set.of(
-                "role", "permission", "factoryscope", "partyscope", "token", "session", "credential");
-        var violations = productionClasses.stream()
-                .filter(javaClass -> javaClass.getPackageName().contains(".system.preference")
-                        || (javaClass.getPackageName().equals("io.github.chrisshi.mom.system.api")
-                        && (javaClass.getSimpleName().contains("UserPreference")
-                        || javaClass.getSimpleName().contains("UserViewSetting"))))
-                .flatMap(javaClass -> Stream.concat(
-                        Stream.of(javaClass.getSimpleName()),
-                        javaClass.getAllFields().stream().map(field -> field.getName())))
-                .filter(name -> forbiddenSegments.stream()
-                        .anyMatch(segment -> name.toLowerCase(Locale.ROOT).contains(segment)))
-                .toList();
-
-        org.assertj.core.api.Assertions.assertThat(violations)
-                .as("Preference 不得成为 IAM 授权或 Factory Scope 的第二权威")
-                .isEmpty();
     }
 
     /** Gateway 生产代码不得依赖 Servlet 或 Spring MVC。 */

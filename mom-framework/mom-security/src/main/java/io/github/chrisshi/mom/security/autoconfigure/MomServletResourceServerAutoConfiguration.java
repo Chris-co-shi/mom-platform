@@ -1,7 +1,9 @@
 package io.github.chrisshi.mom.security.autoconfigure;
 
+import io.github.chrisshi.mom.core.i18n.I18nMessageResolver;
 import io.github.chrisshi.mom.security.token.MomOpaqueTokenIntrospector;
 import io.github.chrisshi.mom.security.token.MomTokenStore;
+import io.github.chrisshi.mom.security.web.MomLocalizedSecurityErrorHandler;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -17,6 +19,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
 import org.springframework.security.web.SecurityFilterChain;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
 
@@ -26,6 +29,10 @@ import java.time.Clock;
  * <p>第一版使用 Opaque Token。Framework 负责提供大多数业务服务一致的安全基线：
  * 无状态请求、公开路径、Bearer Token 认证与方法级授权。Token 的实际查询和认证信息构造由
  * {@link OpaqueTokenIntrospector} 完成。</p>
+ *
+ * <p>认证与授权失败在 Security Filter Chain 内由统一 JSON Handler 处理，并在存在 Core
+ * I18nMessageResolver Bean 时解析展示文案；Resolver 缺失时回退稳定 messageKey。异常正文不包含 Token、
+ * 策略细节或堆栈，响应写入失败直接传播给 Servlet 容器。</p>
  *
  * <p>业务服务如有特殊 HTTP 安全策略，可以自行声明 {@link SecurityFilterChain}，此默认配置会自动退让。</p>
  */
@@ -63,8 +70,13 @@ public class MomServletResourceServerAutoConfiguration {
     SecurityFilterChain momResourceServerSecurityFilterChain(
         HttpSecurity http,
         OpaqueTokenIntrospector introspector,
-        MomResourceServerProperties properties
+        MomResourceServerProperties properties,
+        ObjectProvider<I18nMessageResolver> messageResolverProvider,
+        ObjectMapper objectMapper
     ) {
+
+        MomLocalizedSecurityErrorHandler errorHandler = new MomLocalizedSecurityErrorHandler(
+                messageResolverProvider.getIfAvailable(), objectMapper);
 
         http
             .logout(AbstractHttpConfigurer::disable)
@@ -80,10 +92,14 @@ public class MomServletResourceServerAutoConfiguration {
                 }
                 authorize.anyRequest().authenticated();
             })
+            .exceptionHandling(exceptions -> exceptions
+                    .authenticationEntryPoint(errorHandler)
+                    .accessDeniedHandler(errorHandler))
             .oauth2ResourceServer(resourceServer ->
-                resourceServer.opaqueToken(opaque ->
-                    opaque.introspector(introspector)
-                )
+                resourceServer
+                    .authenticationEntryPoint(errorHandler)
+                    .accessDeniedHandler(errorHandler)
+                    .opaqueToken(opaque -> opaque.introspector(introspector))
             );
 
         return http.build();

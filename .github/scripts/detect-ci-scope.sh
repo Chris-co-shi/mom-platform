@@ -134,10 +134,10 @@ fi
 if path_matches '(^\.github/scripts/redis-rate-limit-smoke\.sh$|^mom-framework/mom-rate-limit/|^mom-gateway/|/rate.?limit|RedisRate)'; then
   redis_rate_limit=true
 fi
-if path_matches '(^\.github/scripts/(mdm|system)-postgresql-smoke\.sh$|^\.github/scripts/system-iam-client-credentials-smoke\.sh$|^mom-framework/(mom-data|mom-outbox)/|^mom-(mdm|integration|system)-platform/.*/src/(main|test)/resources/db/|/(mapper|repository|persistence)/|\.sql$)'; then
+if path_matches '(^\.github/scripts/(mdm|system)-postgresql-smoke\.sh$|^mom-framework/(mom-data|mom-outbox)/|^mom-(mdm|integration|system)-platform/.*/src/(main|test)/resources/db/|/(mapper|repository|persistence)/|\.sql$)'; then
   postgresql=true
 fi
-if path_matches '(^\.github/scripts/system-rocketmq-runtime-event-smoke\.sh$|^mom-framework/(mom-messaging|mom-outbox)/|/messaging/|rocketmq|outbox|inbox)'; then
+if path_matches '(^mom-framework/(mom-messaging|mom-outbox)/|/messaging/|rocketmq|outbox|inbox)'; then
   messaging=true
 fi
 

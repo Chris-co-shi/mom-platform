@@ -68,29 +68,21 @@ docker exec "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USERNAME" -d "$POSTGRES_DAT
   -v ON_ERROR_STOP=1 -Atc "
 SELECT 'schema=' || count(*) FROM information_schema.schemata WHERE schema_name='${POSTGRES_SCHEMA}';
 SELECT 'flyway_version=' || max(version::integer) FROM ${POSTGRES_SCHEMA}.flyway_schema_history WHERE success=true;
-SELECT 'parameter=' || count(*) FROM information_schema.tables WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name='system_parameter';
 SELECT 'dictionary=' || count(*) FROM information_schema.tables WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name IN ('system_dictionary','system_dictionary_item');
-SELECT 'i18n=' || count(*) FROM information_schema.tables WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name IN ('system_i18n_resource','system_i18n_message','system_i18n_release');
-SELECT 'preference=' || count(*) FROM information_schema.tables WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name IN ('system_user_preference','system_user_view_setting');
-SELECT 'catalog=' || count(*) FROM information_schema.tables WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name IN ('system_application','system_navigation_item','system_catalog_release');
-SELECT 'outbox=' || count(*) FROM information_schema.tables WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name='mom_outbox_event';
-SELECT 'inbox=' || count(*) FROM information_schema.tables WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name='mom_inbox_event';
-SELECT 'preference_jsonb=' || count(*) FROM information_schema.columns WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name='system_user_view_setting' AND column_name IN ('columns_json','sort_json','filters_json') AND data_type='jsonb';
-SELECT 'i18n_jsonb=' || count(*) FROM information_schema.columns WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name='system_i18n_release' AND column_name='messages_json' AND data_type='jsonb';
-SELECT 'catalog_jsonb=' || count(*) FROM information_schema.columns WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name='system_catalog_release' AND column_name='snapshot_json' AND data_type='jsonb';
-SELECT 'catalog_unique=' || count(*) FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='${POSTGRES_SCHEMA}' AND c.conname IN ('uk_system_application_code','uk_system_navigation_item_route','uk_system_catalog_release_application_version') AND c.contype='u';
-SELECT 'catalog_immutable_trigger=' || count(*) FROM pg_trigger tr JOIN pg_class t ON t.oid=tr.tgrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='${POSTGRES_SCHEMA}' AND t.relname='system_catalog_release' AND tr.tgname='trg_system_catalog_release_immutable' AND NOT tr.tgisinternal;
-SELECT 'outbox_claim_index=' || count(*) FROM pg_indexes WHERE schemaname='${POSTGRES_SCHEMA}' AND tablename='mom_outbox_event' AND indexname='ix_mom_outbox_event_claim';
-SELECT 'inbox_identity=' || count(*) FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='${POSTGRES_SCHEMA}' AND t.relname='mom_inbox_event' AND c.conname='pk_mom_inbox_event' AND c.contype='p' AND pg_get_constraintdef(c.oid) LIKE '%event_id, consumer_name%';
-SELECT 'base_entity_deleted=' || count(*) FROM information_schema.columns WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name IN ('system_parameter','system_dictionary','system_dictionary_item','system_i18n_resource','system_i18n_message','system_i18n_release') AND column_name='deleted' AND data_type='boolean' AND is_nullable='NO';
+SELECT 'locale=' || count(*) FROM information_schema.tables WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name='system_supported_locale';
+SELECT 'i18n=' || count(*) FROM information_schema.tables WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name IN ('system_i18n_message_definition','system_i18n_translation');
+SELECT 'enabled_locales=' || count(*) FROM ${POSTGRES_SCHEMA}.system_supported_locale WHERE enabled AND NOT deleted;
+SELECT 'default_locales=' || count(*) FROM ${POSTGRES_SCHEMA}.system_supported_locale WHERE is_default AND NOT deleted;
+SELECT 'system_messages=' || count(*) FROM ${POSTGRES_SCHEMA}.system_i18n_message_definition WHERE namespace='system' AND NOT deleted;
+SELECT 'system_translations=' || count(*) FROM ${POSTGRES_SCHEMA}.system_i18n_translation WHERE NOT deleted;
+SELECT 'base_entity_deleted=' || count(*) FROM information_schema.columns WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name IN ('system_dictionary','system_dictionary_item','system_supported_locale','system_i18n_message_definition','system_i18n_translation') AND column_name='deleted' AND data_type='boolean' AND is_nullable='NO';
 SELECT 'cross_schema_fk=' || count(*) FROM pg_constraint c JOIN pg_class s ON s.oid=c.conrelid JOIN pg_namespace sn ON sn.oid=s.relnamespace JOIN pg_class t ON t.oid=c.confrelid JOIN pg_namespace tn ON tn.oid=t.relnamespace WHERE c.contype='f' AND sn.nspname='${POSTGRES_SCHEMA}' AND tn.nspname<>'${POSTGRES_SCHEMA}';
 SELECT 'business_fk=' || count(*) FROM pg_constraint c JOIN pg_class s ON s.oid=c.conrelid JOIN pg_namespace sn ON sn.oid=s.relnamespace WHERE c.contype='f' AND sn.nspname='${POSTGRES_SCHEMA}';
 " > system-postgresql-schema.txt
 
-for expected in schema=1 flyway_version=9 parameter=1 dictionary=2 i18n=3 preference=2 \
-  catalog=3 outbox=1 inbox=1 preference_jsonb=3 i18n_jsonb=1 catalog_jsonb=1 \
-  catalog_unique=3 catalog_immutable_trigger=1 outbox_claim_index=1 inbox_identity=1 \
-  base_entity_deleted=6 cross_schema_fk=0 business_fk=0; do
+for expected in schema=1 flyway_version=10 dictionary=2 locale=1 i18n=2 enabled_locales=2 \
+  default_locales=1 system_messages=15 system_translations=30 \
+  base_entity_deleted=5 cross_schema_fk=0 business_fk=0; do
   grep --fixed-strings --quiet "$expected" system-postgresql-schema.txt || {
     FAILURE_REASON="missing schema evidence: $expected"; exit 1;
   }
@@ -103,9 +95,4 @@ connections=$(docker exec "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USERNAME" \
 [[ "$(docker exec "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USERNAME" \
   -d "$POSTGRES_DATABASE" -tAc 'show timezone')" == "Asia/Tokyo" ]]
 
-echo "SYSTEM_POSTGRESQL_SMOKE result=success flyway=9 outbox=1 inbox=1 business_fk=0 cross_schema_fk=0 readiness=UP"
-
-POSTGRES_CONTAINER="$POSTGRES_CONTAINER" POSTGRES_PORT="$POSTGRES_PORT" \
-POSTGRES_DATABASE="$POSTGRES_DATABASE" POSTGRES_USERNAME="$POSTGRES_USERNAME" \
-POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
-  bash .github/scripts/system-iam-client-credentials-smoke.sh
+echo "SYSTEM_POSTGRESQL_SMOKE result=success flyway=10 dictionary=2 locale=1 i18n=2 business_fk=0 cross_schema_fk=0 readiness=UP"

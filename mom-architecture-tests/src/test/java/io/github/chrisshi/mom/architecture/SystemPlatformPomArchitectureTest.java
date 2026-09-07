@@ -16,31 +16,25 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** System Platform S18 的 POM、API、Migration、事务与零 Mapper XML 精确门禁。 */
+/** System V1 收敛后的 POM、API、Migration、三层结构与零 Mapper XML 精确门禁。 */
 class SystemPlatformPomArchitectureTest {
     private static final String MOM_GROUP = "io.github.chrisshi.mom";
-    private static final Set<String> CLIENT_DEPENDENCIES = Set.of(
-            MOM_GROUP + ":mom-system-api", MOM_GROUP + ":mom-openfeign");
     private static final Set<String> SERVER_DEPENDENCIES = Set.of(
-            MOM_GROUP + ":mom-system-api", MOM_GROUP + ":mom-iam-client",
+            MOM_GROUP + ":mom-system-api",
             MOM_GROUP + ":mom-webmvc", MOM_GROUP + ":mom-security",
-            MOM_GROUP + ":mom-data", MOM_GROUP + ":mom-messaging",
-            MOM_GROUP + ":mom-outbox", MOM_GROUP + ":mom-tracing",
-            MOM_GROUP + ":mom-metrics", MOM_GROUP + ":mom-resilience", MOM_GROUP + ":mom-cache",
-            "org.springframework.boot:spring-boot-starter-oauth2-client",
+            MOM_GROUP + ":mom-data", MOM_GROUP + ":mom-tracing",
+            MOM_GROUP + ":mom-metrics",
+            "org.springframework.boot:spring-boot-starter-flyway",
+            "org.flywaydb:flyway-database-postgresql", "org.postgresql:postgresql",
             "com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery",
-            "com.alibaba.cloud:spring-cloud-starter-stream-rocketmq",
             "org.projectlombok:lombok", "org.springframework.security:spring-security-test",
             MOM_GROUP + ":mom-test");
     private static final Pattern FORBIDDEN_JAVA_TYPE = Pattern.compile(
-            ".*(AuditProjection|Session|Refresh|Credential|FactoryScope|PartyBinding|Factory|Warehouse|"
-                    + "Equipment|Person|Party).*\\.java");
+            ".*(Parameter|ApplicationCatalog|SystemCatalog|Navigation|UserPreference|UserViewSetting|"
+                    + "CatalogRelease|CatalogPublish|CatalogRollback|Outbox|Inbox|RocketMQ).*\\.java");
     private static final Set<String> API_TYPES = Set.of(
-            "package-info.java", "ParameterScopeType.java", "ParameterValueType.java",
-            "ResolvedSystemParameter.java", "SystemDictionaryItemOption.java",
-            "ResolvedSystemDictionaryItem.java", "SupportedUserLocale.java", "UserThemeMode.java",
-            "UserDensity.java", "ResolvedUserPreference.java", "UserViewSetting.java",
-            "SystemCatalogContracts.java");
+            "package-info.java", "SystemDictionaryItemOption.java",
+            "ResolvedSystemDictionaryItem.java", "SupportedLocaleInfo.java");
 
     @Test
     void rootReactorMustRegisterSystemPlatformExactlyOnce() throws Exception {
@@ -55,21 +49,18 @@ class SystemPlatformPomArchitectureTest {
         Element project = document.getDocumentElement();
         assertThat(directText(project, "packaging")).isEqualTo("pom");
         assertThat(modules(document)).containsExactly(
-                "mom-system-api", "mom-system-client", "mom-system-server");
+                "mom-system-api", "mom-system-server");
         assertThat(dependencies(project)).isEmpty();
     }
 
     @Test
-    void apiAndClientMustExposeOnlyApprovedContractsAndRemainTransportBounded() throws Exception {
+    void apiMustExposeOnlyApprovedStableContracts() throws Exception {
         Element api = parse(systemRoot().resolve("mom-system-api/pom.xml")).getDocumentElement();
-        Element client = parse(systemRoot().resolve("mom-system-client/pom.xml")).getDocumentElement();
         assertThat(dependencies(api)).isEmpty();
-        assertThat(coordinates(dependencies(client))).containsExactlyInAnyOrderElementsOf(CLIENT_DEPENDENCIES);
         assertThat(javaFiles(systemRoot().resolve("mom-system-api/src/main/java")))
                 .extracting(path -> path.getFileName().toString())
                 .containsExactlyInAnyOrderElementsOf(API_TYPES);
-        assertThat(javaFiles(systemRoot().resolve("mom-system-client/src/main/java")))
-                .allMatch(path -> path.getFileName().toString().equals("package-info.java"));
+        assertThat(systemRoot().resolve("mom-system-client/pom.xml")).doesNotExist();
     }
 
     @Test
@@ -94,7 +85,7 @@ class SystemPlatformPomArchitectureTest {
     }
 
     @Test
-    void s18MustUseApprovedMigrationsWithoutMapperXmlOrGlobalTransaction() throws Exception {
+    void v1MustPreserveHistoricalMigrationsAndAddOnlyV10WithoutMapperXml() throws Exception {
         Path server = systemRoot().resolve("mom-system-server");
         try (var paths = Files.walk(systemRoot())) {
             List<Path> files = paths.filter(Files::isRegularFile).toList();
@@ -113,7 +104,8 @@ class SystemPlatformPomArchitectureTest {
                             migration(server, "V6__clarify_i18n_release_snapshot_columns.sql"),
                             migration(server, "V7__create_system_user_preference.sql"),
                             migration(server, "V8__create_system_application_catalog.sql"),
-                            migration(server, "V9__create_system_runtime_change_outbox.sql"));
+                            migration(server, "V9__create_system_runtime_change_outbox.sql"),
+                            migration(server, "V10__create_system_v1_locale_and_i18n.sql"));
             assertThat(files)
                     .filteredOn(path -> normalized(path).contains("/src/main/resources/mapper/"))
                     .isEmpty();

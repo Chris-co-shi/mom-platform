@@ -33,6 +33,7 @@ APPLICATION_EXCEPTIONS = {
 # Mapper/Entity。Mini Auth 已按该级别冻结，仍由 Controller 与 Domain 的独立规则防止越层。
 LEVEL_ONE_APPLICATION_PREFIXES = (
     "mom-auth-platform/mom-auth-server/src/main/java/io/github/chrisshi/mom/auth/application/",
+    "mom-system-platform/mom-system-server/src/main/java/io/github/chrisshi/mom/system/application/",
 )
 
 

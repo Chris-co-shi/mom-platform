@@ -1,10 +1,11 @@
 # ADR-031：System 运行时缓存、变更通知、服务身份与事务边界
 
-- 状态：Accepted
+- 状态：Superseded by ADR-043
 - 日期：2026-08-01
 - 决策人：Chris
 - 关联 Slice：P1.6 S18
 - 关联 ADR：ADR-009、ADR-016、ADR-026～ADR-030
+- 历史说明：保留 S18 的设计与验证证据；System V1 不使用 Cache、Outbox/Inbox、MQ 或 IAM 引用校验
 
 ## 1. 背景
 

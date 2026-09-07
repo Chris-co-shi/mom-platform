@@ -2,7 +2,8 @@
 
 本目录是 `mom-platform` 的需求、计划、架构、安全协议和架构决策权威入口。
 
-> 当前代码收敛工作以 `fix/mini-auth` 为事实来源。认证与授权已经从旧完整 IAM / Authorization Server 方案收敛为 Mini Auth V1；Gateway 只做 Bearer 边缘检查、Header 清洗、路由与本地限流，真实 Token 认证由各 Resource Server 完成；`mom-openfeign` 只承担 MOM 内部同步 RPC 的上下文传播。
+> 当前代码收敛工作分别以 Mini Auth V1 与 System V1 当前 ADR 为事实来源。认证以 ADR-040/042 为准；System
+> 能力与 I18n 所有权以 ADR-043 为准。历史 P1.5/P1.6 报告保留验证价值，但不覆盖当前运行时语义。
 
 ## 文档使用原则
 
@@ -21,6 +22,7 @@
 - `mom-gateway`：旧 JWT/JWK/Audience/revoked-sid 链已移除；当前使用 Bearer 形态检查、`X-MOM-*` 清洗、Gateway 本地 Redis 限流与统一异常响应。
 - `mom-openfeign`：已收敛为 MOM 内部同步 RPC 基础设施，全局传播 Correlation ID 和当前 Servlet 请求中的原始 Bearer；不再依赖 `mom-resilience` 或预置 CircuitBreaker 命名策略。
 - `mom-auth-platform`：`mom-auth-api` / `mom-auth-server`、`mom_auth` Schema、5 张核心表和管理员初始化脚本已建立；业务代码下一步开始。
+- `mom-system-platform`：收敛为受限字典、支持 Locale 与 `system.*` Dynamic I18n；历史 Parameter、Preference、Catalog、发布快照、缓存和 MQ 运行时已退出当前代码。
 
 ## Mini Auth V1 当前权威文档
 
@@ -31,6 +33,13 @@
 5. [Mini Auth 数据库与代码分层](architecture/Mini-Auth数据库与代码分层.md)
 6. [Mini Auth 管理员初始化](security/Mini-Auth管理员初始化.md)
 7. [CurrentActor 与数据审计](architecture/CurrentActor与数据审计.md)
+
+## System V1 当前权威文档
+
+1. [ADR-043：System V1 能力与 I18n 数据所有权](adr/ADR-043-System-V1能力与I18n数据所有权.md)
+2. [System V1 与 I18n 运行时设计](architecture/System-V1与I18n运行时设计.md)
+3. [业务模块 I18n 后续设计手册](engineering/System-I18n业务模块后续设计手册.md)
+4. [国际化与 Locale 工程规范](engineering/standards/localization-locale-standard.md)
 
 ## 当前认证链
 
@@ -107,6 +116,8 @@ P1.5/P1.6 的旧认证实施资料继续作为历史证据；与 ADR-040/041 冲
 - [Mini Auth 数据库与代码分层](architecture/Mini-Auth数据库与代码分层.md)
 - [IAM 数据库与领域模型（历史）](architecture/IAM数据库与领域模型.md)
 - [CurrentActor 与数据审计](architecture/CurrentActor与数据审计.md)
+- [System V1 与 I18n 运行时设计](architecture/System-V1与I18n运行时设计.md)
+- [业务模块 I18n 后续设计手册](engineering/System-I18n业务模块后续设计手册.md)
 - [集成架构](architecture/集成架构.md)
 - [可观测性架构](architecture/可观测性架构.md)
 - [部署架构](architecture/部署架构.md)
@@ -117,6 +128,7 @@ P1.5/P1.6 的旧认证实施资料继续作为历史证据；与 ADR-040/041 冲
 - [ADR-040：Mini Auth 与 Redis Opaque Token](adr/ADR-040-Mini-Auth与Redis-Opaque-Token认证基线.md)
 - [ADR-041：Mini Auth 简化三层包结构](adr/ADR-041-Mini-Auth简化三层包结构.md)
 - [ADR-026：业务表禁止物理外键](adr/ADR-026-MOM业务表禁止物理外键与关联完整性策略.md)
+- [ADR-043：System V1 能力与 I18n 数据所有权](adr/ADR-043-System-V1能力与I18n数据所有权.md)
 
 ADR-027/028 对其他 bounded context 继续有效；`mom-auth-server` V1 的精确例外由 ADR-041 决定。
 
@@ -131,4 +143,4 @@ ADR-027/028 对其他 bounded context 继续有效；`mom-auth-server` V1 的精
 
 - [文档维护约定](文档维护约定.md)
 
-当前收敛阶段的代码与对应 Current 文档应在 `fix/mini-auth` 上同步维护；架构决策变化通过 ADR 或明确的当前基线文档记录，不静默覆盖历史 ADR。
+当前收敛阶段的代码与对应 Current 文档必须同步维护；架构决策变化通过 ADR 或明确的当前基线文档记录，不静默覆盖历史 ADR。
