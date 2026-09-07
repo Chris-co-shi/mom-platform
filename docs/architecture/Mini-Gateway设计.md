@@ -84,6 +84,11 @@ Bearer；不在白名单中的 Origin 不获得跨域授权。
 `X-Forwarded-For` 的 Nginx/LB IPv4 CIDR。Base 为空，表示默认不信任任何代理。非法或 IPv6 CIDR 会让
 Gateway 启动失败，避免错误信任边界静默生效。
 
+Mini Gateway V1 使用 `TrustedClientIpResolver` 独立管理客户端 IP 信任边界，
+`server.forward-headers-strategy` 固定为 `none`。禁止 Spring Boot 或 Reactor Netty 在该解析器执行前根据
+`Forwarded` / `X-Forwarded-*` 改写 `request.remoteAddress`；解析器必须看到原始 TCP peer，才能判断实际连接
+Gateway 的节点是否属于 `trusted-proxies`。这是 MOM 的安全边界决策，不依赖框架在不同部署环境中的默认值。
+
 ### 5.2 最终算法
 
 ```text
@@ -113,6 +118,17 @@ proxy_set_header X-Forwarded-Host $host;
 
 Gateway 正式环境不直接暴露公网，网络策略只允许受信 Nginx/LB 访问。CIDR 配置与网络策略共同组成信任边界，
 不能只依靠应用内 Header 解析。
+
+Mini Gateway V1 的 Nginx/LB → Gateway 可信代理链必须使用 IPv4。单机 Nginx 不得在需要可信代理解析时依赖
+`proxy_pass http://localhost:20000`，因为 `localhost` 可能解析为 `::1`；IPv4 CIDR 不会匹配该 TCP peer，
+Gateway 将忽略 XFF 并把所有请求归入 `ip:::1` Bucket。单机部署应明确使用：
+
+```nginx
+proxy_pass http://127.0.0.1:20000;
+```
+
+其他部署也必须确保 Nginx/LB 到 Gateway 的 TCP peer 是 `MOM_GATEWAY_TRUSTED_PROXIES` 所覆盖的 IPv4 地址。
+此限制不影响 Direct IPv6 Client：未经过可信代理的 IPv6 对端仍可直接作为 `remoteAddress` 和 Rate Limit Key。
 
 ## 6. Bearer 与身份 Header
 

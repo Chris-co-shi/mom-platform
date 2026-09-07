@@ -87,6 +87,8 @@ Token 不存在表示无效 Token；Redis 连接、超时、JSON 损坏或反序
 - Base 不激活 Profile，Nacos Discovery 默认关闭；
 - Redis、Nacos 密码默认空，只能由环境变量、Kubernetes Secret 或经 ADR 的 Secret Manager 提供；
 - CORS、可信代理 CIDR、安全协议边界不允许不受控动态刷新；
+- Gateway 以 `TrustedClientIpResolver` 独占代理信任判断，`server.forward-headers-strategy` 固定为 `none`，
+  Spring Boot / Reactor Netty 不得在解析器之前根据 Forwarded Header 改写原始 TCP peer；
 - 正式 Gateway 不直接暴露公网，只接受受控 Nginx/LB 网络入口；
 - Nacos Discovery 与 Config 分离，当前不引入 Nacos Config Starter 或 Bootstrap 文件。
 

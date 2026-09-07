@@ -45,6 +45,7 @@ class MomGatewayApplicationTest {
             assertNotNull(context.getBean(TrustedClientIpResolver.class));
 
             Environment environment = context.getEnvironment();
+            assertEquals("none", environment.getProperty("server.forward-headers-strategy"));
             assertEquals("127.0.0.1", environment.getProperty("spring.data.redis.host"));
             assertEquals("", environment.getProperty("spring.data.redis.password"));
             assertEquals("false", environment.getProperty("spring.cloud.nacos.discovery.enabled"));
