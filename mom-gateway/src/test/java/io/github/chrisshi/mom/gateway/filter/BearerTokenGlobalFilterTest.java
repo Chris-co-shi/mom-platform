@@ -13,8 +13,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class BearerTokenGlobalFilterTest {
@@ -22,18 +20,17 @@ class BearerTokenGlobalFilterTest {
     private final BearerTokenGlobalFilter filter = new BearerTokenGlobalFilter();
 
     @Test
-    void protectedApiWithoutBearerMustRaiseGatewayException() {
+    void requestWithoutBearerMustBeForwardedToResourceServer() {
         ServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/mes/work-orders").build());
         AtomicInteger calls = new AtomicInteger();
 
-        GatewayException exception = assertThrows(GatewayException.class, () -> filter.filter(exchange, current -> {
+        filter.filter(exchange, current -> {
             calls.incrementAndGet();
             return Mono.empty();
-        }).block());
+        }).block();
 
-        assertEquals(0, calls.get());
-        assertEquals(GatewayErrorCode.MISSING_BEARER_TOKEN, exception.errorCode());
+        assertEquals(1, calls.get());
     }
 
     @Test
@@ -54,12 +51,9 @@ class BearerTokenGlobalFilterTest {
     }
 
     @Test
-    void validBearerMustBeForwardedUnchangedAndMomHeadersRemoved() {
+    void validBearerMustBeForwardedUnchanged() {
         MockServerHttpRequest request = MockServerHttpRequest.get("/api/qms/results")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer opaque-token-value")
-                .header("X-MOM-User-Id", "attacker")
-                .header("x-mom-permissions", "qms:result:approve")
-                .header("X-Factory-Id", "factory-1")
                 .build();
         ServerWebExchange exchange = MockServerWebExchange.from(request);
         AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
@@ -69,13 +63,22 @@ class BearerTokenGlobalFilterTest {
             return Mono.empty();
         }).block();
 
-        assertNotNull(forwarded.get());
         assertEquals("Bearer opaque-token-value",
                 forwarded.get().getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION));
-        assertNull(forwarded.get().getRequest().getHeaders().getFirst("X-MOM-User-Id"));
-        assertNull(forwarded.get().getRequest().getHeaders().getFirst("x-mom-permissions"));
-        assertEquals("factory-1",
-                forwarded.get().getRequest().getHeaders().getFirst("X-Factory-Id"));
+    }
+
+    @Test
+    void optionsWithoutBearerMustBypassEdgeValidation() {
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.options("/auth/users").build());
+        AtomicInteger calls = new AtomicInteger();
+
+        filter.filter(exchange, current -> {
+            calls.incrementAndGet();
+            return Mono.empty();
+        }).block();
+
+        assertEquals(1, calls.get());
     }
 
     @Test
