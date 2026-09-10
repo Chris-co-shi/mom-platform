@@ -13,8 +13,8 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  * MOM Server 包分层的渐进式 ArchUnit 门禁。
  *
  * <p>测试分析聚合测试模块依赖中的已编译生产字节码，不使用源码正则。Domain、Controller、公开 API
- * 与 Gateway 规则全量生效；Application 规则仅排除五个已在 S01 规范逐文件登记的 Phase 01 技术探针，
- * 防止历史技术验证代码迫使本 Slice 扩大为生产重构。新增代码不能加入该精确基线。</p>
+ * 与 Gateway 规则全量生效；Application 的严格 Port/Domain 规则只约束已经进入 Level 2/3 的模块，
+ * Mini Auth、System 与 MDM 简单主数据按 ADR-042 允许直接依赖本服务 Mapper/Entity。</p>
  */
 class ServerPackageArchitectureTest {
 
@@ -37,13 +37,12 @@ class ServerPackageArchitectureTest {
                 .check(productionClasses);
     }
 
-    /** 非基线 Application 代码不得依赖 HTTP、Web DTO、Mapper、Entity 或 JDBC。 */
+    /** 已进入 Level 2/3 的 Application 不得依赖 HTTP、Web DTO、Mapper、Entity 或 JDBC。 */
     @Test
     void applicationMustNotDependOnWebOrPersistenceDetails() {
         noClasses()
                 .that().resideInAnyPackage(
                         "io.github.chrisshi.mom.iam.application..",
-                        "io.github.chrisshi.mom.mdm.application..",
                         "io.github.chrisshi.mom.integration.application..",
                         "io.github.chrisshi.mom.mes.application..",
                         "io.github.chrisshi.mom.wms.application..",

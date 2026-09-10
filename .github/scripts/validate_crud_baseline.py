@@ -30,10 +30,12 @@ APPLICATION_EXCEPTIONS = {
 }
 
 # ADR-042 明确允许简单 Level 1 模块的 Application 直接依赖本 bounded context 的
-# Mapper/Entity。Mini Auth 已按该级别冻结，仍由 Controller 与 Domain 的独立规则防止越层。
+# Mapper/Entity。Mini Auth、System 和本次第一组 MDM 主数据均按该级别实现，仍由 Controller 与 Domain
+# 的独立规则防止越层。
 LEVEL_ONE_APPLICATION_PREFIXES = (
     "mom-auth-platform/mom-auth-server/src/main/java/io/github/chrisshi/mom/auth/application/",
     "mom-system-platform/mom-system-server/src/main/java/io/github/chrisshi/mom/system/application/",
+    "mom-mdm-platform/mom-mdm-server/src/main/java/io/github/chrisshi/mom/mdm/application/",
 )
 
 
