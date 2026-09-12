@@ -165,23 +165,19 @@ class FrameworkGovernanceArchitectureTest {
                 .noneMatch(path -> path.endsWith("/IamEventType.java"));
     }
 
-    /** System 必须通过 typed Cache API 和本地事件枚举消费 Framework。 */
+    /** System V1 不得重新引入 Redis/Caffeine、消息发布或本地事件枚举。 */
     @Test
-    void systemMustConsumeTypedCacheAndOwnItsEventEnum() throws Exception {
+    void systemV1MustRemainFreeOfCacheAndMessagingInfrastructure() throws Exception {
         List<SourceFile> systemSources = productionSources().stream()
                 .filter(source -> source.path().startsWith("mom-system-platform/mom-system-server/"))
                 .toList();
 
         assertThat(systemSources)
                 .flatExtracting(SourceFile::imports)
-                .noneMatch(FrameworkGovernanceArchitectureTest::isRedisOrCaffeine);
-        SourceFile producer = systemSources.stream()
-                .filter(source -> source.path().endsWith("/OutboxSystemRuntimeChangeEventAdapter.java"))
-                .findFirst()
-                .orElseThrow();
-        assertThat(producer.content())
-                .contains("SystemEventType")
-                .doesNotContain("public static final String");
+                .noneMatch(imported -> isRedisOrCaffeine(imported)
+                        || imported.startsWith("io.github.chrisshi.mom.messaging.")
+                        || imported.startsWith("io.github.chrisshi.mom.outbox.")
+                        || imported.startsWith("org.springframework.cloud.stream."));
     }
 
     private static boolean isRedisOrCaffeine(String name) {

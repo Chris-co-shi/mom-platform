@@ -1,9 +1,10 @@
 # ADR-037：System 消费 Cache 与 Event Framework
 
-- 状态：Accepted
+- 状态：Superseded by ADR-043
 - 日期：2026-08-01
 - 关联需求：P1.6 Framework Governance Phase 6
 - 关联决策：[ADR-032](ADR-032-Cache-Region与Factory-Scope兼容迁移.md)、[ADR-033](ADR-033-Event与Outbox-Ownership.md)、[ADR-035](ADR-035-Framework-Freeze与平台适应度函数.md)
+- 历史说明：保留 Framework Freeze 阶段证据；System V1 不再是 Cache/Event Framework 的业务消费者
 
 ## 1. 背景
 

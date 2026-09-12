@@ -2,25 +2,12 @@ package io.github.chrisshi.mom.architecture;
 
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.Version;
-import com.baomidou.mybatisplus.spring.repository.CrudRepository;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
-import io.github.chrisshi.mom.data.entity.BaseAuditEntity;
 import io.github.chrisshi.mom.data.entity.BaseEntity;
 import io.github.chrisshi.mom.data.entity.BaseIdEntity;
 import io.github.chrisshi.mom.data.mapper.MomBaseMapper;
-import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemApplicationEntity;
-import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemCatalogReleaseEntity;
-import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemI18nReleaseEntity;
-import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemNavigationItemEntity;
-import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemUserPreferenceEntity;
-import io.github.chrisshi.mom.system.infrastructure.persistence.entity.SystemUserViewSettingEntity;
-import io.github.chrisshi.mom.system.infrastructure.persistence.repository.MybatisSystemApplicationRepository;
-import io.github.chrisshi.mom.system.infrastructure.persistence.repository.MybatisSystemDictionaryItemRepository;
-import io.github.chrisshi.mom.system.infrastructure.persistence.repository.MybatisSystemDictionaryRepository;
-import io.github.chrisshi.mom.system.infrastructure.persistence.repository.MybatisSystemNavigationRepository;
-import io.github.chrisshi.mom.system.infrastructure.persistence.repository.MybatisSystemParameterRepository;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -33,8 +20,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * MOM 持久化类型位置、技术栈与 Entity 能力门禁。
  *
  * <p>ADR-042 后，Level 1 允许 Application 直接依赖本服务 Mapper/Entity，因此本测试不再把
- * Repository Port/Adapter 当作所有 bounded context 的强制中间层；已经采用 Level 2/3 的 System
- * 等模块仍通过各自专用规则保持更严格边界。</p>
+ * Repository Port/Adapter 当作所有 bounded context 的强制中间层；System V1 也按 Level 1 直接复用
+ * Mapper/Entity，不再保留没有替换收益的一对一 Repository Adapter。</p>
  */
 class PersistenceArchitectureTest {
     private static final String[] BOUNDED_CONTEXT_PACKAGES = {
@@ -85,44 +72,14 @@ class PersistenceArchitectureTest {
                 .check(productionClasses);
     }
 
-    /** System 已接受的 Entity 能力选择继续保持不变。 */
+    /** System V1 普通可维护配置表统一需要审计、乐观锁与逻辑删除能力。 */
     @Test
     void systemEntitiesMustSelectBaseClassByCapability() throws NoSuchFieldException {
         classes()
-                .that().resideInAnyPackage("io.github.chrisshi.mom.system.infrastructure.persistence..")
+                .that().resideInAnyPackage("io.github.chrisshi.mom.system.infrastructure..")
                 .and().haveSimpleNameEndingWith("Entity")
-                .and().doNotHaveFullyQualifiedName(SystemI18nReleaseEntity.class.getName())
-                .and().doNotHaveFullyQualifiedName(SystemUserPreferenceEntity.class.getName())
-                .and().doNotHaveFullyQualifiedName(SystemUserViewSettingEntity.class.getName())
-                .and().doNotHaveFullyQualifiedName(SystemApplicationEntity.class.getName())
-                .and().doNotHaveFullyQualifiedName(SystemNavigationItemEntity.class.getName())
-                .and().doNotHaveFullyQualifiedName(SystemCatalogReleaseEntity.class.getName())
                 .should().beAssignableTo(BaseEntity.class)
                 .check(productionClasses);
-        assertAuditOnly(SystemI18nReleaseEntity.class);
-        assertAuditOnly(SystemCatalogReleaseEntity.class);
-        assertAuditVersionedWithoutLogicalDelete(SystemUserPreferenceEntity.class);
-        assertAuditVersionedWithoutLogicalDelete(SystemUserViewSettingEntity.class);
-        assertAuditVersionedWithoutLogicalDelete(SystemApplicationEntity.class);
-        assertAuditVersionedWithoutLogicalDelete(SystemNavigationItemEntity.class);
-    }
-
-    private static void assertAuditOnly(Class<?> type) {
-        assertThat(BaseAuditEntity.class.isAssignableFrom(type)).isTrue();
-        assertThat(BaseEntity.class.isAssignableFrom(type)).isFalse();
-        assertThat(java.util.Arrays.stream(type.getDeclaredFields())
-                .anyMatch(field -> field.getAnnotation(Version.class) != null)).isFalse();
-        assertThat(java.util.Arrays.stream(type.getDeclaredFields())
-                .anyMatch(field -> field.getAnnotation(TableLogic.class) != null)).isFalse();
-    }
-
-    private static void assertAuditVersionedWithoutLogicalDelete(Class<?> type)
-            throws NoSuchFieldException {
-        assertThat(BaseAuditEntity.class.isAssignableFrom(type)).isTrue();
-        assertThat(BaseEntity.class.isAssignableFrom(type)).isFalse();
-        assertThat(type.getDeclaredField("version").getAnnotation(Version.class)).isNotNull();
-        assertThat(java.util.Arrays.stream(type.getDeclaredFields())
-                .anyMatch(field -> field.getAnnotation(TableLogic.class) != null)).isFalse();
     }
 
     /** bounded context 不得使用 MyBatis-Plus 通用 Service 代替业务 Application。 */
@@ -165,16 +122,6 @@ class PersistenceArchitectureTest {
                         "..infrastructure.repository..",
                         "..infrastructure.persistence.repository..")
                 .check(productionClasses);
-    }
-
-    /** System 已批准的单表 Adapter 继续使用既有 CrudRepository 复用机制。 */
-    @Test
-    void approvedSingleTableAdaptersMustUseCrudRepository() {
-        assertThat(CrudRepository.class.isAssignableFrom(MybatisSystemParameterRepository.class)).isTrue();
-        assertThat(CrudRepository.class.isAssignableFrom(MybatisSystemDictionaryRepository.class)).isTrue();
-        assertThat(CrudRepository.class.isAssignableFrom(MybatisSystemDictionaryItemRepository.class)).isTrue();
-        assertThat(CrudRepository.class.isAssignableFrom(MybatisSystemApplicationRepository.class)).isTrue();
-        assertThat(CrudRepository.class.isAssignableFrom(MybatisSystemNavigationRepository.class)).isTrue();
     }
 
     /** 正式 bounded context 不得无 ADR 引入直接 JDBC 访问。 */

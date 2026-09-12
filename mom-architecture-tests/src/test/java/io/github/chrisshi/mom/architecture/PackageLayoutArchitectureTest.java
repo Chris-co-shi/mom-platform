@@ -151,7 +151,8 @@ class PackageLayoutArchitectureTest {
 
     /**
      * 已经通过历史 ADR 建立 Level 2/3 边界的模块继续禁止 Application 直接依赖 Mapper。
-     * Mini Auth 等明确 Level 1 模块不在此规则中，允许 Application 直接编排本服务 Mapper/Entity。
+     * Mini Auth、System 与 MDM 简单主数据等明确 Level 1 能力不在此规则中，允许 Application 直接编排
+     * 本服务 Mapper/Entity。
      */
     @Test
     void domainBackedApplicationsMustNotDependOnMappers() {
@@ -159,7 +160,6 @@ class PackageLayoutArchitectureTest {
                 .that().resideInAnyPackage(
                         "io.github.chrisshi.mom.iam.application..",
                         "io.github.chrisshi.mom.system.application..",
-                        "io.github.chrisshi.mom.mdm.application..",
                         "io.github.chrisshi.mom.integration.application..",
                         "io.github.chrisshi.mom.mes.application..",
                         "io.github.chrisshi.mom.wms.application..",

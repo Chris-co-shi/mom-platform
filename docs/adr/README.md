@@ -44,26 +44,27 @@ ADR 用于记录重要架构决策的背景、候选方案、最终选择、后�
 | [ADR-020](ADR-020-PostgreSQL物理Schema命名空间.md) | PostgreSQL 物理 Schema 命名空间 | Accepted |
 | [ADR-021](ADR-021-运行时配置来源与Secret边界.md) | 运行时配置来源与 Secret 边界 | Accepted |
 | [ADR-022](ADR-022-测试分层与CI质量门禁.md) | 测试分层与 CI 质量门禁 | Accepted |
-| [ADR-023](ADR-023-Locale时区与用户偏好边界.md) | Locale、时区与用户偏好边界 | Accepted |
+| [ADR-023](ADR-023-Locale时区与用户偏好边界.md) | Locale、时区与用户偏好边界 | Accepted；System 用户偏好部分由 ADR-043 替代 |
 | [ADR-024](ADR-024-PC-JSON与Mobile-PKCE-OIDC双通道.md) | PC JSON 与 Mobile PKCE/OIDC 双通道 | Superseded by ADR-040 for V1 auth runtime |
 | [ADR-025](ADR-025-IAM-System-MDM-WMS-EAM数据所有权边界.md) | IAM、System、MDM、WMS、EAM 数据所有权边界 | Accepted |
 | [ADR-026](ADR-026-MOM业务表禁止物理外键与关联完整性策略.md) | MOM 业务表禁止物理外键与关联完整性策略 | Accepted |
 | [ADR-027](ADR-027-服务端包结构与基础设施适配器分层.md) | 服务端包结构与基础设施适配器分层 | Accepted as Level 2/3 option；默认强制解释由 ADR-042 替代 |
 | [ADR-028](ADR-028-MyBatis-Plus-Repository抽象与领域仓储边界.md) | MyBatis-Plus Repository 抽象与领域仓储边界 | Accepted as Level 2/3 option；默认强制解释由 ADR-042 替代 |
 | [ADR-029](ADR-029-IAM-Admin分层与领域模型边界.md) | IAM Admin 分层与领域模型边界 | Historical for old IAM / Mini Auth 不采用 |
-| [ADR-030](ADR-030-System应用目录导航发布与IAM权限引用边界.md) | System 应用目录、导航发布与 IAM 权限引用边界 | Accepted |
-| [ADR-031](ADR-031-System运行时缓存变更通知与服务身份事务边界.md) | System Runtime Cache、变更通知、服务身份与事务边界 | Accepted |
+| [ADR-030](ADR-030-System应用目录导航发布与IAM权限引用边界.md) | System 应用目录、导航发布与 IAM 权限引用边界 | Superseded by ADR-043 |
+| [ADR-031](ADR-031-System运行时缓存变更通知与服务身份事务边界.md) | System Runtime Cache、变更通知、服务身份与事务边界 | Superseded by ADR-043 |
 | [ADR-032](ADR-032-Cache-Region与Factory-Scope兼容迁移.md) | Cache Region、Factory Scope 与兼容迁移 | Accepted |
 | [ADR-033](ADR-033-Event与Outbox-Ownership.md) | Event 与 Outbox Ownership | Accepted |
 | [ADR-034](ADR-034-Resilience-Profile与事务边界.md) | Resilience Profile 与事务边界 | Accepted |
 | [ADR-035](ADR-035-Framework-Freeze与平台适应度函数.md) | Framework Freeze 与平台适应度函数 | Accepted |
 | [ADR-036](ADR-036-IAM安全状态Cache与Event边界.md) | IAM 安全状态、Cache 与 Event 边界 | Historical where it conflicts with ADR-040 |
-| [ADR-037](ADR-037-System消费Cache与Event-Framework.md) | System 消费 Cache/Event Framework | Accepted |
+| [ADR-037](ADR-037-System消费Cache与Event-Framework.md) | System 消费 Cache/Event Framework | Superseded by ADR-043 |
 | [ADR-038](ADR-038-Configuration-Metadata-Governance.md) | Configuration Metadata Governance | Accepted |
 | [ADR-039](ADR-039-MOM-Platform-Engineering-Governance.md) | MOM Platform Engineering Governance | Accepted |
 | [ADR-040](ADR-040-Mini-Auth与Redis-Opaque-Token认证基线.md) | Mini Auth 与 Redis Opaque Token 认证基线 | Accepted |
 | [ADR-041](ADR-041-Mini-Auth简化三层包结构.md) | Mini Auth 简化三层包结构（历史 `service` 命名） | Superseded by ADR-042 |
 | [ADR-042](ADR-042-MOM渐进式分层与对象模型.md) | MOM 渐进式分层、3+1 对象模型与按复杂度升级原则 | Accepted |
+| [ADR-043](ADR-043-System-V1能力与I18n数据所有权.md) | System V1 能力与 I18n 数据所有权 | Accepted |
 
 ## 4. 当前认证决策
 
@@ -121,7 +122,7 @@ controller/web → application/domain → port ← infrastructure adapter
 
 ## 6. P1.6 历史权威决策链
 
-以下链路保留 P1.6 历史治理和平台设计价值，其中与 V1 认证运行时冲突的安全结论以 ADR-040 为准；分层的默认强制解释以 ADR-042 为准：
+以下链路保留 P1.6 历史治理和平台设计价值，其中与 V1 认证运行时冲突的安全结论以 ADR-040 为准；分层的默认强制解释以 ADR-042 为准；System 当前能力和 I18n 所有权以 ADR-043 为准：
 
 ```text
 ADR-023 Locale/Timezone/Preference
@@ -144,6 +145,7 @@ ADR-023 Locale/Timezone/Preference
 → ADR-040 Mini Auth Runtime
 → ADR-041 Mini Auth 三层简化
 → ADR-042 渐进式分层与对象模型
+→ ADR-043 System V1 能力与 I18n 数据所有权
 ```
 
 ## 7. 新建 ADR

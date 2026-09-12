@@ -10,5 +10,5 @@ spring:
       leak-detection-threshold: 0
       connection-init-sql: SET TIME ZONE 'UTC'
   flyway:
-    # S18 起共享 SpringBootTest 必须验证当前完整 V1～V9 Schema；历史升级路径由各隔离 Schema 测试覆盖。
-    target: 9
+    # System V1 集成测试必须完整执行不可修改的 V1～V9 历史迁移和当前 V10。
+    target: 10

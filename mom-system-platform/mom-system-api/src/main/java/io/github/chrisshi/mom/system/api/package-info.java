@@ -1,7 +1,8 @@
 /**
- * System Platform 的跨模块稳定契约边界。
+ * System V1 跨模块稳定契约。
  *
- * <p>S13 参数与 S14 字典只暴露跨服务读取所需的稳定枚举和 DTO，不包含数据库 ID、Web Request、Entity、
- * Mapper 或 Repository。Client 尚无真实调用方，契约本身不代表已提供 Feign 适配器。</p>
+ * <p>当前只包含 Dictionary 消费结果与 SupportedLocale，只依赖 JDK。Parameter、User Preference、
+ * Application Catalog、Navigation 和 Translation 数据不属于本 API；Runtime Bundle 协议由
+ * {@code mom-webmvc} Framework 统一定义。</p>
  */
 package io.github.chrisshi.mom.system.api;

@@ -1,20 +1,19 @@
 package io.github.chrisshi.mom.system.api;
 
-import java.time.Instant;
-
 /**
- * System Dictionary 单项兼容读取契约。
+ * 按稳定双 Code 解析字典历史值的只读契约。
  *
- * <p>即使字典或条目已禁用，只要稳定 Code 记录仍存在就返回，并显式给出两级启用状态及其合取结果。
- * version/updatedAt 描述条目当前版本；调用方不得把 Label、排序或数据库 ID 当作业务 Reference。</p>
+ * <p>即使条目已禁用，历史数据仍可获得当前展示值；{@code selectable} 仅表示能否用于新选择，
+ * 不能用于否定历史记录的合法性。</p>
+ *
+ * @param dictionaryCode 字典类型稳定 Code
+ * @param key 条目稳定机器值
+ * @param value 当前展示值
+ * @param selectable 字典类型与条目当前是否都启用
  */
 public record ResolvedSystemDictionaryItem(
         String dictionaryCode,
-        String itemCode,
-        String itemLabel,
-        boolean dictionaryEnabled,
-        boolean itemEnabled,
-        boolean effectiveEnabled,
-        long version,
-        Instant updatedAt) {
+        String key,
+        String value,
+        boolean selectable) {
 }
