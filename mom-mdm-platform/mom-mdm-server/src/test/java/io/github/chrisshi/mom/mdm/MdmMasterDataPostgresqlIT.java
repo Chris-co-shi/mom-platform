@@ -150,20 +150,109 @@ class MdmMasterDataPostgresqlIT {
         var type = locationApplication.createLocationType("BUFFER", "缓存位置", null, MdmMasterDataRules.ENABLED);
         var warehouse = warehouseApplication.createWarehouse(plantA.id(), "WH-1", "一号仓", null, MdmMasterDataRules.ENABLED);
         var area = warehouseApplication.createWarehouseArea(warehouse.id(), "AREA-1", "一区", null, MdmMasterDataRules.ENABLED);
+        var anotherArea = warehouseApplication.createWarehouseArea(
+                warehouse.id(), "AREA-2", "二区", null, MdmMasterDataRules.ENABLED);
 
         var direct = locationApplication.createLocation(plantA.id(), null, type.id(), "LOC-1", "线边位置", null,
                 MdmMasterDataRules.ENABLED);
         var storage = locationApplication.createLocation(plantA.id(), area.id(), type.id(), "LOC-2", "仓储位置", null,
                 MdmMasterDataRules.ENABLED);
+        locationApplication.createLocation(plantA.id(), anotherArea.id(), type.id(), "LOC-3", "二区位置", null,
+                MdmMasterDataRules.ENABLED);
 
         assertThat(direct.warehouseAreaId()).isNull();
         assertThat(storage.warehouseAreaId()).isEqualTo(area.id());
+        var areaPage = locationApplication.pageLocations(plantA.id(), area.id(), 1, 20);
+        assertThat(areaPage.records()).extracting(record -> record.id()).containsExactly(storage.id());
+        assertThat(areaPage.total()).isEqualTo(1);
         assertThatThrownBy(() -> locationApplication.createLocation(plantB.id(), area.id(), type.id(), "LOC-X",
                 "跨工厂错误位置", null, MdmMasterDataRules.ENABLED))
                 .isInstanceOfSatisfying(MdmException.class,
                         exception -> assertThat(exception.code()).isEqualTo("mdm.invalid_reference"));
         assertNotFound(() -> locationApplication.createLocation(plantA.id(), null, "missing", "LOC-Y",
                 "无类型位置", null, MdmMasterDataRules.ENABLED));
+    }
+
+    /** 覆盖所有层级在父级停用时禁止创建或启用直接子级，且不引入隐式级联状态变更。 */
+    @Test
+    void disabledParentMustBlockCreatingAndEnablingDirectChildren() {
+        var plantCreated = factoryApplication.createPlant("P-A", "工厂甲", null, MdmMasterDataRules.ENABLED);
+        var workshopCreated = factoryApplication.createWorkshop(
+                plantCreated.id(), "WS-1", "一车间", null, MdmMasterDataRules.ENABLED);
+
+        var plantDisabledForWorkshop = factoryApplication.disablePlant(plantCreated.id(), plantCreated.version());
+        assertParentDisabled(() -> factoryApplication.createWorkshop(
+                plantDisabledForWorkshop.id(), "WS-2", "二车间", null, MdmMasterDataRules.ENABLED));
+        assertParentDisabled(() -> factoryApplication.enableWorkshop(workshopCreated.id(), workshopCreated.version()));
+
+        var plantEnabledForWorkshop = factoryApplication.enablePlant(
+                plantDisabledForWorkshop.id(), plantDisabledForWorkshop.version());
+        var lineCreated = factoryApplication.createProductionLine(
+                workshopCreated.id(), "LINE-1", "一号线", null, MdmMasterDataRules.DISABLED);
+        var workshopDisabledForLine = factoryApplication.disableWorkshop(
+                workshopCreated.id(), workshopCreated.version());
+        assertParentDisabled(() -> factoryApplication.createProductionLine(
+                workshopDisabledForLine.id(), "LINE-2", "二号线", null, MdmMasterDataRules.ENABLED));
+        assertParentDisabled(() -> factoryApplication.enableProductionLine(lineCreated.id(), lineCreated.version()));
+
+        factoryApplication.enableWorkshop(workshopDisabledForLine.id(), workshopDisabledForLine.version());
+        var lineEnabledForStation = factoryApplication.enableProductionLine(lineCreated.id(), lineCreated.version());
+        var workstation = factoryApplication.createWorkstation(
+                lineEnabledForStation.id(), "ST-1", "一号工位", null, MdmMasterDataRules.DISABLED);
+        var lineDisabledForStation = factoryApplication.disableProductionLine(
+                lineEnabledForStation.id(), lineEnabledForStation.version());
+        assertParentDisabled(() -> factoryApplication.createWorkstation(
+                lineDisabledForStation.id(), "ST-2", "二号工位", null, MdmMasterDataRules.ENABLED));
+        assertParentDisabled(() -> factoryApplication.enableWorkstation(workstation.id(), workstation.version()));
+
+        var warehouseCreated = warehouseApplication.createWarehouse(
+                plantEnabledForWorkshop.id(), "WH-1", "一号仓", null, MdmMasterDataRules.DISABLED);
+        var plantDisabledForWarehouse = factoryApplication.disablePlant(
+                plantEnabledForWorkshop.id(), plantEnabledForWorkshop.version());
+        assertParentDisabled(() -> warehouseApplication.createWarehouse(
+                plantDisabledForWarehouse.id(), "WH-2", "二号仓", null, MdmMasterDataRules.ENABLED));
+        assertParentDisabled(() -> warehouseApplication.enableWarehouse(
+                warehouseCreated.id(), warehouseCreated.version()));
+
+        var plantEnabledForWarehouse = factoryApplication.enablePlant(
+                plantDisabledForWarehouse.id(), plantDisabledForWarehouse.version());
+        var warehouseEnabledForArea = warehouseApplication.enableWarehouse(
+                warehouseCreated.id(), warehouseCreated.version());
+        var areaCreated = warehouseApplication.createWarehouseArea(
+                warehouseEnabledForArea.id(), "AREA-1", "一区", null, MdmMasterDataRules.DISABLED);
+        var warehouseDisabledForArea = warehouseApplication.disableWarehouse(
+                warehouseEnabledForArea.id(), warehouseEnabledForArea.version());
+        assertParentDisabled(() -> warehouseApplication.createWarehouseArea(
+                warehouseDisabledForArea.id(), "AREA-2", "二区", null, MdmMasterDataRules.ENABLED));
+        assertParentDisabled(() -> warehouseApplication.enableWarehouseArea(areaCreated.id(), areaCreated.version()));
+
+        warehouseApplication.enableWarehouse(warehouseDisabledForArea.id(), warehouseDisabledForArea.version());
+        var areaEnabledForLocation = warehouseApplication.enableWarehouseArea(
+                areaCreated.id(), areaCreated.version());
+        var type = locationApplication.createLocationType(
+                "BUFFER", "缓存位置", null, MdmMasterDataRules.ENABLED);
+        var directLocation = locationApplication.createLocation(
+                plantEnabledForWarehouse.id(), null, type.id(), "LOC-1", "线边位置", null,
+                MdmMasterDataRules.DISABLED);
+        var areaLocation = locationApplication.createLocation(
+                plantEnabledForWarehouse.id(), areaEnabledForLocation.id(), type.id(), "LOC-2", "仓储位置", null,
+                MdmMasterDataRules.DISABLED);
+
+        var plantDisabledForLocation = factoryApplication.disablePlant(
+                plantEnabledForWarehouse.id(), plantEnabledForWarehouse.version());
+        assertParentDisabled(() -> locationApplication.createLocation(
+                plantDisabledForLocation.id(), null, type.id(), "LOC-3", "新位置", null,
+                MdmMasterDataRules.ENABLED));
+        assertParentDisabled(() -> locationApplication.enableLocation(directLocation.id(), directLocation.version()));
+
+        var plantEnabledForLocation = factoryApplication.enablePlant(
+                plantDisabledForLocation.id(), plantDisabledForLocation.version());
+        var areaDisabledForLocation = warehouseApplication.disableWarehouseArea(
+                areaEnabledForLocation.id(), areaEnabledForLocation.version());
+        assertParentDisabled(() -> locationApplication.createLocation(
+                plantEnabledForLocation.id(), areaDisabledForLocation.id(), type.id(), "LOC-4", "新仓储位置", null,
+                MdmMasterDataRules.ENABLED));
+        assertParentDisabled(() -> locationApplication.enableLocation(areaLocation.id(), areaLocation.version()));
     }
 
     /** 覆盖显式启停、更新不改变 Code、乐观锁冲突以及 PageResult 统一转换。 */
@@ -200,6 +289,11 @@ class MdmMasterDataPostgresqlIT {
     private static void assertNotFound(Runnable action) {
         assertThatThrownBy(action::run).isInstanceOfSatisfying(MdmException.class,
                 exception -> assertThat(exception.code()).isEqualTo("mdm.resource_not_found"));
+    }
+
+    private static void assertParentDisabled(Runnable action) {
+        assertThatThrownBy(action::run).isInstanceOfSatisfying(MdmException.class,
+                exception -> assertThat(exception.code()).isEqualTo("mdm.parent_disabled"));
     }
 
     /** 集成测试为审计列提供稳定 Actor；生产请求仍由认证上下文提供真实 Actor。 */

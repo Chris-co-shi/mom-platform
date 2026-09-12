@@ -108,11 +108,14 @@ public class LocationMasterDataController {
     }
 
     /**
-     * 可按 plantId 分页查询 Location。
+     * 可按 plantId、warehouseAreaId 组合分页查询 Location。
      */
     @GetMapping("/locations")
-    public Result<PageResult<LocationView>> pageLocations(@RequestParam(required = false) String plantId, @RequestParam(defaultValue = "1") @Positive long pageNo, @RequestParam(defaultValue = "20") @Positive long pageSize) {
-        return Result.success(application.pageLocations(plantId, pageNo, pageSize));
+    public Result<PageResult<LocationView>> pageLocations(@RequestParam(required = false) String plantId,
+                                                          @RequestParam(required = false) String warehouseAreaId,
+                                                          @RequestParam(defaultValue = "1") @Positive long pageNo,
+                                                          @RequestParam(defaultValue = "20") @Positive long pageSize) {
+        return Result.success(application.pageLocations(plantId, warehouseAreaId, pageNo, pageSize));
     }
 
     /**

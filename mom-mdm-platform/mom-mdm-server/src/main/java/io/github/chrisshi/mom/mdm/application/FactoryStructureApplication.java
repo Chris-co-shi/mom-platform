@@ -91,10 +91,11 @@ public class FactoryStructureApplication {
         return changePlantStatus(id, MdmMasterDataRules.DISABLED, version);
     }
 
-    /** 在已存在 Plant 下创建 Workshop，同一 Plant 内 Code 唯一。 */
+    /** 在已启用 Plant 下创建 Workshop，同一 Plant 内 Code 唯一。 */
     @Transactional
     public WorkshopView createWorkshop(String plantId, String code, String nameZh, String nameEn, String status) {
         PlantEntity plant = requirePlant(plantId);
+        MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
         WorkshopEntity entity = new WorkshopEntity();
         entity.setPlantId(plant.getId());
         entity.setCode(MdmMasterDataRules.code(code));
@@ -145,11 +146,12 @@ public class FactoryStructureApplication {
         return changeWorkshopStatus(id, MdmMasterDataRules.DISABLED, version);
     }
 
-    /** 在已存在 Workshop 下创建 ProductionLine，同一 Workshop 内 Code 唯一。 */
+    /** 在已启用 Workshop 下创建 ProductionLine，同一 Workshop 内 Code 唯一。 */
     @Transactional
     public ProductionLineView createProductionLine(String workshopId, String code, String nameZh,
                                                    String nameEn, String status) {
         WorkshopEntity workshop = requireWorkshop(workshopId);
+        MdmMasterDataRules.requireEnabled(workshop.getStatus(), "Workshop");
         ProductionLineEntity entity = new ProductionLineEntity();
         entity.setWorkshopId(workshop.getId());
         entity.setCode(MdmMasterDataRules.code(code));
@@ -201,11 +203,12 @@ public class FactoryStructureApplication {
         return changeProductionLineStatus(id, MdmMasterDataRules.DISABLED, version);
     }
 
-    /** 在已存在 ProductionLine 下创建 Workstation，同一 ProductionLine 内 Code 唯一。 */
+    /** 在已启用 ProductionLine 下创建 Workstation，同一 ProductionLine 内 Code 唯一。 */
     @Transactional
     public WorkstationView createWorkstation(String productionLineId, String code, String nameZh,
                                              String nameEn, String status) {
         ProductionLineEntity productionLine = requireProductionLine(productionLineId);
+        MdmMasterDataRules.requireEnabled(productionLine.getStatus(), "ProductionLine");
         WorkstationEntity entity = new WorkstationEntity();
         entity.setProductionLineId(productionLine.getId());
         entity.setCode(MdmMasterDataRules.code(code));
@@ -270,6 +273,9 @@ public class FactoryStructureApplication {
     private WorkshopView changeWorkshopStatus(String id, String status, Long version) {
         WorkshopEntity entity = requireWorkshop(id);
         requireVersion(entity.getVersion(), version);
+        if (MdmMasterDataRules.ENABLED.equals(status)) {
+            MdmMasterDataRules.requireEnabled(requirePlant(entity.getPlantId()).getStatus(), "Plant");
+        }
         if (status.equals(entity.getStatus())) return toView(entity);
         entity.setStatus(status);
         requireUpdated(workshopMapper.updateById(entity), () -> workshopMapper.selectById(entity.getId()), "Workshop");
@@ -279,6 +285,9 @@ public class FactoryStructureApplication {
     private ProductionLineView changeProductionLineStatus(String id, String status, Long version) {
         ProductionLineEntity entity = requireProductionLine(id);
         requireVersion(entity.getVersion(), version);
+        if (MdmMasterDataRules.ENABLED.equals(status)) {
+            MdmMasterDataRules.requireEnabled(requireWorkshop(entity.getWorkshopId()).getStatus(), "Workshop");
+        }
         if (status.equals(entity.getStatus())) return toView(entity);
         entity.setStatus(status);
         requireUpdated(productionLineMapper.updateById(entity),
@@ -289,6 +298,10 @@ public class FactoryStructureApplication {
     private WorkstationView changeWorkstationStatus(String id, String status, Long version) {
         WorkstationEntity entity = requireWorkstation(id);
         requireVersion(entity.getVersion(), version);
+        if (MdmMasterDataRules.ENABLED.equals(status)) {
+            MdmMasterDataRules.requireEnabled(
+                    requireProductionLine(entity.getProductionLineId()).getStatus(), "ProductionLine");
+        }
         if (status.equals(entity.getStatus())) return toView(entity);
         entity.setStatus(status);
         requireUpdated(workstationMapper.updateById(entity), () -> workstationMapper.selectById(entity.getId()),

@@ -90,7 +90,8 @@ public class LocationMasterDataApplication {
     public LocationTypeView disableLocationType(String id, Long version) { return changeTypeStatus(id, MdmMasterDataRules.DISABLED, version); }
 
     /**
-     * 创建 Location；WarehouseArea 可空，非空时必须通过 Warehouse 归属于同一 Plant。
+     * 创建 Location；Plant 及可选 WarehouseArea 必须已启用，WarehouseArea 非空时还必须通过 Warehouse
+     * 归属于同一 Plant。LocationType 是分类引用而非层级父级，本用例仅要求其存在。
      *
      * @throws MdmException Plant、LocationType、WarehouseArea 不存在或区域与 Plant 不一致时抛出
      */
@@ -99,6 +100,7 @@ public class LocationMasterDataApplication {
                                        String nameZh, String nameEn, String status) {
         PlantEntity plant = requirePlant(plantId);
         LocationTypeEntity locationType = requireLocationType(locationTypeId);
+        MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
         String validatedAreaId = validateAreaBelongsToPlant(warehouseAreaId, plant.getId());
         LocationEntity entity = new LocationEntity();
         entity.setPlantId(plant.getId());
@@ -125,13 +127,15 @@ public class LocationMasterDataApplication {
     @Transactional(readOnly = true)
     public LocationView getLocation(String id) { return toView(requireLocation(id)); }
 
-    /** 可按 Plant 过滤并稳定排序分页查询 Location。 */
+    /** 可按 Plant、WarehouseArea 组合过滤并稳定排序分页查询 Location。 */
     @Transactional(readOnly = true)
-    public PageResult<LocationView> pageLocations(String plantId, long pageNo, long pageSize) {
+    public PageResult<LocationView> pageLocations(String plantId, String warehouseAreaId, long pageNo, long pageSize) {
         Page<LocationEntity> page = PageAdapter.toPage(new PageQuery<>(plantId, pageNo, pageSize));
         LambdaQueryWrapper<LocationEntity> query = new LambdaQueryWrapper<>();
         if (plantId != null && !plantId.isBlank()) query.eq(LocationEntity::getPlantId,
                 MdmMasterDataRules.id(plantId, "plantId"));
+        if (warehouseAreaId != null && !warehouseAreaId.isBlank()) query.eq(LocationEntity::getWarehouseAreaId,
+                MdmMasterDataRules.id(warehouseAreaId, "warehouseAreaId"));
         query.orderByAsc(LocationEntity::getCode).orderByAsc(LocationEntity::getId);
         locationMapper.selectPage(page, query);
         return PageAdapter.toResult(page, LocationMasterDataApplication::toView);
@@ -158,6 +162,12 @@ public class LocationMasterDataApplication {
     private LocationView changeLocationStatus(String id, String status, Long version) {
         LocationEntity entity = requireLocation(id);
         requireVersion(entity.getVersion(), version);
+        if (MdmMasterDataRules.ENABLED.equals(status)) {
+            PlantEntity plant = requirePlant(entity.getPlantId());
+            requireLocationType(entity.getLocationTypeId());
+            MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
+            validateAreaBelongsToPlant(entity.getWarehouseAreaId(), plant.getId());
+        }
         if (status.equals(entity.getStatus())) return toView(entity);
         entity.setStatus(status);
         requireUpdated(locationMapper.updateById(entity), () -> locationMapper.selectById(entity.getId()), "Location");
@@ -168,6 +178,7 @@ public class LocationMasterDataApplication {
         if (areaId == null || areaId.isBlank()) return null;
         WarehouseAreaEntity area = warehouseAreaMapper.selectById(MdmMasterDataRules.id(areaId, "warehouseAreaId"));
         if (area == null) throw MdmException.notFound("WarehouseArea");
+        MdmMasterDataRules.requireEnabled(area.getStatus(), "WarehouseArea");
         WarehouseEntity warehouse = warehouseMapper.selectById(area.getWarehouseId());
         if (warehouse == null) throw MdmException.notFound("Warehouse");
         if (!plantId.equals(warehouse.getPlantId())) {

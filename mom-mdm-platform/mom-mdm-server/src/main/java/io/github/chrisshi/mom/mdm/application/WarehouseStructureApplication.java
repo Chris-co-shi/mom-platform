@@ -37,11 +37,12 @@ public class WarehouseStructureApplication {
         this.warehouseAreaMapper = warehouseAreaMapper;
     }
 
-    /** 在已存在 Plant 下创建 Warehouse，同一 Plant 内 Code 唯一。 */
+    /** 在已启用 Plant 下创建 Warehouse，同一 Plant 内 Code 唯一。 */
     @Transactional
     public WarehouseView createWarehouse(String plantId, String code, String nameZh, String nameEn, String status) {
         PlantEntity plant = plantMapper.selectById(MdmMasterDataRules.id(plantId, "plantId"));
         if (plant == null) throw MdmException.notFound("Plant");
+        MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
         WarehouseEntity entity = new WarehouseEntity();
         entity.setPlantId(plant.getId());
         entity.setCode(MdmMasterDataRules.code(code));
@@ -84,11 +85,12 @@ public class WarehouseStructureApplication {
     @Transactional
     public WarehouseView disableWarehouse(String id, Long version) { return changeWarehouseStatus(id, MdmMasterDataRules.DISABLED, version); }
 
-    /** 在已存在 Warehouse 下创建 WarehouseArea，同一 Warehouse 内 Code 唯一。 */
+    /** 在已启用 Warehouse 下创建 WarehouseArea，同一 Warehouse 内 Code 唯一。 */
     @Transactional
     public WarehouseAreaView createWarehouseArea(String warehouseId, String code, String nameZh,
                                                  String nameEn, String status) {
         WarehouseEntity warehouse = requireWarehouse(warehouseId);
+        MdmMasterDataRules.requireEnabled(warehouse.getStatus(), "Warehouse");
         WarehouseAreaEntity entity = new WarehouseAreaEntity();
         entity.setWarehouseId(warehouse.getId());
         entity.setCode(MdmMasterDataRules.code(code));
@@ -136,6 +138,11 @@ public class WarehouseStructureApplication {
     private WarehouseView changeWarehouseStatus(String id, String status, Long version) {
         WarehouseEntity entity = requireWarehouse(id);
         requireVersion(entity.getVersion(), version);
+        if (MdmMasterDataRules.ENABLED.equals(status)) {
+            PlantEntity plant = plantMapper.selectById(entity.getPlantId());
+            if (plant == null) throw MdmException.notFound("Plant");
+            MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
+        }
         if (status.equals(entity.getStatus())) return toView(entity);
         entity.setStatus(status);
         requireUpdated(warehouseMapper.updateById(entity), () -> warehouseMapper.selectById(entity.getId()), "Warehouse");
@@ -145,6 +152,9 @@ public class WarehouseStructureApplication {
     private WarehouseAreaView changeAreaStatus(String id, String status, Long version) {
         WarehouseAreaEntity entity = requireWarehouseArea(id);
         requireVersion(entity.getVersion(), version);
+        if (MdmMasterDataRules.ENABLED.equals(status)) {
+            MdmMasterDataRules.requireEnabled(requireWarehouse(entity.getWarehouseId()).getStatus(), "Warehouse");
+        }
         if (status.equals(entity.getStatus())) return toView(entity);
         entity.setStatus(status);
         requireUpdated(warehouseAreaMapper.updateById(entity),

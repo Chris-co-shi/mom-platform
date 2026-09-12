@@ -48,6 +48,19 @@ public final class MdmMasterDataRules {
         throw invalid("status 只允许 ENABLED 或 DISABLED");
     }
 
+    /**
+     * 要求被引用的父级主数据处于启用状态。
+     *
+     * @param status 父级当前持久化状态
+     * @param resourceName 用于脱敏错误提示的资源名称
+     * @throws MdmException 父级不是 ENABLED 时抛出稳定冲突异常
+     */
+    public static void requireEnabled(String status, String resourceName) {
+        if (!ENABLED.equals(status)) {
+            throw MdmException.parentDisabled(resourceName);
+        }
+    }
+
     /** 校验非负乐观锁版本。 */
     public static long version(Long value) {
         if (value == null || value < 0) {

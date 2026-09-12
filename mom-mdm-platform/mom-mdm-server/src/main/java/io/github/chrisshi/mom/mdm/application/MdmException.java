@@ -49,6 +49,11 @@ public final class MdmException extends RuntimeException {
         return new MdmException(Kind.CONFLICT, "mdm.version_conflict", "主数据已被其他请求修改");
     }
 
+    /** 创建父级或引用主数据已停用的冲突异常。 */
+    public static MdmException parentDisabled(String resourceName) {
+        return new MdmException(Kind.CONFLICT, "mdm.parent_disabled", resourceName + "已停用");
+    }
+
     /** 创建引用关系非法异常。 */
     public static MdmException invalidReference(String message) {
         return new MdmException(Kind.BAD_REQUEST, "mdm.invalid_reference", message);
