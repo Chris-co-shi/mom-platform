@@ -5,6 +5,7 @@ import io.github.chrisshi.mom.core.security.AuditActor;
 import io.github.chrisshi.mom.core.security.CurrentActorProvider;
 import io.github.chrisshi.mom.mdm.application.FactoryStructureApplication;
 import io.github.chrisshi.mom.mdm.application.LocationMasterDataApplication;
+import io.github.chrisshi.mom.mdm.application.MaterialCategoryApplication;
 import io.github.chrisshi.mom.mdm.application.MdmException;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataRules;
 import io.github.chrisshi.mom.mdm.application.WarehouseStructureApplication;
@@ -23,17 +24,17 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * 第一组 MDM 主数据的真实 PostgreSQL 集成验收。
+ * MDM 工厂、仓储、位置与 MaterialCategory 主数据的真实 PostgreSQL 集成验收。
  *
- * <p>该测试执行真实 Flyway、MyBatis-Plus、审计填充、分页、唯一约束、父级校验和乐观锁。它不启动
- * Nacos、Redis、MQ 或 Seata；Docker 不可用时由 Testcontainers 显式跳过，不能将跳过描述为通过。</p>
+ * <p>该测试执行真实 Flyway、MyBatis-Plus、审计填充、分页、唯一约束、父级校验、分类循环检测和
+ * 乐观锁。测试方法顺序不构成依赖，每次均清空本 Slice 表；它不启动 Nacos、Redis、MQ 或 Seata，
+ * Docker 不可用时由 Testcontainers 显式跳过，不能将跳过描述为通过。</p>
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
@@ -65,6 +66,7 @@ class MdmMasterDataPostgresqlIT {
     @Autowired private FactoryStructureApplication factoryApplication;
     @Autowired private WarehouseStructureApplication warehouseApplication;
     @Autowired private LocationMasterDataApplication locationApplication;
+    @Autowired private MaterialCategoryApplication materialCategoryApplication;
     @Autowired private JdbcTemplate jdbcTemplate;
 
     /** 注入隔离 PostgreSQL 连接并保持生产 currentSchema、Keepalive 与 ApplicationName 约束。 */
@@ -79,29 +81,31 @@ class MdmMasterDataPostgresqlIT {
         registry.add("spring.flyway.schemas", () -> SCHEMA);
     }
 
-    /** 每个测试清理本 Slice 的普通主数据；没有物理外键，因此不依赖级联顺序。 */
+    /** 每个测试清理 MDM 普通主数据；没有物理外键，因此不依赖级联顺序。 */
     @BeforeEach
     void cleanTables() {
         jdbcTemplate.update("""
-                TRUNCATE TABLE mdm_location, mdm_location_type, mdm_warehouse_area, mdm_warehouse,
+                TRUNCATE TABLE mdm_material_category, mdm_location, mdm_location_type,
+                               mdm_warehouse_area, mdm_warehouse,
                                mdm_workstation, mdm_production_line, mdm_workshop, mdm_plant
                 """);
     }
 
-    /** 验证 V102 表、命名唯一约束、状态/版本约束和无物理外键策略。 */
+    /** 验证 V103 表、命名约束、父级查询索引和无物理外键策略。 */
     @Test
-    void migrationMustCreateEightMasterTablesAndDatabaseConstraints() {
+    void migrationMustCreateNineMasterTablesAndDatabaseConstraints() {
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT version FROM flyway_schema_history
                  WHERE success = true ORDER BY installed_rank DESC LIMIT 1
-                """, String.class)).isEqualTo("102");
+                """, String.class)).isEqualTo("103");
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT count(*) FROM information_schema.tables
                  WHERE table_schema = ? AND table_name IN (
                    'mdm_plant', 'mdm_workshop', 'mdm_production_line', 'mdm_workstation',
-                   'mdm_warehouse', 'mdm_warehouse_area', 'mdm_location_type', 'mdm_location')
-                """, Long.class, SCHEMA)).isEqualTo(8L);
+                   'mdm_warehouse', 'mdm_warehouse_area', 'mdm_location_type', 'mdm_location',
+                   'mdm_material_category')
+                """, Long.class, SCHEMA)).isEqualTo(9L);
         assertThat(jdbcTemplate.queryForList("""
                 SELECT constraint_name FROM information_schema.table_constraints
                  WHERE table_schema = ? AND constraint_type = 'UNIQUE'
@@ -111,11 +115,141 @@ class MdmMasterDataPostgresqlIT {
                 "uk_mdm_plant_code", "uk_mdm_workshop_plant_code",
                 "uk_mdm_production_line_workshop_code", "uk_mdm_workstation_line_code",
                 "uk_mdm_warehouse_plant_code", "uk_mdm_warehouse_area_warehouse_code",
-                "uk_mdm_location_type_code", "uk_mdm_location_plant_code");
+                "uk_mdm_location_type_code", "uk_mdm_location_plant_code",
+                "uk_mdm_material_category_code");
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT constraint_name FROM information_schema.table_constraints
+                 WHERE table_schema = ? AND table_name = 'mdm_material_category'
+                   AND constraint_type = 'CHECK'
+                """, String.class, SCHEMA)).contains(
+                "ck_mdm_material_category_status",
+                "ck_mdm_material_category_shelf_life_non_negative",
+                "ck_mdm_material_category_version_non_negative");
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT indexname FROM pg_indexes
+                 WHERE schemaname = ? AND tablename = 'mdm_material_category'
+                """, String.class, SCHEMA)).contains("ix_mdm_material_category_parent_sort");
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT count(*) FROM information_schema.table_constraints
                  WHERE table_schema = ? AND constraint_type = 'FOREIGN KEY'
                 """, Long.class, SCHEMA)).isZero();
+    }
+
+    /** 覆盖根/子分类创建、默认建议值、全局 Code 唯一、父级存在/状态和非负保质期。 */
+    @Test
+    void materialCategoryCreationMustEnforceDefaultsAndParentRules() {
+        var root = materialCategoryApplication.createMaterialCategory(
+                "RAW", "原材料", "Raw Material", null, 10, true, 365, MdmMasterDataRules.ENABLED);
+        var child = materialCategoryApplication.createMaterialCategory(
+                "ADDITIVE", "添加剂", null, root.id(), 20, null, 0, MdmMasterDataRules.ENABLED);
+
+        assertThat(root.parentId()).isNull();
+        assertThat(root.defaultBatchManaged()).isTrue();
+        assertThat(root.defaultShelfLifeDays()).isEqualTo(365);
+        assertThat(child.parentId()).isEqualTo(root.id());
+        assertThat(child.defaultBatchManaged()).isNull();
+        assertCodeConflict(() -> materialCategoryApplication.createMaterialCategory(
+                "RAW", "重复分类", null, null, 30, false, null, MdmMasterDataRules.ENABLED));
+        assertNotFound(() -> materialCategoryApplication.createMaterialCategory(
+                "ORPHAN", "孤儿分类", null, "missing", 30, null, null, MdmMasterDataRules.ENABLED));
+
+        var disabledParent = materialCategoryApplication.createMaterialCategory(
+                "DISABLED-PARENT", "停用父分类", null, null, 40, null, null, MdmMasterDataRules.DISABLED);
+        assertParentDisabled(() -> materialCategoryApplication.createMaterialCategory(
+                "BLOCKED-CHILD", "禁止创建", null, disabledParent.id(), 1, null, null,
+                MdmMasterDataRules.ENABLED));
+        assertValidationFailed(() -> materialCategoryApplication.createMaterialCategory(
+                "NEGATIVE-SHELF", "非法保质期", null, null, 50, null, -1, MdmMasterDataRules.ENABLED));
+    }
+
+    /** 覆盖允许移动、Code 不变、自引用拒绝、后代循环拒绝、脏循环防护和乐观锁冲突。 */
+    @Test
+    void materialCategoryUpdateMustMoveWithoutCreatingTreeCycles() {
+        var rootA = materialCategoryApplication.createMaterialCategory(
+                "A", "分类 A", null, null, 1, null, null, MdmMasterDataRules.ENABLED);
+        var childB = materialCategoryApplication.createMaterialCategory(
+                "B", "分类 B", null, rootA.id(), 2, false, 30, MdmMasterDataRules.ENABLED);
+        var childC = materialCategoryApplication.createMaterialCategory(
+                "C", "分类 C", null, childB.id(), 3, null, null, MdmMasterDataRules.ENABLED);
+        var rootD = materialCategoryApplication.createMaterialCategory(
+                "D", "分类 D", null, null, 4, null, null, MdmMasterDataRules.ENABLED);
+
+        assertInvalidReference(() -> materialCategoryApplication.updateMaterialCategory(
+                rootA.id(), rootA.nameZh(), rootA.nameEn(), childC.id(), rootA.sort(),
+                rootA.defaultBatchManaged(), rootA.defaultShelfLifeDays(), rootA.version()));
+        var moved = materialCategoryApplication.updateMaterialCategory(
+                childB.id(), "分类 B 已移动", "Moved B", rootD.id(), 5, true, 60, childB.version());
+        assertThat(moved.code()).isEqualTo("B");
+        assertThat(moved.parentId()).isEqualTo(rootD.id());
+        assertThat(moved.nameZh()).isEqualTo("分类 B 已移动");
+        assertThat(moved.defaultBatchManaged()).isTrue();
+        assertThat(moved.version()).isEqualTo(1L);
+        var movedToRoot = materialCategoryApplication.updateMaterialCategory(
+                moved.id(), "分类 B 根节点", null, null, 6, null, null, moved.version());
+        var reloadedRoot = materialCategoryApplication.getMaterialCategory(movedToRoot.id());
+        assertThat(reloadedRoot.code()).isEqualTo("B");
+        assertThat(reloadedRoot.parentId()).isNull();
+        assertThat(reloadedRoot.nameEn()).isNull();
+        assertThat(reloadedRoot.defaultBatchManaged()).isNull();
+        assertThat(reloadedRoot.defaultShelfLifeDays()).isNull();
+        assertInvalidReference(() -> materialCategoryApplication.updateMaterialCategory(
+                movedToRoot.id(), movedToRoot.nameZh(), movedToRoot.nameEn(), movedToRoot.id(), movedToRoot.sort(),
+                movedToRoot.defaultBatchManaged(), movedToRoot.defaultShelfLifeDays(), movedToRoot.version()));
+        assertVersionConflict(() -> materialCategoryApplication.updateMaterialCategory(
+                childB.id(), "陈旧更新", null, rootD.id(), 6, null, null, childB.version()));
+
+        var dirtyX = materialCategoryApplication.createMaterialCategory(
+                "DIRTY-X", "脏节点 X", null, null, 10, null, null, MdmMasterDataRules.ENABLED);
+        var dirtyY = materialCategoryApplication.createMaterialCategory(
+                "DIRTY-Y", "脏节点 Y", null, null, 11, null, null, MdmMasterDataRules.ENABLED);
+        var movable = materialCategoryApplication.createMaterialCategory(
+                "MOVABLE", "待移动节点", null, null, 12, null, null, MdmMasterDataRules.ENABLED);
+        jdbcTemplate.update("UPDATE mdm_material_category SET parent_id = ? WHERE id = ?", dirtyY.id(), dirtyX.id());
+        jdbcTemplate.update("UPDATE mdm_material_category SET parent_id = ? WHERE id = ?", dirtyX.id(), dirtyY.id());
+        assertInvalidReference(() -> materialCategoryApplication.updateMaterialCategory(
+                movable.id(), movable.nameZh(), movable.nameEn(), dirtyX.id(), movable.sort(),
+                movable.defaultBatchManaged(), movable.defaultShelfLifeDays(), movable.version()));
+    }
+
+    /** 覆盖显式启停、父级停用禁止启用子级，以及 parentId/status 组合分页和 PageResult 元数据。 */
+    @Test
+    void materialCategoryLifecycleAndPageMustRespectParentAndFilters() {
+        var parentA = materialCategoryApplication.createMaterialCategory(
+                "PARENT-A", "父分类 A", null, null, 1, null, null, MdmMasterDataRules.ENABLED);
+        var parentB = materialCategoryApplication.createMaterialCategory(
+                "PARENT-B", "父分类 B", null, null, 2, null, null, MdmMasterDataRules.ENABLED);
+        var enabledChild = materialCategoryApplication.createMaterialCategory(
+                "ENABLED-CHILD", "启用子分类", null, parentA.id(), 20, null, null, MdmMasterDataRules.ENABLED);
+        var disabledChild = materialCategoryApplication.createMaterialCategory(
+                "DISABLED-CHILD", "停用子分类", null, parentA.id(), 10, null, null,
+                MdmMasterDataRules.DISABLED);
+        materialCategoryApplication.createMaterialCategory(
+                "OTHER-CHILD", "其他父级子分类", null, parentB.id(), 5, null, null,
+                MdmMasterDataRules.ENABLED);
+
+        var enabledPage = materialCategoryApplication.pageMaterialCategories(
+                parentA.id(), MdmMasterDataRules.ENABLED, 1, 20);
+        assertThat(enabledPage.records()).extracting(record -> record.id()).containsExactly(enabledChild.id());
+        assertThat(enabledPage.pageNo()).isEqualTo(1);
+        assertThat(enabledPage.pageSize()).isEqualTo(20);
+        assertThat(enabledPage.total()).isEqualTo(1);
+        assertThat(enabledPage.totalPages()).isEqualTo(1);
+        var disabledPage = materialCategoryApplication.pageMaterialCategories(
+                parentA.id(), MdmMasterDataRules.DISABLED, 1, 20);
+        assertThat(disabledPage.records()).extracting(record -> record.id()).containsExactly(disabledChild.id());
+
+        var disabledParent = materialCategoryApplication.disableMaterialCategory(parentA.id(), parentA.version());
+        assertParentDisabled(() -> materialCategoryApplication.enableMaterialCategory(
+                disabledChild.id(), disabledChild.version()));
+        var enabledParent = materialCategoryApplication.enableMaterialCategory(
+                disabledParent.id(), disabledParent.version());
+        var enabledPreviouslyDisabledChild = materialCategoryApplication.enableMaterialCategory(
+                disabledChild.id(), disabledChild.version());
+        assertThat(enabledParent.status()).isEqualTo(MdmMasterDataRules.ENABLED);
+        assertThat(enabledPreviouslyDisabledChild.status()).isEqualTo(MdmMasterDataRules.ENABLED);
+        var disabledAgain = materialCategoryApplication.disableMaterialCategory(
+                enabledPreviouslyDisabledChild.id(), enabledPreviouslyDisabledChild.version());
+        assertThat(disabledAgain.status()).isEqualTo(MdmMasterDataRules.DISABLED);
     }
 
     /** 覆盖正常层级创建、平台唯一 Code、同父级冲突、不同父级同 Code 和父级不存在。 */
@@ -294,6 +428,21 @@ class MdmMasterDataPostgresqlIT {
     private static void assertParentDisabled(Runnable action) {
         assertThatThrownBy(action::run).isInstanceOfSatisfying(MdmException.class,
                 exception -> assertThat(exception.code()).isEqualTo("mdm.parent_disabled"));
+    }
+
+    private static void assertInvalidReference(Runnable action) {
+        assertThatThrownBy(action::run).isInstanceOfSatisfying(MdmException.class,
+                exception -> assertThat(exception.code()).isEqualTo("mdm.invalid_reference"));
+    }
+
+    private static void assertValidationFailed(Runnable action) {
+        assertThatThrownBy(action::run).isInstanceOfSatisfying(MdmException.class,
+                exception -> assertThat(exception.code()).isEqualTo("mdm.validation_failed"));
+    }
+
+    private static void assertVersionConflict(Runnable action) {
+        assertThatThrownBy(action::run).isInstanceOfSatisfying(MdmException.class,
+                exception -> assertThat(exception.code()).isEqualTo("mdm.version_conflict"));
     }
 
     /** 集成测试为审计列提供稳定 Actor；生产请求仍由认证上下文提供真实 Actor。 */
