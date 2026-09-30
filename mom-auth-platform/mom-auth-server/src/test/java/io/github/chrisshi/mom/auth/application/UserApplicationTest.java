@@ -6,6 +6,7 @@ import io.github.chrisshi.mom.auth.infrastructure.entity.UserRoleEntity;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RoleMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.UserMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.UserRoleMapper;
+import io.github.chrisshi.mom.data.page.PageAdapter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -41,7 +42,8 @@ class UserApplicationTest {
         userRoleMapper = mock(UserRoleMapper.class);
         roleMapper = mock(RoleMapper.class);
         passwordEncoder = mock(PasswordEncoder.class);
-        application = new UserApplication(userMapper, userRoleMapper, roleMapper, passwordEncoder);
+        application = new UserApplication(userMapper, userRoleMapper, roleMapper, passwordEncoder,
+            new PageAdapter(200));
     }
 
     @Test

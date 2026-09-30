@@ -3,6 +3,7 @@ package io.github.chrisshi.mom.auth.application;
 import io.github.chrisshi.mom.auth.infrastructure.entity.PermissionEntity;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.PermissionMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RolePermissionMapper;
+import io.github.chrisshi.mom.data.page.PageAdapter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
@@ -26,7 +27,7 @@ class PermissionApplicationTest {
     void setUp() {
         permissionMapper = mock(PermissionMapper.class);
         rolePermissionMapper = mock(RolePermissionMapper.class);
-        application = new PermissionApplication(permissionMapper, rolePermissionMapper);
+        application = new PermissionApplication(permissionMapper, rolePermissionMapper, new PageAdapter(200));
     }
 
     @Test

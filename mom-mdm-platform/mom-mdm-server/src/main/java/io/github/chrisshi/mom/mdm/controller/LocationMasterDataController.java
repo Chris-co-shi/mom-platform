@@ -1,14 +1,16 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.mdm.application.LocationMasterDataApplication;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.LocationPageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.LocationTypePageParams;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.LocationTypeView;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.LocationView;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -60,10 +62,14 @@ public class LocationMasterDataController {
 
     /**
      * 分页查询 LocationType。
+     *
+     * @param pageQuery 包含空 LocationType Params 和分页信息的唯一请求体
+     * @return 统一 LocationType 分页结果
      */
-    @GetMapping("/location-types")
-    public Result<PageResult<LocationTypeView>> pageLocationTypes(@RequestParam(defaultValue = "1") @Positive long pageNo, @RequestParam(defaultValue = "20") @Positive long pageSize) {
-        return Result.success(application.pageLocationTypes(pageNo, pageSize));
+    @PostMapping("/location-types/search")
+    public Result<PageResult<LocationTypeView>> pageLocationTypes(
+            @RequestBody PageQuery<LocationTypePageParams> pageQuery) {
+        return Result.success(application.pageLocationTypes(pageQuery));
     }
 
     /**
@@ -109,13 +115,14 @@ public class LocationMasterDataController {
 
     /**
      * 可按 plantId、warehouseAreaId 组合分页查询 Location。
+     *
+     * @param pageQuery 包含可选 Plant、WarehouseArea ID 和分页信息的唯一请求体
+     * @return 统一 Location 分页结果
      */
-    @GetMapping("/locations")
-    public Result<PageResult<LocationView>> pageLocations(@RequestParam(required = false) String plantId,
-                                                          @RequestParam(required = false) String warehouseAreaId,
-                                                          @RequestParam(defaultValue = "1") @Positive long pageNo,
-                                                          @RequestParam(defaultValue = "20") @Positive long pageSize) {
-        return Result.success(application.pageLocations(plantId, warehouseAreaId, pageNo, pageSize));
+    @PostMapping("/locations/search")
+    public Result<PageResult<LocationView>> pageLocations(
+            @RequestBody PageQuery<LocationPageParams> pageQuery) {
+        return Result.success(application.pageLocations(pageQuery));
     }
 
     /**

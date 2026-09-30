@@ -5,6 +5,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.data.page.PageAdapter;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.PlantPageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.ProductionLinePageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.WorkshopPageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.WorkstationPageParams;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.PlantView;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.ProductionLineView;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.WorkshopView;
@@ -35,14 +39,25 @@ public class FactoryStructureApplication {
     private final WorkshopMapper workshopMapper;
     private final ProductionLineMapper productionLineMapper;
     private final WorkstationMapper workstationMapper;
+    private final PageAdapter pageAdapter;
 
-    /** 注入四类主数据的单表 Mapper。 */
+    /**
+     * 注入四类主数据的单表 Mapper 与统一分页适配器。
+     *
+     * @param plantMapper Plant 单表 Mapper
+     * @param workshopMapper Workshop 单表 Mapper
+     * @param productionLineMapper ProductionLine 单表 Mapper
+     * @param workstationMapper Workstation 单表 Mapper
+     * @param pageAdapter 配置化分页适配器
+     */
     public FactoryStructureApplication(PlantMapper plantMapper, WorkshopMapper workshopMapper,
-                                       ProductionLineMapper productionLineMapper, WorkstationMapper workstationMapper) {
+                                       ProductionLineMapper productionLineMapper, WorkstationMapper workstationMapper,
+                                       PageAdapter pageAdapter) {
         this.plantMapper = plantMapper;
         this.workshopMapper = workshopMapper;
         this.productionLineMapper = productionLineMapper;
         this.workstationMapper = workstationMapper;
+        this.pageAdapter = pageAdapter;
     }
 
     /** 创建平台编码唯一的 Plant；重复请求不会视为幂等成功。 */
@@ -72,13 +87,18 @@ public class FactoryStructureApplication {
         return toView(requirePlant(id));
     }
 
-    /** 按 Code、ID 稳定排序分页查询 Plant，并复用 PageAdapter 转换分页元数据。 */
+    /**
+     * 按 Code、ID 稳定排序分页查询 Plant。
+     *
+     * @param pageQuery 包含空 Plant Params 和分页信息的唯一业务入参
+     * @return 统一分页结果；只读、幂等且无持久化副作用
+     */
     @Transactional(readOnly = true)
-    public PageResult<PlantView> pagePlants(long pageNo, long pageSize) {
-        Page<PlantEntity> page = PageAdapter.toPage(new PageQuery<>(null, pageNo, pageSize));
+    public PageResult<PlantView> pagePlants(PageQuery<PlantPageParams> pageQuery) {
+        Page<PlantEntity> page = pageAdapter.toPage(pageQuery);
         plantMapper.selectPage(page, new LambdaQueryWrapper<PlantEntity>()
                 .orderByAsc(PlantEntity::getCode).orderByAsc(PlantEntity::getId));
-        return PageAdapter.toResult(page, FactoryStructureApplication::toView);
+        return pageAdapter.toResult(page, FactoryStructureApplication::toView);
     }
 
     /** 显式启用 Plant；不级联修改任何子级状态。 */
@@ -123,17 +143,25 @@ public class FactoryStructureApplication {
         return toView(requireWorkshop(id));
     }
 
-    /** 可按 Plant 过滤并稳定排序分页查询 Workshop。 */
+    /**
+     * 可按 Plant 过滤并稳定排序分页查询 Workshop。
+     *
+     * @param pageQuery 包含可选 Plant ID 和分页信息的唯一业务入参
+     * @return 统一分页结果；只读、幂等且无持久化副作用
+     * @throws MdmException Plant ID 格式非法时抛出
+     */
     @Transactional(readOnly = true)
-    public PageResult<WorkshopView> pageWorkshops(String plantId, long pageNo, long pageSize) {
-        Page<WorkshopEntity> page = PageAdapter.toPage(new PageQuery<>(plantId, pageNo, pageSize));
+    public PageResult<WorkshopView> pageWorkshops(PageQuery<WorkshopPageParams> pageQuery) {
+        WorkshopPageParams params = pageQuery.params();
+        Page<WorkshopEntity> page = pageAdapter.toPage(pageQuery);
         LambdaQueryWrapper<WorkshopEntity> query = new LambdaQueryWrapper<>();
+        String plantId = params.plantId();
         if (plantId != null && !plantId.isBlank()) {
             query.eq(WorkshopEntity::getPlantId, MdmMasterDataRules.id(plantId, "plantId"));
         }
         query.orderByAsc(WorkshopEntity::getCode).orderByAsc(WorkshopEntity::getId);
         workshopMapper.selectPage(page, query);
-        return PageAdapter.toResult(page, FactoryStructureApplication::toView);
+        return pageAdapter.toResult(page, FactoryStructureApplication::toView);
     }
 
     /** 启用 Workshop，不隐式改变 Plant 或子级状态。 */
@@ -180,17 +208,25 @@ public class FactoryStructureApplication {
         return toView(requireProductionLine(id));
     }
 
-    /** 可按 Workshop 过滤并稳定排序分页查询 ProductionLine。 */
+    /**
+     * 可按 Workshop 过滤并稳定排序分页查询 ProductionLine。
+     *
+     * @param pageQuery 包含可选 Workshop ID 和分页信息的唯一业务入参
+     * @return 统一分页结果；只读、幂等且无持久化副作用
+     * @throws MdmException Workshop ID 格式非法时抛出
+     */
     @Transactional(readOnly = true)
-    public PageResult<ProductionLineView> pageProductionLines(String workshopId, long pageNo, long pageSize) {
-        Page<ProductionLineEntity> page = PageAdapter.toPage(new PageQuery<>(workshopId, pageNo, pageSize));
+    public PageResult<ProductionLineView> pageProductionLines(PageQuery<ProductionLinePageParams> pageQuery) {
+        ProductionLinePageParams params = pageQuery.params();
+        Page<ProductionLineEntity> page = pageAdapter.toPage(pageQuery);
         LambdaQueryWrapper<ProductionLineEntity> query = new LambdaQueryWrapper<>();
+        String workshopId = params.workshopId();
         if (workshopId != null && !workshopId.isBlank()) {
             query.eq(ProductionLineEntity::getWorkshopId, MdmMasterDataRules.id(workshopId, "workshopId"));
         }
         query.orderByAsc(ProductionLineEntity::getCode).orderByAsc(ProductionLineEntity::getId);
         productionLineMapper.selectPage(page, query);
-        return PageAdapter.toResult(page, FactoryStructureApplication::toView);
+        return pageAdapter.toResult(page, FactoryStructureApplication::toView);
     }
 
     /** 启用 ProductionLine，不级联修改 Workstation。 */
@@ -237,18 +273,26 @@ public class FactoryStructureApplication {
         return toView(requireWorkstation(id));
     }
 
-    /** 可按 ProductionLine 过滤并稳定排序分页查询 Workstation。 */
+    /**
+     * 可按 ProductionLine 过滤并稳定排序分页查询 Workstation。
+     *
+     * @param pageQuery 包含可选 ProductionLine ID 和分页信息的唯一业务入参
+     * @return 统一分页结果；只读、幂等且无持久化副作用
+     * @throws MdmException ProductionLine ID 格式非法时抛出
+     */
     @Transactional(readOnly = true)
-    public PageResult<WorkstationView> pageWorkstations(String productionLineId, long pageNo, long pageSize) {
-        Page<WorkstationEntity> page = PageAdapter.toPage(new PageQuery<>(productionLineId, pageNo, pageSize));
+    public PageResult<WorkstationView> pageWorkstations(PageQuery<WorkstationPageParams> pageQuery) {
+        WorkstationPageParams params = pageQuery.params();
+        Page<WorkstationEntity> page = pageAdapter.toPage(pageQuery);
         LambdaQueryWrapper<WorkstationEntity> query = new LambdaQueryWrapper<>();
+        String productionLineId = params.productionLineId();
         if (productionLineId != null && !productionLineId.isBlank()) {
             query.eq(WorkstationEntity::getProductionLineId,
                     MdmMasterDataRules.id(productionLineId, "productionLineId"));
         }
         query.orderByAsc(WorkstationEntity::getCode).orderByAsc(WorkstationEntity::getId);
         workstationMapper.selectPage(page, query);
-        return PageAdapter.toResult(page, FactoryStructureApplication::toView);
+        return pageAdapter.toResult(page, FactoryStructureApplication::toView);
     }
 
     /** 启用 Workstation。 */

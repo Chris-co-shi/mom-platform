@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.data.page.PageAdapter;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.LocationPageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.LocationTypePageParams;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.LocationTypeView;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.LocationView;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.LocationEntity;
@@ -36,16 +38,27 @@ public class LocationMasterDataApplication {
     private final WarehouseAreaMapper warehouseAreaMapper;
     private final LocationTypeMapper locationTypeMapper;
     private final LocationMapper locationMapper;
+    private final PageAdapter pageAdapter;
 
-    /** 注入 Location 本地引用校验及单表持久化 Mapper。 */
+    /**
+     * 注入 Location 本地引用校验 Mapper、单表持久化 Mapper 与统一分页适配器。
+     *
+     * @param plantMapper Plant 单表 Mapper
+     * @param warehouseMapper Warehouse 单表 Mapper
+     * @param warehouseAreaMapper WarehouseArea 单表 Mapper
+     * @param locationTypeMapper LocationType 单表 Mapper
+     * @param locationMapper Location 单表 Mapper
+     * @param pageAdapter 配置化分页适配器
+     */
     public LocationMasterDataApplication(PlantMapper plantMapper, WarehouseMapper warehouseMapper,
                                          WarehouseAreaMapper warehouseAreaMapper, LocationTypeMapper locationTypeMapper,
-                                         LocationMapper locationMapper) {
+                                         LocationMapper locationMapper, PageAdapter pageAdapter) {
         this.plantMapper = plantMapper;
         this.warehouseMapper = warehouseMapper;
         this.warehouseAreaMapper = warehouseAreaMapper;
         this.locationTypeMapper = locationTypeMapper;
         this.locationMapper = locationMapper;
+        this.pageAdapter = pageAdapter;
     }
 
     /** 创建平台唯一 Code 的动态 LocationType。 */
@@ -74,13 +87,18 @@ public class LocationMasterDataApplication {
     @Transactional(readOnly = true)
     public LocationTypeView getLocationType(String id) { return toView(requireLocationType(id)); }
 
-    /** 稳定排序分页查询 LocationType，分页转换复用 PageAdapter。 */
+    /**
+     * 稳定排序分页查询 LocationType。
+     *
+     * @param pageQuery 包含空 LocationType Params 和分页信息的唯一业务入参
+     * @return 统一分页结果；只读、幂等且无持久化副作用
+     */
     @Transactional(readOnly = true)
-    public PageResult<LocationTypeView> pageLocationTypes(long pageNo, long pageSize) {
-        Page<LocationTypeEntity> page = PageAdapter.toPage(new PageQuery<>(null, pageNo, pageSize));
+    public PageResult<LocationTypeView> pageLocationTypes(PageQuery<LocationTypePageParams> pageQuery) {
+        Page<LocationTypeEntity> page = pageAdapter.toPage(pageQuery);
         locationTypeMapper.selectPage(page, new LambdaQueryWrapper<LocationTypeEntity>()
                 .orderByAsc(LocationTypeEntity::getCode).orderByAsc(LocationTypeEntity::getId));
-        return PageAdapter.toResult(page, LocationMasterDataApplication::toView);
+        return pageAdapter.toResult(page, LocationMasterDataApplication::toView);
     }
 
     /** 启用 LocationType，不按类型 Code 执行任何业务分支。 */
@@ -129,18 +147,27 @@ public class LocationMasterDataApplication {
     @Transactional(readOnly = true)
     public LocationView getLocation(String id) { return toView(requireLocation(id)); }
 
-    /** 可按 Plant、WarehouseArea 组合过滤并稳定排序分页查询 Location。 */
+    /**
+     * 可按 Plant、WarehouseArea 组合过滤并稳定排序分页查询 Location。
+     *
+     * @param pageQuery 包含可选 Plant、WarehouseArea ID 和分页信息的唯一业务入参
+     * @return 统一分页结果；只读、幂等且无持久化副作用
+     * @throws MdmException 任一过滤 ID 格式非法时抛出
+     */
     @Transactional(readOnly = true)
-    public PageResult<LocationView> pageLocations(String plantId, String warehouseAreaId, long pageNo, long pageSize) {
-        Page<LocationEntity> page = PageAdapter.toPage(new PageQuery<>(plantId, pageNo, pageSize));
+    public PageResult<LocationView> pageLocations(PageQuery<LocationPageParams> pageQuery) {
+        LocationPageParams params = pageQuery.params();
+        Page<LocationEntity> page = pageAdapter.toPage(pageQuery);
         LambdaQueryWrapper<LocationEntity> query = new LambdaQueryWrapper<>();
+        String plantId = params.plantId();
+        String warehouseAreaId = params.warehouseAreaId();
         if (plantId != null && !plantId.isBlank()) query.eq(LocationEntity::getPlantId,
                 MdmMasterDataRules.id(plantId, "plantId"));
         if (warehouseAreaId != null && !warehouseAreaId.isBlank()) query.eq(LocationEntity::getWarehouseAreaId,
                 MdmMasterDataRules.id(warehouseAreaId, "warehouseAreaId"));
         query.orderByAsc(LocationEntity::getCode).orderByAsc(LocationEntity::getId);
         locationMapper.selectPage(page, query);
-        return PageAdapter.toResult(page, LocationMasterDataApplication::toView);
+        return pageAdapter.toResult(page, LocationMasterDataApplication::toView);
     }
 
     /** 启用 Location。 */

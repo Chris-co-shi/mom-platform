@@ -1,13 +1,14 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.MaterialCategoryPageParams;
 import io.github.chrisshi.mom.mdm.application.MaterialCategoryApplication;
 import io.github.chrisshi.mom.mdm.application.MaterialCategoryView;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
@@ -19,7 +20,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -98,22 +98,16 @@ public class MaterialCategoryController {
     /**
      * 按父级和状态分页查询分类。
      *
-     * @param parentId 可选父分类 ID；提供时只返回直接子节点
-     * @param status 可选 ENABLED/DISABLED 状态
-     * @param pageNo 从 1 开始的页码
-     * @param pageSize 每页条数
+     * @param pageQuery 包含父级、状态和分页信息的唯一请求体
      * @return 统一成功结果，分页内容由 PageAdapter 转换
      * @throws io.github.chrisshi.mom.mdm.application.MdmException 过滤参数非法时抛出
      *
      * <p>该端点幂等且不递归构建整棵树。</p>
      */
-    @GetMapping
+    @PostMapping("/search")
     public Result<PageResult<MaterialCategoryView>> pageMaterialCategories(
-            @RequestParam(required = false) String parentId,
-            @RequestParam(required = false) String status,
-            @RequestParam(defaultValue = "1") @Positive long pageNo,
-            @RequestParam(defaultValue = "20") @Positive long pageSize) {
-        return Result.success(application.pageMaterialCategories(parentId, status, pageNo, pageSize));
+            @RequestBody PageQuery<MaterialCategoryPageParams> pageQuery) {
+        return Result.success(application.pageMaterialCategories(pageQuery));
     }
 
     /**

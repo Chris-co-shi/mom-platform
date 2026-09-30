@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.data.page.PageAdapter;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.WarehouseAreaPageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.WarehousePageParams;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.WarehouseAreaView;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.WarehouseView;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.PlantEntity;
@@ -30,13 +32,22 @@ public class WarehouseStructureApplication {
     private final PlantMapper plantMapper;
     private final WarehouseMapper warehouseMapper;
     private final WarehouseAreaMapper warehouseAreaMapper;
+    private final PageAdapter pageAdapter;
 
-    /** 注入 Plant 引用校验与仓库结构单表 Mapper。 */
+    /**
+     * 注入 Plant 引用校验、仓库结构 Mapper 与统一分页适配器。
+     *
+     * @param plantMapper Plant 单表 Mapper
+     * @param warehouseMapper Warehouse 单表 Mapper
+     * @param warehouseAreaMapper WarehouseArea 单表 Mapper
+     * @param pageAdapter 配置化分页适配器
+     */
     public WarehouseStructureApplication(PlantMapper plantMapper, WarehouseMapper warehouseMapper,
-                                         WarehouseAreaMapper warehouseAreaMapper) {
+                                         WarehouseAreaMapper warehouseAreaMapper, PageAdapter pageAdapter) {
         this.plantMapper = plantMapper;
         this.warehouseMapper = warehouseMapper;
         this.warehouseAreaMapper = warehouseAreaMapper;
+        this.pageAdapter = pageAdapter;
     }
 
     /** 在已启用 Plant 下创建 Warehouse，同一 Plant 内 Code 唯一。 */
@@ -68,15 +79,23 @@ public class WarehouseStructureApplication {
     @Transactional(readOnly = true)
     public WarehouseView getWarehouse(String id) { return toView(requireWarehouse(id)); }
 
-    /** 可按 Plant 过滤并稳定排序分页 Warehouse，分页元数据由 PageAdapter 统一转换。 */
+    /**
+     * 可按 Plant 过滤并稳定排序分页 Warehouse。
+     *
+     * @param pageQuery 包含可选 Plant ID 和分页信息的唯一业务入参
+     * @return 统一分页结果；只读、幂等且无持久化副作用
+     * @throws MdmException Plant ID 格式非法时抛出
+     */
     @Transactional(readOnly = true)
-    public PageResult<WarehouseView> pageWarehouses(String plantId, long pageNo, long pageSize) {
-        Page<WarehouseEntity> page = PageAdapter.toPage(new PageQuery<>(plantId, pageNo, pageSize));
+    public PageResult<WarehouseView> pageWarehouses(PageQuery<WarehousePageParams> pageQuery) {
+        WarehousePageParams params = pageQuery.params();
+        Page<WarehouseEntity> page = pageAdapter.toPage(pageQuery);
         LambdaQueryWrapper<WarehouseEntity> query = new LambdaQueryWrapper<>();
+        String plantId = params.plantId();
         if (plantId != null && !plantId.isBlank()) query.eq(WarehouseEntity::getPlantId, MdmMasterDataRules.id(plantId, "plantId"));
         query.orderByAsc(WarehouseEntity::getCode).orderByAsc(WarehouseEntity::getId);
         warehouseMapper.selectPage(page, query);
-        return PageAdapter.toResult(page, WarehouseStructureApplication::toView);
+        return pageAdapter.toResult(page, WarehouseStructureApplication::toView);
     }
 
     /** 启用 Warehouse，不级联修改 WarehouseArea。 */
@@ -117,16 +136,24 @@ public class WarehouseStructureApplication {
     @Transactional(readOnly = true)
     public WarehouseAreaView getWarehouseArea(String id) { return toView(requireWarehouseArea(id)); }
 
-    /** 可按 Warehouse 过滤并稳定排序分页 WarehouseArea。 */
+    /**
+     * 可按 Warehouse 过滤并稳定排序分页 WarehouseArea。
+     *
+     * @param pageQuery 包含可选 Warehouse ID 和分页信息的唯一业务入参
+     * @return 统一分页结果；只读、幂等且无持久化副作用
+     * @throws MdmException Warehouse ID 格式非法时抛出
+     */
     @Transactional(readOnly = true)
-    public PageResult<WarehouseAreaView> pageWarehouseAreas(String warehouseId, long pageNo, long pageSize) {
-        Page<WarehouseAreaEntity> page = PageAdapter.toPage(new PageQuery<>(warehouseId, pageNo, pageSize));
+    public PageResult<WarehouseAreaView> pageWarehouseAreas(PageQuery<WarehouseAreaPageParams> pageQuery) {
+        WarehouseAreaPageParams params = pageQuery.params();
+        Page<WarehouseAreaEntity> page = pageAdapter.toPage(pageQuery);
         LambdaQueryWrapper<WarehouseAreaEntity> query = new LambdaQueryWrapper<>();
+        String warehouseId = params.warehouseId();
         if (warehouseId != null && !warehouseId.isBlank()) query.eq(WarehouseAreaEntity::getWarehouseId,
                 MdmMasterDataRules.id(warehouseId, "warehouseId"));
         query.orderByAsc(WarehouseAreaEntity::getCode).orderByAsc(WarehouseAreaEntity::getId);
         warehouseAreaMapper.selectPage(page, query);
-        return PageAdapter.toResult(page, WarehouseStructureApplication::toView);
+        return pageAdapter.toResult(page, WarehouseStructureApplication::toView);
     }
 
     /** 启用 WarehouseArea。 */

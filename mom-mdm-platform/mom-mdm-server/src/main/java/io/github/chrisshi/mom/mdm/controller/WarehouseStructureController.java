@@ -1,6 +1,9 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.WarehouseAreaPageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.WarehousePageParams;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.WarehouseAreaView;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.WarehouseView;
 import io.github.chrisshi.mom.mdm.application.WarehouseStructureApplication;
@@ -8,7 +11,6 @@ import io.github.chrisshi.mom.webmvc.response.Result;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -60,10 +62,14 @@ public class WarehouseStructureController {
 
     /**
      * 可按 plantId 分页查询 Warehouse。
+     *
+     * @param pageQuery 包含可选 Plant ID 和分页信息的唯一请求体
+     * @return 统一 Warehouse 分页结果
      */
-    @GetMapping("/warehouses")
-    public Result<PageResult<WarehouseView>> pageWarehouses(@RequestParam(required = false) String plantId, @RequestParam(defaultValue = "1") @Positive long pageNo, @RequestParam(defaultValue = "20") @Positive long pageSize) {
-        return Result.success(application.pageWarehouses(plantId, pageNo, pageSize));
+    @PostMapping("/warehouses/search")
+    public Result<PageResult<WarehouseView>> pageWarehouses(
+            @RequestBody PageQuery<WarehousePageParams> pageQuery) {
+        return Result.success(application.pageWarehouses(pageQuery));
     }
 
     /**
@@ -109,10 +115,14 @@ public class WarehouseStructureController {
 
     /**
      * 可按 warehouseId 分页查询 WarehouseArea。
+     *
+     * @param pageQuery 包含可选 Warehouse ID 和分页信息的唯一请求体
+     * @return 统一 WarehouseArea 分页结果
      */
-    @GetMapping("/warehouse-areas")
-    public Result<PageResult<WarehouseAreaView>> pageWarehouseAreas(@RequestParam(required = false) String warehouseId, @RequestParam(defaultValue = "1") @Positive long pageNo, @RequestParam(defaultValue = "20") @Positive long pageSize) {
-        return Result.success(application.pageWarehouseAreas(warehouseId, pageNo, pageSize));
+    @PostMapping("/warehouse-areas/search")
+    public Result<PageResult<WarehouseAreaView>> pageWarehouseAreas(
+            @RequestBody PageQuery<WarehouseAreaPageParams> pageQuery) {
+        return Result.success(application.pageWarehouseAreas(pageQuery));
     }
 
     /**

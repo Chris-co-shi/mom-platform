@@ -5,6 +5,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.data.page.PageAdapter;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.DimensionPageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.UomCategoryPageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.UomConversionRulePageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.UomPageParams;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.DimensionEntity;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.UomCategoryEntity;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.UomConversionRuleEntity;
@@ -41,14 +45,25 @@ public class UomMasterDataApplication {
     private final UomCategoryMapper categoryMapper;
     private final UomMapper uomMapper;
     private final UomConversionRuleMapper ruleMapper;
+    private final PageAdapter pageAdapter;
 
-    /** 注入当前 bounded context 的四个单表 Mapper。 */
+    /**
+     * 注入当前 bounded context 的四个单表 Mapper 与统一分页适配器。
+     *
+     * @param dimensionMapper Dimension 单表 Mapper
+     * @param categoryMapper UOM Category 单表 Mapper
+     * @param uomMapper UOM 单表 Mapper
+     * @param ruleMapper 换算规则单表 Mapper
+     * @param pageAdapter 配置化分页适配器
+     */
     public UomMasterDataApplication(DimensionMapper dimensionMapper, UomCategoryMapper categoryMapper,
-                                    UomMapper uomMapper, UomConversionRuleMapper ruleMapper) {
+                                    UomMapper uomMapper, UomConversionRuleMapper ruleMapper,
+                                    PageAdapter pageAdapter) {
         this.dimensionMapper = dimensionMapper;
         this.categoryMapper = categoryMapper;
         this.uomMapper = uomMapper;
         this.ruleMapper = ruleMapper;
+        this.pageAdapter = pageAdapter;
     }
 
     /**
@@ -117,18 +132,18 @@ public class UomMasterDataApplication {
 
     /**
      * 按可选状态稳定分页量纲，复用统一 PageAdapter。
-     * @param status 可选状态
-     * @param pageNo 页码
-     * @param pageSize 每页条数
+     * @param pageQuery 包含可选状态和分页信息的唯一业务入参
      * @return 统一分页结果；只读且无副作用
      */
     @Transactional(readOnly = true)
-    public PageResult<DimensionView> pageDimensions(String status, long pageNo, long pageSize) {
-        Page<DimensionEntity> page = PageAdapter.toPage(new PageQuery<>(status, pageNo, pageSize));
+    public PageResult<DimensionView> pageDimensions(PageQuery<DimensionPageParams> pageQuery) {
+        DimensionPageParams params = pageQuery.params();
+        Page<DimensionEntity> page = pageAdapter.toPage(pageQuery);
         var query = new LambdaQueryWrapper<DimensionEntity>();
+        String status = params.status();
         if (hasText(status)) query.eq(DimensionEntity::getStatus, MdmMasterDataRules.status(status));
         query.orderByAsc(DimensionEntity::getCode).orderByAsc(DimensionEntity::getId);
-        dimensionMapper.selectPage(page, query); return PageAdapter.toResult(page, UomMasterDataApplication::dimensionView);
+        dimensionMapper.selectPage(page, query); return pageAdapter.toResult(page, UomMasterDataApplication::dimensionView);
     }
 
     /**
@@ -215,22 +230,22 @@ public class UomMasterDataApplication {
 
     /**
      * 按量纲和状态分页类别，结果复用统一 PageResult 转换。
-     * @param dimensionId 可选量纲 ID
-     * @param status 可选状态
-     * @param pageNo 页码
-     * @param pageSize 每页条数
+     * @param pageQuery 包含可选量纲、状态和分页信息的唯一业务入参
      * @return 类别统一分页结果；只读且无副作用
      */
     @Transactional(readOnly = true)
-    public PageResult<CategoryView> pageCategories(String dimensionId, String status, long pageNo, long pageSize) {
-        Page<UomCategoryEntity> page = PageAdapter.toPage(new PageQuery<>(dimensionId, pageNo, pageSize));
+    public PageResult<CategoryView> pageCategories(PageQuery<UomCategoryPageParams> pageQuery) {
+        UomCategoryPageParams params = pageQuery.params();
+        Page<UomCategoryEntity> page = pageAdapter.toPage(pageQuery);
         var query = new LambdaQueryWrapper<UomCategoryEntity>();
+        String dimensionId = params.dimensionId();
+        String status = params.status();
         if (hasText(dimensionId)) query.eq(UomCategoryEntity::getDimensionId, MdmMasterDataRules.id(dimensionId, "dimensionId"));
         if (hasText(status)) query.eq(UomCategoryEntity::getStatus, MdmMasterDataRules.status(status));
         query.orderByAsc(UomCategoryEntity::getCode).orderByAsc(UomCategoryEntity::getId);
         categoryMapper.selectPage(page, query);
         Map<String, String> referenceIds = referenceIdsByCategory(page.getRecords());
-        return PageAdapter.toResult(page, category ->
+        return pageAdapter.toResult(page, category ->
                 categoryView(category, requireReferenceId(referenceIds, category.getId())));
     }
 
@@ -311,22 +326,22 @@ public class UomMasterDataApplication {
 
     /**
      * 按类别、状态和基准标记分页单位，复用统一分页转换。
-     * @param categoryId 可选类别 ID
-     * @param status 可选状态
-     * @param reference 可选基准标记
-     * @param pageNo 页码
-     * @param pageSize 每页条数
+     * @param pageQuery 包含可选类别、状态、基准标记和分页信息的唯一业务入参
      * @return 单位统一分页结果；只读且无副作用
      */
     @Transactional(readOnly = true)
-    public PageResult<UomView> pageUoms(String categoryId, String status, Boolean reference, long pageNo, long pageSize) {
-        Page<UomEntity> page = PageAdapter.toPage(new PageQuery<>(categoryId, pageNo, pageSize));
+    public PageResult<UomView> pageUoms(PageQuery<UomPageParams> pageQuery) {
+        UomPageParams params = pageQuery.params();
+        Page<UomEntity> page = pageAdapter.toPage(pageQuery);
         var query = new LambdaQueryWrapper<UomEntity>();
+        String categoryId = params.categoryId();
+        String status = params.status();
+        Boolean reference = params.referenceUnit();
         if (hasText(categoryId)) query.eq(UomEntity::getCategoryId, MdmMasterDataRules.id(categoryId, "categoryId"));
         if (hasText(status)) query.eq(UomEntity::getStatus, MdmMasterDataRules.status(status));
         if (reference != null) query.eq(UomEntity::getReferenceUnit, reference);
         query.orderByDesc(UomEntity::getReferenceUnit).orderByAsc(UomEntity::getCode).orderByAsc(UomEntity::getId);
-        uomMapper.selectPage(page, query); return PageAdapter.toResult(page, UomMasterDataApplication::uomView);
+        uomMapper.selectPage(page, query); return pageAdapter.toResult(page, UomMasterDataApplication::uomView);
     }
 
     /**
@@ -386,19 +401,18 @@ public class UomMasterDataApplication {
 
     /**
      * 按版本倒序分页查询不可变规则历史。
-     * @param uomId 单位 ID
-     * @param pageNo 页码
-     * @param pageSize 每页条数
+     * @param pageQuery 包含必填单位 ID 和分页信息的唯一业务入参
      * @return 规则历史统一分页结果；只读且无副作用
      * @throws MdmException 单位不存在时抛出
      */
     @Transactional(readOnly = true)
-    public PageResult<RuleView> pageRules(String uomId, long pageNo, long pageSize) {
+    public PageResult<RuleView> pageRules(PageQuery<UomConversionRulePageParams> pageQuery) {
+        String uomId = pageQuery.params().uomId();
         String id = requireUom(uomId).getId();
-        Page<UomConversionRuleEntity> page = PageAdapter.toPage(new PageQuery<>(id, pageNo, pageSize));
+        Page<UomConversionRuleEntity> page = pageAdapter.toPage(pageQuery);
         var query = new LambdaQueryWrapper<UomConversionRuleEntity>().eq(UomConversionRuleEntity::getUomId, id)
                 .orderByDesc(UomConversionRuleEntity::getVersionNo);
-        ruleMapper.selectPage(page, query); return PageAdapter.toResult(page, UomMasterDataApplication::ruleView);
+        ruleMapper.selectPage(page, query); return pageAdapter.toResult(page, UomMasterDataApplication::ruleView);
     }
 
     /** 量纲启停只修改目标行，不级联已有类别或单位。 */

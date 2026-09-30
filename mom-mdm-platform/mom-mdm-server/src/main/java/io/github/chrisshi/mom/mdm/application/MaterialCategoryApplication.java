@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.data.page.PageAdapter;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.MaterialCategoryPageParams;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.MaterialCategoryEntity;
 import io.github.chrisshi.mom.mdm.infrastructure.mapper.MaterialCategoryMapper;
 import org.springframework.dao.DuplicateKeyException;
@@ -33,14 +34,17 @@ public class MaterialCategoryApplication {
     private static final String RESOURCE_NAME = "MaterialCategory";
 
     private final MaterialCategoryMapper materialCategoryMapper;
+    private final PageAdapter pageAdapter;
 
     /**
      * 创建 MaterialCategory 用例入口。
      *
      * @param materialCategoryMapper 分类单表 Mapper
+     * @param pageAdapter 配置化分页适配器
      */
-    public MaterialCategoryApplication(MaterialCategoryMapper materialCategoryMapper) {
+    public MaterialCategoryApplication(MaterialCategoryMapper materialCategoryMapper, PageAdapter pageAdapter) {
         this.materialCategoryMapper = materialCategoryMapper;
+        this.pageAdapter = pageAdapter;
     }
 
     /**
@@ -141,10 +145,7 @@ public class MaterialCategoryApplication {
     /**
      * 按可选父级和状态过滤分类，并按 sort、code、id 稳定分页。
      *
-     * @param parentId 可选父分类 ID；提供时仅查询其直接子节点
-     * @param status 可选 ENABLED/DISABLED 状态
-     * @param pageNo 从 1 开始的页码
-     * @param pageSize 每页条数
+     * @param pageQuery 包含父级、状态与分页信息的唯一业务入参
      * @return 通过 PageAdapter 转换的统一分页结果
      * @throws MdmException 过滤条件非法时抛出
      *
@@ -152,9 +153,12 @@ public class MaterialCategoryApplication {
      */
     @Transactional(readOnly = true)
     public PageResult<MaterialCategoryView> pageMaterialCategories(
-            String parentId, String status, long pageNo, long pageSize) {
-        Page<MaterialCategoryEntity> page = PageAdapter.toPage(new PageQuery<>(parentId, pageNo, pageSize));
+            PageQuery<MaterialCategoryPageParams> pageQuery) {
+        MaterialCategoryPageParams params = pageQuery.params();
+        Page<MaterialCategoryEntity> page = pageAdapter.toPage(pageQuery);
         LambdaQueryWrapper<MaterialCategoryEntity> query = new LambdaQueryWrapper<>();
+        String parentId = params.parentId();
+        String status = params.status();
         if (parentId != null && !parentId.isBlank()) {
             query.eq(MaterialCategoryEntity::getParentId, MdmMasterDataRules.id(parentId, "parentId"));
         }
@@ -165,7 +169,7 @@ public class MaterialCategoryApplication {
                 .orderByAsc(MaterialCategoryEntity::getCode)
                 .orderByAsc(MaterialCategoryEntity::getId);
         materialCategoryMapper.selectPage(page, query);
-        return PageAdapter.toResult(page, MaterialCategoryApplication::toView);
+        return pageAdapter.toResult(page, MaterialCategoryApplication::toView);
     }
 
     /**

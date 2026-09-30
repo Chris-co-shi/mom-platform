@@ -1,5 +1,7 @@
 package io.github.chrisshi.mom.auth;
 
+import io.github.chrisshi.mom.auth.application.AuthPageParams.UserPageParams;
+import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.auth.application.AuthErrorCode;
 import io.github.chrisshi.mom.auth.application.AuthException;
 import io.github.chrisshi.mom.auth.application.PermissionApplication;
@@ -122,7 +124,8 @@ class AuthManagementPostgresqlIT {
         var user = userApplication.create(" Test.User ", "Password@123", " Test User ", true);
         assertThat(user.username()).isEqualTo("test.user");
         assertThat(userApplication.get(user.id()).displayName()).isEqualTo("Test User");
-        assertThat(userApplication.list(1, 20).records()).extracting("id").contains(user.id());
+        assertThat(userApplication.list(new PageQuery<>(new UserPageParams(), 1, 20)).records())
+            .extracting("id").contains(user.id());
 
         String passwordHash = jdbcTemplate.queryForObject(
             "select password_hash from auth_user where id=?", String.class, user.id());

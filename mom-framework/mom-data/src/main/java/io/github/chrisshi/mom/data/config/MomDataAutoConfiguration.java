@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInt
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import io.github.chrisshi.mom.core.security.CurrentActorProvider;
 import io.github.chrisshi.mom.data.audit.MomMetaObjectHandler;
+import io.github.chrisshi.mom.data.page.PageAdapter;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -52,17 +53,26 @@ public class MomDataAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(MybatisPlusInterceptor.class)
-    MybatisPlusInterceptor momMybatisPlusInterceptor(MomDataPaginationProperties paginationProperties) {
+    MybatisPlusInterceptor momMybatisPlusInterceptor() {
         MybatisPlusInterceptor interceptor =
             new MybatisPlusInterceptor();
         // 乐观锁
         interceptor.addInnerInterceptor(new OptimisticLockerInnerInterceptor());
         // 防止全表删除
         interceptor.addInnerInterceptor(new BlockAttackInnerInterceptor());
-        PaginationInnerInterceptor pagination = new PaginationInnerInterceptor();
-        // 在 SQL 生成前把超大 pageSize 截断到平台配置上限，PageResult 元数据也随 IPage 同步更新。
-        pagination.setMaxLimit(paginationProperties.getMaxPageSize());
-        interceptor.addInnerInterceptor(pagination);
+        interceptor.addInnerInterceptor(new PaginationInnerInterceptor());
         return interceptor;
+    }
+
+    /**
+     * 创建在 SQL 执行前拒绝超大分页请求的统一适配器。
+     *
+     * @param paginationProperties 启动时完成绑定的分页保护配置
+     * @return 不可变、线程安全的分页适配器
+     */
+    @Bean
+    @ConditionalOnMissingBean(PageAdapter.class)
+    PageAdapter momPageAdapter(MomDataPaginationProperties paginationProperties) {
+        return new PageAdapter(paginationProperties.getMaxPageSize());
     }
 }

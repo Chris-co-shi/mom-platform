@@ -1,7 +1,12 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.mdm.application.FactoryStructureApplication;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.PlantPageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.ProductionLinePageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.WorkshopPageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.WorkstationPageParams;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.PlantView;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.ProductionLineView;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.WorkshopView;
@@ -10,7 +15,6 @@ import io.github.chrisshi.mom.webmvc.response.Result;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -62,11 +66,13 @@ public class FactoryStructureController {
 
     /**
      * 分页查询 Plant。
+     *
+     * @param pageQuery 包含空 Plant Params 和分页信息的唯一请求体
+     * @return 统一 Plant 分页结果
      */
-    @GetMapping("/plants")
-    public Result<PageResult<PlantView>> pagePlants(@RequestParam(defaultValue = "1") @Positive long pageNo,
-                                                    @RequestParam(defaultValue = "20") @Positive long pageSize) {
-        return Result.success(application.pagePlants(pageNo, pageSize));
+    @PostMapping("/plants/search")
+    public Result<PageResult<PlantView>> pagePlants(@RequestBody PageQuery<PlantPageParams> pageQuery) {
+        return Result.success(application.pagePlants(pageQuery));
     }
 
     /**
@@ -112,10 +118,14 @@ public class FactoryStructureController {
 
     /**
      * 可按 plantId 分页查询 Workshop。
+     *
+     * @param pageQuery 包含可选 Plant ID 和分页信息的唯一请求体
+     * @return 统一 Workshop 分页结果
      */
-    @GetMapping("/workshops")
-    public Result<PageResult<WorkshopView>> pageWorkshops(@RequestParam(required = false) String plantId, @RequestParam(defaultValue = "1") @Positive long pageNo, @RequestParam(defaultValue = "20") @Positive long pageSize) {
-        return Result.success(application.pageWorkshops(plantId, pageNo, pageSize));
+    @PostMapping("/workshops/search")
+    public Result<PageResult<WorkshopView>> pageWorkshops(
+            @RequestBody PageQuery<WorkshopPageParams> pageQuery) {
+        return Result.success(application.pageWorkshops(pageQuery));
     }
 
     /**
@@ -161,10 +171,14 @@ public class FactoryStructureController {
 
     /**
      * 可按 workshopId 分页查询 ProductionLine。
+     *
+     * @param pageQuery 包含可选 Workshop ID 和分页信息的唯一请求体
+     * @return 统一 ProductionLine 分页结果
      */
-    @GetMapping("/production-lines")
-    public Result<PageResult<ProductionLineView>> pageProductionLines(@RequestParam(required = false) String workshopId, @RequestParam(defaultValue = "1") @Positive long pageNo, @RequestParam(defaultValue = "20") @Positive long pageSize) {
-        return Result.success(application.pageProductionLines(workshopId, pageNo, pageSize));
+    @PostMapping("/production-lines/search")
+    public Result<PageResult<ProductionLineView>> pageProductionLines(
+            @RequestBody PageQuery<ProductionLinePageParams> pageQuery) {
+        return Result.success(application.pageProductionLines(pageQuery));
     }
 
     /**
@@ -210,10 +224,14 @@ public class FactoryStructureController {
 
     /**
      * 可按 productionLineId 分页查询 Workstation。
+     *
+     * @param pageQuery 包含可选 ProductionLine ID 和分页信息的唯一请求体
+     * @return 统一 Workstation 分页结果
      */
-    @GetMapping("/workstations")
-    public Result<PageResult<WorkstationView>> pageWorkstations(@RequestParam(required = false) String productionLineId, @RequestParam(defaultValue = "1") @Positive long pageNo, @RequestParam(defaultValue = "20") @Positive long pageSize) {
-        return Result.success(application.pageWorkstations(productionLineId, pageNo, pageSize));
+    @PostMapping("/workstations/search")
+    public Result<PageResult<WorkstationView>> pageWorkstations(
+            @RequestBody PageQuery<WorkstationPageParams> pageQuery) {
+        return Result.success(application.pageWorkstations(pageQuery));
     }
 
     /**

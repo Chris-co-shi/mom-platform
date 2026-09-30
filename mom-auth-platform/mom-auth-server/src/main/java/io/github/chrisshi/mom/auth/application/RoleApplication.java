@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.auth.application.model.PermissionView;
 import io.github.chrisshi.mom.auth.application.model.RoleView;
+import io.github.chrisshi.mom.auth.application.AuthPageParams.RolePageParams;
 import io.github.chrisshi.mom.auth.infrastructure.entity.PermissionEntity;
 import io.github.chrisshi.mom.auth.infrastructure.entity.RoleEntity;
 import io.github.chrisshi.mom.auth.infrastructure.entity.RolePermissionEntity;
@@ -38,17 +39,29 @@ public class RoleApplication {
     private final UserRoleMapper userRoleMapper;
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
+    private final PageAdapter pageAdapter;
 
+    /**
+     * 注入角色、用户关系、权限关系持久化能力与统一分页适配器。
+     *
+     * @param roleMapper Role 单表 Mapper
+     * @param userRoleMapper User-Role 关系 Mapper
+     * @param rolePermissionMapper Role-Permission 关系 Mapper
+     * @param permissionMapper Permission 单表 Mapper
+     * @param pageAdapter 配置化分页适配器
+     */
     public RoleApplication(
         RoleMapper roleMapper,
         UserRoleMapper userRoleMapper,
         RolePermissionMapper rolePermissionMapper,
-        PermissionMapper permissionMapper
+        PermissionMapper permissionMapper,
+        PageAdapter pageAdapter
     ) {
         this.roleMapper = roleMapper;
         this.userRoleMapper = userRoleMapper;
         this.rolePermissionMapper = rolePermissionMapper;
         this.permissionMapper = permissionMapper;
+        this.pageAdapter = pageAdapter;
     }
 
     /**
@@ -95,19 +108,18 @@ public class RoleApplication {
      *
      * <p>统一使用 PageAdapter 适配分页，排序固定为 code、id，避免跨页顺序漂移。</p>
      *
-     * @param pageNo 从 1 开始的页码
-     * @param pageSize 每页数量
+     * @param pageQuery 包含明确空 Params 和分页信息的唯一业务入参
      * @return 平台统一分页结果
      */
-    public PageResult<RoleView> list(long pageNo, int pageSize) {
-        Page<RoleEntity> page = PageAdapter.toPage(new PageQuery<>(null, pageNo, pageSize));
+    public PageResult<RoleView> list(PageQuery<RolePageParams> pageQuery) {
+        Page<RoleEntity> page = pageAdapter.toPage(pageQuery);
         roleMapper.selectPage(
             page,
             new LambdaQueryWrapper<RoleEntity>()
                 .orderByAsc(RoleEntity::getCode)
                 .orderByAsc(RoleEntity::getId)
         );
-        return PageAdapter.toResult(page, RoleView::from);
+        return pageAdapter.toResult(page, RoleView::from);
     }
 
     /**

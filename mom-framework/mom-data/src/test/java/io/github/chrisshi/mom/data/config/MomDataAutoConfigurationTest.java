@@ -1,7 +1,8 @@
 package io.github.chrisshi.mom.data.config;
 
-import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
-import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import io.github.chrisshi.mom.core.page.PageQuery;
+import io.github.chrisshi.mom.core.page.PageQueryValidationException;
+import io.github.chrisshi.mom.data.page.PageAdapter;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -19,18 +20,21 @@ class MomDataAutoConfigurationTest {
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(MomDataAutoConfiguration.class));
 
-    /** 默认配置必须把分页插件单页上限固定为 200。 */
+    /** 默认配置必须让 PageAdapter 在 SQL 前拒绝超过 200 条的请求。 */
     @Test
     void shouldApplyDefaultMaximumPageSize() {
-        contextRunner.run(context -> assertThat(pagination(context.getBean(MybatisPlusInterceptor.class)).getMaxLimit())
-                .isEqualTo(MomDataPaginationProperties.DEFAULT_MAX_PAGE_SIZE));
+        contextRunner.run(context -> assertThatThrownBy(() -> context.getBean(PageAdapter.class)
+                        .toPage(new PageQuery<>(new EmptyPageParams(), 1, 201)))
+                .isInstanceOf(PageQueryValidationException.class)
+                .hasMessage("每页条数不能超过 200"));
     }
 
-    /** 业务服务通过 application.yml 等价属性覆盖时，分页插件必须采用覆盖值。 */
+    /** 业务服务通过 application.yml 等价属性覆盖时，PageAdapter 必须采用覆盖值。 */
     @Test
     void shouldApplyConfiguredMaximumPageSize() {
         contextRunner.withPropertyValues("mom.data.pagination.max-page-size=50")
-                .run(context -> assertThat(pagination(context.getBean(MybatisPlusInterceptor.class)).getMaxLimit())
+                .run(context -> assertThat(context.getBean(PageAdapter.class)
+                                .toPage(new PageQuery<>(new EmptyPageParams(), 1, 50)).getSize())
                         .isEqualTo(50L));
     }
 
@@ -44,12 +48,7 @@ class MomDataAutoConfigurationTest {
                 .hasMessageContaining("必须大于 0");
     }
 
-    /** 从统一拦截器链中定位唯一分页插件，避免测试依赖插件添加顺序。 */
-    private static PaginationInnerInterceptor pagination(MybatisPlusInterceptor interceptor) {
-        return interceptor.getInterceptors().stream()
-                .filter(PaginationInnerInterceptor.class::isInstance)
-                .map(PaginationInnerInterceptor.class::cast)
-                .findFirst()
-                .orElseThrow();
+    /** 无业务过滤条件时使用的明确空参数类型。 */
+    private record EmptyPageParams() {
     }
 }

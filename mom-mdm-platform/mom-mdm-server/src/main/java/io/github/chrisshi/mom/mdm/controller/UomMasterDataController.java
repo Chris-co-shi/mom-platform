@@ -1,6 +1,11 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.DimensionPageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.UomCategoryPageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.UomConversionRulePageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.UomPageParams;
 import io.github.chrisshi.mom.mdm.application.UomMasterDataApplication;
 import io.github.chrisshi.mom.mdm.application.UomMasterDataViews.*;
 import io.github.chrisshi.mom.webmvc.response.Result;
@@ -42,9 +47,9 @@ public class UomMasterDataController {
     @GetMapping("/dimensions/{id}") @PreAuthorize("hasAuthority('mdm:uom:read')")
     public Result<DimensionView> getDimension(@PathVariable String id) { return Result.success(application.getDimension(id)); }
 
-    /** 按状态分页量纲且无写副作用。 @param status 可选状态 @param pageNo 页码 @param pageSize 每页条数 @return 统一分页结果 */
-    @GetMapping("/dimensions") @PreAuthorize("hasAuthority('mdm:uom:read')")
-    public Result<PageResult<DimensionView>> pageDimensions(@RequestParam(required=false) String status, @RequestParam(defaultValue="1") @Positive long pageNo, @RequestParam(defaultValue="20") @Positive long pageSize) { return Result.success(application.pageDimensions(status, pageNo, pageSize)); }
+    /** 按状态分页量纲且无写副作用。 @param query 唯一分页请求体 @return 统一分页结果 */
+    @PostMapping("/dimensions/search") @PreAuthorize("hasAuthority('mdm:uom:read')")
+    public Result<PageResult<DimensionView>> pageDimensions(@RequestBody PageQuery<DimensionPageParams> query) { return Result.success(application.pageDimensions(query)); }
 
     /** 启用量纲且不级联类别。 @param id 量纲 ID @param r 版本请求 @return 统一结果 @throws io.github.chrisshi.mom.mdm.application.MdmException 冲突时抛出 */
     @PatchMapping("/dimensions/{id}/enable") @PreAuthorize("hasAuthority('mdm:uom:write')")
@@ -66,9 +71,9 @@ public class UomMasterDataController {
     @GetMapping("/uom-categories/{id}") @PreAuthorize("hasAuthority('mdm:uom:read')")
     public Result<CategoryView> getCategory(@PathVariable String id) { return Result.success(application.getCategory(id)); }
 
-    /** 按量纲和状态分页类别且无写副作用。 @param dimensionId 可选量纲 @param status 可选状态 @param pageNo 页码 @param pageSize 每页条数 @return 统一分页 */
-    @GetMapping("/uom-categories") @PreAuthorize("hasAuthority('mdm:uom:read')")
-    public Result<PageResult<CategoryView>> pageCategories(@RequestParam(required=false) String dimensionId, @RequestParam(required=false) String status, @RequestParam(defaultValue="1") @Positive long pageNo, @RequestParam(defaultValue="20") @Positive long pageSize) { return Result.success(application.pageCategories(dimensionId, status, pageNo, pageSize)); }
+    /** 按量纲和状态分页类别且无写副作用。 @param query 唯一分页请求体 @return 统一分页 */
+    @PostMapping("/uom-categories/search") @PreAuthorize("hasAuthority('mdm:uom:read')")
+    public Result<PageResult<CategoryView>> pageCategories(@RequestBody PageQuery<UomCategoryPageParams> query) { return Result.success(application.pageCategories(query)); }
 
     /** 启用类别并恢复基准单位。 @param id 类别 ID @param r 版本请求 @return 统一结果 @throws io.github.chrisshi.mom.mdm.application.MdmException 父级或冲突时抛出 */
     @PatchMapping("/uom-categories/{id}/enable") @PreAuthorize("hasAuthority('mdm:uom:write')")
@@ -90,9 +95,9 @@ public class UomMasterDataController {
     @GetMapping("/uoms/{id}") @PreAuthorize("hasAuthority('mdm:uom:read')")
     public Result<UomView> getUom(@PathVariable String id) { return Result.success(application.getUom(id)); }
 
-    /** 分页单位。 @param categoryId 可选类别 @param status 可选状态 @param referenceUnit 可选基准标记 @param pageNo 页码 @param pageSize 每页条数 @return 统一分页 */
-    @GetMapping("/uoms") @PreAuthorize("hasAuthority('mdm:uom:read')")
-    public Result<PageResult<UomView>> pageUoms(@RequestParam(required=false) String categoryId, @RequestParam(required=false) String status, @RequestParam(required=false) Boolean referenceUnit, @RequestParam(defaultValue="1") @Positive long pageNo, @RequestParam(defaultValue="20") @Positive long pageSize) { return Result.success(application.pageUoms(categoryId, status, referenceUnit, pageNo, pageSize)); }
+    /** 分页单位。 @param query 唯一分页请求体 @return 统一分页 */
+    @PostMapping("/uoms/search") @PreAuthorize("hasAuthority('mdm:uom:read')")
+    public Result<PageResult<UomView>> pageUoms(@RequestBody PageQuery<UomPageParams> query) { return Result.success(application.pageUoms(query)); }
 
     /** 启用普通单位。 @param id 单位 ID @param r 版本请求 @return 统一结果 @throws io.github.chrisshi.mom.mdm.application.MdmException 父级、基准身份或冲突时抛出 */
     @PatchMapping("/uoms/{id}/enable") @PreAuthorize("hasAuthority('mdm:uom:write')")
@@ -110,9 +115,9 @@ public class UomMasterDataController {
     @GetMapping("/uoms/{id}/conversion-rules/current") @PreAuthorize("hasAuthority('mdm:uom:read')")
     public Result<RuleView> getCurrentRule(@PathVariable String id) { return Result.success(application.getCurrentRule(id)); }
 
-    /** 分页查询不可变规则历史。 @param id 单位 ID @param pageNo 页码 @param pageSize 每页条数 @return 统一分页 @throws io.github.chrisshi.mom.mdm.application.MdmException 单位不存在时抛出 */
-    @GetMapping("/uoms/{id}/conversion-rules") @PreAuthorize("hasAuthority('mdm:uom:read')")
-    public Result<PageResult<RuleView>> pageRules(@PathVariable String id, @RequestParam(defaultValue="1") @Positive long pageNo, @RequestParam(defaultValue="20") @Positive long pageSize) { return Result.success(application.pageRules(id, pageNo, pageSize)); }
+    /** 分页查询不可变规则历史。 @param query 包含单位 ID 的唯一分页请求体 @return 统一分页 @throws io.github.chrisshi.mom.mdm.application.MdmException 单位不存在时抛出 */
+    @PostMapping("/uom-conversion-rules/search") @PreAuthorize("hasAuthority('mdm:uom:read')")
+    public Result<PageResult<RuleView>> pageRules(@RequestBody PageQuery<UomConversionRulePageParams> query) { return Result.success(application.pageRules(query)); }
 
     /**
      * 量纲创建协议，七个指数按 T/L/M/I/Theta/N/J 顺序表达。

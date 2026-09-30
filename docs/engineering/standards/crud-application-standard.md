@@ -263,7 +263,13 @@ Application 优先返回具有业务语义的 View/Result；Controller 根据 HT
 
 ## 10. 分页和排序
 
-分页请求必须有服务端最大 page size、稳定且唯一的次级排序；MyBatis `Page` 不进入公开 Web/API。
+普通控制面分页统一使用 `POST /资源/search` 与 `PageQuery<XxxPageParams>` 请求体。Controller 和
+Application 只接收该分页业务入参；`params/pageNo/pageSize` 均必填且不提供默认值，最大 page size
+由数据框架配置并在 SQL 前拒绝超限请求。MyBatis `Page` 不进入公开 Web/API。
+
+无过滤条件时使用明确的空 Params 记录和 JSON 空对象 `{}`，禁止以 `null`、单个 ID 或无类型 Map
+占位。Infrastructure 可以接收 PageAdapter 转换出的 `IPage` 与强类型 Params，但不得绕过统一适配器
+手工计算分页元数据。
 
 排序字段由服务端枚举映射为固定列，禁止客户端原始 SQL 表达式。大数据量场景评估 Keyset/Cursor，不在 Java 内存中加载全量后分页。
 

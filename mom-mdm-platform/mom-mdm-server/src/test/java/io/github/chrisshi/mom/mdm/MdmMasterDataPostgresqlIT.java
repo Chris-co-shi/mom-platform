@@ -1,5 +1,7 @@
 package io.github.chrisshi.mom.mdm;
 
+import io.github.chrisshi.mom.core.page.PageQuery;
+import io.github.chrisshi.mom.core.page.PageQueryValidationException;
 import io.github.chrisshi.mom.core.security.ActorType;
 import io.github.chrisshi.mom.core.security.AuditActor;
 import io.github.chrisshi.mom.core.security.CurrentActorProvider;
@@ -8,6 +10,12 @@ import io.github.chrisshi.mom.mdm.application.LocationMasterDataApplication;
 import io.github.chrisshi.mom.mdm.application.MaterialCategoryApplication;
 import io.github.chrisshi.mom.mdm.application.MdmException;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataRules;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.LocationPageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.MaterialCategoryPageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.PlantPageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.UomCategoryPageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.UomConversionRulePageParams;
+import io.github.chrisshi.mom.mdm.application.MdmPageParams.UomPageParams;
 import io.github.chrisshi.mom.mdm.application.WarehouseStructureApplication;
 import io.github.chrisshi.mom.mdm.application.UomConversionApplication;
 import io.github.chrisshi.mom.mdm.application.UomMasterDataApplication;
@@ -246,14 +254,16 @@ class MdmMasterDataPostgresqlIT {
                 MdmMasterDataRules.ENABLED);
 
         var enabledPage = materialCategoryApplication.pageMaterialCategories(
-                parentA.id(), MdmMasterDataRules.ENABLED, 1, 20);
+                new PageQuery<>(new MaterialCategoryPageParams(
+                        parentA.id(), MdmMasterDataRules.ENABLED), 1, 20));
         assertThat(enabledPage.records()).extracting(record -> record.id()).containsExactly(enabledChild.id());
         assertThat(enabledPage.pageNo()).isEqualTo(1);
         assertThat(enabledPage.pageSize()).isEqualTo(20);
         assertThat(enabledPage.total()).isEqualTo(1);
         assertThat(enabledPage.totalPages()).isEqualTo(1);
         var disabledPage = materialCategoryApplication.pageMaterialCategories(
-                parentA.id(), MdmMasterDataRules.DISABLED, 1, 20);
+                new PageQuery<>(new MaterialCategoryPageParams(
+                        parentA.id(), MdmMasterDataRules.DISABLED), 1, 20));
         assertThat(disabledPage.records()).extracting(record -> record.id()).containsExactly(disabledChild.id());
 
         var disabledParent = materialCategoryApplication.disableMaterialCategory(parentA.id(), parentA.version());
@@ -314,7 +324,8 @@ class MdmMasterDataPostgresqlIT {
 
         assertThat(direct.warehouseAreaId()).isNull();
         assertThat(storage.warehouseAreaId()).isEqualTo(area.id());
-        var areaPage = locationApplication.pageLocations(plantA.id(), area.id(), 1, 20);
+        var areaPage = locationApplication.pageLocations(
+                new PageQuery<>(new LocationPageParams(plantA.id(), area.id()), 1, 20));
         assertThat(areaPage.records()).extracting(record -> record.id()).containsExactly(storage.id());
         assertThat(areaPage.total()).isEqualTo(1);
         assertThatThrownBy(() -> locationApplication.createLocation(plantB.id(), area.id(), type.id(), "LOC-X",
@@ -425,7 +436,7 @@ class MdmMasterDataPostgresqlIT {
                         exception -> assertThat(exception.code()).isEqualTo("mdm.version_conflict"));
 
         factoryApplication.createPlant("P-B", "工厂乙", null, MdmMasterDataRules.ENABLED);
-        var page = factoryApplication.pagePlants(1, 1);
+        var page = factoryApplication.pagePlants(new PageQuery<>(new PlantPageParams(), 1, 1));
         assertThat(page.records()).hasSize(1);
         assertThat(page.pageNo()).isEqualTo(1);
         assertThat(page.pageSize()).isEqualTo(1);
@@ -452,7 +463,11 @@ class MdmMasterDataPostgresqlIT {
         var secondCategory = uomMasterDataApplication.createCategory(
                 "TEST_DISTANCE_2", "测试距离二", null, dimension.id(), MdmMasterDataRules.ENABLED,
                 "mom:test-m-2", "测试米二", null, "tm2", "测试专用非 UCUM 单位");
-        var categoryPage = uomMasterDataApplication.pageCategories(dimension.id(), null, 1, 1_000);
+        assertThatThrownBy(() -> uomMasterDataApplication.pageCategories(
+                new PageQuery<>(new UomCategoryPageParams(dimension.id(), null), 1, 1_000)))
+                .isInstanceOf(PageQueryValidationException.class);
+        var categoryPage = uomMasterDataApplication.pageCategories(
+                new PageQuery<>(new UomCategoryPageParams(dimension.id(), null), 1, 200));
         assertThat(categoryPage.pageSize()).isEqualTo(200);
         assertThat(categoryPage.records()).extracting(record -> record.id())
                 .containsExactly(category.id(), secondCategory.id());
@@ -465,7 +480,8 @@ class MdmMasterDataPostgresqlIT {
         var centimetre = uomMasterDataApplication.createUom(
                 "mom:test-cm", "测试厘米", null, "tcm", category.id(), "测试专用非 UCUM 单位",
                 MdmMasterDataRules.DISABLED, new BigDecimal("0.01"), BigDecimal.ZERO, 34, "HALF_EVEN");
-        var page = uomMasterDataApplication.pageUoms(category.id(), MdmMasterDataRules.DISABLED, false, 1, 20);
+        var page = uomMasterDataApplication.pageUoms(new PageQuery<>(
+                new UomPageParams(category.id(), MdmMasterDataRules.DISABLED, false), 1, 20));
         assertThat(page.records()).extracting(record -> record.id()).containsExactly(centimetre.id());
         assertThat(page.total()).isEqualTo(1);
 
@@ -521,7 +537,8 @@ class MdmMasterDataPostgresqlIT {
                 .isEqualTo("5");
         assertThat(uomConversionApplication.replay("250", cm.id(), lengthCategory.referenceUomId(), 1, null).targetValue())
                 .isEqualTo("2.5");
-        assertThat(uomMasterDataApplication.pageRules(cm.id(), 1, 20).records())
+        assertThat(uomMasterDataApplication.pageRules(
+                        new PageQuery<>(new UomConversionRulePageParams(cm.id()), 1, 20)).records())
                 .extracting(record -> record.status()).containsExactly(MdmMasterDataRules.ENABLED, MdmMasterDataRules.DISABLED);
 
         var time = uomMasterDataApplication.createDimension(
