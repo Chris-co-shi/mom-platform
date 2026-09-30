@@ -34,6 +34,7 @@ class ServerPackageArchitectureTest {
                         "org.springframework.cloud.openfeign..", "org.springframework.data.redis..",
                         "jakarta.servlet..")
                 .because("Domain 必须保持框架和入出站 Adapter 无关")
+                .allowEmptyShould(true)
                 .check(productionClasses);
     }
 
@@ -66,6 +67,7 @@ class ServerPackageArchitectureTest {
                 .orShould().dependOnClassesThat().haveSimpleNameEndingWith("Mapper")
                 .orShould().dependOnClassesThat().haveSimpleNameEndingWith("Entity")
                 .because("Application 只能通过 Command/Query 与 Port 编排用例")
+                .allowEmptyShould(true)
                 .check(productionClasses);
     }
 

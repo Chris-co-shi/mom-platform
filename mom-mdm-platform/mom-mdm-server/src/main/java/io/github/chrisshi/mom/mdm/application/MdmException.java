@@ -58,4 +58,14 @@ public final class MdmException extends RuntimeException {
     public static MdmException invalidReference(String message) {
         return new MdmException(Kind.BAD_REQUEST, "mdm.invalid_reference", message);
     }
+
+    /** 创建不可变业务身份被普通入口修改的冲突异常。 */
+    public static MdmException immutable(String message) {
+        return new MdmException(Kind.CONFLICT, "mdm.immutable_master_data", message);
+    }
+
+    /** 创建单位不在同一换算类别的输入异常。 */
+    public static MdmException incompatibleUom() {
+        return new MdmException(Kind.BAD_REQUEST, "mdm.incompatible_uom", "两个计量单位不属于同一计量单位类别");
+    }
 }

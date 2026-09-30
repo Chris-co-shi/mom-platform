@@ -9,6 +9,8 @@ import io.github.chrisshi.mom.mdm.application.MaterialCategoryApplication;
 import io.github.chrisshi.mom.mdm.application.MdmException;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataRules;
 import io.github.chrisshi.mom.mdm.application.WarehouseStructureApplication;
+import io.github.chrisshi.mom.mdm.application.UomConversionApplication;
+import io.github.chrisshi.mom.mdm.application.UomMasterDataApplication;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +27,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.util.Optional;
+import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -67,6 +70,8 @@ class MdmMasterDataPostgresqlIT {
     @Autowired private WarehouseStructureApplication warehouseApplication;
     @Autowired private LocationMasterDataApplication locationApplication;
     @Autowired private MaterialCategoryApplication materialCategoryApplication;
+    @Autowired private UomMasterDataApplication uomMasterDataApplication;
+    @Autowired private UomConversionApplication uomConversionApplication;
     @Autowired private JdbcTemplate jdbcTemplate;
 
     /** 注入隔离 PostgreSQL 连接并保持生产 currentSchema、Keepalive 与 ApplicationName 约束。 */
@@ -84,6 +89,10 @@ class MdmMasterDataPostgresqlIT {
     /** 每个测试清理 MDM 普通主数据；没有物理外键，因此不依赖级联顺序。 */
     @BeforeEach
     void cleanTables() {
+        jdbcTemplate.update("DELETE FROM mdm_uom_conversion_rule WHERE created_by <> 'flyway:uom-seed'");
+        jdbcTemplate.update("DELETE FROM mdm_uom WHERE created_by <> 'flyway:uom-seed'");
+        jdbcTemplate.update("DELETE FROM mdm_uom_category WHERE created_by <> 'flyway:uom-seed'");
+        jdbcTemplate.update("DELETE FROM mdm_dimension WHERE created_by <> 'flyway:uom-seed'");
         jdbcTemplate.update("""
                 TRUNCATE TABLE mdm_material_category, mdm_location, mdm_location_type,
                                mdm_warehouse_area, mdm_warehouse,
@@ -91,21 +100,22 @@ class MdmMasterDataPostgresqlIT {
                 """);
     }
 
-    /** 验证 V103 表、命名约束、父级查询索引和无物理外键策略。 */
+    /** 验证截至 V105 的表、命名约束、查询索引和无物理外键策略。 */
     @Test
     void migrationMustCreateNineMasterTablesAndDatabaseConstraints() {
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT version FROM flyway_schema_history
                  WHERE success = true ORDER BY installed_rank DESC LIMIT 1
-                """, String.class)).isEqualTo("103");
+                """, String.class)).isEqualTo("105");
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT count(*) FROM information_schema.tables
                  WHERE table_schema = ? AND table_name IN (
                    'mdm_plant', 'mdm_workshop', 'mdm_production_line', 'mdm_workstation',
                    'mdm_warehouse', 'mdm_warehouse_area', 'mdm_location_type', 'mdm_location',
-                   'mdm_material_category')
-                """, Long.class, SCHEMA)).isEqualTo(9L);
+                   'mdm_material_category', 'mdm_dimension', 'mdm_uom_category', 'mdm_uom',
+                   'mdm_uom_conversion_rule')
+                """, Long.class, SCHEMA)).isEqualTo(13L);
         assertThat(jdbcTemplate.queryForList("""
                 SELECT constraint_name FROM information_schema.table_constraints
                  WHERE table_schema = ? AND constraint_type = 'UNIQUE'
@@ -116,7 +126,8 @@ class MdmMasterDataPostgresqlIT {
                 "uk_mdm_production_line_workshop_code", "uk_mdm_workstation_line_code",
                 "uk_mdm_warehouse_plant_code", "uk_mdm_warehouse_area_warehouse_code",
                 "uk_mdm_location_type_code", "uk_mdm_location_plant_code",
-                "uk_mdm_material_category_code");
+                "uk_mdm_material_category_code", "uk_mdm_dimension_code", "uk_mdm_dimension_vector",
+                "uk_mdm_uom_category_code", "uk_mdm_uom_code", "uk_mdm_uom_conversion_rule_version");
         assertThat(jdbcTemplate.queryForList("""
                 SELECT constraint_name FROM information_schema.table_constraints
                  WHERE table_schema = ? AND table_name = 'mdm_material_category'
@@ -133,6 +144,13 @@ class MdmMasterDataPostgresqlIT {
                 SELECT count(*) FROM information_schema.table_constraints
                  WHERE table_schema = ? AND constraint_type = 'FOREIGN KEY'
                 """, Long.class, SCHEMA)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM mdm_dimension WHERE created_by = 'flyway:uom-seed'", Long.class)).isEqualTo(7L);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM mdm_uom WHERE created_by = 'flyway:uom-seed'", Long.class)).isEqualTo(20L);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM mdm_uom_conversion_rule WHERE created_by = 'flyway:uom-seed'", Long.class))
+                .isEqualTo(13L);
     }
 
     /** 覆盖根/子分类创建、默认建议值、全局 Code 唯一、父级存在/状态和非负保质期。 */
@@ -413,6 +431,85 @@ class MdmMasterDataPostgresqlIT {
         assertThat(page.pageSize()).isEqualTo(1);
         assertThat(page.total()).isEqualTo(2);
         assertThat(page.totalPages()).isEqualTo(2);
+    }
+
+    /** 覆盖类别与基准单位原子创建、父级状态、企业扩展 Code 说明和 PageResult 复用。 */
+    @Test
+    void uomCatalogMustEnforceReferenceAndParentRules() {
+        var dimension = uomMasterDataApplication.createDimension(
+                "TEST_LENGTH", "测试长度", "Test length", 9, 1, 0, 0, 0, 0, 0, MdmMasterDataRules.ENABLED);
+        var category = uomMasterDataApplication.createCategory(
+                "TEST_DISTANCE", "测试距离", null, dimension.id(), MdmMasterDataRules.ENABLED,
+                "mom:test-m", "测试米", null, "tm", "测试专用非 UCUM 单位");
+        var reference = uomMasterDataApplication.getUom(category.referenceUomId());
+        assertThat(reference.referenceUnit()).isTrue();
+        assertThat(reference.status()).isEqualTo(MdmMasterDataRules.ENABLED);
+        assertThatThrownBy(() -> uomMasterDataApplication.disableUom(reference.id(), reference.version()))
+                .isInstanceOfSatisfying(MdmException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("mdm.immutable_master_data"));
+
+        var centimetre = uomMasterDataApplication.createUom(
+                "mom:test-cm", "测试厘米", null, "tcm", category.id(), "测试专用非 UCUM 单位",
+                MdmMasterDataRules.DISABLED, new BigDecimal("0.01"), BigDecimal.ZERO, 34, "HALF_EVEN");
+        var page = uomMasterDataApplication.pageUoms(category.id(), MdmMasterDataRules.DISABLED, false, 1, 20);
+        assertThat(page.records()).extracting(record -> record.id()).containsExactly(centimetre.id());
+        assertThat(page.total()).isEqualTo(1);
+
+        var disabledCategory = uomMasterDataApplication.disableCategory(category.id(), category.version());
+        assertThat(uomMasterDataApplication.getUom(reference.id()).status()).isEqualTo(MdmMasterDataRules.DISABLED);
+        assertParentDisabled(() -> uomMasterDataApplication.enableUom(centimetre.id(), centimetre.version()));
+        assertParentDisabled(() -> uomMasterDataApplication.createUom(
+                "mom:blocked", "禁止单位", null, "x", disabledCategory.id(), "测试扩展",
+                MdmMasterDataRules.ENABLED, BigDecimal.ONE, BigDecimal.ZERO, 34, "HALF_EVEN"));
+
+        var enabledCategory = uomMasterDataApplication.enableCategory(disabledCategory.id(), disabledCategory.version());
+        assertThat(enabledCategory.status()).isEqualTo(MdmMasterDataRules.ENABLED);
+        assertThat(uomMasterDataApplication.getUom(reference.id()).status()).isEqualTo(MdmMasterDataRules.ENABLED);
+        assertThat(uomMasterDataApplication.enableUom(centimetre.id(), centimetre.version()).status())
+                .isEqualTo(MdmMasterDataRules.ENABLED);
+    }
+
+    /** 覆盖星型换算、跨类别拒绝、规则不可变换版和指定历史版本重放。 */
+    @Test
+    void uomConversionMustUseVersionedRulesAndReplayHistory() {
+        assertThat(uomConversionApplication.convertCurrent(
+                "25", "800000000000000219", "800000000000000218").targetValue()).isEqualTo("298.15");
+        assertThat(new BigDecimal(uomConversionApplication.convertCurrent(
+                "32", "800000000000000220", "800000000000000219").targetValue()).abs())
+                .isLessThan(new BigDecimal("0.000000000000000000000000001"));
+
+        var length = uomMasterDataApplication.createDimension(
+                "D-L", "长度", null, 8, 1, 0, 0, 0, 0, 0, MdmMasterDataRules.ENABLED);
+        var lengthCategory = uomMasterDataApplication.createCategory(
+                "C-L", "长度类别", null, length.id(), MdmMasterDataRules.ENABLED,
+                "mom:metre", "米", null, "m", "集成测试单位");
+        var cm = uomMasterDataApplication.createUom(
+                "mom:centimetre", "厘米", null, "cm", lengthCategory.id(), "集成测试单位",
+                MdmMasterDataRules.ENABLED, new BigDecimal("0.01"), BigDecimal.ZERO, 34, "HALF_EVEN");
+
+        var current = uomConversionApplication.convertCurrent("250", cm.id(), lengthCategory.referenceUomId());
+        assertThat(current.targetValue()).isEqualTo("2.5");
+        assertThat(current.sourceRuleVersion()).isEqualTo(1);
+        var v2 = uomMasterDataApplication.publishRule(
+                cm.id(), 1, new BigDecimal("0.02"), BigDecimal.ZERO, 34, "HALF_EVEN");
+        assertThat(v2.versionNo()).isEqualTo(2);
+        assertThat(uomConversionApplication.convertCurrent("250", cm.id(), lengthCategory.referenceUomId()).targetValue())
+                .isEqualTo("5");
+        assertThat(uomConversionApplication.replay("250", cm.id(), lengthCategory.referenceUomId(), 1, null).targetValue())
+                .isEqualTo("2.5");
+        assertThat(uomMasterDataApplication.pageRules(cm.id(), 1, 20).records())
+                .extracting(record -> record.status()).containsExactly(MdmMasterDataRules.ENABLED, MdmMasterDataRules.DISABLED);
+
+        var time = uomMasterDataApplication.createDimension(
+                "D-T", "时间", null, 7, 0, 0, 0, 0, 0, 0, MdmMasterDataRules.ENABLED);
+        var timeCategory = uomMasterDataApplication.createCategory(
+                "C-T", "时间类别", null, time.id(), MdmMasterDataRules.ENABLED,
+                "mom:second", "秒", null, "s", "集成测试单位");
+        assertThat(uomConversionApplication.compatibility(cm.id(), timeCategory.referenceUomId()).compatible()).isFalse();
+        assertThatThrownBy(() -> uomConversionApplication.convertCurrent(
+                "1", cm.id(), timeCategory.referenceUomId()))
+                .isInstanceOfSatisfying(MdmException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("mdm.incompatible_uom"));
     }
 
     private static void assertCodeConflict(Runnable action) {

@@ -4,6 +4,7 @@ owner: mom-system-platform
 
 configs:
   - key: mom.i18n.runtime.base-path
+    environmentVariable: MOM_I18N_RUNTIME_BASE_PATH
     type: string
     default: /api/system/i18n/runtime
     required: true
