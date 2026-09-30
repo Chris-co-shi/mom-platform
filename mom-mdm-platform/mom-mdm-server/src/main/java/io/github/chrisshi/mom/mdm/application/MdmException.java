@@ -44,6 +44,11 @@ public final class MdmException extends RuntimeException {
         return new MdmException(Kind.CONFLICT, "mdm.code_conflict", resourceName + "编码已存在");
     }
 
+    /** 创建量纲编码或七维向量唯一性冲突异常，不向调用方暴露数据库约束名。 */
+    public static MdmException dimensionConflict() {
+        return new MdmException(Kind.CONFLICT, "mdm.dimension_conflict", "量纲编码或七维向量已存在");
+    }
+
     /** 创建乐观锁冲突异常。 */
     public static MdmException versionConflict() {
         return new MdmException(Kind.CONFLICT, "mdm.version_conflict", "主数据已被其他请求修改");
@@ -67,5 +72,10 @@ public final class MdmException extends RuntimeException {
     /** 创建单位不在同一换算类别的输入异常。 */
     public static MdmException incompatibleUom() {
         return new MdmException(Kind.BAD_REQUEST, "mdm.incompatible_uom", "两个计量单位不属于同一计量单位类别");
+    }
+
+    /** 创建因规则要求精确计算但结果无法精确表示而产生的稳定输入异常。 */
+    public static MdmException conversionInexact() {
+        return new MdmException(Kind.BAD_REQUEST, "mdm.conversion_inexact", "换算结果无法按指定规则精确表示");
     }
 }

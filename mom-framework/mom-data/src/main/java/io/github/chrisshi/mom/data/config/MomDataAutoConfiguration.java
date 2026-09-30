@@ -11,6 +11,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 
 import java.time.Clock;
@@ -21,6 +22,7 @@ import java.util.Optional;
  */
 @AutoConfiguration
 @ConditionalOnClass(MybatisPlusInterceptor.class)
+@EnableConfigurationProperties(MomDataPaginationProperties.class)
 public class MomDataAutoConfiguration {
 
     /**
@@ -50,7 +52,7 @@ public class MomDataAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(MybatisPlusInterceptor.class)
-    MybatisPlusInterceptor momMybatisPlusInterceptor() {
+    MybatisPlusInterceptor momMybatisPlusInterceptor(MomDataPaginationProperties paginationProperties) {
         MybatisPlusInterceptor interceptor =
             new MybatisPlusInterceptor();
         // 乐观锁
@@ -58,8 +60,8 @@ public class MomDataAutoConfiguration {
         // 防止全表删除
         interceptor.addInnerInterceptor(new BlockAttackInnerInterceptor());
         PaginationInnerInterceptor pagination = new PaginationInnerInterceptor();
-        // 最大分页数量
-        pagination.setMaxLimit(200L);
+        // 在 SQL 生成前把超大 pageSize 截断到平台配置上限，PageResult 元数据也随 IPage 同步更新。
+        pagination.setMaxLimit(paginationProperties.getMaxPageSize());
         interceptor.addInnerInterceptor(pagination);
         return interceptor;
     }

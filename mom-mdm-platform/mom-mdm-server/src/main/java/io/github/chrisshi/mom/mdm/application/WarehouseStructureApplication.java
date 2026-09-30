@@ -17,6 +17,8 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireVersion;
+
 /**
  * Warehouse 与 WarehouseArea 的 Level 1 用例和本地事务边界。
  *
@@ -172,11 +174,6 @@ public class WarehouseStructureApplication {
         WarehouseAreaEntity entity = warehouseAreaMapper.selectById(MdmMasterDataRules.id(id, "warehouseAreaId"));
         if (entity == null) throw MdmException.notFound("WarehouseArea");
         return entity;
-    }
-
-    private static void requireVersion(Long actual, Long expected) {
-        long value = MdmMasterDataRules.version(expected);
-        if (actual == null || actual != value) throw MdmException.versionConflict();
     }
 
     private static void insert(IntOperation operation, String resourceName) {

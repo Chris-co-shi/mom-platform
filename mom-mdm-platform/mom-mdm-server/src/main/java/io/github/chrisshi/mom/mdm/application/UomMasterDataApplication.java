@@ -19,9 +19,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static io.github.chrisshi.mom.mdm.application.UomMasterDataViews.*;
+import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireVersion;
 
 /**
  * Dimension、UomCategory、Uom 与换算规则的 Level 1 用例和本地事务边界。
@@ -74,7 +79,11 @@ public class UomMasterDataApplication {
         entity.setMassExponent(requiredExponent(m)); entity.setElectricCurrentExponent(requiredExponent(i));
         entity.setTemperatureExponent(requiredExponent(theta)); entity.setAmountExponent(requiredExponent(n));
         entity.setLuminousIntensityExponent(requiredExponent(j)); entity.setStatus(MdmMasterDataRules.status(status));
-        try { dimensionMapper.insert(entity); } catch (DuplicateKeyException e) { throw MdmException.codeConflict("Dimension"); }
+        try {
+            dimensionMapper.insert(entity);
+        } catch (DuplicateKeyException exception) {
+            throw MdmException.dimensionConflict();
+        }
         return dimensionView(entity);
     }
 
@@ -89,9 +98,12 @@ public class UomMasterDataApplication {
      */
     @Transactional
     public DimensionView updateDimension(String id, String nameZh, String nameEn, Long version) {
-        DimensionEntity entity = requireDimension(id); requireVersion(entity.getVersion(), version);
-        entity.setNameZh(MdmMasterDataRules.nameZh(nameZh)); entity.setNameEn(MdmMasterDataRules.nameEn(nameEn));
-        requireUpdated(dimensionMapper.updateById(entity), "Dimension"); return dimensionView(entity);
+        DimensionEntity entity = requireDimension(id);
+        requireVersion(entity.getVersion(), version);
+        entity.setNameZh(MdmMasterDataRules.nameZh(nameZh));
+        entity.setNameEn(MdmMasterDataRules.nameEn(nameEn));
+        requireUpdated(dimensionMapper.updateById(entity), () -> dimensionMapper.selectById(entity.getId()), "Dimension");
+        return dimensionView(entity);
     }
 
     /**
@@ -183,9 +195,13 @@ public class UomMasterDataApplication {
      */
     @Transactional
     public CategoryView updateCategory(String id, String nameZh, String nameEn, Long version) {
-        UomCategoryEntity category = requireCategory(id); requireVersion(category.getVersion(), version);
-        category.setNameZh(MdmMasterDataRules.nameZh(nameZh)); category.setNameEn(MdmMasterDataRules.nameEn(nameEn));
-        requireUpdated(categoryMapper.updateById(category), "UomCategory"); return categoryView(category, requireReference(category.getId()).getId());
+        UomCategoryEntity category = requireCategory(id);
+        requireVersion(category.getVersion(), version);
+        category.setNameZh(MdmMasterDataRules.nameZh(nameZh));
+        category.setNameEn(MdmMasterDataRules.nameEn(nameEn));
+        requireUpdated(categoryMapper.updateById(category), () -> categoryMapper.selectById(category.getId()),
+                "UomCategory");
+        return categoryView(category, requireReference(category.getId()).getId());
     }
 
     /**
@@ -213,7 +229,9 @@ public class UomMasterDataApplication {
         if (hasText(status)) query.eq(UomCategoryEntity::getStatus, MdmMasterDataRules.status(status));
         query.orderByAsc(UomCategoryEntity::getCode).orderByAsc(UomCategoryEntity::getId);
         categoryMapper.selectPage(page, query);
-        return PageAdapter.toResult(page, c -> categoryView(c, requireReference(c.getId()).getId()));
+        Map<String, String> referenceIds = referenceIdsByCategory(page.getRecords());
+        return PageAdapter.toResult(page, category ->
+                categoryView(category, requireReferenceId(referenceIds, category.getId())));
     }
 
     /**
@@ -274,9 +292,12 @@ public class UomMasterDataApplication {
      */
     @Transactional
     public UomView updateUom(String id, String nameZh, String nameEn, Long version) {
-        UomEntity unit = requireUom(id); requireVersion(unit.getVersion(), version);
-        unit.setNameZh(MdmMasterDataRules.nameZh(nameZh)); unit.setNameEn(MdmMasterDataRules.nameEn(nameEn));
-        requireUpdated(uomMapper.updateById(unit), "Uom"); return uomView(unit);
+        UomEntity unit = requireUom(id);
+        requireVersion(unit.getVersion(), version);
+        unit.setNameZh(MdmMasterDataRules.nameZh(nameZh));
+        unit.setNameEn(MdmMasterDataRules.nameEn(nameEn));
+        requireUpdated(uomMapper.updateById(unit), () -> uomMapper.selectById(unit.getId()), "Uom");
+        return uomView(unit);
     }
 
     /**
@@ -348,7 +369,8 @@ public class UomMasterDataApplication {
         UomConversionRuleEntity current = requireCurrentRule(unit.getId());
         if (expectedVersionNo == null || !Objects.equals(current.getVersionNo(), expectedVersionNo)) throw MdmException.versionConflict();
         current.setStatus(MdmMasterDataRules.DISABLED);
-        requireUpdated(ruleMapper.updateById(current), "UomConversionRule");
+        requireUpdated(ruleMapper.updateById(current), () -> ruleMapper.selectById(current.getId()),
+                "UomConversionRule");
         UomConversionRuleEntity next = newRule(unit.getId(), current.getVersionNo() + 1, multiplier, offset, precision, roundingMode);
         insertRule(next); return ruleView(next);
     }
@@ -379,64 +401,240 @@ public class UomMasterDataApplication {
         ruleMapper.selectPage(page, query); return PageAdapter.toResult(page, UomMasterDataApplication::ruleView);
     }
 
+    /** 量纲启停只修改目标行，不级联已有类别或单位。 */
     private DimensionView changeDimensionStatus(String id, String status, Long version) {
-        DimensionEntity e = requireDimension(id); requireVersion(e.getVersion(), version);
-        if (!status.equals(e.getStatus())) { e.setStatus(status); requireUpdated(dimensionMapper.updateById(e), "Dimension"); }
-        return dimensionView(e);
+        DimensionEntity entity = requireDimension(id);
+        requireVersion(entity.getVersion(), version);
+        if (!status.equals(entity.getStatus())) {
+            entity.setStatus(status);
+            requireUpdated(dimensionMapper.updateById(entity), () -> dimensionMapper.selectById(entity.getId()),
+                    "Dimension");
+        }
+        return dimensionView(entity);
     }
 
     /** 类别生命周期是基准单位可用性的唯一管理入口。 */
     private CategoryView changeCategoryStatus(String id, String status, Long version) {
-        UomCategoryEntity category = requireCategory(id); requireVersion(category.getVersion(), version);
-        if (MdmMasterDataRules.ENABLED.equals(status)) MdmMasterDataRules.requireEnabled(requireDimension(category.getDimensionId()).getStatus(), "Dimension");
+        UomCategoryEntity category = requireCategory(id);
+        requireVersion(category.getVersion(), version);
+        if (MdmMasterDataRules.ENABLED.equals(status)) {
+            MdmMasterDataRules.requireEnabled(requireDimension(category.getDimensionId()).getStatus(), "Dimension");
+        }
         UomEntity reference = requireReference(category.getId());
-        if (!status.equals(category.getStatus())) { category.setStatus(status); requireUpdated(categoryMapper.updateById(category), "UomCategory"); }
-        if (!status.equals(reference.getStatus())) { reference.setStatus(status); requireUpdated(uomMapper.updateById(reference), "ReferenceUom"); }
+        if (!status.equals(category.getStatus())) {
+            category.setStatus(status);
+            requireUpdated(categoryMapper.updateById(category), () -> categoryMapper.selectById(category.getId()),
+                    "UomCategory");
+        }
+        if (!status.equals(reference.getStatus())) {
+            reference.setStatus(status);
+            requireUpdated(uomMapper.updateById(reference), () -> uomMapper.selectById(reference.getId()),
+                    "ReferenceUom");
+        }
         return categoryView(category, reference.getId());
     }
 
+    /** 普通单位启停只修改目标行；重新启用时必须再次验证完整父链。 */
     private UomView changeUomStatus(String id, String status, Long version) {
-        UomEntity unit = requireUom(id); requireVersion(unit.getVersion(), version);
-        if (Boolean.TRUE.equals(unit.getReferenceUnit())) throw MdmException.immutable("基准单位只能随计量单位类别启停");
-        if (MdmMasterDataRules.ENABLED.equals(status)) requireEnabledCategory(unit.getCategoryId());
-        if (!status.equals(unit.getStatus())) { unit.setStatus(status); requireUpdated(uomMapper.updateById(unit), "Uom"); }
+        UomEntity unit = requireUom(id);
+        requireVersion(unit.getVersion(), version);
+        if (Boolean.TRUE.equals(unit.getReferenceUnit())) {
+            throw MdmException.immutable("基准单位只能随计量单位类别启停");
+        }
+        if (MdmMasterDataRules.ENABLED.equals(status)) {
+            requireEnabledCategory(unit.getCategoryId());
+        }
+        if (!status.equals(unit.getStatus())) {
+            unit.setStatus(status);
+            requireUpdated(uomMapper.updateById(unit), () -> uomMapper.selectById(unit.getId()), "Uom");
+        }
         return uomView(unit);
     }
 
+    /** 只构造通过字段规则校验的单位实体；基准身份由调用用例明确传入。 */
     private UomEntity newUom(String code, String nameZh, String nameEn, String symbol, String categoryId,
                              boolean reference, String reason, String status) {
-        UomEntity e = new UomEntity(); e.setCode(MdmMasterDataRules.code(code));
-        e.setNameZh(MdmMasterDataRules.nameZh(nameZh)); e.setNameEn(MdmMasterDataRules.nameEn(nameEn));
-        e.setSymbol(required(symbol, "symbol", 32)); e.setCategoryId(categoryId); e.setReferenceUnit(reference);
-        e.setUcumNotApplicableReason(validateReason(e.getCode(), reason)); e.setStatus(MdmMasterDataRules.status(status)); return e;
+        UomEntity entity = new UomEntity();
+        entity.setCode(MdmMasterDataRules.code(code));
+        entity.setNameZh(MdmMasterDataRules.nameZh(nameZh));
+        entity.setNameEn(MdmMasterDataRules.nameEn(nameEn));
+        entity.setSymbol(required(symbol, "symbol", 32));
+        entity.setCategoryId(categoryId);
+        entity.setReferenceUnit(reference);
+        entity.setUcumNotApplicableReason(validateReason(entity.getCode(), reason));
+        entity.setStatus(MdmMasterDataRules.status(status));
+        return entity;
     }
 
+    /** 创建尚未持久化的不可变 AFFINE 规则版本，并在写库前完成数值范围校验。 */
     private UomConversionRuleEntity newRule(String uomId, int versionNo, BigDecimal multiplier, BigDecimal offset,
                                             Integer precision, String roundingMode) {
-        validateDecimal(multiplier, "multiplier"); validateDecimal(offset, "offset");
-        if (multiplier.signum() <= 0) throw validation("multiplier 必须大于 0");
-        if (precision == null || precision < 1 || precision > 34) throw validation("calculationPrecision 必须在 1..34");
-        try { RoundingMode.valueOf(roundingMode); } catch (RuntimeException e) { throw validation("roundingMode 无效"); }
-        UomConversionRuleEntity r = new UomConversionRuleEntity(); r.setUomId(uomId); r.setVersionNo(versionNo);
-        r.setAlgorithmType("AFFINE"); r.setMultiplier(multiplier); r.setOffset(offset); r.setCalculationPrecision(precision);
-        r.setRoundingMode(roundingMode); r.setStatus(MdmMasterDataRules.ENABLED); r.setLockVersion(0L); return r;
+        validateDecimal(multiplier, "multiplier");
+        validateDecimal(offset, "offset");
+        if (multiplier.signum() <= 0) {
+            throw validation("multiplier 必须大于 0");
+        }
+        if (precision == null || precision < 1 || precision > 34) {
+            throw validation("calculationPrecision 必须在 1..34");
+        }
+        try {
+            RoundingMode.valueOf(roundingMode);
+        } catch (RuntimeException exception) {
+            throw validation("roundingMode 无效");
+        }
+        UomConversionRuleEntity rule = new UomConversionRuleEntity();
+        rule.setUomId(uomId);
+        rule.setVersionNo(versionNo);
+        rule.setAlgorithmType("AFFINE");
+        rule.setMultiplier(multiplier);
+        rule.setOffset(offset);
+        rule.setCalculationPrecision(precision);
+        rule.setRoundingMode(roundingMode);
+        rule.setStatus(MdmMasterDataRules.ENABLED);
+        rule.setLockVersion(0L);
+        return rule;
     }
 
-    private DimensionEntity requireDimension(String id) { var e = dimensionMapper.selectById(MdmMasterDataRules.id(id, "dimensionId")); if (e == null) throw MdmException.notFound("Dimension"); return e; }
-    private UomCategoryEntity requireCategory(String id) { var e = categoryMapper.selectById(MdmMasterDataRules.id(id, "categoryId")); if (e == null) throw MdmException.notFound("UomCategory"); return e; }
-    private UomEntity requireUom(String id) { var e = uomMapper.selectById(MdmMasterDataRules.id(id, "uomId")); if (e == null) throw MdmException.notFound("Uom"); return e; }
-    private UomCategoryEntity requireEnabledCategory(String id) { var c = requireCategory(id); MdmMasterDataRules.requireEnabled(c.getStatus(), "UomCategory"); MdmMasterDataRules.requireEnabled(requireDimension(c.getDimensionId()).getStatus(), "Dimension"); return c; }
-    private UomEntity requireReference(String categoryId) { var e = uomMapper.selectOne(new LambdaQueryWrapper<UomEntity>().eq(UomEntity::getCategoryId, categoryId).eq(UomEntity::getReferenceUnit, true)); if (e == null) throw MdmException.notFound("ReferenceUom"); return e; }
-    private UomConversionRuleEntity requireCurrentRule(String uomId) { var r = ruleMapper.selectOne(new LambdaQueryWrapper<UomConversionRuleEntity>().eq(UomConversionRuleEntity::getUomId, uomId).eq(UomConversionRuleEntity::getStatus, MdmMasterDataRules.ENABLED)); if (r == null) throw MdmException.notFound("UomConversionRule"); return r; }
+    /** 按受控 String ID 读取量纲，逻辑删除行由 MyBatis-Plus 自动排除。 */
+    private DimensionEntity requireDimension(String id) {
+        DimensionEntity entity = dimensionMapper.selectById(MdmMasterDataRules.id(id, "dimensionId"));
+        if (entity == null) {
+            throw MdmException.notFound("Dimension");
+        }
+        return entity;
+    }
 
-    private void insertUom(UomEntity e) { try { uomMapper.insert(e); } catch (DuplicateKeyException x) { throw MdmException.codeConflict("Uom"); } }
-    private void insertRule(UomConversionRuleEntity r) { try { ruleMapper.insert(r); } catch (DuplicateKeyException x) { throw MdmException.versionConflict(); } }
-    private static void requireVersion(Long actual, Long expected) { long e = MdmMasterDataRules.version(expected); if (actual == null || actual != e) throw MdmException.versionConflict(); }
-    private static void requireUpdated(int affected, String resource) { if (affected != 1) throw new MdmException(MdmException.Kind.CONFLICT, "mdm.update_conflict", resource + "更新冲突"); }
-    private static Integer requiredExponent(Integer value) { if (value == null) throw validation("量纲指数不能为空"); return value; }
-    private static boolean hasText(String value) { return value != null && !value.isBlank(); }
-    private static String required(String value, String field, int max) { if (!hasText(value)) throw validation(field + "不能为空"); String v = value.strip(); if (v.length() > max) throw validation(field + "长度不能超过" + max); return v; }
-    private static String validateReason(String code, String reason) { if (code.startsWith("mom:")) return required(reason, "ucumNotApplicableReason", 500); if (hasText(reason)) throw validation("标准单位不应填写 UCUM 不适用原因"); return null; }
+    /** 按受控 String ID 读取计量单位类别。 */
+    private UomCategoryEntity requireCategory(String id) {
+        UomCategoryEntity entity = categoryMapper.selectById(MdmMasterDataRules.id(id, "categoryId"));
+        if (entity == null) {
+            throw MdmException.notFound("UomCategory");
+        }
+        return entity;
+    }
+
+    /** 按受控 String ID 读取单位目录行。 */
+    private UomEntity requireUom(String id) {
+        UomEntity entity = uomMapper.selectById(MdmMasterDataRules.id(id, "uomId"));
+        if (entity == null) {
+            throw MdmException.notFound("Uom");
+        }
+        return entity;
+    }
+
+    /** 创建或启用单位前同时要求类别及其量纲处于启用状态。 */
+    private UomCategoryEntity requireEnabledCategory(String id) {
+        UomCategoryEntity category = requireCategory(id);
+        MdmMasterDataRules.requireEnabled(category.getStatus(), "UomCategory");
+        MdmMasterDataRules.requireEnabled(requireDimension(category.getDimensionId()).getStatus(), "Dimension");
+        return category;
+    }
+
+    /** 查询类别唯一基准单位；缺失时按目录完整性错误显式失败。 */
+    private UomEntity requireReference(String categoryId) {
+        UomEntity entity = uomMapper.selectOne(new LambdaQueryWrapper<UomEntity>()
+                .eq(UomEntity::getCategoryId, categoryId)
+                .eq(UomEntity::getReferenceUnit, true));
+        if (entity == null) {
+            throw MdmException.notFound("ReferenceUom");
+        }
+        return entity;
+    }
+
+    /** 查询单位唯一启用规则；部分唯一索引保证正常数据最多返回一行。 */
+    private UomConversionRuleEntity requireCurrentRule(String uomId) {
+        UomConversionRuleEntity rule = ruleMapper.selectOne(new LambdaQueryWrapper<UomConversionRuleEntity>()
+                .eq(UomConversionRuleEntity::getUomId, uomId)
+                .eq(UomConversionRuleEntity::getStatus, MdmMasterDataRules.ENABLED));
+        if (rule == null) {
+            throw MdmException.notFound("UomConversionRule");
+        }
+        return rule;
+    }
+
+    /** 本页类别一次批量加载基准单位，避免在 PageAdapter 映射阶段逐行查询。 */
+    private Map<String, String> referenceIdsByCategory(List<UomCategoryEntity> categories) {
+        if (categories.isEmpty()) {
+            return Map.of();
+        }
+        List<String> categoryIds = categories.stream().map(UomCategoryEntity::getId).toList();
+        return uomMapper.selectList(new LambdaQueryWrapper<UomEntity>()
+                        .in(UomEntity::getCategoryId, categoryIds)
+                        .eq(UomEntity::getReferenceUnit, true))
+                .stream()
+                .collect(Collectors.toUnmodifiableMap(UomEntity::getCategoryId, UomEntity::getId));
+    }
+
+    /** 缺失基准单位代表目录完整性已损坏，分页必须显式失败而不能返回不完整视图。 */
+    private static String requireReferenceId(Map<String, String> referenceIds, String categoryId) {
+        String referenceId = referenceIds.get(categoryId);
+        if (referenceId == null) {
+            throw MdmException.notFound("ReferenceUom");
+        }
+        return referenceId;
+    }
+
+    /** 插入单位并将数据库唯一冲突转换为稳定的 MDM 409。 */
+    private void insertUom(UomEntity entity) {
+        try {
+            uomMapper.insert(entity);
+        } catch (DuplicateKeyException exception) {
+            throw MdmException.codeConflict("Uom");
+        }
+    }
+
+    /** 插入新规则版本；版本号或当前版本竞争统一表现为版本冲突并回滚外层事务。 */
+    private void insertRule(UomConversionRuleEntity rule) {
+        try {
+            ruleMapper.insert(rule);
+        } catch (DuplicateKeyException exception) {
+            throw MdmException.versionConflict();
+        }
+    }
+    /** 将零行更新稳定地区分为资源已不存在或乐观锁版本冲突。 */
+    private static void requireUpdated(int affected, Supplier<?> lookup, String resource) {
+        if (affected == 1) {
+            return;
+        }
+        if (lookup.get() == null) {
+            throw MdmException.notFound(resource);
+        }
+        throw MdmException.versionConflict();
+    }
+    /** 七维向量的每一个指数都必须显式提供。 */
+    private static Integer requiredExponent(Integer value) {
+        if (value == null) {
+            throw validation("量纲指数不能为空");
+        }
+        return value;
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    /** 校验必填字符串并返回去除首尾空白后的值。 */
+    private static String required(String value, String field, int max) {
+        if (!hasText(value)) {
+            throw validation(field + "不能为空");
+        }
+        String normalized = value.strip();
+        if (normalized.length() > max) {
+            throw validation(field + "长度不能超过" + max);
+        }
+        return normalized;
+    }
+
+    /** 企业扩展编码必须说明 UCUM 不适用原因，标准 UCUM 编码则禁止携带该说明。 */
+    private static String validateReason(String code, String reason) {
+        if (code.startsWith("mom:")) {
+            return required(reason, "ucumNotApplicableReason", 500);
+        }
+        if (hasText(reason)) {
+            throw validation("标准单位不应填写 UCUM 不适用原因");
+        }
+        return null;
+    }
     /** 在进入 PostgreSQL 前按 numeric(50,30) 同时限制小数位和最多二十位整数。 */
     private static void validateDecimal(BigDecimal value, String field) {
         int integerDigits = value == null ? Integer.MAX_VALUE : Math.max(0, value.precision() - value.scale());

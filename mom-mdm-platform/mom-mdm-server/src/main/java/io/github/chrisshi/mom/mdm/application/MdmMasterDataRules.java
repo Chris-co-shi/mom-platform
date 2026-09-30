@@ -69,6 +69,20 @@ public final class MdmMasterDataRules {
         return value;
     }
 
+    /**
+     * 校验调用方读取到的版本与当前持久化版本一致。
+     *
+     * @param actual 当前实体版本
+     * @param expected 调用方提交的期望版本
+     * @throws MdmException 期望版本非法或与当前版本不一致时抛出稳定冲突异常
+     */
+    public static void requireVersion(Long actual, Long expected) {
+        long validated = version(expected);
+        if (actual == null || actual != validated) {
+            throw MdmException.versionConflict();
+        }
+    }
+
     private static String required(String value, String field, int maxLength) {
         if (value == null || value.isBlank()) {
             throw invalid(field + " 不能为空");

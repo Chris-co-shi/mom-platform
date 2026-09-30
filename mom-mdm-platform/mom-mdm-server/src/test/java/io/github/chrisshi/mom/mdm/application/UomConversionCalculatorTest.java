@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * UOM 仿射计算器的快速单元测试。
@@ -30,6 +31,18 @@ class UomConversionCalculatorTest {
         UomConversionRuleEntity rule = rule("1", "273.15");
         assertThat(calculator.toReference(new BigDecimal("25"), rule)).isEqualByComparingTo("298.15");
         assertThat(calculator.fromReference(new BigDecimal("298.15"), rule)).isEqualByComparingTo("25");
+    }
+
+    /** 验证规则禁止舍入且结果无法精确表示时返回稳定业务错误，而不是泄漏算术异常。 */
+    @Test
+    void shouldRejectInexactConversionWhenRoundingIsUnnecessary() {
+        UomConversionRuleEntity rule = rule("3", "0");
+        rule.setCalculationPrecision(2);
+        rule.setRoundingMode("UNNECESSARY");
+
+        assertThatThrownBy(() -> calculator.toReference(new BigDecimal("1.23"), rule))
+                .isInstanceOfSatisfying(MdmException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("mdm.conversion_inexact"));
     }
 
     /** 创建仅供纯算法测试使用的完整 AFFINE 规则。 */

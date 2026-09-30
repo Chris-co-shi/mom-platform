@@ -21,6 +21,8 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireVersion;
+
 /**
  * LocationType 与统一可寻址 Location 的 Level 1 用例及本地事务边界。
  *
@@ -203,11 +205,6 @@ public class LocationMasterDataApplication {
         LocationEntity entity = locationMapper.selectById(MdmMasterDataRules.id(id, "locationId"));
         if (entity == null) throw MdmException.notFound("Location");
         return entity;
-    }
-
-    private static void requireVersion(Long actual, Long expected) {
-        long value = MdmMasterDataRules.version(expected);
-        if (actual == null || actual != value) throw MdmException.versionConflict();
     }
 
     private static void insert(IntOperation operation, String resourceName) {

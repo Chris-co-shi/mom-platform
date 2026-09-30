@@ -61,8 +61,12 @@ public class UomConversionApplication {
         UomEntity target = requireById(targetUomId, "targetUomId");
         UomCategoryEntity category = requireCompatible(source, target);
         requireAvailable(source, target, category);
+        BigDecimal input = decimal(value);
+        if (source.getId().equals(target.getId())) {
+            return identity(input, source);
+        }
         Map<String, UomConversionRuleEntity> rules = currentRules(source, target);
-        return calculate(decimal(value), source, target, rules.get(source.getId()), rules.get(target.getId()));
+        return calculate(input, source, target, rules.get(source.getId()), rules.get(target.getId()));
     }
 
     /**
@@ -82,9 +86,16 @@ public class UomConversionApplication {
         UomEntity source = requireById(sourceUomId, "sourceUomId");
         UomEntity target = requireById(targetUomId, "targetUomId");
         requireCompatible(source, target);
+        BigDecimal input = decimal(value);
+        if (source.getId().equals(target.getId())) {
+            if (sourceRuleVersion != null || targetRuleVersion != null) {
+                throw validation("同一单位重放不应提供换算规则版本");
+            }
+            return identity(input, source);
+        }
         UomConversionRuleEntity sourceRule = historicalRule(source, sourceRuleVersion);
         UomConversionRuleEntity targetRule = historicalRule(target, targetRuleVersion);
-        return calculate(decimal(value), source, target, sourceRule, targetRule);
+        return calculate(input, source, target, sourceRule, targetRule);
     }
 
     /**
@@ -164,6 +175,16 @@ public class UomConversionApplication {
         return new ConversionView(plain(value), source.getId(), plain(result), target.getId(),
                 sourceRule == null ? null : sourceRule.getId(), sourceRule == null ? null : sourceRule.getVersionNo(),
                 targetRule == null ? null : targetRule.getId(), targetRule == null ? null : targetRule.getVersionNo());
+    }
+
+    /**
+     * 同一技术主键不执行先乘后除，避免规则精度和舍入破坏换算恒等性。
+     *
+     * <p>没有执行任何换算规则，因此返回结果中的规则 ID 和版本均为 {@code null}。</p>
+     */
+    private ConversionView identity(BigDecimal value, UomEntity unit) {
+        String normalized = plain(value);
+        return new ConversionView(normalized, unit.getId(), normalized, unit.getId(), null, null, null, null);
     }
 
     private UomCategoryEntity requireCategory(String id) { var e = categoryMapper.selectById(id); if (e == null) throw MdmException.notFound("UomCategory"); return e; }

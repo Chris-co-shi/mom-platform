@@ -26,7 +26,11 @@ public class UomConversionCalculator {
     public BigDecimal toReference(BigDecimal value, UomConversionRuleEntity rule) {
         requireAffine(rule);
         MathContext context = context(rule);
-        return value.multiply(rule.getMultiplier(), context).add(rule.getOffset(), context);
+        try {
+            return value.multiply(rule.getMultiplier(), context).add(rule.getOffset(), context);
+        } catch (ArithmeticException exception) {
+            throw MdmException.conversionInexact();
+        }
     }
 
     /**
@@ -40,7 +44,11 @@ public class UomConversionCalculator {
     public BigDecimal fromReference(BigDecimal referenceValue, UomConversionRuleEntity rule) {
         requireAffine(rule);
         MathContext context = context(rule);
-        return referenceValue.subtract(rule.getOffset(), context).divide(rule.getMultiplier(), context);
+        try {
+            return referenceValue.subtract(rule.getOffset(), context).divide(rule.getMultiplier(), context);
+        } catch (ArithmeticException exception) {
+            throw MdmException.conversionInexact();
+        }
     }
 
     /** 拒绝未受控算法以及不完整规则，避免基础数据异常产生静默错误结果。 */

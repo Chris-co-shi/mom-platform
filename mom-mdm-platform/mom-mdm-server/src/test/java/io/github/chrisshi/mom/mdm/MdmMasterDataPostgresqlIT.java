@@ -438,12 +438,26 @@ class MdmMasterDataPostgresqlIT {
     void uomCatalogMustEnforceReferenceAndParentRules() {
         var dimension = uomMasterDataApplication.createDimension(
                 "TEST_LENGTH", "测试长度", "Test length", 9, 1, 0, 0, 0, 0, 0, MdmMasterDataRules.ENABLED);
+        assertDimensionConflict(() -> uomMasterDataApplication.createDimension(
+                "TEST_LENGTH", "重复编码", null, 10, 2, 0, 0, 0, 0, 0, MdmMasterDataRules.ENABLED));
+        assertDimensionConflict(() -> uomMasterDataApplication.createDimension(
+                "TEST_LENGTH_VECTOR", "重复向量", null, 9, 1, 0, 0, 0, 0, 0,
+                MdmMasterDataRules.ENABLED));
         var category = uomMasterDataApplication.createCategory(
                 "TEST_DISTANCE", "测试距离", null, dimension.id(), MdmMasterDataRules.ENABLED,
                 "mom:test-m", "测试米", null, "tm", "测试专用非 UCUM 单位");
         var reference = uomMasterDataApplication.getUom(category.referenceUomId());
         assertThat(reference.referenceUnit()).isTrue();
         assertThat(reference.status()).isEqualTo(MdmMasterDataRules.ENABLED);
+        var secondCategory = uomMasterDataApplication.createCategory(
+                "TEST_DISTANCE_2", "测试距离二", null, dimension.id(), MdmMasterDataRules.ENABLED,
+                "mom:test-m-2", "测试米二", null, "tm2", "测试专用非 UCUM 单位");
+        var categoryPage = uomMasterDataApplication.pageCategories(dimension.id(), null, 1, 1_000);
+        assertThat(categoryPage.pageSize()).isEqualTo(200);
+        assertThat(categoryPage.records()).extracting(record -> record.id())
+                .containsExactly(category.id(), secondCategory.id());
+        assertThat(categoryPage.records()).extracting(record -> record.referenceUomId())
+                .containsExactly(category.referenceUomId(), secondCategory.referenceUomId());
         assertThatThrownBy(() -> uomMasterDataApplication.disableUom(reference.id(), reference.version()))
                 .isInstanceOfSatisfying(MdmException.class,
                         exception -> assertThat(exception.code()).isEqualTo("mdm.immutable_master_data"));
@@ -486,6 +500,16 @@ class MdmMasterDataPostgresqlIT {
         var cm = uomMasterDataApplication.createUom(
                 "mom:centimetre", "厘米", null, "cm", lengthCategory.id(), "集成测试单位",
                 MdmMasterDataRules.ENABLED, new BigDecimal("0.01"), BigDecimal.ZERO, 34, "HALF_EVEN");
+        var coarse = uomMasterDataApplication.createUom(
+                "mom:coarse", "低精度测试单位", null, "coarse", lengthCategory.id(), "集成测试单位",
+                MdmMasterDataRules.ENABLED, new BigDecimal("3"), BigDecimal.ZERO, 2, "HALF_EVEN");
+
+        var identity = uomConversionApplication.convertCurrent("1.2300", coarse.id(), coarse.id());
+        assertThat(identity.targetValue()).isEqualTo("1.23");
+        assertThat(identity.sourceRuleId()).isNull();
+        assertThat(identity.targetRuleId()).isNull();
+        assertThat(uomConversionApplication.replay("1.2300", coarse.id(), coarse.id(), null, null).targetValue())
+                .isEqualTo("1.23");
 
         var current = uomConversionApplication.convertCurrent("250", cm.id(), lengthCategory.referenceUomId());
         assertThat(current.targetValue()).isEqualTo("2.5");
@@ -515,6 +539,11 @@ class MdmMasterDataPostgresqlIT {
     private static void assertCodeConflict(Runnable action) {
         assertThatThrownBy(action::run).isInstanceOfSatisfying(MdmException.class,
                 exception -> assertThat(exception.code()).isEqualTo("mdm.code_conflict"));
+    }
+
+    private static void assertDimensionConflict(Runnable action) {
+        assertThatThrownBy(action::run).isInstanceOfSatisfying(MdmException.class,
+                exception -> assertThat(exception.code()).isEqualTo("mdm.dimension_conflict"));
     }
 
     private static void assertNotFound(Runnable action) {

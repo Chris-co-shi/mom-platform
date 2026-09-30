@@ -15,6 +15,8 @@ import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
+import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireVersion;
+
 /**
  * MaterialCategory 动态分类树的 Level 1 用例与本地事务边界。
  *
@@ -290,14 +292,6 @@ public class MaterialCategoryApplication {
             materialCategoryMapper.insert(entity);
         } catch (DuplicateKeyException exception) {
             throw MdmException.codeConflict(RESOURCE_NAME);
-        }
-    }
-
-    /** 检查乐观锁版本，阻止陈旧请求覆盖新状态。 */
-    private static void requireVersion(Long actual, Long expected) {
-        long validated = MdmMasterDataRules.version(expected);
-        if (actual == null || actual != validated) {
-            throw MdmException.versionConflict();
         }
     }
 
