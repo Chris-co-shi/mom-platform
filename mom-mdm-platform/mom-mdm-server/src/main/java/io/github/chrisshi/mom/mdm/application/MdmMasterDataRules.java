@@ -23,21 +23,9 @@ public final class MdmMasterDataRules {
         return required(value, "code", 64);
     }
 
-    /** 校验中文名称。 */
-    public static String nameZh(String value) {
-        return required(value, "nameZh", 200);
-    }
-
-    /** 校验可空英文名称；空白值统一保存为 null。 */
-    public static String nameEn(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        String result = value.strip();
-        if (result.length() > 200) {
-            throw invalid("nameEn 长度不能超过 200");
-        }
-        return result;
+    /** 校验面向业务用户的必填名称；多语言显示由未来独立翻译表承载。 */
+    public static String name(String value) {
+        return required(value, "name", 200);
     }
 
     /** 校验状态只允许 ENABLED 或 DISABLED。 */

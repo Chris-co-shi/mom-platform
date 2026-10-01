@@ -41,7 +41,7 @@ public class LocationMasterDataController {
     @PostMapping("/location-types")
     @ResponseStatus(HttpStatus.CREATED)
     public Result<LocationTypeView> createLocationType(@Valid @RequestBody CreateLocationTypeRequest request) {
-        return Result.success(application.createLocationType(request.code(), request.nameZh(), request.nameEn(), request.status()));
+        return Result.success(application.createLocationType(request.code(), request.name(), request.status()));
     }
 
     /**
@@ -49,7 +49,7 @@ public class LocationMasterDataController {
      */
     @PutMapping("/location-types/{id}")
     public Result<LocationTypeView> updateLocationType(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
-        return Result.success(application.updateLocationType(id, request.nameZh(), request.nameEn(), request.version()));
+        return Result.success(application.updateLocationType(id, request.name(), request.version()));
     }
 
     /**
@@ -94,7 +94,7 @@ public class LocationMasterDataController {
     @PostMapping("/locations")
     @ResponseStatus(HttpStatus.CREATED)
     public Result<LocationView> createLocation(@Valid @RequestBody CreateLocationRequest request) {
-        return Result.success(application.createLocation(request.plantId(), request.warehouseAreaId(), request.locationTypeId(), request.code(), request.nameZh(), request.nameEn(), request.status()));
+        return Result.success(application.createLocation(request.plantId(), request.warehouseAreaId(), request.locationTypeId(), request.code(), request.name(), request.status()));
     }
 
     /**
@@ -102,7 +102,7 @@ public class LocationMasterDataController {
      */
     @PutMapping("/locations/{id}")
     public Result<LocationView> updateLocation(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
-        return Result.success(application.updateLocation(id, request.nameZh(), request.nameEn(), request.version()));
+        return Result.success(application.updateLocation(id, request.name(), request.version()));
     }
 
     /**
@@ -145,15 +145,14 @@ public class LocationMasterDataController {
      * LocationType 创建请求。
      */
     public record CreateLocationTypeRequest(@NotBlank @Size(max = 64) String code,
-                                            @NotBlank @Size(max = 200) String nameZh, @Size(max = 200) String nameEn,
-                                            @NotBlank String status) {
+                                            @NotBlank @Size(max = 200) String name, @NotBlank String status) {
     }
 
     /**
      * Location 创建请求；warehouseAreaId 可空，其余引用必填。
      */
-    public record CreateLocationRequest(@NotBlank @Size(max = 64) String code, @NotBlank @Size(max = 200) String nameZh,
-                                        @Size(max = 200) String nameEn, @NotBlank @Size(max = 19) String plantId,
+    public record CreateLocationRequest(@NotBlank @Size(max = 64) String code, @NotBlank @Size(max = 200) String name,
+                                        @NotBlank @Size(max = 19) String plantId,
                                         @Size(max = 19) String warehouseAreaId,
                                         @NotBlank @Size(max = 19) String locationTypeId, @NotBlank String status) {
     }
@@ -161,8 +160,7 @@ public class LocationMasterDataController {
     /**
      * 只更新名称与 Version 的请求，不允许修改 Code 或引用。
      */
-    public record UpdateNameRequest(@NotBlank @Size(max = 200) String nameZh, @Size(max = 200) String nameEn,
-                                    @NotNull Long version) {
+    public record UpdateNameRequest(@NotBlank @Size(max = 200) String name, @NotNull Long version) {
     }
 
     /**

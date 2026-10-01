@@ -44,6 +44,16 @@ public final class MdmPageParams {
      */
     public record MaterialCategoryPageParams(String parentId, String status) { }
 
+    /**
+     * @param code 可选平台唯一物料编码精确匹配
+     * @param keyword 可选编码或名称包含匹配
+     * @param categoryId 可选直接分类 ID，不递归包含后代
+     * @param baseUomId 可选基础计量单位 ID
+     * @param status 可选 ENABLED/DISABLED 状态
+     */
+    public record MaterialPageParams(
+            String code, String keyword, String categoryId, String baseUomId, String status) { }
+
     /** @param status 可选 ENABLED/DISABLED 状态 */
     public record DimensionPageParams(String status) { }
 

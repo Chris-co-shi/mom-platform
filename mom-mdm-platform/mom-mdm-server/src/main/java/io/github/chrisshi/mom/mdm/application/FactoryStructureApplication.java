@@ -62,10 +62,10 @@ public class FactoryStructureApplication {
 
     /** 创建平台编码唯一的 Plant；重复请求不会视为幂等成功。 */
     @Transactional
-    public PlantView createPlant(String code, String nameZh, String nameEn, String status) {
+    public PlantView createPlant(String code, String name, String status) {
         PlantEntity entity = new PlantEntity();
         entity.setCode(MdmMasterDataRules.code(code));
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         entity.setStatus(MdmMasterDataRules.status(status));
         insert(() -> plantMapper.insert(entity), "Plant");
         return toView(entity);
@@ -73,10 +73,10 @@ public class FactoryStructureApplication {
 
     /** 更新 Plant 名称；请求不接收 Code，因此不会改变业务身份。 */
     @Transactional
-    public PlantView updatePlant(String id, String nameZh, String nameEn, Long version) {
+    public PlantView updatePlant(String id, String name, Long version) {
         PlantEntity entity = requirePlant(id);
         requireVersion(entity.getVersion(), version);
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         requireUpdated(plantMapper.updateById(entity), () -> plantMapper.selectById(entity.getId()), "Plant");
         return toView(entity);
     }
@@ -115,13 +115,13 @@ public class FactoryStructureApplication {
 
     /** 在已启用 Plant 下创建 Workshop，同一 Plant 内 Code 唯一。 */
     @Transactional
-    public WorkshopView createWorkshop(String plantId, String code, String nameZh, String nameEn, String status) {
+    public WorkshopView createWorkshop(String plantId, String code, String name, String status) {
         PlantEntity plant = requirePlant(plantId);
         MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
         WorkshopEntity entity = new WorkshopEntity();
         entity.setPlantId(plant.getId());
         entity.setCode(MdmMasterDataRules.code(code));
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         entity.setStatus(MdmMasterDataRules.status(status));
         insert(() -> workshopMapper.insert(entity), "Workshop");
         return toView(entity);
@@ -129,10 +129,10 @@ public class FactoryStructureApplication {
 
     /** 更新 Workshop 名称，不允许改变 Plant 或 Code。 */
     @Transactional
-    public WorkshopView updateWorkshop(String id, String nameZh, String nameEn, Long version) {
+    public WorkshopView updateWorkshop(String id, String name, Long version) {
         WorkshopEntity entity = requireWorkshop(id);
         requireVersion(entity.getVersion(), version);
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         requireUpdated(workshopMapper.updateById(entity), () -> workshopMapper.selectById(entity.getId()), "Workshop");
         return toView(entity);
     }
@@ -178,14 +178,14 @@ public class FactoryStructureApplication {
 
     /** 在已启用 Workshop 下创建 ProductionLine，同一 Workshop 内 Code 唯一。 */
     @Transactional
-    public ProductionLineView createProductionLine(String workshopId, String code, String nameZh,
-                                                   String nameEn, String status) {
+    public ProductionLineView createProductionLine(String workshopId, String code, String name,
+                                                   String status) {
         WorkshopEntity workshop = requireWorkshop(workshopId);
         MdmMasterDataRules.requireEnabled(workshop.getStatus(), "Workshop");
         ProductionLineEntity entity = new ProductionLineEntity();
         entity.setWorkshopId(workshop.getId());
         entity.setCode(MdmMasterDataRules.code(code));
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         entity.setStatus(MdmMasterDataRules.status(status));
         insert(() -> productionLineMapper.insert(entity), "ProductionLine");
         return toView(entity);
@@ -193,10 +193,10 @@ public class FactoryStructureApplication {
 
     /** 更新 ProductionLine 名称，不允许改变 Workshop 或 Code。 */
     @Transactional
-    public ProductionLineView updateProductionLine(String id, String nameZh, String nameEn, Long version) {
+    public ProductionLineView updateProductionLine(String id, String name, Long version) {
         ProductionLineEntity entity = requireProductionLine(id);
         requireVersion(entity.getVersion(), version);
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         requireUpdated(productionLineMapper.updateById(entity),
                 () -> productionLineMapper.selectById(entity.getId()), "ProductionLine");
         return toView(entity);
@@ -243,14 +243,14 @@ public class FactoryStructureApplication {
 
     /** 在已启用 ProductionLine 下创建 Workstation，同一 ProductionLine 内 Code 唯一。 */
     @Transactional
-    public WorkstationView createWorkstation(String productionLineId, String code, String nameZh,
-                                             String nameEn, String status) {
+    public WorkstationView createWorkstation(String productionLineId, String code, String name,
+                                             String status) {
         ProductionLineEntity productionLine = requireProductionLine(productionLineId);
         MdmMasterDataRules.requireEnabled(productionLine.getStatus(), "ProductionLine");
         WorkstationEntity entity = new WorkstationEntity();
         entity.setProductionLineId(productionLine.getId());
         entity.setCode(MdmMasterDataRules.code(code));
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         entity.setStatus(MdmMasterDataRules.status(status));
         insert(() -> workstationMapper.insert(entity), "Workstation");
         return toView(entity);
@@ -258,10 +258,10 @@ public class FactoryStructureApplication {
 
     /** 更新 Workstation 名称，不允许改变 ProductionLine 或 Code。 */
     @Transactional
-    public WorkstationView updateWorkstation(String id, String nameZh, String nameEn, Long version) {
+    public WorkstationView updateWorkstation(String id, String name, Long version) {
         WorkstationEntity entity = requireWorkstation(id);
         requireVersion(entity.getVersion(), version);
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         requireUpdated(workstationMapper.updateById(entity), () -> workstationMapper.selectById(entity.getId()),
                 "Workstation");
         return toView(entity);
@@ -393,15 +393,15 @@ public class FactoryStructureApplication {
         throw MdmException.versionConflict();
     }
 
-    private static void setNames(PlantEntity e, String zh, String en) { e.setNameZh(MdmMasterDataRules.nameZh(zh)); e.setNameEn(MdmMasterDataRules.nameEn(en)); }
-    private static void setNames(WorkshopEntity e, String zh, String en) { e.setNameZh(MdmMasterDataRules.nameZh(zh)); e.setNameEn(MdmMasterDataRules.nameEn(en)); }
-    private static void setNames(ProductionLineEntity e, String zh, String en) { e.setNameZh(MdmMasterDataRules.nameZh(zh)); e.setNameEn(MdmMasterDataRules.nameEn(en)); }
-    private static void setNames(WorkstationEntity e, String zh, String en) { e.setNameZh(MdmMasterDataRules.nameZh(zh)); e.setNameEn(MdmMasterDataRules.nameEn(en)); }
+    private static void setName(PlantEntity e, String name) { e.setName(MdmMasterDataRules.name(name)); }
+    private static void setName(WorkshopEntity e, String name) { e.setName(MdmMasterDataRules.name(name)); }
+    private static void setName(ProductionLineEntity e, String name) { e.setName(MdmMasterDataRules.name(name)); }
+    private static void setName(WorkstationEntity e, String name) { e.setName(MdmMasterDataRules.name(name)); }
 
-    private static PlantView toView(PlantEntity e) { return new PlantView(e.getId(), e.getCode(), e.getNameZh(), e.getNameEn(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
-    private static WorkshopView toView(WorkshopEntity e) { return new WorkshopView(e.getId(), e.getCode(), e.getNameZh(), e.getNameEn(), e.getPlantId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
-    private static ProductionLineView toView(ProductionLineEntity e) { return new ProductionLineView(e.getId(), e.getCode(), e.getNameZh(), e.getNameEn(), e.getWorkshopId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
-    private static WorkstationView toView(WorkstationEntity e) { return new WorkstationView(e.getId(), e.getCode(), e.getNameZh(), e.getNameEn(), e.getProductionLineId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
+    private static PlantView toView(PlantEntity e) { return new PlantView(e.getId(), e.getCode(), e.getName(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
+    private static WorkshopView toView(WorkshopEntity e) { return new WorkshopView(e.getId(), e.getCode(), e.getName(), e.getPlantId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
+    private static ProductionLineView toView(ProductionLineEntity e) { return new ProductionLineView(e.getId(), e.getCode(), e.getName(), e.getWorkshopId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
+    private static WorkstationView toView(WorkstationEntity e) { return new WorkstationView(e.getId(), e.getCode(), e.getName(), e.getProductionLineId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
 
     @FunctionalInterface private interface IntOperation { int execute(); }
     @FunctionalInterface private interface EntityLookup { Object find(); }

@@ -34,14 +34,14 @@ public class UomMasterDataController {
     /** 创建量纲，成功返回 201；非幂等。 @param r 创建协议 @return 统一量纲结果 @throws io.github.chrisshi.mom.mdm.application.MdmException 校验或冲突时抛出 */
     @PostMapping("/dimensions") @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('mdm:uom:write')")
     public Result<DimensionView> createDimension(@Valid @RequestBody CreateDimensionRequest r) {
-        return Result.success(application.createDimension(r.code(), r.nameZh(), r.nameEn(), r.timeExponent(),
+        return Result.success(application.createDimension(r.code(), r.name(), r.timeExponent(),
                 r.lengthExponent(), r.massExponent(), r.electricCurrentExponent(), r.temperatureExponent(),
                 r.amountExponent(), r.luminousIntensityExponent(), r.status()));
     }
 
     /** 更新量纲名称，不接受 Code 或向量。 @param id 量纲 ID @param r 名称及版本 @return 统一结果 @throws io.github.chrisshi.mom.mdm.application.MdmException 不存在或冲突时抛出 */
     @PutMapping("/dimensions/{id}") @PreAuthorize("hasAuthority('mdm:uom:write')")
-    public Result<DimensionView> updateDimension(@PathVariable String id, @Valid @RequestBody NameVersionRequest r) { return Result.success(application.updateDimension(id, r.nameZh(), r.nameEn(), r.version())); }
+    public Result<DimensionView> updateDimension(@PathVariable String id, @Valid @RequestBody NameVersionRequest r) { return Result.success(application.updateDimension(id, r.name(), r.version())); }
 
     /** 查询量纲详情；幂等且无写副作用。 @param id 量纲 ID @return 统一详情 @throws io.github.chrisshi.mom.mdm.application.MdmException 不存在时抛出 */
     @GetMapping("/dimensions/{id}") @PreAuthorize("hasAuthority('mdm:uom:read')")
@@ -61,11 +61,11 @@ public class UomMasterDataController {
 
     /** 原子创建类别和基准单位，成功返回 201。 @param r 创建协议 @return 统一类别结果 @throws io.github.chrisshi.mom.mdm.application.MdmException 校验或冲突时抛出 */
     @PostMapping("/uom-categories") @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('mdm:uom:write')")
-    public Result<CategoryView> createCategory(@Valid @RequestBody CreateCategoryRequest r) { return Result.success(application.createCategory(r.code(), r.nameZh(), r.nameEn(), r.dimensionId(), r.status(), r.referenceCode(), r.referenceNameZh(), r.referenceNameEn(), r.referenceSymbol(), r.referenceUcumNotApplicableReason())); }
+    public Result<CategoryView> createCategory(@Valid @RequestBody CreateCategoryRequest r) { return Result.success(application.createCategory(r.code(), r.name(), r.dimensionId(), r.status(), r.referenceCode(), r.referenceName(), r.referenceSymbol(), r.referenceUcumNotApplicableReason())); }
 
     /** 更新类别名称。 @param id 类别 ID @param r 名称及版本 @return 统一结果 @throws io.github.chrisshi.mom.mdm.application.MdmException 不存在或冲突时抛出 */
     @PutMapping("/uom-categories/{id}") @PreAuthorize("hasAuthority('mdm:uom:write')")
-    public Result<CategoryView> updateCategory(@PathVariable String id, @Valid @RequestBody NameVersionRequest r) { return Result.success(application.updateCategory(id, r.nameZh(), r.nameEn(), r.version())); }
+    public Result<CategoryView> updateCategory(@PathVariable String id, @Valid @RequestBody NameVersionRequest r) { return Result.success(application.updateCategory(id, r.name(), r.version())); }
 
     /** 查询类别及基准单位 ID。 @param id 类别 ID @return 统一详情 @throws io.github.chrisshi.mom.mdm.application.MdmException 不存在时抛出 */
     @GetMapping("/uom-categories/{id}") @PreAuthorize("hasAuthority('mdm:uom:read')")
@@ -85,11 +85,11 @@ public class UomMasterDataController {
 
     /** 原子创建普通单位及规则 v1。 @param r 创建协议 @return 统一单位结果 @throws io.github.chrisshi.mom.mdm.application.MdmException 校验或冲突时抛出 */
     @PostMapping("/uoms") @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('mdm:uom:write')")
-    public Result<UomView> createUom(@Valid @RequestBody CreateUomRequest r) { return Result.success(application.createUom(r.code(), r.nameZh(), r.nameEn(), r.symbol(), r.categoryId(), r.ucumNotApplicableReason(), r.status(), r.multiplier(), r.offset(), r.calculationPrecision(), r.roundingMode())); }
+    public Result<UomView> createUom(@Valid @RequestBody CreateUomRequest r) { return Result.success(application.createUom(r.code(), r.name(), r.symbol(), r.categoryId(), r.ucumNotApplicableReason(), r.status(), r.multiplier(), r.offset(), r.calculationPrecision(), r.roundingMode())); }
 
     /** 更新单位名称。 @param id 单位 ID @param r 名称及版本 @return 统一结果 @throws io.github.chrisshi.mom.mdm.application.MdmException 不存在或冲突时抛出 */
     @PutMapping("/uoms/{id}") @PreAuthorize("hasAuthority('mdm:uom:write')")
-    public Result<UomView> updateUom(@PathVariable String id, @Valid @RequestBody NameVersionRequest r) { return Result.success(application.updateUom(id, r.nameZh(), r.nameEn(), r.version())); }
+    public Result<UomView> updateUom(@PathVariable String id, @Valid @RequestBody NameVersionRequest r) { return Result.success(application.updateUom(id, r.name(), r.version())); }
 
     /** 查询单位详情且无写副作用。 @param id 单位 ID @return 统一详情 @throws io.github.chrisshi.mom.mdm.application.MdmException 不存在时抛出 */
     @GetMapping("/uoms/{id}") @PreAuthorize("hasAuthority('mdm:uom:read')")
@@ -123,8 +123,7 @@ public class UomMasterDataController {
      * 量纲创建协议，七个指数按 T/L/M/I/Theta/N/J 顺序表达。
      *
      * @param code 唯一业务编码
-     * @param nameZh 中文名称
-     * @param nameEn 可选英文名称
+     * @param name 业务名称
      * @param timeExponent 时间指数
      * @param lengthExponent 长度指数
      * @param massExponent 质量指数
@@ -134,8 +133,8 @@ public class UomMasterDataController {
      * @param luminousIntensityExponent 发光强度指数
      * @param status 初始生命周期状态
      */
-    public record CreateDimensionRequest(@NotBlank @Size(max=64) String code, @NotBlank @Size(max=200) String nameZh,
-            @Size(max=200) String nameEn, @NotNull Integer timeExponent, @NotNull Integer lengthExponent,
+    public record CreateDimensionRequest(@NotBlank @Size(max=64) String code, @NotBlank @Size(max=200) String name,
+            @NotNull Integer timeExponent, @NotNull Integer lengthExponent,
             @NotNull Integer massExponent, @NotNull Integer electricCurrentExponent, @NotNull Integer temperatureExponent,
             @NotNull Integer amountExponent, @NotNull Integer luminousIntensityExponent, @NotBlank String status) { }
 
@@ -143,28 +142,25 @@ public class UomMasterDataController {
      * 类别和基准单位原子创建协议；基准身份由服务端固定。
      *
      * @param code 类别唯一编码
-     * @param nameZh 类别中文名称
-     * @param nameEn 类别可选英文名称
+     * @param name 类别业务名称
      * @param dimensionId 所属启用量纲 ID
      * @param status 类别初始状态
      * @param referenceCode 基准单位唯一编码
-     * @param referenceNameZh 基准单位中文名称
-     * @param referenceNameEn 基准单位可选英文名称
+     * @param referenceName 基准单位业务名称
      * @param referenceSymbol 基准单位显示符号
      * @param referenceUcumNotApplicableReason mom: 扩展编码的治理说明
      */
-    public record CreateCategoryRequest(@NotBlank @Size(max=64) String code, @NotBlank @Size(max=200) String nameZh,
-            @Size(max=200) String nameEn, @NotBlank @Size(max=19) String dimensionId, @NotBlank String status,
-            @NotBlank @Size(max=64) String referenceCode, @NotBlank @Size(max=200) String referenceNameZh,
-            @Size(max=200) String referenceNameEn, @NotBlank @Size(max=32) String referenceSymbol,
+    public record CreateCategoryRequest(@NotBlank @Size(max=64) String code, @NotBlank @Size(max=200) String name,
+            @NotBlank @Size(max=19) String dimensionId, @NotBlank String status,
+            @NotBlank @Size(max=64) String referenceCode, @NotBlank @Size(max=200) String referenceName,
+            @NotBlank @Size(max=32) String referenceSymbol,
             @Size(max=500) String referenceUcumNotApplicableReason) { }
 
     /**
      * 普通单位和首个 AFFINE 规则的原子创建协议。
      *
      * @param code 单位唯一编码
-     * @param nameZh 中文名称
-     * @param nameEn 可选英文名称
+     * @param name 业务名称
      * @param symbol 显示符号
      * @param categoryId 唯一所属类别 ID
      * @param ucumNotApplicableReason mom: 扩展编码治理说明
@@ -174,8 +170,8 @@ public class UomMasterDataController {
      * @param calculationPrecision 计算有效数字精度
      * @param roundingMode BigDecimal 舍入模式
      */
-    public record CreateUomRequest(@NotBlank @Size(max=64) String code, @NotBlank @Size(max=200) String nameZh,
-            @Size(max=200) String nameEn, @NotBlank @Size(max=32) String symbol, @NotBlank @Size(max=19) String categoryId,
+    public record CreateUomRequest(@NotBlank @Size(max=64) String code, @NotBlank @Size(max=200) String name,
+            @NotBlank @Size(max=32) String symbol, @NotBlank @Size(max=19) String categoryId,
             @Size(max=500) String ucumNotApplicableReason, @NotBlank String status, @NotNull BigDecimal multiplier,
             @NotNull BigDecimal offset, @NotNull @Min(1) @Max(34) Integer calculationPrecision,
             @NotBlank String roundingMode) { }
@@ -183,11 +179,12 @@ public class UomMasterDataController {
     /**
      * 仅允许名称修正并携带乐观锁版本的更新协议。
      *
-     * @param nameZh 中文名称
-     * @param nameEn 可选英文名称
+     * @param name 业务名称
      * @param version 调用方读取到的乐观锁版本
      */
-    public record NameVersionRequest(@NotBlank @Size(max=200) String nameZh, @Size(max=200) String nameEn, @NotNull @PositiveOrZero Long version) { }
+    public record NameVersionRequest(
+            @NotBlank @Size(max=200) String name,
+            @NotNull @PositiveOrZero Long version) { }
 
     /**
      * 生命周期变更协议，仅携带调用方读取到的版本。

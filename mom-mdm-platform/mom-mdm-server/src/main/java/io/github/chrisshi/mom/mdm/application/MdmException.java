@@ -69,6 +69,24 @@ public final class MdmException extends RuntimeException {
         return new MdmException(Kind.CONFLICT, "mdm.immutable_master_data", message);
     }
 
+    /** 创建仍被非删除业务数据引用的生命周期冲突异常。 */
+    public static MdmException resourceReferenced(String resourceName) {
+        return new MdmException(Kind.CONFLICT, "mdm.resource_referenced",
+                resourceName + "仍被物料引用，不能执行当前操作");
+    }
+
+    /** 创建物料分类不是叶子节点的稳定冲突异常。 */
+    public static MdmException categoryNotLeaf() {
+        return new MdmException(Kind.CONFLICT, "mdm.material_category_not_leaf",
+                "Material 只能引用没有子分类的 MaterialCategory");
+    }
+
+    /** 创建分类级联规模超过 V1 单事务保护上限的稳定冲突异常。 */
+    public static MdmException categoryCascadeTooLarge(int limit) {
+        return new MdmException(Kind.CONFLICT, "mdm.material_category_cascade_too_large",
+                "MaterialCategory 子树超过单次级联上限 " + limit);
+    }
+
     /** 创建单位不在同一换算类别的输入异常。 */
     public static MdmException incompatibleUom() {
         return new MdmException(Kind.BAD_REQUEST, "mdm.incompatible_uom", "两个计量单位不属于同一计量单位类别");

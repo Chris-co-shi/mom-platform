@@ -41,7 +41,7 @@ public class WarehouseStructureController {
     @PostMapping("/warehouses")
     @ResponseStatus(HttpStatus.CREATED)
     public Result<WarehouseView> createWarehouse(@Valid @RequestBody CreateWarehouseRequest request) {
-        return Result.success(application.createWarehouse(request.plantId(), request.code(), request.nameZh(), request.nameEn(), request.status()));
+        return Result.success(application.createWarehouse(request.plantId(), request.code(), request.name(), request.status()));
     }
 
     /**
@@ -49,7 +49,7 @@ public class WarehouseStructureController {
      */
     @PutMapping("/warehouses/{id}")
     public Result<WarehouseView> updateWarehouse(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
-        return Result.success(application.updateWarehouse(id, request.nameZh(), request.nameEn(), request.version()));
+        return Result.success(application.updateWarehouse(id, request.name(), request.version()));
     }
 
     /**
@@ -94,7 +94,7 @@ public class WarehouseStructureController {
     @PostMapping("/warehouse-areas")
     @ResponseStatus(HttpStatus.CREATED)
     public Result<WarehouseAreaView> createWarehouseArea(@Valid @RequestBody CreateWarehouseAreaRequest request) {
-        return Result.success(application.createWarehouseArea(request.warehouseId(), request.code(), request.nameZh(), request.nameEn(), request.status()));
+        return Result.success(application.createWarehouseArea(request.warehouseId(), request.code(), request.name(), request.status()));
     }
 
     /**
@@ -102,7 +102,7 @@ public class WarehouseStructureController {
      */
     @PutMapping("/warehouse-areas/{id}")
     public Result<WarehouseAreaView> updateWarehouseArea(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
-        return Result.success(application.updateWarehouseArea(id, request.nameZh(), request.nameEn(), request.version()));
+        return Result.success(application.updateWarehouseArea(id, request.name(), request.version()));
     }
 
     /**
@@ -146,8 +146,7 @@ public class WarehouseStructureController {
      */
     public record CreateWarehouseRequest(@NotBlank @Size(max = 19) String plantId,
                                          @NotBlank @Size(max = 64) String code,
-                                         @NotBlank @Size(max = 200) String nameZh, @Size(max = 200) String nameEn,
-                                         @NotBlank String status) {
+                                         @NotBlank @Size(max = 200) String name, @NotBlank String status) {
     }
 
     /**
@@ -155,15 +154,13 @@ public class WarehouseStructureController {
      */
     public record CreateWarehouseAreaRequest(@NotBlank @Size(max = 19) String warehouseId,
                                              @NotBlank @Size(max = 64) String code,
-                                             @NotBlank @Size(max = 200) String nameZh, @Size(max = 200) String nameEn,
-                                             @NotBlank String status) {
+                                             @NotBlank @Size(max = 200) String name, @NotBlank String status) {
     }
 
     /**
      * 只更新名称和 Version 的请求，不允许修改 Code 或父级。
      */
-    public record UpdateNameRequest(@NotBlank @Size(max = 200) String nameZh, @Size(max = 200) String nameEn,
-                                    @NotNull Long version) {
+    public record UpdateNameRequest(@NotBlank @Size(max = 200) String name, @NotNull Long version) {
     }
 
     /**

@@ -11,8 +11,7 @@ import lombok.Setter;
 @TableName("mdm_production_line")
 public class ProductionLineEntity extends BaseEntity {
     private String code;
-    private String nameZh;
-    private String nameEn;
+    private String name;
     private String workshopId;
     private String status;
 }

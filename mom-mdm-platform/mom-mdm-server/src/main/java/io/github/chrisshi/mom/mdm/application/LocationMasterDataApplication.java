@@ -63,10 +63,10 @@ public class LocationMasterDataApplication {
 
     /** 创建平台唯一 Code 的动态 LocationType。 */
     @Transactional
-    public LocationTypeView createLocationType(String code, String nameZh, String nameEn, String status) {
+    public LocationTypeView createLocationType(String code, String name, String status) {
         LocationTypeEntity entity = new LocationTypeEntity();
         entity.setCode(MdmMasterDataRules.code(code));
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         entity.setStatus(MdmMasterDataRules.status(status));
         insert(() -> locationTypeMapper.insert(entity), "LocationType");
         return toView(entity);
@@ -74,10 +74,10 @@ public class LocationMasterDataApplication {
 
     /** 更新 LocationType 名称，不允许修改 Code。 */
     @Transactional
-    public LocationTypeView updateLocationType(String id, String nameZh, String nameEn, Long version) {
+    public LocationTypeView updateLocationType(String id, String name, Long version) {
         LocationTypeEntity entity = requireLocationType(id);
         requireVersion(entity.getVersion(), version);
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         requireUpdated(locationTypeMapper.updateById(entity), () -> locationTypeMapper.selectById(entity.getId()),
                 "LocationType");
         return toView(entity);
@@ -117,7 +117,7 @@ public class LocationMasterDataApplication {
      */
     @Transactional
     public LocationView createLocation(String plantId, String warehouseAreaId, String locationTypeId, String code,
-                                       String nameZh, String nameEn, String status) {
+                                       String name, String status) {
         PlantEntity plant = requirePlant(plantId);
         LocationTypeEntity locationType = requireLocationType(locationTypeId);
         MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
@@ -127,7 +127,7 @@ public class LocationMasterDataApplication {
         entity.setWarehouseAreaId(validatedAreaId);
         entity.setLocationTypeId(locationType.getId());
         entity.setCode(MdmMasterDataRules.code(code));
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         entity.setStatus(MdmMasterDataRules.status(status));
         insert(() -> locationMapper.insert(entity), "Location");
         return toView(entity);
@@ -135,10 +135,10 @@ public class LocationMasterDataApplication {
 
     /** 更新 Location 名称，不允许改变 Code、Plant、WarehouseArea 或 LocationType。 */
     @Transactional
-    public LocationView updateLocation(String id, String nameZh, String nameEn, Long version) {
+    public LocationView updateLocation(String id, String name, Long version) {
         LocationEntity entity = requireLocation(id);
         requireVersion(entity.getVersion(), version);
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         requireUpdated(locationMapper.updateById(entity), () -> locationMapper.selectById(entity.getId()), "Location");
         return toView(entity);
     }
@@ -244,10 +244,10 @@ public class LocationMasterDataApplication {
         throw MdmException.versionConflict();
     }
 
-    private static void setNames(LocationTypeEntity e, String zh, String en) { e.setNameZh(MdmMasterDataRules.nameZh(zh)); e.setNameEn(MdmMasterDataRules.nameEn(en)); }
-    private static void setNames(LocationEntity e, String zh, String en) { e.setNameZh(MdmMasterDataRules.nameZh(zh)); e.setNameEn(MdmMasterDataRules.nameEn(en)); }
-    private static LocationTypeView toView(LocationTypeEntity e) { return new LocationTypeView(e.getId(), e.getCode(), e.getNameZh(), e.getNameEn(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
-    private static LocationView toView(LocationEntity e) { return new LocationView(e.getId(), e.getCode(), e.getNameZh(), e.getNameEn(), e.getPlantId(), e.getWarehouseAreaId(), e.getLocationTypeId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
+    private static void setName(LocationTypeEntity e, String name) { e.setName(MdmMasterDataRules.name(name)); }
+    private static void setName(LocationEntity e, String name) { e.setName(MdmMasterDataRules.name(name)); }
+    private static LocationTypeView toView(LocationTypeEntity e) { return new LocationTypeView(e.getId(), e.getCode(), e.getName(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
+    private static LocationView toView(LocationEntity e) { return new LocationView(e.getId(), e.getCode(), e.getName(), e.getPlantId(), e.getWarehouseAreaId(), e.getLocationTypeId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
 
     @FunctionalInterface private interface IntOperation { int execute(); }
     @FunctionalInterface private interface EntityLookup { Object find(); }

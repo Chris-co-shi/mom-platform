@@ -45,7 +45,7 @@ public class FactoryStructureController {
     @PostMapping("/plants")
     @ResponseStatus(HttpStatus.CREATED)
     public Result<PlantView> createPlant(@Valid @RequestBody CreateRootRequest request) {
-        return Result.success(application.createPlant(request.code(), request.nameZh(), request.nameEn(), request.status()));
+        return Result.success(application.createPlant(request.code(), request.name(), request.status()));
     }
 
     /**
@@ -53,7 +53,7 @@ public class FactoryStructureController {
      */
     @PutMapping("/plants/{id}")
     public Result<PlantView> updatePlant(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
-        return Result.success(application.updatePlant(id, request.nameZh(), request.nameEn(), request.version()));
+        return Result.success(application.updatePlant(id, request.name(), request.version()));
     }
 
     /**
@@ -97,7 +97,7 @@ public class FactoryStructureController {
     @PostMapping("/workshops")
     @ResponseStatus(HttpStatus.CREATED)
     public Result<WorkshopView> createWorkshop(@Valid @RequestBody CreateWorkshopRequest request) {
-        return Result.success(application.createWorkshop(request.plantId(), request.code(), request.nameZh(), request.nameEn(), request.status()));
+        return Result.success(application.createWorkshop(request.plantId(), request.code(), request.name(), request.status()));
     }
 
     /**
@@ -105,7 +105,7 @@ public class FactoryStructureController {
      */
     @PutMapping("/workshops/{id}")
     public Result<WorkshopView> updateWorkshop(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
-        return Result.success(application.updateWorkshop(id, request.nameZh(), request.nameEn(), request.version()));
+        return Result.success(application.updateWorkshop(id, request.name(), request.version()));
     }
 
     /**
@@ -150,7 +150,7 @@ public class FactoryStructureController {
     @PostMapping("/production-lines")
     @ResponseStatus(HttpStatus.CREATED)
     public Result<ProductionLineView> createProductionLine(@Valid @RequestBody CreateProductionLineRequest request) {
-        return Result.success(application.createProductionLine(request.workshopId(), request.code(), request.nameZh(), request.nameEn(), request.status()));
+        return Result.success(application.createProductionLine(request.workshopId(), request.code(), request.name(), request.status()));
     }
 
     /**
@@ -158,7 +158,7 @@ public class FactoryStructureController {
      */
     @PutMapping("/production-lines/{id}")
     public Result<ProductionLineView> updateProductionLine(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
-        return Result.success(application.updateProductionLine(id, request.nameZh(), request.nameEn(), request.version()));
+        return Result.success(application.updateProductionLine(id, request.name(), request.version()));
     }
 
     /**
@@ -203,7 +203,7 @@ public class FactoryStructureController {
     @PostMapping("/workstations")
     @ResponseStatus(HttpStatus.CREATED)
     public Result<WorkstationView> createWorkstation(@Valid @RequestBody CreateWorkstationRequest request) {
-        return Result.success(application.createWorkstation(request.productionLineId(), request.code(), request.nameZh(), request.nameEn(), request.status()));
+        return Result.success(application.createWorkstation(request.productionLineId(), request.code(), request.name(), request.status()));
     }
 
     /**
@@ -211,7 +211,7 @@ public class FactoryStructureController {
      */
     @PutMapping("/workstations/{id}")
     public Result<WorkstationView> updateWorkstation(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
-        return Result.success(application.updateWorkstation(id, request.nameZh(), request.nameEn(), request.version()));
+        return Result.success(application.updateWorkstation(id, request.name(), request.version()));
     }
 
     /**
@@ -253,8 +253,8 @@ public class FactoryStructureController {
     /**
      * 顶层主数据创建请求。
      */
-    public record CreateRootRequest(@NotBlank @Size(max = 64) String code, @NotBlank @Size(max = 200) String nameZh,
-                                    @Size(max = 200) String nameEn, @NotBlank String status) {
+    public record CreateRootRequest(@NotBlank @Size(max = 64) String code, @NotBlank @Size(max = 200) String name,
+                                    @NotBlank String status) {
     }
 
     /**
@@ -262,8 +262,8 @@ public class FactoryStructureController {
      */
     public record CreateWorkshopRequest(@NotBlank @Size(max = 19) String plantId,
                                         @NotBlank @Size(max = 64) String code,
-                                        @NotBlank @Size(max = 200) String nameZh,
-                                        @Size(max = 200) String nameEn, @NotBlank String status) {
+                                        @NotBlank @Size(max = 200) String name,
+                                        @NotBlank String status) {
     }
 
     /**
@@ -271,8 +271,8 @@ public class FactoryStructureController {
      */
     public record CreateProductionLineRequest(@NotBlank @Size(max = 19) String workshopId,
                                               @NotBlank @Size(max = 64) String code,
-                                              @NotBlank @Size(max = 200) String nameZh,
-                                              @Size(max = 200) String nameEn, @NotBlank String status) {
+                                              @NotBlank @Size(max = 200) String name,
+                                              @NotBlank String status) {
     }
 
     /**
@@ -280,15 +280,14 @@ public class FactoryStructureController {
      */
     public record CreateWorkstationRequest(@NotBlank @Size(max = 19) String productionLineId,
                                            @NotBlank @Size(max = 64) String code,
-                                           @NotBlank @Size(max = 200) String nameZh,
-                                           @Size(max = 200) String nameEn, @NotBlank String status) {
+                                           @NotBlank @Size(max = 200) String name,
+                                           @NotBlank String status) {
     }
 
     /**
      * 仅更新名称与乐观锁版本的请求；有意不包含 Code 和父级。
      */
-    public record UpdateNameRequest(@NotBlank @Size(max = 200) String nameZh, @Size(max = 200) String nameEn,
-                                    @NotNull Long version) {
+    public record UpdateNameRequest(@NotBlank @Size(max = 200) String name, @NotNull Long version) {
     }
 
     /**

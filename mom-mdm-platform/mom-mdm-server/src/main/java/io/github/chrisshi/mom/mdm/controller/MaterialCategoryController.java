@@ -59,8 +59,8 @@ public class MaterialCategoryController {
     public Result<MaterialCategoryView> createMaterialCategory(
             @Valid @RequestBody CreateMaterialCategoryRequest request) {
         return Result.success(application.createMaterialCategory(
-                request.code(), request.nameZh(), request.nameEn(), request.parentId(), request.sort(),
-                request.defaultBatchManaged(), request.defaultShelfLifeDays(), request.status()));
+                request.code(), request.name(), request.parentId(), request.sort(),
+                request.defaultShelfLifeDays(), request.status()));
     }
 
     /**
@@ -77,8 +77,8 @@ public class MaterialCategoryController {
     public Result<MaterialCategoryView> updateMaterialCategory(
             @PathVariable String id, @Valid @RequestBody UpdateMaterialCategoryRequest request) {
         return Result.success(application.updateMaterialCategory(
-                id, request.nameZh(), request.nameEn(), request.parentId(), request.sort(),
-                request.defaultBatchManaged(), request.defaultShelfLifeDays(), request.version()));
+                id, request.name(), request.parentId(), request.sort(),
+                request.defaultShelfLifeDays(), request.version()));
     }
 
     /**
@@ -127,14 +127,14 @@ public class MaterialCategoryController {
     }
 
     /**
-     * 停用分类，不级联修改子分类或 Material。
+     * 原子停用分类及全部后代；任一节点被 Material 引用时整笔拒绝。
      *
      * @param id 分类 String 技术主键
      * @param request 当前乐观锁版本
      * @return 统一成功结果，内部包含停用后的分类
      * @throws io.github.chrisshi.mom.mdm.application.MdmException 资源或版本校验失败时抛出
      *
-     * <p>重复停用且版本一致时不产生额外写入。</p>
+     * <p>不会停用或修改 Material；失败时不产生部分停用。</p>
      */
     @PatchMapping("/{id}/disable")
     public Result<MaterialCategoryView> disableMaterialCategory(
@@ -149,21 +149,17 @@ public class MaterialCategoryController {
      * 拒绝基础格式错误，父级与业务约束由 Application 再校验。</p>
      *
      * @param code 平台唯一业务编码
-     * @param nameZh 必填中文名称
-     * @param nameEn 可选英文名称
+     * @param name 必填业务名称
      * @param parentId 可选父分类 ID
      * @param sort 同级显示排序值
-     * @param defaultBatchManaged 可选批次管理默认建议
      * @param defaultShelfLifeDays 可选非负保质期天数默认建议
      * @param status ENABLED 或 DISABLED
      */
     public record CreateMaterialCategoryRequest(
             @NotBlank @Size(max = 64) String code,
-            @NotBlank @Size(max = 200) String nameZh,
-            @Size(max = 200) String nameEn,
+            @NotBlank @Size(max = 200) String name,
             @Size(max = 19) String parentId,
             @NotNull Integer sort,
-            Boolean defaultBatchManaged,
             @PositiveOrZero Integer defaultShelfLifeDays,
             @NotBlank String status) {
     }
@@ -174,20 +170,16 @@ public class MaterialCategoryController {
      * <p>该不可变记录只表达允许普通修改的字段，避免客户端借更新入口改变业务身份；树移动、并发和
      * 父级状态仍由 Application 在本地事务中校验。</p>
      *
-     * @param nameZh 必填中文名称
-     * @param nameEn 可选英文名称
+     * @param name 必填业务名称
      * @param parentId 新父分类 ID；null 表示根分类
      * @param sort 同级显示排序值
-     * @param defaultBatchManaged 可选批次管理默认建议
      * @param defaultShelfLifeDays 可选非负保质期天数默认建议
      * @param version 调用方读取到的乐观锁版本
      */
     public record UpdateMaterialCategoryRequest(
-            @NotBlank @Size(max = 200) String nameZh,
-            @Size(max = 200) String nameEn,
+            @NotBlank @Size(max = 200) String name,
             @Size(max = 19) String parentId,
             @NotNull Integer sort,
-            Boolean defaultBatchManaged,
             @PositiveOrZero Integer defaultShelfLifeDays,
             @NotNull Long version) {
     }

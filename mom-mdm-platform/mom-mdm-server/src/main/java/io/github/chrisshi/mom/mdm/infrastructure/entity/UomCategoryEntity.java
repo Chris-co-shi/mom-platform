@@ -1,7 +1,5 @@
 package io.github.chrisshi.mom.mdm.infrastructure.entity;
 
-import com.baomidou.mybatisplus.annotation.FieldStrategy;
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import io.github.chrisshi.mom.data.entity.BaseEntity;
 import lombok.Getter;
@@ -18,9 +16,7 @@ import lombok.Setter;
 @TableName("mdm_uom_category")
 public class UomCategoryEntity extends BaseEntity {
     private String code;
-    private String nameZh;
-    @TableField(updateStrategy = FieldStrategy.ALWAYS)
-    private String nameEn;
+    private String name;
     private String dimensionId;
     private String status;
 }

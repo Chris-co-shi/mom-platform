@@ -11,8 +11,7 @@ import lombok.Setter;
 @TableName("mdm_warehouse_area")
 public class WarehouseAreaEntity extends BaseEntity {
     private String code;
-    private String nameZh;
-    private String nameEn;
+    private String name;
     private String warehouseId;
     private String status;
 }

@@ -11,7 +11,6 @@ import lombok.Setter;
 @TableName("mdm_location_type")
 public class LocationTypeEntity extends BaseEntity {
     private String code;
-    private String nameZh;
-    private String nameEn;
+    private String name;
     private String status;
 }

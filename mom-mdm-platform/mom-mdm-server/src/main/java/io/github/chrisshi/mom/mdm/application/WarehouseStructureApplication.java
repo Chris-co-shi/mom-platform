@@ -52,14 +52,14 @@ public class WarehouseStructureApplication {
 
     /** 在已启用 Plant 下创建 Warehouse，同一 Plant 内 Code 唯一。 */
     @Transactional
-    public WarehouseView createWarehouse(String plantId, String code, String nameZh, String nameEn, String status) {
+    public WarehouseView createWarehouse(String plantId, String code, String name, String status) {
         PlantEntity plant = plantMapper.selectById(MdmMasterDataRules.id(plantId, "plantId"));
         if (plant == null) throw MdmException.notFound("Plant");
         MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
         WarehouseEntity entity = new WarehouseEntity();
         entity.setPlantId(plant.getId());
         entity.setCode(MdmMasterDataRules.code(code));
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         entity.setStatus(MdmMasterDataRules.status(status));
         insert(() -> warehouseMapper.insert(entity), "Warehouse");
         return toView(entity);
@@ -67,10 +67,10 @@ public class WarehouseStructureApplication {
 
     /** 更新 Warehouse 名称，不允许改变 Plant 或 Code。 */
     @Transactional
-    public WarehouseView updateWarehouse(String id, String nameZh, String nameEn, Long version) {
+    public WarehouseView updateWarehouse(String id, String name, Long version) {
         WarehouseEntity entity = requireWarehouse(id);
         requireVersion(entity.getVersion(), version);
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         requireUpdated(warehouseMapper.updateById(entity), () -> warehouseMapper.selectById(entity.getId()), "Warehouse");
         return toView(entity);
     }
@@ -108,14 +108,14 @@ public class WarehouseStructureApplication {
 
     /** 在已启用 Warehouse 下创建 WarehouseArea，同一 Warehouse 内 Code 唯一。 */
     @Transactional
-    public WarehouseAreaView createWarehouseArea(String warehouseId, String code, String nameZh,
-                                                 String nameEn, String status) {
+    public WarehouseAreaView createWarehouseArea(String warehouseId, String code, String name,
+                                                 String status) {
         WarehouseEntity warehouse = requireWarehouse(warehouseId);
         MdmMasterDataRules.requireEnabled(warehouse.getStatus(), "Warehouse");
         WarehouseAreaEntity entity = new WarehouseAreaEntity();
         entity.setWarehouseId(warehouse.getId());
         entity.setCode(MdmMasterDataRules.code(code));
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         entity.setStatus(MdmMasterDataRules.status(status));
         insert(() -> warehouseAreaMapper.insert(entity), "WarehouseArea");
         return toView(entity);
@@ -123,10 +123,10 @@ public class WarehouseStructureApplication {
 
     /** 更新 WarehouseArea 名称，不允许改变 Warehouse 或 Code。 */
     @Transactional
-    public WarehouseAreaView updateWarehouseArea(String id, String nameZh, String nameEn, Long version) {
+    public WarehouseAreaView updateWarehouseArea(String id, String name, Long version) {
         WarehouseAreaEntity entity = requireWarehouseArea(id);
         requireVersion(entity.getVersion(), version);
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         requireUpdated(warehouseAreaMapper.updateById(entity),
                 () -> warehouseAreaMapper.selectById(entity.getId()), "WarehouseArea");
         return toView(entity);
@@ -213,10 +213,10 @@ public class WarehouseStructureApplication {
         throw MdmException.versionConflict();
     }
 
-    private static void setNames(WarehouseEntity e, String zh, String en) { e.setNameZh(MdmMasterDataRules.nameZh(zh)); e.setNameEn(MdmMasterDataRules.nameEn(en)); }
-    private static void setNames(WarehouseAreaEntity e, String zh, String en) { e.setNameZh(MdmMasterDataRules.nameZh(zh)); e.setNameEn(MdmMasterDataRules.nameEn(en)); }
-    private static WarehouseView toView(WarehouseEntity e) { return new WarehouseView(e.getId(), e.getCode(), e.getNameZh(), e.getNameEn(), e.getPlantId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
-    private static WarehouseAreaView toView(WarehouseAreaEntity e) { return new WarehouseAreaView(e.getId(), e.getCode(), e.getNameZh(), e.getNameEn(), e.getWarehouseId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
+    private static void setName(WarehouseEntity e, String name) { e.setName(MdmMasterDataRules.name(name)); }
+    private static void setName(WarehouseAreaEntity e, String name) { e.setName(MdmMasterDataRules.name(name)); }
+    private static WarehouseView toView(WarehouseEntity e) { return new WarehouseView(e.getId(), e.getCode(), e.getName(), e.getPlantId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
+    private static WarehouseAreaView toView(WarehouseAreaEntity e) { return new WarehouseAreaView(e.getId(), e.getCode(), e.getName(), e.getWarehouseId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
 
     @FunctionalInterface private interface IntOperation { int execute(); }
     @FunctionalInterface private interface EntityLookup { Object find(); }

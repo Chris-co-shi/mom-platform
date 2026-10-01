@@ -18,8 +18,7 @@ public final class UomMasterDataViews {
      *
      * @param id 技术主键
      * @param code 不可普通修改的业务编码
-     * @param nameZh 中文名称
-     * @param nameEn 可选英文名称
+     * @param name 业务名称
      * @param timeExponent 时间指数 T
      * @param lengthExponent 长度指数 L
      * @param massExponent 质量指数 M
@@ -34,7 +33,7 @@ public final class UomMasterDataViews {
      * @param updatedBy 最近修改 Actor
      * @param version 乐观锁版本
      */
-    public record DimensionView(String id, String code, String nameZh, String nameEn,
+    public record DimensionView(String id, String code, String name,
                                 Integer timeExponent, Integer lengthExponent, Integer massExponent,
                                 Integer electricCurrentExponent, Integer temperatureExponent,
                                 Integer amountExponent, Integer luminousIntensityExponent,
@@ -47,8 +46,7 @@ public final class UomMasterDataViews {
      *
      * @param id 技术主键
      * @param code 唯一业务编码
-     * @param nameZh 中文名称
-     * @param nameEn 可选英文名称
+     * @param name 业务名称
      * @param dimensionId 所属量纲 ID
      * @param referenceUomId 唯一基准单位 ID
      * @param status 生命周期状态
@@ -58,7 +56,7 @@ public final class UomMasterDataViews {
      * @param updatedBy 最近修改 Actor
      * @param version 乐观锁版本
      */
-    public record CategoryView(String id, String code, String nameZh, String nameEn,
+    public record CategoryView(String id, String code, String name,
                                String dimensionId, String referenceUomId, String status,
                                Instant createdAt, String createdBy, Instant updatedAt,
                                String updatedBy, Long version) {
@@ -69,8 +67,7 @@ public final class UomMasterDataViews {
      *
      * @param id 技术主键
      * @param code 优先采用 UCUM 的权威编码
-     * @param nameZh 中文名称
-     * @param nameEn 可选英文名称
+     * @param name 业务名称
      * @param symbol 显示符号
      * @param categoryId 唯一所属类别 ID
      * @param referenceUnit 是否类别基准单位
@@ -82,7 +79,7 @@ public final class UomMasterDataViews {
      * @param updatedBy 最近修改 Actor
      * @param version 乐观锁版本
      */
-    public record UomView(String id, String code, String nameZh, String nameEn, String symbol,
+    public record UomView(String id, String code, String name, String symbol,
                           String categoryId, Boolean referenceUnit, String ucumNotApplicableReason,
                           String status, Instant createdAt, String createdBy, Instant updatedAt,
                           String updatedBy, Long version) {

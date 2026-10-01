@@ -18,9 +18,7 @@ import lombok.Setter;
 @TableName("mdm_uom")
 public class UomEntity extends BaseEntity {
     private String code;
-    private String nameZh;
-    @TableField(updateStrategy = FieldStrategy.ALWAYS)
-    private String nameEn;
+    private String name;
     private String symbol;
     private String categoryId;
     private Boolean referenceUnit;

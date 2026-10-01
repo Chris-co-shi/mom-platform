@@ -14,6 +14,7 @@ import io.github.chrisshi.mom.mdm.infrastructure.entity.UomCategoryEntity;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.UomConversionRuleEntity;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.UomEntity;
 import io.github.chrisshi.mom.mdm.infrastructure.mapper.DimensionMapper;
+import io.github.chrisshi.mom.mdm.infrastructure.mapper.MaterialMapper;
 import io.github.chrisshi.mom.mdm.infrastructure.mapper.UomCategoryMapper;
 import io.github.chrisshi.mom.mdm.infrastructure.mapper.UomConversionRuleMapper;
 import io.github.chrisshi.mom.mdm.infrastructure.mapper.UomMapper;
@@ -45,6 +46,7 @@ public class UomMasterDataApplication {
     private final UomCategoryMapper categoryMapper;
     private final UomMapper uomMapper;
     private final UomConversionRuleMapper ruleMapper;
+    private final MaterialMapper materialMapper;
     private final PageAdapter pageAdapter;
 
     /**
@@ -54,15 +56,17 @@ public class UomMasterDataApplication {
      * @param categoryMapper UOM Category 单表 Mapper
      * @param uomMapper UOM 单表 Mapper
      * @param ruleMapper 换算规则单表 Mapper
+     * @param materialMapper Material 引用保护 Mapper
      * @param pageAdapter 配置化分页适配器
      */
     public UomMasterDataApplication(DimensionMapper dimensionMapper, UomCategoryMapper categoryMapper,
                                     UomMapper uomMapper, UomConversionRuleMapper ruleMapper,
-                                    PageAdapter pageAdapter) {
+                                    MaterialMapper materialMapper, PageAdapter pageAdapter) {
         this.dimensionMapper = dimensionMapper;
         this.categoryMapper = categoryMapper;
         this.uomMapper = uomMapper;
         this.ruleMapper = ruleMapper;
+        this.materialMapper = materialMapper;
         this.pageAdapter = pageAdapter;
     }
 
@@ -70,8 +74,7 @@ public class UomMasterDataApplication {
      * 创建固定向量量纲；Code 与向量创建后不可普通修改。
      *
      * @param code 唯一业务编码
-     * @param nameZh 中文名称
-     * @param nameEn 可选英文名称
+     * @param name 业务名称
      * @param t 时间指数
      * @param l 长度指数
      * @param m 质量指数
@@ -84,12 +87,11 @@ public class UomMasterDataApplication {
      * @throws MdmException 输入、唯一性或数据库约束校验失败时抛出
      */
     @Transactional
-    public DimensionView createDimension(String code, String nameZh, String nameEn, Integer t, Integer l,
+    public DimensionView createDimension(String code, String name, Integer t, Integer l,
                                          Integer m, Integer i, Integer theta, Integer n, Integer j, String status) {
         DimensionEntity entity = new DimensionEntity();
         entity.setCode(MdmMasterDataRules.code(code));
-        entity.setNameZh(MdmMasterDataRules.nameZh(nameZh));
-        entity.setNameEn(MdmMasterDataRules.nameEn(nameEn));
+        entity.setName(MdmMasterDataRules.name(name));
         entity.setTimeExponent(requiredExponent(t)); entity.setLengthExponent(requiredExponent(l));
         entity.setMassExponent(requiredExponent(m)); entity.setElectricCurrentExponent(requiredExponent(i));
         entity.setTemperatureExponent(requiredExponent(theta)); entity.setAmountExponent(requiredExponent(n));
@@ -105,18 +107,16 @@ public class UomMasterDataApplication {
     /**
      * 更新量纲名称；不会修改 Code 或七维向量。
      * @param id 量纲 ID
-     * @param nameZh 中文名称
-     * @param nameEn 可选英文名称
+     * @param name 业务名称
      * @param version 乐观锁版本
      * @return 更新后视图；成功推进版本且无跨表副作用
      * @throws MdmException 不存在、输入或版本冲突时抛出
      */
     @Transactional
-    public DimensionView updateDimension(String id, String nameZh, String nameEn, Long version) {
+    public DimensionView updateDimension(String id, String name, Long version) {
         DimensionEntity entity = requireDimension(id);
         requireVersion(entity.getVersion(), version);
-        entity.setNameZh(MdmMasterDataRules.nameZh(nameZh));
-        entity.setNameEn(MdmMasterDataRules.nameEn(nameEn));
+        entity.setName(MdmMasterDataRules.name(name));
         requireUpdated(dimensionMapper.updateById(entity), () -> dimensionMapper.selectById(entity.getId()), "Dimension");
         return dimensionView(entity);
     }
@@ -170,30 +170,28 @@ public class UomMasterDataApplication {
      * 原子创建类别及其唯一基准单位。
      *
      * @param code 类别编码
-     * @param nameZh 类别中文名
-     * @param nameEn 类别英文名
+     * @param name 类别业务名称
      * @param dimensionId 启用量纲 ID
      * @param status 类别状态
      * @param referenceCode 基准单位编码
-     * @param referenceNameZh 基准单位中文名
-     * @param referenceNameEn 基准单位英文名
+     * @param referenceName 基准单位业务名称
      * @param referenceSymbol 基准单位符号
      * @param referenceReason 企业扩展编码说明
      * @return 类别视图；非幂等，任一插入失败则两行都回滚
      * @throws MdmException 输入、父级、唯一性或数据库失败时抛出
      */
     @Transactional
-    public CategoryView createCategory(String code, String nameZh, String nameEn, String dimensionId, String status,
-                                       String referenceCode, String referenceNameZh, String referenceNameEn,
+    public CategoryView createCategory(String code, String name, String dimensionId, String status,
+                                       String referenceCode, String referenceName,
                                        String referenceSymbol, String referenceReason) {
         DimensionEntity dimension = requireDimension(dimensionId);
         MdmMasterDataRules.requireEnabled(dimension.getStatus(), "Dimension");
         UomCategoryEntity category = new UomCategoryEntity();
-        category.setCode(MdmMasterDataRules.code(code)); category.setNameZh(MdmMasterDataRules.nameZh(nameZh));
-        category.setNameEn(MdmMasterDataRules.nameEn(nameEn)); category.setDimensionId(dimension.getId());
+        category.setCode(MdmMasterDataRules.code(code)); category.setName(MdmMasterDataRules.name(name));
+        category.setDimensionId(dimension.getId());
         category.setStatus(MdmMasterDataRules.status(status));
         try { categoryMapper.insert(category); } catch (DuplicateKeyException e) { throw MdmException.codeConflict("UomCategory"); }
-        UomEntity reference = newUom(referenceCode, referenceNameZh, referenceNameEn, referenceSymbol,
+        UomEntity reference = newUom(referenceCode, referenceName, referenceSymbol,
                 category.getId(), true, referenceReason, category.getStatus());
         insertUom(reference);
         return categoryView(category, reference.getId());
@@ -202,18 +200,16 @@ public class UomMasterDataApplication {
     /**
      * 更新类别名称；量纲、Code 与基准单位身份不可修改。
      * @param id 类别 ID
-     * @param nameZh 中文名称
-     * @param nameEn 可选英文名称
+     * @param name 业务名称
      * @param version 乐观锁版本
      * @return 更新后类别视图
      * @throws MdmException 不存在、输入或并发冲突时抛出
      */
     @Transactional
-    public CategoryView updateCategory(String id, String nameZh, String nameEn, Long version) {
+    public CategoryView updateCategory(String id, String name, Long version) {
         UomCategoryEntity category = requireCategory(id);
         requireVersion(category.getVersion(), version);
-        category.setNameZh(MdmMasterDataRules.nameZh(nameZh));
-        category.setNameEn(MdmMasterDataRules.nameEn(nameEn));
+        category.setName(MdmMasterDataRules.name(name));
         requireUpdated(categoryMapper.updateById(category), () -> categoryMapper.selectById(category.getId()),
                 "UomCategory");
         return categoryView(category, requireReference(category.getId()).getId());
@@ -273,8 +269,7 @@ public class UomMasterDataApplication {
      * 创建非基准单位及首个不可变换算规则版本。
      *
      * @param code 单位编码
-     * @param nameZh 中文名称
-     * @param nameEn 可选英文名称
+     * @param name 业务名称
      * @param symbol 显示符号
      * @param categoryId 启用类别 ID
      * @param reason 企业扩展编码说明
@@ -287,30 +282,28 @@ public class UomMasterDataApplication {
      * @throws MdmException 输入、父级、唯一性或数据库失败时抛出
      */
     @Transactional
-    public UomView createUom(String code, String nameZh, String nameEn, String symbol, String categoryId,
+    public UomView createUom(String code, String name, String symbol, String categoryId,
                              String reason, String status, BigDecimal multiplier, BigDecimal offset,
                              Integer precision, String roundingMode) {
         UomCategoryEntity category = requireEnabledCategory(categoryId);
-        UomEntity unit = newUom(code, nameZh, nameEn, symbol, category.getId(), false, reason, status);
+        UomEntity unit = newUom(code, name, symbol, category.getId(), false, reason, status);
         insertUom(unit); insertRule(newRule(unit.getId(), 1, multiplier, offset, precision, roundingMode));
         return uomView(unit);
     }
 
     /**
-     * 更新单位中允许修正的中英文名称；不接受 Code、Symbol、类别和基准身份。
+     * 更新单位中允许修正的名称；不接受 Code、Symbol、类别和基准身份。
      * @param id 单位 ID
-     * @param nameZh 中文名称
-     * @param nameEn 可选英文名称
+     * @param name 业务名称
      * @param version 乐观锁版本
      * @return 更新后单位视图
      * @throws MdmException 不存在、输入或并发冲突时抛出
      */
     @Transactional
-    public UomView updateUom(String id, String nameZh, String nameEn, Long version) {
+    public UomView updateUom(String id, String name, Long version) {
         UomEntity unit = requireUom(id);
         requireVersion(unit.getVersion(), version);
-        unit.setNameZh(MdmMasterDataRules.nameZh(nameZh));
-        unit.setNameEn(MdmMasterDataRules.nameEn(nameEn));
+        unit.setName(MdmMasterDataRules.name(name));
         requireUpdated(uomMapper.updateById(unit), () -> uomMapper.selectById(unit.getId()), "Uom");
         return uomView(unit);
     }
@@ -415,10 +408,14 @@ public class UomMasterDataApplication {
         ruleMapper.selectPage(page, query); return pageAdapter.toResult(page, UomMasterDataApplication::ruleView);
     }
 
-    /** 量纲启停只修改目标行，不级联已有类别或单位。 */
+    /** 量纲启停只修改目标行；停用前拒绝任何 Material 的间接引用。 */
     private DimensionView changeDimensionStatus(String id, String status, Long version) {
-        DimensionEntity entity = requireDimension(id);
+        DimensionEntity entity = dimensionMapper.selectByIdForUpdate(MdmMasterDataRules.id(id, "dimensionId"));
+        if (entity == null) throw MdmException.notFound("Dimension");
         requireVersion(entity.getVersion(), version);
+        if (MdmMasterDataRules.DISABLED.equals(status) && materialMapper.existsByDimensionId(entity.getId())) {
+            throw MdmException.resourceReferenced("Dimension");
+        }
         if (!status.equals(entity.getStatus())) {
             entity.setStatus(status);
             requireUpdated(dimensionMapper.updateById(entity), () -> dimensionMapper.selectById(entity.getId()),
@@ -429,12 +426,19 @@ public class UomMasterDataApplication {
 
     /** 类别生命周期是基准单位可用性的唯一管理入口。 */
     private CategoryView changeCategoryStatus(String id, String status, Long version) {
-        UomCategoryEntity category = requireCategory(id);
+        UomCategoryEntity category = categoryMapper.selectByIdForUpdate(MdmMasterDataRules.id(id, "categoryId"));
+        if (category == null) throw MdmException.notFound("UomCategory");
         requireVersion(category.getVersion(), version);
         if (MdmMasterDataRules.ENABLED.equals(status)) {
             MdmMasterDataRules.requireEnabled(requireDimension(category.getDimensionId()).getStatus(), "Dimension");
         }
-        UomEntity reference = requireReference(category.getId());
+        if (MdmMasterDataRules.DISABLED.equals(status)
+                && materialMapper.existsByUomCategoryId(category.getId())) {
+            throw MdmException.resourceReferenced("UomCategory");
+        }
+        UomEntity referenceSnapshot = requireReference(category.getId());
+        UomEntity reference = uomMapper.selectByIdForUpdate(referenceSnapshot.getId());
+        if (reference == null) throw MdmException.notFound("ReferenceUom");
         if (!status.equals(category.getStatus())) {
             category.setStatus(status);
             requireUpdated(categoryMapper.updateById(category), () -> categoryMapper.selectById(category.getId()),
@@ -450,13 +454,17 @@ public class UomMasterDataApplication {
 
     /** 普通单位启停只修改目标行；重新启用时必须再次验证完整父链。 */
     private UomView changeUomStatus(String id, String status, Long version) {
-        UomEntity unit = requireUom(id);
+        UomEntity unit = uomMapper.selectByIdForUpdate(MdmMasterDataRules.id(id, "uomId"));
+        if (unit == null) throw MdmException.notFound("Uom");
         requireVersion(unit.getVersion(), version);
         if (Boolean.TRUE.equals(unit.getReferenceUnit())) {
             throw MdmException.immutable("基准单位只能随计量单位类别启停");
         }
         if (MdmMasterDataRules.ENABLED.equals(status)) {
             requireEnabledCategory(unit.getCategoryId());
+        }
+        if (MdmMasterDataRules.DISABLED.equals(status) && materialMapper.existsByUomId(unit.getId())) {
+            throw MdmException.resourceReferenced("Uom");
         }
         if (!status.equals(unit.getStatus())) {
             unit.setStatus(status);
@@ -466,12 +474,11 @@ public class UomMasterDataApplication {
     }
 
     /** 只构造通过字段规则校验的单位实体；基准身份由调用用例明确传入。 */
-    private UomEntity newUom(String code, String nameZh, String nameEn, String symbol, String categoryId,
+    private UomEntity newUom(String code, String name, String symbol, String categoryId,
                              boolean reference, String reason, String status) {
         UomEntity entity = new UomEntity();
         entity.setCode(MdmMasterDataRules.code(code));
-        entity.setNameZh(MdmMasterDataRules.nameZh(nameZh));
-        entity.setNameEn(MdmMasterDataRules.nameEn(nameEn));
+        entity.setName(MdmMasterDataRules.name(name));
         entity.setSymbol(required(symbol, "symbol", 32));
         entity.setCategoryId(categoryId);
         entity.setReferenceUnit(reference);
@@ -658,8 +665,8 @@ public class UomMasterDataApplication {
     }
     private static MdmException validation(String message) { return new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.validation_failed", message); }
 
-    static DimensionView dimensionView(DimensionEntity e) { return new DimensionView(e.getId(), e.getCode(), e.getNameZh(), e.getNameEn(), e.getTimeExponent(), e.getLengthExponent(), e.getMassExponent(), e.getElectricCurrentExponent(), e.getTemperatureExponent(), e.getAmountExponent(), e.getLuminousIntensityExponent(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
-    static CategoryView categoryView(UomCategoryEntity e, String referenceId) { return new CategoryView(e.getId(), e.getCode(), e.getNameZh(), e.getNameEn(), e.getDimensionId(), referenceId, e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
-    static UomView uomView(UomEntity e) { return new UomView(e.getId(), e.getCode(), e.getNameZh(), e.getNameEn(), e.getSymbol(), e.getCategoryId(), e.getReferenceUnit(), e.getUcumNotApplicableReason(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
+    static DimensionView dimensionView(DimensionEntity e) { return new DimensionView(e.getId(), e.getCode(), e.getName(), e.getTimeExponent(), e.getLengthExponent(), e.getMassExponent(), e.getElectricCurrentExponent(), e.getTemperatureExponent(), e.getAmountExponent(), e.getLuminousIntensityExponent(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
+    static CategoryView categoryView(UomCategoryEntity e, String referenceId) { return new CategoryView(e.getId(), e.getCode(), e.getName(), e.getDimensionId(), referenceId, e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
+    static UomView uomView(UomEntity e) { return new UomView(e.getId(), e.getCode(), e.getName(), e.getSymbol(), e.getCategoryId(), e.getReferenceUnit(), e.getUcumNotApplicableReason(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
     static RuleView ruleView(UomConversionRuleEntity e) { return new RuleView(e.getId(), e.getUomId(), e.getVersionNo(), e.getAlgorithmType(), e.getMultiplier(), e.getOffset(), e.getCalculationPrecision(), e.getRoundingMode(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getLockVersion()); }
 }
