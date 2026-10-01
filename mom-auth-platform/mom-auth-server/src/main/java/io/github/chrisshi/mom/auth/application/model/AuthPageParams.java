@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.auth.application;
+package io.github.chrisshi.mom.auth.application.model;
 
 /**
  * Mini Auth 分页用例的强类型过滤参数集合。

@@ -3,7 +3,7 @@ package io.github.chrisshi.mom.mdm.controller;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageQueryValidationException;
 import io.github.chrisshi.mom.core.page.PageResult;
-import io.github.chrisshi.mom.mdm.application.MdmPageParams.UomPageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.UomPageParams;
 import io.github.chrisshi.mom.mdm.application.UomMasterDataApplication;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

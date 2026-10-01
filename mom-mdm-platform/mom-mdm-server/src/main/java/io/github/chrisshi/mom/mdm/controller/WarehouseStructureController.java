@@ -2,10 +2,10 @@ package io.github.chrisshi.mom.mdm.controller;
 
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
-import io.github.chrisshi.mom.mdm.application.MdmPageParams.WarehouseAreaPageParams;
-import io.github.chrisshi.mom.mdm.application.MdmPageParams.WarehousePageParams;
-import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.WarehouseAreaView;
-import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.WarehouseView;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.WarehouseAreaPageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.WarehousePageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmMasterDataViews.WarehouseAreaView;
+import io.github.chrisshi.mom.mdm.application.model.MdmMasterDataViews.WarehouseView;
 import io.github.chrisshi.mom.mdm.application.WarehouseStructureApplication;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import jakarta.validation.Valid;

@@ -2,12 +2,12 @@ package io.github.chrisshi.mom.mdm.controller;
 
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
-import io.github.chrisshi.mom.mdm.application.MdmPageParams.DimensionPageParams;
-import io.github.chrisshi.mom.mdm.application.MdmPageParams.UomCategoryPageParams;
-import io.github.chrisshi.mom.mdm.application.MdmPageParams.UomConversionRulePageParams;
-import io.github.chrisshi.mom.mdm.application.MdmPageParams.UomPageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.DimensionPageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.UomCategoryPageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.UomConversionRulePageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.UomPageParams;
 import io.github.chrisshi.mom.mdm.application.UomMasterDataApplication;
-import io.github.chrisshi.mom.mdm.application.UomMasterDataViews.*;
+import io.github.chrisshi.mom.mdm.application.model.UomMasterDataViews.*;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;

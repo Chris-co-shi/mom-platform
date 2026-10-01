@@ -1,7 +1,7 @@
 package io.github.chrisshi.mom.auth.controller;
 
 import io.github.chrisshi.mom.auth.application.UserApplication;
-import io.github.chrisshi.mom.auth.application.AuthPageParams.UserPageParams;
+import io.github.chrisshi.mom.auth.application.model.AuthPageParams.UserPageParams;
 import io.github.chrisshi.mom.auth.controller.request.ChangeStatusRequest;
 import io.github.chrisshi.mom.auth.controller.request.CreateUserRequest;
 import io.github.chrisshi.mom.auth.controller.request.ReplaceUserRolesRequest;

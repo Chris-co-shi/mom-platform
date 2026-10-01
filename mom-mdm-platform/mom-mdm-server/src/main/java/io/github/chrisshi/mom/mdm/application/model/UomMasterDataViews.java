@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.mdm.application;
+package io.github.chrisshi.mom.mdm.application.model;
 
 import java.math.BigDecimal;
 import java.time.Instant;

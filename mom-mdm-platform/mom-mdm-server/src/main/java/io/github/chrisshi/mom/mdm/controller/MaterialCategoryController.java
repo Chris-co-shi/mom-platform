@@ -2,9 +2,9 @@ package io.github.chrisshi.mom.mdm.controller;
 
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
-import io.github.chrisshi.mom.mdm.application.MdmPageParams.MaterialCategoryPageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.MaterialCategoryPageParams;
 import io.github.chrisshi.mom.mdm.application.MaterialCategoryApplication;
-import io.github.chrisshi.mom.mdm.application.MaterialCategoryView;
+import io.github.chrisshi.mom.mdm.application.model.MaterialCategoryView;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;

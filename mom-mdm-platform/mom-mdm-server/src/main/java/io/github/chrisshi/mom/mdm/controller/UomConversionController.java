@@ -1,8 +1,8 @@
 package io.github.chrisshi.mom.mdm.controller;
 
 import io.github.chrisshi.mom.mdm.application.UomConversionApplication;
-import io.github.chrisshi.mom.mdm.application.UomMasterDataViews.CompatibilityView;
-import io.github.chrisshi.mom.mdm.application.UomMasterDataViews.ConversionView;
+import io.github.chrisshi.mom.mdm.application.model.UomMasterDataViews.CompatibilityView;
+import io.github.chrisshi.mom.mdm.application.model.UomMasterDataViews.ConversionView;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;

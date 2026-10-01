@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.auth.application.model.PermissionView;
 import io.github.chrisshi.mom.auth.application.model.RoleView;
-import io.github.chrisshi.mom.auth.application.AuthPageParams.RolePageParams;
+import io.github.chrisshi.mom.auth.application.model.AuthPageParams.RolePageParams;
 import io.github.chrisshi.mom.auth.infrastructure.entity.PermissionEntity;
 import io.github.chrisshi.mom.auth.infrastructure.entity.RoleEntity;
 import io.github.chrisshi.mom.auth.infrastructure.entity.RolePermissionEntity;

@@ -17,8 +17,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static io.github.chrisshi.mom.mdm.application.UomMasterDataViews.CompatibilityView;
-import static io.github.chrisshi.mom.mdm.application.UomMasterDataViews.ConversionView;
+import static io.github.chrisshi.mom.mdm.application.model.UomMasterDataViews.CompatibilityView;
+import static io.github.chrisshi.mom.mdm.application.model.UomMasterDataViews.ConversionView;
 
 /**
  * 当前规则换算、历史重放与兼容性识别的只读 Application。

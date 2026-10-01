@@ -5,10 +5,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.data.page.PageAdapter;
-import io.github.chrisshi.mom.mdm.application.MdmPageParams.DimensionPageParams;
-import io.github.chrisshi.mom.mdm.application.MdmPageParams.UomCategoryPageParams;
-import io.github.chrisshi.mom.mdm.application.MdmPageParams.UomConversionRulePageParams;
-import io.github.chrisshi.mom.mdm.application.MdmPageParams.UomPageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.DimensionPageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.UomCategoryPageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.UomConversionRulePageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.UomPageParams;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.DimensionEntity;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.UomCategoryEntity;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.UomConversionRuleEntity;
@@ -30,7 +30,7 @@ import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import static io.github.chrisshi.mom.mdm.application.UomMasterDataViews.*;
+import static io.github.chrisshi.mom.mdm.application.model.UomMasterDataViews.*;
 import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireVersion;
 
 /**

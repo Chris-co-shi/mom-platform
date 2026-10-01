@@ -1,7 +1,7 @@
 package io.github.chrisshi.mom.auth.controller;
 
 import io.github.chrisshi.mom.auth.application.PermissionApplication;
-import io.github.chrisshi.mom.auth.application.AuthPageParams.PermissionPageParams;
+import io.github.chrisshi.mom.auth.application.model.AuthPageParams.PermissionPageParams;
 import io.github.chrisshi.mom.auth.controller.request.ChangeStatusRequest;
 import io.github.chrisshi.mom.auth.controller.request.CreatePermissionRequest;
 import io.github.chrisshi.mom.auth.controller.request.UpdatePermissionRequest;

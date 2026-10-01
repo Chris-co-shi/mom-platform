@@ -1,6 +1,6 @@
 package io.github.chrisshi.mom.auth.controller;
 
-import io.github.chrisshi.mom.auth.application.AuthPageParams.UserPageParams;
+import io.github.chrisshi.mom.auth.application.model.AuthPageParams.UserPageParams;
 import io.github.chrisshi.mom.auth.application.UserApplication;
 import io.github.chrisshi.mom.auth.infrastructure.configuration.AuthExceptionHandler;
 import io.github.chrisshi.mom.core.page.PageQuery;

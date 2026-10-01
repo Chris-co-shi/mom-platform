@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.mdm.application;
+package io.github.chrisshi.mom.mdm.application.model;
 
 /**
  * MDM 分页用例的强类型过滤参数集合。
