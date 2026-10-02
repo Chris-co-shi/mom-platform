@@ -19,12 +19,11 @@ import org.springframework.web.bind.annotation.*;
 /**
  * LocationType 和统一可寻址 Location 的 HTTP 协议边界。
  *
- * <p>Controller 不解释动态 Type Code，也不暴露占用、预留、库存、容器或 AGV 字段。所有端点要求认证，
- * 引用校验、事务和乐观并发由 Application 负责。</p>
+ * <p>Controller 不解释动态 Type Code，也不暴露占用、预留、库存、容器或 AGV 字段。读写端点分别要求
+ * {@code mdm:location:read} 与 {@code mdm:location:write} 权限，引用校验、事务和乐观并发由 Application 负责。</p>
  */
 @RestController
 @RequestMapping("/api/mdm")
-@PreAuthorize("isAuthenticated()")
 public class LocationMasterDataController {
     private final LocationMasterDataApplication application;
 
@@ -40,6 +39,7 @@ public class LocationMasterDataController {
      */
     @PostMapping("/location-types")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationTypeView> createLocationType(@Valid @RequestBody CreateLocationTypeRequest request) {
         return Result.success(application.createLocationType(request.code(), request.name(), request.status()));
     }
@@ -48,6 +48,7 @@ public class LocationMasterDataController {
      * 更新 LocationType 名称，不接收 Code。
      */
     @PutMapping("/location-types/{id}")
+    @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationTypeView> updateLocationType(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
         return Result.success(application.updateLocationType(id, request.name(), request.version()));
     }
@@ -56,6 +57,7 @@ public class LocationMasterDataController {
      * 查询 LocationType 详情。
      */
     @GetMapping("/location-types/{id}")
+    @PreAuthorize("hasAuthority('mdm:location:read')")
     public Result<LocationTypeView> getLocationType(@PathVariable String id) {
         return Result.success(application.getLocationType(id));
     }
@@ -67,6 +69,7 @@ public class LocationMasterDataController {
      * @return 统一 LocationType 分页结果
      */
     @PostMapping("/location-types/search")
+    @PreAuthorize("hasAuthority('mdm:location:read')")
     public Result<PageResult<LocationTypeView>> pageLocationTypes(
             @RequestBody PageQuery<LocationTypePageParams> pageQuery) {
         return Result.success(application.pageLocationTypes(pageQuery));
@@ -76,6 +79,7 @@ public class LocationMasterDataController {
      * 启用 LocationType，不执行 Type Code 分支。
      */
     @PatchMapping("/location-types/{id}/enable")
+    @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationTypeView> enableLocationType(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableLocationType(id, request.version()));
     }
@@ -84,6 +88,7 @@ public class LocationMasterDataController {
      * 停用 LocationType，不级联 Location。
      */
     @PatchMapping("/location-types/{id}/disable")
+    @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationTypeView> disableLocationType(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableLocationType(id, request.version()));
     }
@@ -93,6 +98,7 @@ public class LocationMasterDataController {
      */
     @PostMapping("/locations")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationView> createLocation(@Valid @RequestBody CreateLocationRequest request) {
         return Result.success(application.createLocation(request.plantId(), request.warehouseAreaId(), request.locationTypeId(), request.code(), request.name(), request.status()));
     }
@@ -101,6 +107,7 @@ public class LocationMasterDataController {
      * 更新 Location 名称，不接收 Code 或引用字段。
      */
     @PutMapping("/locations/{id}")
+    @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationView> updateLocation(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
         return Result.success(application.updateLocation(id, request.name(), request.version()));
     }
@@ -109,6 +116,7 @@ public class LocationMasterDataController {
      * 查询 Location 详情。
      */
     @GetMapping("/locations/{id}")
+    @PreAuthorize("hasAuthority('mdm:location:read')")
     public Result<LocationView> getLocation(@PathVariable String id) {
         return Result.success(application.getLocation(id));
     }
@@ -120,6 +128,7 @@ public class LocationMasterDataController {
      * @return 统一 Location 分页结果
      */
     @PostMapping("/locations/search")
+    @PreAuthorize("hasAuthority('mdm:location:read')")
     public Result<PageResult<LocationView>> pageLocations(
             @RequestBody PageQuery<LocationPageParams> pageQuery) {
         return Result.success(application.pageLocations(pageQuery));
@@ -129,6 +138,7 @@ public class LocationMasterDataController {
      * 启用 Location。
      */
     @PatchMapping("/locations/{id}/enable")
+    @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationView> enableLocation(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableLocation(id, request.version()));
     }
@@ -137,6 +147,7 @@ public class LocationMasterDataController {
      * 停用 Location，不改变运行时事实。
      */
     @PatchMapping("/locations/{id}/disable")
+    @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationView> disableLocation(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableLocation(id, request.version()));
     }

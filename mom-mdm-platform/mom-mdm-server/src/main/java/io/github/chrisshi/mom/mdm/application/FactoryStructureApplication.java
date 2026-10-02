@@ -30,8 +30,9 @@ import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireV
 /**
  * Plant、Workshop、ProductionLine、Workstation 的 Level 1 用例与本地事务边界。
  *
- * <p>调用方向为 Controller → Application → Mapper。父级存在性在创建时显式校验，唯一性由 PostgreSQL
- * 约束最终保证，更新由 Version 乐观锁保证；不使用物理外键、级联停用、Redis、MQ 或跨服务调用。</p>
+ * <p>调用方向为 Controller → Application → Mapper。创建、启用直接子级与父级停用通过父行锁串行，
+ * 唯一性由 PostgreSQL 约束最终保证，目标行更新由 Version 乐观锁保证；不使用物理外键、级联停用、
+ * Redis、MQ 或跨服务调用，数据库不可用或锁等待失败时本地事务整体回滚。</p>
  */
 @Component
 public class FactoryStructureApplication {
@@ -116,7 +117,7 @@ public class FactoryStructureApplication {
     /** 在已启用 Plant 下创建 Workshop，同一 Plant 内 Code 唯一。 */
     @Transactional
     public WorkshopView createWorkshop(String plantId, String code, String name, String status) {
-        PlantEntity plant = requirePlant(plantId);
+        PlantEntity plant = requirePlantForUpdate(plantId);
         MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
         WorkshopEntity entity = new WorkshopEntity();
         entity.setPlantId(plant.getId());
@@ -180,7 +181,7 @@ public class FactoryStructureApplication {
     @Transactional
     public ProductionLineView createProductionLine(String workshopId, String code, String name,
                                                    String status) {
-        WorkshopEntity workshop = requireWorkshop(workshopId);
+        WorkshopEntity workshop = requireWorkshopForUpdate(workshopId);
         MdmMasterDataRules.requireEnabled(workshop.getStatus(), "Workshop");
         ProductionLineEntity entity = new ProductionLineEntity();
         entity.setWorkshopId(workshop.getId());
@@ -245,7 +246,7 @@ public class FactoryStructureApplication {
     @Transactional
     public WorkstationView createWorkstation(String productionLineId, String code, String name,
                                              String status) {
-        ProductionLineEntity productionLine = requireProductionLine(productionLineId);
+        ProductionLineEntity productionLine = requireProductionLineForUpdate(productionLineId);
         MdmMasterDataRules.requireEnabled(productionLine.getStatus(), "ProductionLine");
         WorkstationEntity entity = new WorkstationEntity();
         entity.setProductionLineId(productionLine.getId());
@@ -308,7 +309,7 @@ public class FactoryStructureApplication {
     }
 
     private PlantView changePlantStatus(String id, String status, Long version) {
-        PlantEntity entity = requirePlant(id);
+        PlantEntity entity = requirePlantForUpdate(id);
         requireVersion(entity.getVersion(), version);
         if (status.equals(entity.getStatus())) return toView(entity);
         entity.setStatus(status);
@@ -317,10 +318,10 @@ public class FactoryStructureApplication {
     }
 
     private WorkshopView changeWorkshopStatus(String id, String status, Long version) {
-        WorkshopEntity entity = requireWorkshop(id);
+        WorkshopEntity entity = requireWorkshopForUpdate(id);
         requireVersion(entity.getVersion(), version);
         if (MdmMasterDataRules.ENABLED.equals(status)) {
-            MdmMasterDataRules.requireEnabled(requirePlant(entity.getPlantId()).getStatus(), "Plant");
+            MdmMasterDataRules.requireEnabled(requirePlantForUpdate(entity.getPlantId()).getStatus(), "Plant");
         }
         if (status.equals(entity.getStatus())) return toView(entity);
         entity.setStatus(status);
@@ -329,10 +330,11 @@ public class FactoryStructureApplication {
     }
 
     private ProductionLineView changeProductionLineStatus(String id, String status, Long version) {
-        ProductionLineEntity entity = requireProductionLine(id);
+        ProductionLineEntity entity = requireProductionLineForUpdate(id);
         requireVersion(entity.getVersion(), version);
         if (MdmMasterDataRules.ENABLED.equals(status)) {
-            MdmMasterDataRules.requireEnabled(requireWorkshop(entity.getWorkshopId()).getStatus(), "Workshop");
+            MdmMasterDataRules.requireEnabled(
+                    requireWorkshopForUpdate(entity.getWorkshopId()).getStatus(), "Workshop");
         }
         if (status.equals(entity.getStatus())) return toView(entity);
         entity.setStatus(status);
@@ -346,7 +348,7 @@ public class FactoryStructureApplication {
         requireVersion(entity.getVersion(), version);
         if (MdmMasterDataRules.ENABLED.equals(status)) {
             MdmMasterDataRules.requireEnabled(
-                    requireProductionLine(entity.getProductionLineId()).getStatus(), "ProductionLine");
+                    requireProductionLineForUpdate(entity.getProductionLineId()).getStatus(), "ProductionLine");
         }
         if (status.equals(entity.getStatus())) return toView(entity);
         entity.setStatus(status);
@@ -376,6 +378,28 @@ public class FactoryStructureApplication {
     private WorkstationEntity requireWorkstation(String id) {
         WorkstationEntity entity = workstationMapper.selectById(MdmMasterDataRules.id(id, "workstationId"));
         if (entity == null) throw MdmException.notFound("Workstation");
+        return entity;
+    }
+
+    /** 锁定 Plant，使其停用与直接子级创建、启用不能在检查后交叉提交。 */
+    private PlantEntity requirePlantForUpdate(String id) {
+        PlantEntity entity = plantMapper.selectByIdForUpdate(MdmMasterDataRules.id(id, "plantId"));
+        if (entity == null) throw MdmException.notFound("Plant");
+        return entity;
+    }
+
+    /** 锁定 Workshop，使其停用与 ProductionLine 创建、启用串行执行。 */
+    private WorkshopEntity requireWorkshopForUpdate(String id) {
+        WorkshopEntity entity = workshopMapper.selectByIdForUpdate(MdmMasterDataRules.id(id, "workshopId"));
+        if (entity == null) throw MdmException.notFound("Workshop");
+        return entity;
+    }
+
+    /** 锁定 ProductionLine，使其停用与 Workstation 创建、启用串行执行。 */
+    private ProductionLineEntity requireProductionLineForUpdate(String id) {
+        ProductionLineEntity entity = productionLineMapper.selectByIdForUpdate(
+                MdmMasterDataRules.id(id, "productionLineId"));
+        if (entity == null) throw MdmException.notFound("ProductionLine");
         return entity;
     }
 

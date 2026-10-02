@@ -27,12 +27,12 @@ import org.springframework.web.bind.annotation.RestController;
  * MaterialCategory 的 HTTP 协议边界。
  *
  * <p>该 Controller 只执行参数绑定、Bean Validation、Result 包装和 Application 调用，不依赖 Mapper、
- * Entity 或事务实现。所有端点沿用 MDM 已有认证基线；树完整性、循环检测、父级状态和乐观并发全部由
- * Application 负责。数据库不可用或事务失败时不伪造成功，也不泄露 SQL 与约束细节。</p>
+ * Entity 或事务实现。读写端点分别要求 {@code mdm:material:read} 与 {@code mdm:material:write} 权限；
+ * 树完整性、循环检测、父级状态和乐观并发全部由 Application 负责。数据库不可用或事务失败时不伪造成功，
+ * 也不泄露 SQL 与约束细节。</p>
  */
 @RestController
 @RequestMapping("/api/mdm/material-categories")
-@PreAuthorize("isAuthenticated()")
 public class MaterialCategoryController {
     private final MaterialCategoryApplication application;
 
@@ -56,6 +56,7 @@ public class MaterialCategoryController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('mdm:material:write')")
     public Result<MaterialCategoryView> createMaterialCategory(
             @Valid @RequestBody CreateMaterialCategoryRequest request) {
         return Result.success(application.createMaterialCategory(
@@ -74,6 +75,7 @@ public class MaterialCategoryController {
      * <p>成功会推进 Version；不会修改子分类或任何未来 Material。</p>
      */
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('mdm:material:write')")
     public Result<MaterialCategoryView> updateMaterialCategory(
             @PathVariable String id, @Valid @RequestBody UpdateMaterialCategoryRequest request) {
         return Result.success(application.updateMaterialCategory(
@@ -91,6 +93,7 @@ public class MaterialCategoryController {
      * <p>该端点幂等且无写副作用。</p>
      */
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('mdm:material:read')")
     public Result<MaterialCategoryView> getMaterialCategory(@PathVariable String id) {
         return Result.success(application.getMaterialCategory(id));
     }
@@ -105,6 +108,7 @@ public class MaterialCategoryController {
      * <p>该端点幂等且不递归构建整棵树。</p>
      */
     @PostMapping("/search")
+    @PreAuthorize("hasAuthority('mdm:material:read')")
     public Result<PageResult<MaterialCategoryView>> pageMaterialCategories(
             @RequestBody PageQuery<MaterialCategoryPageParams> pageQuery) {
         return Result.success(application.pageMaterialCategories(pageQuery));
@@ -121,6 +125,7 @@ public class MaterialCategoryController {
      * <p>不会级联启用子分类或 Material。</p>
      */
     @PatchMapping("/{id}/enable")
+    @PreAuthorize("hasAuthority('mdm:material:write')")
     public Result<MaterialCategoryView> enableMaterialCategory(
             @PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableMaterialCategory(id, request.version()));
@@ -137,6 +142,7 @@ public class MaterialCategoryController {
      * <p>不会停用或修改 Material；失败时不产生部分停用。</p>
      */
     @PatchMapping("/{id}/disable")
+    @PreAuthorize("hasAuthority('mdm:material:write')")
     public Result<MaterialCategoryView> disableMaterialCategory(
             @PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableMaterialCategory(id, request.version()));

@@ -30,6 +30,8 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
@@ -39,6 +41,12 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.util.Optional;
 import java.math.BigDecimal;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -85,6 +93,7 @@ class MdmMasterDataPostgresqlIT {
     @Autowired private UomMasterDataApplication uomMasterDataApplication;
     @Autowired private UomConversionApplication uomConversionApplication;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private PlatformTransactionManager transactionManager;
 
     /** 注入隔离 PostgreSQL 连接并保持生产 currentSchema、Keepalive 与 ApplicationName 约束。 */
     @DynamicPropertySource
@@ -409,6 +418,16 @@ class MdmMasterDataPostgresqlIT {
         var areaLocation = locationApplication.createLocation(
                 plantEnabledForWarehouse.id(), areaEnabledForLocation.id(), type.id(), "LOC-2", "仓储位置", MdmMasterDataRules.DISABLED);
 
+        var warehouseCurrent = warehouseApplication.getWarehouse(warehouseEnabledForArea.id());
+        var warehouseDisabledForLocation = warehouseApplication.disableWarehouse(
+                warehouseCurrent.id(), warehouseCurrent.version());
+        assertParentDisabled(() -> locationApplication.createLocation(
+                plantEnabledForWarehouse.id(), areaEnabledForLocation.id(), type.id(), "LOC-WH-DISABLED",
+                "父仓库停用位置", MdmMasterDataRules.ENABLED));
+        assertParentDisabled(() -> locationApplication.enableLocation(areaLocation.id(), areaLocation.version()));
+        warehouseApplication.enableWarehouse(
+                warehouseDisabledForLocation.id(), warehouseDisabledForLocation.version());
+
         var plantDisabledForLocation = factoryApplication.disablePlant(
                 plantEnabledForWarehouse.id(), plantEnabledForWarehouse.version());
         assertParentDisabled(() -> locationApplication.createLocation(
@@ -422,6 +441,55 @@ class MdmMasterDataPostgresqlIT {
         assertParentDisabled(() -> locationApplication.createLocation(
                 plantEnabledForLocation.id(), areaDisabledForLocation.id(), type.id(), "LOC-4", "新仓储位置", MdmMasterDataRules.ENABLED));
         assertParentDisabled(() -> locationApplication.enableLocation(areaLocation.id(), areaLocation.version()));
+    }
+
+    /**
+     * 验证父级停用持有行锁时，子级创建必须等待并在父事务提交后看到 DISABLED 状态。
+     *
+     * <p>测试直接在独立本地事务中模拟父级状态提交，以便精确控制锁窗口；业务线程仍完整经过
+     * FactoryStructureApplication。若父行锁缺失，子级会越过检查并插入，本测试将失败。</p>
+     *
+     * @throws Exception 并发任务、锁等待观测或超时失败时由 JUnit 记录错误
+     */
+    @Test
+    void parentDisableAndChildCreateMustSerializeOnPostgresqlRowLock() throws Exception {
+        var plant = factoryApplication.createPlant("P-LOCK", "并发锁工厂", MdmMasterDataRules.ENABLED);
+        CountDownLatch parentLocked = new CountDownLatch(1);
+        CountDownLatch allowParentCommit = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> parent = executor.submit(() -> new TransactionTemplate(transactionManager)
+                    .executeWithoutResult(status -> {
+                        jdbcTemplate.queryForObject(
+                                "SELECT id FROM mdm_plant WHERE id = ? FOR UPDATE", String.class, plant.id());
+                        parentLocked.countDown();
+                        await(allowParentCommit);
+                        jdbcTemplate.update("""
+                                UPDATE mdm_plant
+                                   SET status = 'DISABLED', updated_at = now(), updated_by = 'mdm-lock-it',
+                                       version = version + 1
+                                 WHERE id = ?
+                                """, plant.id());
+                    }));
+            assertThat(parentLocked.await(5, TimeUnit.SECONDS)).isTrue();
+
+            Future<?> child = executor.submit(() -> factoryApplication.createWorkshop(
+                    plant.id(), "WS-LOCK", "并发锁车间", MdmMasterDataRules.ENABLED));
+            assertThat(waitForPlantLockWait()).isTrue();
+            allowParentCommit.countDown();
+
+            parent.get(5, TimeUnit.SECONDS);
+            assertThatThrownBy(() -> child.get(5, TimeUnit.SECONDS))
+                    .isInstanceOfSatisfying(ExecutionException.class,
+                            exception -> assertThat(exception.getCause())
+                                    .isInstanceOfSatisfying(MdmException.class,
+                                            cause -> assertThat(cause.code()).isEqualTo("mdm.parent_disabled")));
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT count(*) FROM mdm_workshop WHERE plant_id = ?", Long.class, plant.id())).isZero();
+        } finally {
+            allowParentCommit.countDown();
+            executor.shutdownNow();
+        }
     }
 
     /** 覆盖显式启停、更新不改变 Code、乐观锁冲突以及 PageResult 统一转换。 */
@@ -607,6 +675,8 @@ class MdmMasterDataPostgresqlIT {
         var enabledCategory = uomMasterDataApplication.enableCategory(disabledCategory.id(), disabledCategory.version());
         assertThat(enabledCategory.status()).isEqualTo(MdmMasterDataRules.ENABLED);
         assertThat(uomMasterDataApplication.getUom(reference.id()).status()).isEqualTo(MdmMasterDataRules.ENABLED);
+        assertParentDisabled(() -> uomMasterDataApplication.publishRule(
+                centimetre.id(), 1, new BigDecimal("0.02"), BigDecimal.ZERO, 34, "HALF_EVEN"));
         assertThat(uomMasterDataApplication.enableUom(centimetre.id(), centimetre.version()).status())
                 .isEqualTo(MdmMasterDataRules.ENABLED);
     }
@@ -683,6 +753,37 @@ class MdmMasterDataPostgresqlIT {
     private static void assertNotFound(Runnable action) {
         assertThatThrownBy(action::run).isInstanceOfSatisfying(MdmException.class,
                 exception -> assertThat(exception.code()).isEqualTo("mdm.resource_not_found"));
+    }
+
+    /** 在有界时间内观察子事务确实因 mdm_plant 行锁等待，避免用固定长时间睡眠猜测并发顺序。 */
+    private boolean waitForPlantLockWait() throws InterruptedException {
+        for (int attempt = 0; attempt < 40; attempt++) {
+            Long waiting = jdbcTemplate.queryForObject("""
+                    SELECT count(*)
+                      FROM pg_stat_activity
+                     WHERE datname = current_database()
+                       AND pid <> pg_backend_pid()
+                       AND wait_event_type = 'Lock'
+                       AND query ILIKE '%mdm_plant%FOR UPDATE%'
+                    """, Long.class);
+            if (waiting != null && waiting > 0) {
+                return true;
+            }
+            Thread.sleep(50);
+        }
+        return false;
+    }
+
+    /** 在线程任务内等待测试闩锁；中断时恢复标记并使事务失败，避免吞掉取消信号。 */
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("等待并发测试闩锁超时");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("并发测试线程被中断", exception);
+        }
     }
 
     private static void assertParentDisabled(Runnable action) {

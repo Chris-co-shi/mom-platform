@@ -28,8 +28,9 @@ import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireV
 /**
  * LocationType 与统一可寻址 Location 的 Level 1 用例及本地事务边界。
  *
- * <p>LocationType 是动态分类，代码中不按 Type Code 分支。Location 创建时校验 Plant、LocationType 以及
- * 可选 WarehouseArea 的完整关系；不保存占用、预留、库存、容器或 AGV 运行时事实。</p>
+ * <p>LocationType 是动态分类，代码中不按 Type Code 分支。Location 创建或启用时锁定 Plant 与可选
+ * WarehouseArea，并校验 LocationType 引用，使层级父级停用不能与子级写交叉提交；不保存占用、预留、
+ * 库存、容器或 AGV 运行时事实，数据库或锁等待失败时本地事务整体回滚。</p>
  */
 @Component
 public class LocationMasterDataApplication {
@@ -110,7 +111,7 @@ public class LocationMasterDataApplication {
     public LocationTypeView disableLocationType(String id, Long version) { return changeTypeStatus(id, MdmMasterDataRules.DISABLED, version); }
 
     /**
-     * 创建 Location；Plant 及可选 WarehouseArea 必须已启用，WarehouseArea 非空时还必须通过 Warehouse
+     * 创建 Location；Plant 及可选 Warehouse → WarehouseArea 链必须已启用，WarehouseArea 非空时还必须
      * 归属于同一 Plant。LocationType 是分类引用而非层级父级，本用例仅要求其存在。
      *
      * @throws MdmException Plant、LocationType、WarehouseArea 不存在或区域与 Plant 不一致时抛出
@@ -118,7 +119,7 @@ public class LocationMasterDataApplication {
     @Transactional
     public LocationView createLocation(String plantId, String warehouseAreaId, String locationTypeId, String code,
                                        String name, String status) {
-        PlantEntity plant = requirePlant(plantId);
+        PlantEntity plant = requirePlantForUpdate(plantId);
         LocationTypeEntity locationType = requireLocationType(locationTypeId);
         MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
         String validatedAreaId = validateAreaBelongsToPlant(warehouseAreaId, plant.getId());
@@ -192,7 +193,7 @@ public class LocationMasterDataApplication {
         LocationEntity entity = requireLocation(id);
         requireVersion(entity.getVersion(), version);
         if (MdmMasterDataRules.ENABLED.equals(status)) {
-            PlantEntity plant = requirePlant(entity.getPlantId());
+            PlantEntity plant = requirePlantForUpdate(entity.getPlantId());
             requireLocationType(entity.getLocationTypeId());
             MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
             validateAreaBelongsToPlant(entity.getWarehouseAreaId(), plant.getId());
@@ -205,11 +206,19 @@ public class LocationMasterDataApplication {
 
     private String validateAreaBelongsToPlant(String areaId, String plantId) {
         if (areaId == null || areaId.isBlank()) return null;
-        WarehouseAreaEntity area = warehouseAreaMapper.selectById(MdmMasterDataRules.id(areaId, "warehouseAreaId"));
-        if (area == null) throw MdmException.notFound("WarehouseArea");
+        String validatedAreaId = MdmMasterDataRules.id(areaId, "warehouseAreaId");
+        WarehouseAreaEntity areaSnapshot = warehouseAreaMapper.selectById(validatedAreaId);
+        if (areaSnapshot == null) throw MdmException.notFound("WarehouseArea");
+        WarehouseEntity warehouseSnapshot = warehouseMapper.selectById(areaSnapshot.getWarehouseId());
+        if (warehouseSnapshot == null) throw MdmException.notFound("Warehouse");
+
+        WarehouseEntity warehouse = warehouseMapper.selectByIdForUpdate(warehouseSnapshot.getId());
+        WarehouseAreaEntity area = warehouseAreaMapper.selectByIdForUpdate(validatedAreaId);
+        if (warehouse == null || area == null || !warehouse.getId().equals(area.getWarehouseId())) {
+            throw MdmException.invalidReference("WarehouseArea 父链在并发修改中发生变化");
+        }
+        MdmMasterDataRules.requireEnabled(warehouse.getStatus(), "Warehouse");
         MdmMasterDataRules.requireEnabled(area.getStatus(), "WarehouseArea");
-        WarehouseEntity warehouse = warehouseMapper.selectById(area.getWarehouseId());
-        if (warehouse == null) throw MdmException.notFound("Warehouse");
         if (!plantId.equals(warehouse.getPlantId())) {
             throw MdmException.invalidReference("WarehouseArea 不属于 Location 指定的 Plant");
         }
@@ -218,6 +227,13 @@ public class LocationMasterDataApplication {
 
     private PlantEntity requirePlant(String id) {
         PlantEntity entity = plantMapper.selectById(MdmMasterDataRules.id(id, "plantId"));
+        if (entity == null) throw MdmException.notFound("Plant");
+        return entity;
+    }
+
+    /** 锁定 Plant，使 Location 创建、启用与 Plant 停用在同一数据库顺序中完成。 */
+    private PlantEntity requirePlantForUpdate(String id) {
+        PlantEntity entity = plantMapper.selectByIdForUpdate(MdmMasterDataRules.id(id, "plantId"));
         if (entity == null) throw MdmException.notFound("Plant");
         return entity;
     }

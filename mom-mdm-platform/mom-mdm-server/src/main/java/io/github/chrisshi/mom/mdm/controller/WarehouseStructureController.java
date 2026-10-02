@@ -20,11 +20,11 @@ import org.springframework.web.bind.annotation.*;
  * Warehouse 与 WarehouseArea 的 HTTP 协议边界。
  *
  * <p>该 Controller 只校验请求、包装 Result 并调用 Application，不接触 Entity、Mapper 或库存运行时事实。
- * 所有端点要求认证，事务和父级校验由 Application 负责。</p>
+ * 读写端点分别要求 {@code mdm:warehouse:read} 与 {@code mdm:warehouse:write} 权限，事务和父级校验由
+ * Application 负责。</p>
  */
 @RestController
 @RequestMapping("/api/mdm")
-@PreAuthorize("isAuthenticated()")
 public class WarehouseStructureController {
     private final WarehouseStructureApplication application;
 
@@ -40,6 +40,7 @@ public class WarehouseStructureController {
      */
     @PostMapping("/warehouses")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('mdm:warehouse:write')")
     public Result<WarehouseView> createWarehouse(@Valid @RequestBody CreateWarehouseRequest request) {
         return Result.success(application.createWarehouse(request.plantId(), request.code(), request.name(), request.status()));
     }
@@ -48,6 +49,7 @@ public class WarehouseStructureController {
      * 更新 Warehouse 名称，不接收 Code 或 Plant。
      */
     @PutMapping("/warehouses/{id}")
+    @PreAuthorize("hasAuthority('mdm:warehouse:write')")
     public Result<WarehouseView> updateWarehouse(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
         return Result.success(application.updateWarehouse(id, request.name(), request.version()));
     }
@@ -56,6 +58,7 @@ public class WarehouseStructureController {
      * 查询 Warehouse 详情。
      */
     @GetMapping("/warehouses/{id}")
+    @PreAuthorize("hasAuthority('mdm:warehouse:read')")
     public Result<WarehouseView> getWarehouse(@PathVariable String id) {
         return Result.success(application.getWarehouse(id));
     }
@@ -67,6 +70,7 @@ public class WarehouseStructureController {
      * @return 统一 Warehouse 分页结果
      */
     @PostMapping("/warehouses/search")
+    @PreAuthorize("hasAuthority('mdm:warehouse:read')")
     public Result<PageResult<WarehouseView>> pageWarehouses(
             @RequestBody PageQuery<WarehousePageParams> pageQuery) {
         return Result.success(application.pageWarehouses(pageQuery));
@@ -76,6 +80,7 @@ public class WarehouseStructureController {
      * 启用 Warehouse，不级联修改区域。
      */
     @PatchMapping("/warehouses/{id}/enable")
+    @PreAuthorize("hasAuthority('mdm:warehouse:write')")
     public Result<WarehouseView> enableWarehouse(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableWarehouse(id, request.version()));
     }
@@ -84,6 +89,7 @@ public class WarehouseStructureController {
      * 停用 Warehouse，不级联修改区域。
      */
     @PatchMapping("/warehouses/{id}/disable")
+    @PreAuthorize("hasAuthority('mdm:warehouse:write')")
     public Result<WarehouseView> disableWarehouse(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableWarehouse(id, request.version()));
     }
@@ -93,6 +99,7 @@ public class WarehouseStructureController {
      */
     @PostMapping("/warehouse-areas")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('mdm:warehouse:write')")
     public Result<WarehouseAreaView> createWarehouseArea(@Valid @RequestBody CreateWarehouseAreaRequest request) {
         return Result.success(application.createWarehouseArea(request.warehouseId(), request.code(), request.name(), request.status()));
     }
@@ -101,6 +108,7 @@ public class WarehouseStructureController {
      * 更新 WarehouseArea 名称。
      */
     @PutMapping("/warehouse-areas/{id}")
+    @PreAuthorize("hasAuthority('mdm:warehouse:write')")
     public Result<WarehouseAreaView> updateWarehouseArea(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
         return Result.success(application.updateWarehouseArea(id, request.name(), request.version()));
     }
@@ -109,6 +117,7 @@ public class WarehouseStructureController {
      * 查询 WarehouseArea 详情。
      */
     @GetMapping("/warehouse-areas/{id}")
+    @PreAuthorize("hasAuthority('mdm:warehouse:read')")
     public Result<WarehouseAreaView> getWarehouseArea(@PathVariable String id) {
         return Result.success(application.getWarehouseArea(id));
     }
@@ -120,6 +129,7 @@ public class WarehouseStructureController {
      * @return 统一 WarehouseArea 分页结果
      */
     @PostMapping("/warehouse-areas/search")
+    @PreAuthorize("hasAuthority('mdm:warehouse:read')")
     public Result<PageResult<WarehouseAreaView>> pageWarehouseAreas(
             @RequestBody PageQuery<WarehouseAreaPageParams> pageQuery) {
         return Result.success(application.pageWarehouseAreas(pageQuery));
@@ -129,6 +139,7 @@ public class WarehouseStructureController {
      * 启用 WarehouseArea。
      */
     @PatchMapping("/warehouse-areas/{id}/enable")
+    @PreAuthorize("hasAuthority('mdm:warehouse:write')")
     public Result<WarehouseAreaView> enableWarehouseArea(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableWarehouseArea(id, request.version()));
     }
@@ -137,6 +148,7 @@ public class WarehouseStructureController {
      * 停用 WarehouseArea。
      */
     @PatchMapping("/warehouse-areas/{id}/disable")
+    @PreAuthorize("hasAuthority('mdm:warehouse:write')")
     public Result<WarehouseAreaView> disableWarehouseArea(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableWarehouseArea(id, request.version()));
     }

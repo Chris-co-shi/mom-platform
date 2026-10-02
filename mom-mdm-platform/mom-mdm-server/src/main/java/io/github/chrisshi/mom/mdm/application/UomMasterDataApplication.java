@@ -38,7 +38,8 @@ import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireV
  *
  * <p>调用方向保持 Controller → Application → Mapper。该类负责引用状态、基准单位不变量、Code 治理、
  * 简单生命周期与不可变规则换版，不引入 Repository Port、动态图算法、缓存或消息。所有写入使用唯一
- * MDM DataSource 的本地事务；唯一约束与乐观锁处理并发，数据库不可用时 fail-closed。</p>
+ * MDM DataSource 的本地事务；父子创建、启用与停用通过固定父到子行锁顺序串行，唯一约束与乐观锁处理
+ * 其余并发，数据库不可用或锁等待失败时 fail-closed。</p>
  */
 @Component
 public class UomMasterDataApplication {
@@ -184,7 +185,7 @@ public class UomMasterDataApplication {
     public CategoryView createCategory(String code, String name, String dimensionId, String status,
                                        String referenceCode, String referenceName,
                                        String referenceSymbol, String referenceReason) {
-        DimensionEntity dimension = requireDimension(dimensionId);
+        DimensionEntity dimension = requireDimensionForUpdate(dimensionId);
         MdmMasterDataRules.requireEnabled(dimension.getStatus(), "Dimension");
         UomCategoryEntity category = new UomCategoryEntity();
         category.setCode(MdmMasterDataRules.code(code)); category.setName(MdmMasterDataRules.name(name));
@@ -285,7 +286,7 @@ public class UomMasterDataApplication {
     public UomView createUom(String code, String name, String symbol, String categoryId,
                              String reason, String status, BigDecimal multiplier, BigDecimal offset,
                              Integer precision, String roundingMode) {
-        UomCategoryEntity category = requireEnabledCategory(categoryId);
+        UomCategoryEntity category = lockEnabledCategoryChain(categoryId);
         UomEntity unit = newUom(code, name, symbol, category.getId(), false, reason, status);
         insertUom(unit); insertRule(newRule(unit.getId(), 1, multiplier, offset, precision, roundingMode));
         return uomView(unit);
@@ -371,9 +372,9 @@ public class UomMasterDataApplication {
     @Transactional
     public RuleView publishRule(String uomId, Integer expectedVersionNo, BigDecimal multiplier, BigDecimal offset,
                                 Integer precision, String roundingMode) {
-        UomEntity unit = requireUom(uomId);
+        UomEntity unit = lockEnabledUomChain(MdmMasterDataRules.id(uomId, "uomId"));
         if (Boolean.TRUE.equals(unit.getReferenceUnit())) throw MdmException.immutable("基准单位不需要换算规则");
-        requireEnabledCategory(unit.getCategoryId());
+        MdmMasterDataRules.requireEnabled(unit.getStatus(), "Uom");
         UomConversionRuleEntity current = requireCurrentRule(unit.getId());
         if (expectedVersionNo == null || !Objects.equals(current.getVersionNo(), expectedVersionNo)) throw MdmException.versionConflict();
         current.setStatus(MdmMasterDataRules.DISABLED);
@@ -426,12 +427,12 @@ public class UomMasterDataApplication {
 
     /** 类别生命周期是基准单位可用性的唯一管理入口。 */
     private CategoryView changeCategoryStatus(String id, String status, Long version) {
-        UomCategoryEntity category = categoryMapper.selectByIdForUpdate(MdmMasterDataRules.id(id, "categoryId"));
+        String validatedId = MdmMasterDataRules.id(id, "categoryId");
+        UomCategoryEntity category = MdmMasterDataRules.ENABLED.equals(status)
+                ? lockCategoryWithEnabledDimension(validatedId)
+                : categoryMapper.selectByIdForUpdate(validatedId);
         if (category == null) throw MdmException.notFound("UomCategory");
         requireVersion(category.getVersion(), version);
-        if (MdmMasterDataRules.ENABLED.equals(status)) {
-            MdmMasterDataRules.requireEnabled(requireDimension(category.getDimensionId()).getStatus(), "Dimension");
-        }
         if (MdmMasterDataRules.DISABLED.equals(status)
                 && materialMapper.existsByUomCategoryId(category.getId())) {
             throw MdmException.resourceReferenced("UomCategory");
@@ -454,14 +455,14 @@ public class UomMasterDataApplication {
 
     /** 普通单位启停只修改目标行；重新启用时必须再次验证完整父链。 */
     private UomView changeUomStatus(String id, String status, Long version) {
-        UomEntity unit = uomMapper.selectByIdForUpdate(MdmMasterDataRules.id(id, "uomId"));
+        String validatedId = MdmMasterDataRules.id(id, "uomId");
+        UomEntity unit = MdmMasterDataRules.ENABLED.equals(status)
+                ? lockEnabledUomChain(validatedId)
+                : uomMapper.selectByIdForUpdate(validatedId);
         if (unit == null) throw MdmException.notFound("Uom");
         requireVersion(unit.getVersion(), version);
         if (Boolean.TRUE.equals(unit.getReferenceUnit())) {
             throw MdmException.immutable("基准单位只能随计量单位类别启停");
-        }
-        if (MdmMasterDataRules.ENABLED.equals(status)) {
-            requireEnabledCategory(unit.getCategoryId());
         }
         if (MdmMasterDataRules.DISABLED.equals(status) && materialMapper.existsByUomId(unit.getId())) {
             throw MdmException.resourceReferenced("Uom");
@@ -525,6 +526,15 @@ public class UomMasterDataApplication {
         return entity;
     }
 
+    /** 锁定量纲，使类别创建与量纲停用不能在父状态检查后交叉提交。 */
+    private DimensionEntity requireDimensionForUpdate(String id) {
+        DimensionEntity entity = dimensionMapper.selectByIdForUpdate(MdmMasterDataRules.id(id, "dimensionId"));
+        if (entity == null) {
+            throw MdmException.notFound("Dimension");
+        }
+        return entity;
+    }
+
     /** 按受控 String ID 读取计量单位类别。 */
     private UomCategoryEntity requireCategory(String id) {
         UomCategoryEntity entity = categoryMapper.selectById(MdmMasterDataRules.id(id, "categoryId"));
@@ -549,6 +559,52 @@ public class UomMasterDataApplication {
         MdmMasterDataRules.requireEnabled(category.getStatus(), "UomCategory");
         MdmMasterDataRules.requireEnabled(requireDimension(category.getDimensionId()).getStatus(), "Dimension");
         return category;
+    }
+
+    /**
+     * 以 Dimension → UOM Category 的稳定顺序锁定类别父链，并重新校验并发期间关系未变化。
+     */
+    private UomCategoryEntity lockEnabledCategoryChain(String id) {
+        UomCategoryEntity snapshot = requireCategory(id);
+        DimensionEntity dimension = requireDimensionForUpdate(snapshot.getDimensionId());
+        UomCategoryEntity category = categoryMapper.selectByIdForUpdate(snapshot.getId());
+        if (category == null || !dimension.getId().equals(category.getDimensionId())) {
+            throw MdmException.invalidReference("计量单位类别父链在并发修改中发生变化");
+        }
+        MdmMasterDataRules.requireEnabled(dimension.getStatus(), "Dimension");
+        MdmMasterDataRules.requireEnabled(category.getStatus(), "UomCategory");
+        return category;
+    }
+
+    /** 锁定待启用类别及其量纲；类别自身可为停用，但量纲必须已启用。 */
+    private UomCategoryEntity lockCategoryWithEnabledDimension(String id) {
+        UomCategoryEntity snapshot = requireCategory(id);
+        DimensionEntity dimension = requireDimensionForUpdate(snapshot.getDimensionId());
+        UomCategoryEntity category = categoryMapper.selectByIdForUpdate(snapshot.getId());
+        if (category == null || !dimension.getId().equals(category.getDimensionId())) {
+            throw MdmException.invalidReference("计量单位类别父链在并发修改中发生变化");
+        }
+        MdmMasterDataRules.requireEnabled(dimension.getStatus(), "Dimension");
+        return category;
+    }
+
+    /**
+     * 以 Dimension → UOM Category → UOM 的稳定顺序锁定完整父链，供普通单位启用与换算规则发布复核。
+     */
+    private UomEntity lockEnabledUomChain(String id) {
+        UomEntity unitSnapshot = requireUom(id);
+        UomCategoryEntity categorySnapshot = requireCategory(unitSnapshot.getCategoryId());
+        DimensionEntity dimension = requireDimensionForUpdate(categorySnapshot.getDimensionId());
+        UomCategoryEntity category = categoryMapper.selectByIdForUpdate(categorySnapshot.getId());
+        UomEntity unit = uomMapper.selectByIdForUpdate(unitSnapshot.getId());
+        if (category == null || unit == null
+                || !category.getId().equals(unit.getCategoryId())
+                || !dimension.getId().equals(category.getDimensionId())) {
+            throw MdmException.invalidReference("计量单位父链在并发修改中发生变化");
+        }
+        MdmMasterDataRules.requireEnabled(dimension.getStatus(), "Dimension");
+        MdmMasterDataRules.requireEnabled(category.getStatus(), "UomCategory");
+        return unit;
     }
 
     /** 查询类别唯一基准单位；缺失时按目录完整性错误显式失败。 */
@@ -622,10 +678,13 @@ public class UomMasterDataApplication {
         }
         throw MdmException.versionConflict();
     }
-    /** 七维向量的每一个指数都必须显式提供。 */
+    /** 七维向量指数必须显式提供且符合 PostgreSQL smallint 的可持久化范围。 */
     private static Integer requiredExponent(Integer value) {
         if (value == null) {
             throw validation("量纲指数不能为空");
+        }
+        if (value < Short.MIN_VALUE || value > Short.MAX_VALUE) {
+            throw validation("量纲指数必须在 -32768..32767");
         }
         return value;
     }

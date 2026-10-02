@@ -28,12 +28,12 @@ import org.springframework.web.bind.annotation.RestController;
  * Material 主数据的 HTTP 协议边界。
  *
  * <p>该 Controller 只负责请求绑定、Bean Validation、Result 包装和 Application 调用，不依赖 Mapper、
- * Entity 或事务实现。分类、单位链、叶子约束和并发规则全部由 Application 负责；数据库不可用时异常
- * 交给统一处理器，不伪造成功或暴露 SQL 信息。</p>
+ * Entity 或事务实现。读写端点分别要求 {@code mdm:material:read} 与 {@code mdm:material:write} 权限；
+ * 分类、单位链、叶子约束和并发规则全部由 Application 负责。数据库不可用时异常交给统一处理器，不伪造
+ * 成功或暴露 SQL 信息。</p>
  */
 @RestController
 @RequestMapping("/api/mdm/materials")
-@PreAuthorize("isAuthenticated()")
 public class MaterialController {
     private final MaterialApplication application;
 
@@ -57,6 +57,7 @@ public class MaterialController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('mdm:material:write')")
     public Result<MaterialView> createMaterial(@Valid @RequestBody CreateMaterialRequest request) {
         return Result.success(application.createMaterial(
                 request.code(), request.name(), request.categoryId(), request.baseUomId(),
@@ -74,6 +75,7 @@ public class MaterialController {
      * <p>成功推进 Version，不自动转换历史数量或修改下游事实。</p>
      */
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('mdm:material:write')")
     public Result<MaterialView> updateMaterial(
             @PathVariable String id, @Valid @RequestBody UpdateMaterialRequest request) {
         return Result.success(application.updateMaterial(
@@ -89,6 +91,7 @@ public class MaterialController {
      * @throws io.github.chrisshi.mom.mdm.application.MdmException ID 非法或资源不存在时抛出
      */
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('mdm:material:read')")
     public Result<MaterialView> getMaterial(@PathVariable String id) {
         return Result.success(application.getMaterial(id));
     }
@@ -101,6 +104,7 @@ public class MaterialController {
      * @throws io.github.chrisshi.mom.mdm.application.MdmException 过滤条件非法时抛出
      */
     @PostMapping("/search")
+    @PreAuthorize("hasAuthority('mdm:material:read')")
     public Result<PageResult<MaterialView>> pageMaterials(
             @RequestBody PageQuery<MaterialPageParams> pageQuery) {
         return Result.success(application.pageMaterials(pageQuery));
@@ -115,6 +119,7 @@ public class MaterialController {
      * @throws io.github.chrisshi.mom.mdm.application.MdmException 引用或版本校验失败时抛出
      */
     @PatchMapping("/{id}/enable")
+    @PreAuthorize("hasAuthority('mdm:material:write')")
     public Result<MaterialView> enableMaterial(
             @PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableMaterial(id, request.version()));
@@ -129,6 +134,7 @@ public class MaterialController {
      * @throws io.github.chrisshi.mom.mdm.application.MdmException 资源或版本校验失败时抛出
      */
     @PatchMapping("/{id}/disable")
+    @PreAuthorize("hasAuthority('mdm:material:write')")
     public Result<MaterialView> disableMaterial(
             @PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableMaterial(id, request.version()));

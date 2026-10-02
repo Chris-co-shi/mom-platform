@@ -23,12 +23,11 @@ import org.springframework.web.bind.annotation.*;
 /**
  * Plant 至 Workstation 工厂结构的 HTTP 边界。
  *
- * <p>Controller 只处理协议校验和 Result 包装，不访问 Mapper/Entity 或开启事务。所有端点要求认证；细粒度
- * MDM 权限尚未在本 Slice 定义，因此不在这里伪造不可分配的 Permission。</p>
+ * <p>Controller 只处理协议校验和 Result 包装，不访问 Mapper/Entity 或开启事务。查询要求
+ * {@code mdm:factory:read}，写入和启停要求 {@code mdm:factory:write}；业务事务与一致性由 Application 负责。</p>
  */
 @RestController
 @RequestMapping("/api/mdm")
-@PreAuthorize("isAuthenticated()")
 public class FactoryStructureController {
     private final FactoryStructureApplication application;
 
@@ -44,6 +43,7 @@ public class FactoryStructureController {
      */
     @PostMapping("/plants")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<PlantView> createPlant(@Valid @RequestBody CreateRootRequest request) {
         return Result.success(application.createPlant(request.code(), request.name(), request.status()));
     }
@@ -52,6 +52,7 @@ public class FactoryStructureController {
      * 更新 Plant 名称，不接收 Code。
      */
     @PutMapping("/plants/{id}")
+    @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<PlantView> updatePlant(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
         return Result.success(application.updatePlant(id, request.name(), request.version()));
     }
@@ -60,6 +61,7 @@ public class FactoryStructureController {
      * 查询 Plant 详情。
      */
     @GetMapping("/plants/{id}")
+    @PreAuthorize("hasAuthority('mdm:factory:read')")
     public Result<PlantView> getPlant(@PathVariable String id) {
         return Result.success(application.getPlant(id));
     }
@@ -71,6 +73,7 @@ public class FactoryStructureController {
      * @return 统一 Plant 分页结果
      */
     @PostMapping("/plants/search")
+    @PreAuthorize("hasAuthority('mdm:factory:read')")
     public Result<PageResult<PlantView>> pagePlants(@RequestBody PageQuery<PlantPageParams> pageQuery) {
         return Result.success(application.pagePlants(pageQuery));
     }
@@ -79,6 +82,7 @@ public class FactoryStructureController {
      * 启用 Plant。
      */
     @PatchMapping("/plants/{id}/enable")
+    @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<PlantView> enablePlant(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enablePlant(id, request.version()));
     }
@@ -87,6 +91,7 @@ public class FactoryStructureController {
      * 停用 Plant。
      */
     @PatchMapping("/plants/{id}/disable")
+    @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<PlantView> disablePlant(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disablePlant(id, request.version()));
     }
@@ -96,6 +101,7 @@ public class FactoryStructureController {
      */
     @PostMapping("/workshops")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<WorkshopView> createWorkshop(@Valid @RequestBody CreateWorkshopRequest request) {
         return Result.success(application.createWorkshop(request.plantId(), request.code(), request.name(), request.status()));
     }
@@ -104,6 +110,7 @@ public class FactoryStructureController {
      * 更新 Workshop 名称。
      */
     @PutMapping("/workshops/{id}")
+    @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<WorkshopView> updateWorkshop(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
         return Result.success(application.updateWorkshop(id, request.name(), request.version()));
     }
@@ -112,6 +119,7 @@ public class FactoryStructureController {
      * 查询 Workshop 详情。
      */
     @GetMapping("/workshops/{id}")
+    @PreAuthorize("hasAuthority('mdm:factory:read')")
     public Result<WorkshopView> getWorkshop(@PathVariable String id) {
         return Result.success(application.getWorkshop(id));
     }
@@ -123,6 +131,7 @@ public class FactoryStructureController {
      * @return 统一 Workshop 分页结果
      */
     @PostMapping("/workshops/search")
+    @PreAuthorize("hasAuthority('mdm:factory:read')")
     public Result<PageResult<WorkshopView>> pageWorkshops(
             @RequestBody PageQuery<WorkshopPageParams> pageQuery) {
         return Result.success(application.pageWorkshops(pageQuery));
@@ -132,6 +141,7 @@ public class FactoryStructureController {
      * 启用 Workshop。
      */
     @PatchMapping("/workshops/{id}/enable")
+    @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<WorkshopView> enableWorkshop(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableWorkshop(id, request.version()));
     }
@@ -140,6 +150,7 @@ public class FactoryStructureController {
      * 停用 Workshop。
      */
     @PatchMapping("/workshops/{id}/disable")
+    @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<WorkshopView> disableWorkshop(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableWorkshop(id, request.version()));
     }
@@ -149,6 +160,7 @@ public class FactoryStructureController {
      */
     @PostMapping("/production-lines")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<ProductionLineView> createProductionLine(@Valid @RequestBody CreateProductionLineRequest request) {
         return Result.success(application.createProductionLine(request.workshopId(), request.code(), request.name(), request.status()));
     }
@@ -157,6 +169,7 @@ public class FactoryStructureController {
      * 更新 ProductionLine 名称。
      */
     @PutMapping("/production-lines/{id}")
+    @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<ProductionLineView> updateProductionLine(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
         return Result.success(application.updateProductionLine(id, request.name(), request.version()));
     }
@@ -165,6 +178,7 @@ public class FactoryStructureController {
      * 查询 ProductionLine 详情。
      */
     @GetMapping("/production-lines/{id}")
+    @PreAuthorize("hasAuthority('mdm:factory:read')")
     public Result<ProductionLineView> getProductionLine(@PathVariable String id) {
         return Result.success(application.getProductionLine(id));
     }
@@ -176,6 +190,7 @@ public class FactoryStructureController {
      * @return 统一 ProductionLine 分页结果
      */
     @PostMapping("/production-lines/search")
+    @PreAuthorize("hasAuthority('mdm:factory:read')")
     public Result<PageResult<ProductionLineView>> pageProductionLines(
             @RequestBody PageQuery<ProductionLinePageParams> pageQuery) {
         return Result.success(application.pageProductionLines(pageQuery));
@@ -185,6 +200,7 @@ public class FactoryStructureController {
      * 启用 ProductionLine。
      */
     @PatchMapping("/production-lines/{id}/enable")
+    @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<ProductionLineView> enableProductionLine(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableProductionLine(id, request.version()));
     }
@@ -193,6 +209,7 @@ public class FactoryStructureController {
      * 停用 ProductionLine。
      */
     @PatchMapping("/production-lines/{id}/disable")
+    @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<ProductionLineView> disableProductionLine(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableProductionLine(id, request.version()));
     }
@@ -202,6 +219,7 @@ public class FactoryStructureController {
      */
     @PostMapping("/workstations")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<WorkstationView> createWorkstation(@Valid @RequestBody CreateWorkstationRequest request) {
         return Result.success(application.createWorkstation(request.productionLineId(), request.code(), request.name(), request.status()));
     }
@@ -210,6 +228,7 @@ public class FactoryStructureController {
      * 更新 Workstation 名称。
      */
     @PutMapping("/workstations/{id}")
+    @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<WorkstationView> updateWorkstation(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
         return Result.success(application.updateWorkstation(id, request.name(), request.version()));
     }
@@ -218,6 +237,7 @@ public class FactoryStructureController {
      * 查询 Workstation 详情。
      */
     @GetMapping("/workstations/{id}")
+    @PreAuthorize("hasAuthority('mdm:factory:read')")
     public Result<WorkstationView> getWorkstation(@PathVariable String id) {
         return Result.success(application.getWorkstation(id));
     }
@@ -229,6 +249,7 @@ public class FactoryStructureController {
      * @return 统一 Workstation 分页结果
      */
     @PostMapping("/workstations/search")
+    @PreAuthorize("hasAuthority('mdm:factory:read')")
     public Result<PageResult<WorkstationView>> pageWorkstations(
             @RequestBody PageQuery<WorkstationPageParams> pageQuery) {
         return Result.success(application.pageWorkstations(pageQuery));
@@ -238,6 +259,7 @@ public class FactoryStructureController {
      * 启用 Workstation。
      */
     @PatchMapping("/workstations/{id}/enable")
+    @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<WorkstationView> enableWorkstation(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableWorkstation(id, request.version()));
     }
@@ -246,6 +268,7 @@ public class FactoryStructureController {
      * 停用 Workstation。
      */
     @PatchMapping("/workstations/{id}/disable")
+    @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<WorkstationView> disableWorkstation(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableWorkstation(id, request.version()));
     }
