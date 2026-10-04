@@ -29,7 +29,9 @@ import java.util.Set;
  *
  * <p>该类属于 Mini Auth 的 Application 层，负责用户生命周期、密码重置、引用保护、
  * User-Role 整体替换和事务边界。它可以直接依赖本模块 Mapper/Entity，但不承担 HTTP 协议、
- * 用户名密码认证或 Token 生命周期；这些职责分别属于 Controller 和 AuthenticationApplication。</p>
+ * 登录认证或 Token 生命周期；这些职责分别属于 Controller 和 AuthenticationApplication。
+ * 自助改密只确认当前密码，不建立新会话；本地事务以版本 CAS 提交，数据库故障直接失败，
+ * 不修改 Redis Token；该无状态组件不跨请求保留 Entity 或凭据。</p>
  *
  * <p>当前为 Level 1 分层，因此不为单表 CRUD 额外引入 Repository Port、ServiceImpl 或 Converter。</p>
  */
@@ -197,6 +199,46 @@ public class UserApplication {
         requireVersion(entity.getVersion(), version);
         entity.setPasswordHash(passwordEncoder.encode(newPassword));
         requireUpdateSucceeded(id, userMapper.updateById(entity));
+        return UserView.from(entity);
+    }
+
+    /**
+     * 修改本人显示名，不修改登录名、启用状态或角色。
+     * @param currentUserId Controller 从可信认证主体取得的用户 ID
+     * @param displayName 已校验显示名，入库前去除首尾空白
+     * @param version 客户端读取的版本；旧版本重放拒绝
+     * @return 更新后的用户视图，无密码摘要
+     * @throws AuthException 用户不存在或版本冲突时抛出，事务回滚
+     */
+    @Transactional
+    public UserView updateOwnProfile(String currentUserId, String displayName, long version) {
+        UserEntity entity = requireUser(currentUserId);
+        requireVersion(entity.getVersion(), version);
+        entity.setDisplayName(displayName.strip());
+        requireUpdateSucceeded(currentUserId, userMapper.updateById(entity));
+        return UserView.from(entity);
+    }
+
+    /**
+     * 确认原密码后修改本人密码摘要，不签发、刷新或撤销 Token。
+     * <p>比较摘要和 UPDATE 使用同一版本，防止管理员重置与个人改密并发时覆盖新密码。
+     * 该确认不是登录流程，不替代 AuthenticationManager。</p>
+     * @param currentUserId 可信认证主体的用户 ID
+     * @param currentPassword 原密码，保持原始字符，不规范化
+     * @param newPassword 已校验长度的新密码，不记录或返回明文
+     * @param version 当前版本；重复旧版本不再次执行写入
+     * @return 更新后的用户视图
+     * @throws AuthException 用户不存在、原密码错误或版本冲突时抛出，事务回滚
+     */
+    @Transactional
+    public UserView changeOwnPassword(String currentUserId, String currentPassword, String newPassword, long version) {
+        UserEntity entity = requireUser(currentUserId);
+        requireVersion(entity.getVersion(), version);
+        if (!passwordEncoder.matches(currentPassword, entity.getPasswordHash())) {
+            throw new AuthException(AuthErrorCode.CURRENT_PASSWORD_INVALID, AuthErrorCode.CURRENT_PASSWORD_INVALID.defaultMessage());
+        }
+        entity.setPasswordHash(passwordEncoder.encode(newPassword));
+        requireUpdateSucceeded(currentUserId, userMapper.updateById(entity));
         return UserView.from(entity);
     }
 

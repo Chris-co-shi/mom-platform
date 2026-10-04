@@ -13,6 +13,7 @@ class AuthExceptionHandlerTest {
 
     @Test
     void businessInputAndStateConflictsMustKeepRealHttpStatus() {
+        assertStatus(AuthErrorCode.CURRENT_PASSWORD_INVALID, HttpStatus.BAD_REQUEST);
         assertStatus(AuthErrorCode.RELATION_SELECTION_TOO_LARGE, HttpStatus.BAD_REQUEST);
         assertStatus(AuthErrorCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND);
         assertStatus(AuthErrorCode.ROLE_DISABLED, HttpStatus.CONFLICT);

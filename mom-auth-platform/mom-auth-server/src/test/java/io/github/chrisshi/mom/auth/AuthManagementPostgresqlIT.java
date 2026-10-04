@@ -74,6 +74,35 @@ class AuthManagementPostgresqlIT {
     private JdbcTemplate jdbcTemplate;
     @Autowired
     private Flyway flyway;
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
+    /** 通过真实 Spring 事务代理验证自助写入、版本推进、失败不改库及管理员重置冲突。 */
+    @Test
+    void selfServiceMustPersistOnlyAllowedFieldsAndRejectStaleCredentials() {
+        var user = userApplication.create("self.service", " OldPassword@123 ", "Before", true);
+        var other = userApplication.create("other.user", "OtherPassword@123", "Other", true);
+        var profile = userApplication.updateOwnProfile(user.id(), " After ", user.version());
+        assertThat(profile.version()).isEqualTo(user.version() + 1);
+        assertThat(profile.displayName()).isEqualTo("After");
+        assertThat(profile.username()).isEqualTo("self.service");
+        assertThat(userApplication.get(other.id())).isEqualTo(other);
+        assertError(() -> userApplication.changeOwnPassword(user.id(), "wrong", "NewPassword@123", profile.version()),
+            AuthErrorCode.CURRENT_PASSWORD_INVALID);
+        assertThat(userApplication.get(user.id()).version()).isEqualTo(profile.version());
+        var changed = userApplication.changeOwnPassword(user.id(), " OldPassword@123 ", " NewPassword@123 ", profile.version());
+        assertThat(changed.version()).isEqualTo(profile.version() + 1);
+        String hash = jdbcTemplate.queryForObject("select password_hash from auth_user where id=?", String.class, user.id());
+        assertThat(passwordEncoder.matches(" NewPassword@123 ", hash)).isTrue();
+        assertThat(passwordEncoder.matches(" OldPassword@123 ", hash)).isFalse();
+        var reset = userApplication.resetPassword(user.id(), "AdminReset@123", changed.version());
+        assertError(() -> userApplication.changeOwnPassword(user.id(), " NewPassword@123 ", "StalePassword@123", changed.version()),
+            AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
+        assertThat(userApplication.get(user.id()).version()).isEqualTo(reset.version());
+        assertError(() -> userApplication.updateOwnProfile(user.id(), "Stale", profile.version()),
+            AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
+        assertThat(userApplication.get(user.id()).displayName()).isEqualTo("After");
+    }
 
     /** 为隔离 PostgreSQL 容器注入动态连接参数并保持生产 PgJDBC 治理项。 */
     @DynamicPropertySource

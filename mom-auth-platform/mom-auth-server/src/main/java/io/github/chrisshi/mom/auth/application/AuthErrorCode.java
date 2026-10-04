@@ -9,6 +9,7 @@ import io.github.chrisshi.mom.core.error.ErrorCode;
  * V1 不启用 MessageSource/Locale 转换。</p>
  */
 public enum AuthErrorCode implements ErrorCode {
+    CURRENT_PASSWORD_INVALID("auth.current_password_invalid", "auth.error.current-password-invalid", "原密码不正确"),
     INVALID_CREDENTIALS("auth.invalid_credentials", "auth.error.invalid-credentials", "用户名或密码错误"),
     ACCOUNT_DISABLED("auth.account_disabled", "auth.error.account-disabled", "账号已停用"),
     AUTHENTICATION_SERVICE_UNAVAILABLE(
