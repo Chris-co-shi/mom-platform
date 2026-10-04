@@ -119,7 +119,7 @@ public class AuthExceptionHandler {
         return switch (errorCode) {
             case INVALID_CREDENTIALS -> HttpStatus.UNAUTHORIZED;
             case ACCOUNT_DISABLED -> HttpStatus.FORBIDDEN;
-            case RELATION_SELECTION_TOO_LARGE -> HttpStatus.BAD_REQUEST;
+            case RELATION_SELECTION_TOO_LARGE, CURRENT_PASSWORD_INVALID -> HttpStatus.BAD_REQUEST;
             case RESOURCE_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case USERNAME_CONFLICT, ROLE_CODE_CONFLICT, PERMISSION_CODE_CONFLICT,
                  ROLE_DISABLED, PERMISSION_DISABLED, RESOURCE_REFERENCED,

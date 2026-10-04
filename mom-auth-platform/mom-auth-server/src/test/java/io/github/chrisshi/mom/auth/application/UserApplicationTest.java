@@ -28,7 +28,57 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/** Auth 用户用例的隔离测试，验证更新白名单和失败分支，不替代真实数据库事务证据。 */
 class UserApplicationTest {
+
+    @Test
+    void ownProfileMustNotChangeUsernamePasswordOrEnabled() {
+        UserEntity entity = user("self", false, 3L);
+        entity.setUsername("operator");
+        entity.setPasswordHash("old-hash");
+        when(userMapper.selectById("self")).thenReturn(entity);
+        when(userMapper.updateById(entity)).thenReturn(1);
+        var result = application.updateOwnProfile("self", " 新名称 ", 3L);
+        assertThat(result.displayName()).isEqualTo("新名称");
+        assertThat(result.username()).isEqualTo("operator");
+        assertThat(result.enabled()).isFalse();
+        assertThat(entity.getPasswordHash()).isEqualTo("old-hash");
+    }
+
+    @Test
+    void ownPasswordMustRejectWrongPasswordWithoutWriting() {
+        UserEntity entity = user("self", true, 3L);
+        entity.setPasswordHash("old-hash");
+        when(userMapper.selectById("self")).thenReturn(entity);
+        assertError(() -> application.changeOwnPassword("self", "wrong", "NewPassword@123", 3L),
+            AuthErrorCode.CURRENT_PASSWORD_INVALID);
+        verify(userMapper, never()).updateById(any(UserEntity.class));
+        verify(passwordEncoder, never()).encode(any());
+    }
+
+    @Test
+    void ownPasswordMustPreserveWhitespaceAndDetectConcurrentUpdate() {
+        UserEntity entity = user("self", true, 3L);
+        entity.setPasswordHash("old-hash");
+        when(userMapper.selectById("self")).thenReturn(entity);
+        when(passwordEncoder.matches(" old password ", "old-hash")).thenReturn(true);
+        when(passwordEncoder.encode(" new password ")).thenReturn("new-hash");
+        when(userMapper.updateById(entity)).thenReturn(0);
+        assertError(() -> application.changeOwnPassword("self", " old password ", " new password ", 3L),
+            AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
+        verify(passwordEncoder).encode(" new password ");
+        verify(userMapper).updateById(entity);
+    }
+
+    @Test
+    void selfServiceMustRejectMissingUserAndStaleVersion() {
+        assertError(() -> application.updateOwnProfile("missing", "Name", 0L), AuthErrorCode.RESOURCE_NOT_FOUND);
+        when(userMapper.selectById("self")).thenReturn(user("self", true, 4L));
+        assertError(() -> application.changeOwnPassword("self", "old", "NewPassword@123", 3L),
+            AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
+        verify(passwordEncoder, never()).matches(any(), any());
+        verify(userMapper, never()).updateById(any(UserEntity.class));
+    }
 
     private UserMapper userMapper;
     private UserRoleMapper userRoleMapper;
