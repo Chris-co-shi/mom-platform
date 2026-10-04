@@ -17,6 +17,13 @@ class Finding:
     location: str
 
 
+MDM_LOCK_POLL_IT = pathlib.Path(
+    "mom-mdm-platform/mom-mdm-server/src/test/java/"
+    "io/github/chrisshi/mom/mdm/MdmMasterDataPostgresqlIT.java"
+)
+THREAD_SLEEP_PATTERN = re.compile(r"\bThread\s*\.\s*sleep\s*\(\s*([^)]*)\)")
+
+
 def local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
@@ -102,6 +109,25 @@ def strip_java_comments(source: str) -> str:
     return re.sub(r"//[^\n]*", "", source)
 
 
+def is_allowed_bounded_lock_poll(root: pathlib.Path, path: pathlib.Path, code: str) -> bool:
+    """只允许 MDM PostgreSQL 行锁观测中的单一、有界 50ms 条件轮询。"""
+    try:
+        relative = path.relative_to(root)
+    except ValueError:
+        return False
+    sleeps = THREAD_SLEEP_PATTERN.findall(code)
+    return (
+        relative == MDM_LOCK_POLL_IT
+        and len(sleeps) == 1
+        and sleeps[0].strip() == "50"
+        and "waitForPlantLockWait" in code
+        and re.search(r"attempt\s*<\s*40", code) is not None
+        and "pg_stat_activity" in code
+        and "wait_event_type = 'Lock'" in code
+        and "mdm_plant%FOR UPDATE" in code
+    )
+
+
 def validate_java_tests(root: pathlib.Path) -> list[Finding]:
     findings: list[Finding] = []
     for path in root.glob("**/src/test/**/*.java"):
@@ -110,7 +136,7 @@ def validate_java_tests(root: pathlib.Path) -> list[Finding]:
         if ("org.testcontainers" in code or "@Testcontainers" in code) \
                 and not re.search(r"(?:IT|ITCase)\.java$", path.name):
             findings.append(Finding("TB004", path, "Testcontainers"))
-        if re.search(r"\bThread\s*\.\s*sleep\s*\(", code):
+        if THREAD_SLEEP_PATTERN.search(code) and not is_allowed_bounded_lock_poll(root, path, code):
             findings.append(Finding("TB005", path, "Thread.sleep"))
         image_literals = re.findall(
             r'(?:DockerImageName\.parse|\w+Container(?:<[^>]+>)?)\s*\(\s*"([^"]+)"',
