@@ -39,9 +39,15 @@ class CrudBaselineTest(unittest.TestCase):
         report = self.check("web/item/ItemController.java", "import a.b.ItemRepository; class ItemController {}")
         self.assertTrue(report.errors)
 
-    def test_application_mapper_dependency_is_rejected(self):
-        report = self.check("application/item/ItemService.java", "import a.b.ItemMapper; class ItemService {}")
+    def test_non_level_one_application_mapper_dependency_is_rejected(self):
+        report = module.Report()
+        path = "mom-mes-platform/mom-mes-server/src/main/java/io/github/chrisshi/mom/mes/application/item/ItemService.java"
+        module.check_java_file(path, "import a.b.ItemMapper; class ItemService {}", report)
         self.assertTrue(report.errors)
+
+    def test_level_one_system_application_mapper_dependency_is_allowed(self):
+        report = self.check("application/item/ItemApplication.java", "import a.b.ItemMapper; class ItemApplication {}")
+        self.assertEqual([], report.errors)
 
     def test_level_one_auth_application_mapper_dependency_is_allowed(self):
         report = module.Report()
