@@ -1,17 +1,17 @@
 package io.github.chrisshi.mom.auth.controller;
 
 import io.github.chrisshi.mom.auth.application.RoleApplication;
+import io.github.chrisshi.mom.auth.application.model.AuthPageParams.RolePageParams;
 import io.github.chrisshi.mom.auth.controller.request.ChangeStatusRequest;
 import io.github.chrisshi.mom.auth.controller.request.CreateRoleRequest;
 import io.github.chrisshi.mom.auth.controller.request.ReplaceRolePermissionsRequest;
 import io.github.chrisshi.mom.auth.controller.request.UpdateRoleRequest;
 import io.github.chrisshi.mom.auth.controller.response.PermissionResponse;
 import io.github.chrisshi.mom.auth.controller.response.RoleResponse;
+import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -61,17 +60,13 @@ public class RoleController {
     /**
      * 分页查询角色目录。
      *
-     * @param pageNo 从 1 开始的页码
-     * @param pageSize 每页数量，最大 200
+     * @param pageQuery 包含明确空 Params 和分页信息的唯一请求体
      * @return 统一分页结果
      */
-    @GetMapping
+    @PostMapping("/search")
     @PreAuthorize("hasAuthority('auth:role:read')")
-    public Result<PageResult<RoleResponse>> list(
-        @RequestParam(defaultValue = "1") @Min(1) long pageNo,
-        @RequestParam(defaultValue = "50") @Min(1) @Max(200) int pageSize
-    ) {
-        return Result.success(roleApplication.list(pageNo, pageSize).map(RoleResponse::from));
+    public Result<PageResult<RoleResponse>> list(@RequestBody PageQuery<RolePageParams> pageQuery) {
+        return Result.success(roleApplication.list(pageQuery).map(RoleResponse::from));
     }
 
     /**

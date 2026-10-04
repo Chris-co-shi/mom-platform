@@ -23,21 +23,9 @@ public final class MdmMasterDataRules {
         return required(value, "code", 64);
     }
 
-    /** 校验中文名称。 */
-    public static String nameZh(String value) {
-        return required(value, "nameZh", 200);
-    }
-
-    /** 校验可空英文名称；空白值统一保存为 null。 */
-    public static String nameEn(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        String result = value.strip();
-        if (result.length() > 200) {
-            throw invalid("nameEn 长度不能超过 200");
-        }
-        return result;
+    /** 校验面向业务用户的必填名称；多语言显示由未来独立翻译表承载。 */
+    public static String name(String value) {
+        return required(value, "name", 200);
     }
 
     /** 校验状态只允许 ENABLED 或 DISABLED。 */
@@ -67,6 +55,20 @@ public final class MdmMasterDataRules {
             throw invalid("version 必须是非负整数");
         }
         return value;
+    }
+
+    /**
+     * 校验调用方读取到的版本与当前持久化版本一致。
+     *
+     * @param actual 当前实体版本
+     * @param expected 调用方提交的期望版本
+     * @throws MdmException 期望版本非法或与当前版本不一致时抛出稳定冲突异常
+     */
+    public static void requireVersion(Long actual, Long expected) {
+        long validated = version(expected);
+        if (actual == null || actual != validated) {
+            throw MdmException.versionConflict();
+        }
     }
 
     private static String required(String value, String field, int maxLength) {

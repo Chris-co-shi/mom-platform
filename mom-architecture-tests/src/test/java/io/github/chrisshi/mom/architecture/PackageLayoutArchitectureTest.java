@@ -143,7 +143,7 @@ class PackageLayoutArchitectureTest {
     void controllersMustNotDependOnMappers() {
         noClasses()
                 .that().resideInAnyPackage("..controller..", "..web..", "..interfaces.rest..")
-                .should().dependOnClassesThat().haveSimpleNameEndingWith("Mapper")
+                .should().dependOnClassesThat().areAssignableTo(MomBaseMapper.class)
                 .because("Controller/Web 只能通过 Application 进入业务")
                 .allowEmptyShould(true)
                 .check(productionClasses);
@@ -159,7 +159,6 @@ class PackageLayoutArchitectureTest {
         noClasses()
                 .that().resideInAnyPackage(
                         "io.github.chrisshi.mom.iam.application..",
-                        "io.github.chrisshi.mom.system.application..",
                         "io.github.chrisshi.mom.integration.application..",
                         "io.github.chrisshi.mom.mes.application..",
                         "io.github.chrisshi.mom.wms.application..",

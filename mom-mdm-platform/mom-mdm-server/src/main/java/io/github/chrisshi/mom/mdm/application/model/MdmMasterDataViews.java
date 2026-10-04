@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.mdm.application;
+package io.github.chrisshi.mom.mdm.application.model;
 
 import java.time.Instant;
 
@@ -13,39 +13,39 @@ public final class MdmMasterDataViews {
     }
 
     /** Plant 详情与分页视图。 */
-    public record PlantView(String id, String code, String nameZh, String nameEn, String status,
+    public record PlantView(String id, String code, String name, String status,
                             Instant createdAt, String createdBy, Instant updatedAt, String updatedBy, Long version) { }
 
     /** Workshop 详情与分页视图。 */
-    public record WorkshopView(String id, String code, String nameZh, String nameEn, String plantId, String status,
+    public record WorkshopView(String id, String code, String name, String plantId, String status,
                                Instant createdAt, String createdBy, Instant updatedAt, String updatedBy, Long version) { }
 
     /** ProductionLine 详情与分页视图。 */
-    public record ProductionLineView(String id, String code, String nameZh, String nameEn, String workshopId,
+    public record ProductionLineView(String id, String code, String name, String workshopId,
                                      String status, Instant createdAt, String createdBy, Instant updatedAt,
                                      String updatedBy, Long version) { }
 
     /** Workstation 详情与分页视图。 */
-    public record WorkstationView(String id, String code, String nameZh, String nameEn, String productionLineId,
+    public record WorkstationView(String id, String code, String name, String productionLineId,
                                   String status, Instant createdAt, String createdBy, Instant updatedAt,
                                   String updatedBy, Long version) { }
 
     /** Warehouse 详情与分页视图。 */
-    public record WarehouseView(String id, String code, String nameZh, String nameEn, String plantId, String status,
+    public record WarehouseView(String id, String code, String name, String plantId, String status,
                                 Instant createdAt, String createdBy, Instant updatedAt, String updatedBy, Long version) { }
 
     /** WarehouseArea 详情与分页视图。 */
-    public record WarehouseAreaView(String id, String code, String nameZh, String nameEn, String warehouseId,
+    public record WarehouseAreaView(String id, String code, String name, String warehouseId,
                                     String status, Instant createdAt, String createdBy, Instant updatedAt,
                                     String updatedBy, Long version) { }
 
     /** 动态 LocationType 详情与分页视图。 */
-    public record LocationTypeView(String id, String code, String nameZh, String nameEn, String status,
+    public record LocationTypeView(String id, String code, String name, String status,
                                    Instant createdAt, String createdBy, Instant updatedAt, String updatedBy,
                                    Long version) { }
 
     /** 统一可寻址 Location 详情与分页视图。 */
-    public record LocationView(String id, String code, String nameZh, String nameEn, String plantId,
+    public record LocationView(String id, String code, String name, String plantId,
                                String warehouseAreaId, String locationTypeId, String status, Instant createdAt,
                                String createdBy, Instant updatedAt, String updatedBy, Long version) { }
 }

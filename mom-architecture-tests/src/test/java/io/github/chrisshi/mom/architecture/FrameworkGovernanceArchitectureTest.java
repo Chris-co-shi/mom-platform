@@ -24,9 +24,7 @@ class FrameworkGovernanceArchitectureTest {
     private static final Pattern IMPORT = Pattern.compile("(?m)^\\s*import\\s+([^;]+);");
     private static final Pattern CONTEXT_PATH = Pattern.compile("^mom-([a-z0-9-]+)-platform/");
     private static final Set<String> TEMPORARY_SYSTEM_CACHE_EXCEPTIONS = Set.of();
-    private static final String SAS_JDBC_EXCEPTION =
-            "mom-iam-platform/mom-iam-server/src/main/java/io/github/chrisshi/mom/iam/security/"
-                    + "IamAuthorizationServerProtocolConfiguration.java";
+    private static final String SAS_JDBC_EXCEPTION = "";
 
     /** System/IAM 与业务层不得直接拥有通用 Cache/JDBC/Feign/Messaging 基础设施。 */
     @Test
@@ -35,7 +33,7 @@ class FrameworkGovernanceArchitectureTest {
         for (SourceFile source : productionSources()) {
             Set<String> imports = source.imports();
             boolean systemServer = source.path().startsWith("mom-system-platform/mom-system-server/");
-            boolean iamServer = source.path().startsWith("mom-iam-platform/mom-iam-server/");
+            boolean authServer = source.path().startsWith("mom-auth-platform/mom-auth-server/");
             boolean businessServer = source.path().matches("mom-[^/]+-platform/mom-[^/]+-server/.*");
             boolean domainOrApplication = businessServer && (source.path().contains("/domain/")
                     || source.path().contains("/application/"));
@@ -44,8 +42,8 @@ class FrameworkGovernanceArchitectureTest {
                     && !TEMPORARY_SYSTEM_CACHE_EXCEPTIONS.contains(source.path())) {
                 violations.add(source.path() + " System Server 直接依赖 Redis/Caffeine");
             }
-            if (iamServer && imports.stream().anyMatch(name -> name.startsWith("com.github.benmanes.caffeine"))) {
-                violations.add(source.path() + " IAM Server 直接依赖 Caffeine");
+            if (authServer && imports.stream().anyMatch(name -> name.startsWith("com.github.benmanes.caffeine"))) {
+                violations.add(source.path() + " Auth Server 直接依赖 Caffeine");
             }
             if (businessServer && imports.stream().anyMatch(FrameworkGovernanceArchitectureTest::isJdbcTemplate)
                     && !SAS_JDBC_EXCEPTION.equals(source.path())) {
@@ -143,26 +141,20 @@ class FrameworkGovernanceArchitectureTest {
         assertThat(violations).as("事务内部远程调用门禁").isEmpty();
     }
 
-    /** IAM revoked SID 必须保持 Security fail-closed 状态，不得伪装成 Cache 或提前创建事件模型。 */
+    /** Mini Auth V1 不得重新引入旧 IAM 的本地缓存、Redis 实现或事件模型。 */
     @Test
-    void iamSecurityStateMustReuseMomSecurityWithoutSpeculativeCacheOrEvents() throws Exception {
-        List<SourceFile> iamSources = productionSources().stream()
-                .filter(source -> source.path().startsWith("mom-iam-platform/"))
+    void authMustRemainFreeOfSpeculativeCacheAndEvents() throws Exception {
+        List<SourceFile> authSources = productionSources().stream()
+                .filter(source -> source.path().startsWith("mom-auth-platform/"))
                 .toList();
-        SourceFile revokedStore = iamSources.stream()
-                .filter(source -> source.path().endsWith("/IamRevokedSessionStore.java"))
-                .findFirst()
-                .orElseThrow();
-
-        assertThat(revokedStore.imports())
-                .contains(
-                        "io.github.chrisshi.mom.security.revocation.MomRevokedSessionKeys",
-                        "io.github.chrisshi.mom.security.revocation.MomRevocationStoreUnavailableException")
-                .noneMatch(name -> name.startsWith("io.github.chrisshi.mom.cache."))
-                .noneMatch(name -> name.startsWith("io.github.chrisshi.mom.resilience."));
-        assertThat(iamSources)
+        assertThat(authSources).isNotEmpty();
+        assertThat(authSources)
+                .flatExtracting(SourceFile::imports)
+                .noneMatch(FrameworkGovernanceArchitectureTest::isRedisOrCaffeine)
+                .noneMatch(name -> name.startsWith("io.github.chrisshi.mom.cache."));
+        assertThat(authSources)
                 .extracting(SourceFile::path)
-                .noneMatch(path -> path.endsWith("/IamEventType.java"));
+                .noneMatch(path -> path.endsWith("/AuthEventType.java") || path.endsWith("/IamEventType.java"));
     }
 
     /** System V1 不得重新引入 Redis/Caffeine、消息发布或本地事件枚举。 */

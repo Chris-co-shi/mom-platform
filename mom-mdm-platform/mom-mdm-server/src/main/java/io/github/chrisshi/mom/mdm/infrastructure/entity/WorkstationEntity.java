@@ -11,8 +11,7 @@ import lombok.Setter;
 @TableName("mdm_workstation")
 public class WorkstationEntity extends BaseEntity {
     private String code;
-    private String nameZh;
-    private String nameEn;
+    private String name;
     private String productionLineId;
     private String status;
 }

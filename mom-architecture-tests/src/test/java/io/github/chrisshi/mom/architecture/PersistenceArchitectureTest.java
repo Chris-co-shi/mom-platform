@@ -110,6 +110,7 @@ class PersistenceArchitectureTest {
         noClasses().that().resideInAnyPackage("..domain..")
                 .and().haveSimpleNameEndingWith("Repository")
                 .should().dependOnClassesThat().resideInAnyPackage("com.baomidou.mybatisplus..")
+                .allowEmptyShould(true)
                 .check(productionClasses);
     }
 

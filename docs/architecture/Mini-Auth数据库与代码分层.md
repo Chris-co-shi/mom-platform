@@ -117,7 +117,7 @@ Row / Projection    仅复杂 SQL 确实需要时出现
 分页依赖方向固定为：
 
 ```text
-HTTP pageNo/pageSize
+POST /资源/search + PageQuery<XxxPageParams>
         ↓
 Application
         ↓
@@ -156,7 +156,9 @@ Result<PageResult<RoleResponse>>
 Result<PageResult<PermissionResponse>>
 ```
 
-HTTP 参数仍为 `pageNo/pageSize`，默认 `1/50`，最大 `200`。
+HTTP 分页统一使用 `POST /users|roles|permissions/search`，请求体为
+`PageQuery<XxxPageParams>`。`params/pageNo/pageSize` 均必填且无默认值；当前 Auth Params 为空记录，
+JSON 必须显式传 `{}`。最大值由 `mom.data.pagination.max-page-size` 配置，超限返回 400，不静默截断。
 
 ## 6. 用户名密码认证
 

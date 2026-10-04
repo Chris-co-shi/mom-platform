@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.auth.application.model.RoleView;
 import io.github.chrisshi.mom.auth.application.model.UserView;
+import io.github.chrisshi.mom.auth.application.model.AuthPageParams.UserPageParams;
 import io.github.chrisshi.mom.auth.infrastructure.entity.RoleEntity;
 import io.github.chrisshi.mom.auth.infrastructure.entity.UserEntity;
 import io.github.chrisshi.mom.auth.infrastructure.entity.UserRoleEntity;
@@ -41,17 +42,29 @@ public class UserApplication {
     private final UserRoleMapper userRoleMapper;
     private final RoleMapper roleMapper;
     private final PasswordEncoder passwordEncoder;
+    private final PageAdapter pageAdapter;
 
+    /**
+     * 注入用户、关系、角色持久化能力、密码编码器和统一分页适配器。
+     *
+     * @param userMapper User 单表 Mapper
+     * @param userRoleMapper User-Role 关系 Mapper
+     * @param roleMapper Role 单表 Mapper
+     * @param passwordEncoder Spring Security 密码编码器
+     * @param pageAdapter 配置化分页适配器
+     */
     public UserApplication(
         UserMapper userMapper,
         UserRoleMapper userRoleMapper,
         RoleMapper roleMapper,
-        PasswordEncoder passwordEncoder
+        PasswordEncoder passwordEncoder,
+        PageAdapter pageAdapter
     ) {
         this.userMapper = userMapper;
         this.userRoleMapper = userRoleMapper;
         this.roleMapper = roleMapper;
         this.passwordEncoder = passwordEncoder;
+        this.pageAdapter = pageAdapter;
     }
 
     /**
@@ -101,19 +114,18 @@ public class UserApplication {
      * <p>分页元数据统一由 {@link PageAdapter} 适配 MyBatis-Plus Page，Application 不自行计算
      * offset、totalPages 或复制 records。排序固定为 username、id，保证跨页结果稳定。</p>
      *
-     * @param pageNo 从 1 开始的页码
-     * @param pageSize 每页数量
+     * @param pageQuery 包含明确空 Params 和分页信息的唯一业务入参
      * @return 平台统一分页结果
      */
-    public PageResult<UserView> list(long pageNo, int pageSize) {
-        Page<UserEntity> page = PageAdapter.toPage(new PageQuery<>(null, pageNo, pageSize));
+    public PageResult<UserView> list(PageQuery<UserPageParams> pageQuery) {
+        Page<UserEntity> page = pageAdapter.toPage(pageQuery);
         userMapper.selectPage(
             page,
             new LambdaQueryWrapper<UserEntity>()
                 .orderByAsc(UserEntity::getUsername)
                 .orderByAsc(UserEntity::getId)
         );
-        return PageAdapter.toResult(page, UserView::from);
+        return pageAdapter.toResult(page, UserView::from);
     }
 
     /**

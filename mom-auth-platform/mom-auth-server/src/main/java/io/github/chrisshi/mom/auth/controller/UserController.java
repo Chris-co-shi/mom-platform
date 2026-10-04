@@ -1,6 +1,7 @@
 package io.github.chrisshi.mom.auth.controller;
 
 import io.github.chrisshi.mom.auth.application.UserApplication;
+import io.github.chrisshi.mom.auth.application.model.AuthPageParams.UserPageParams;
 import io.github.chrisshi.mom.auth.controller.request.ChangeStatusRequest;
 import io.github.chrisshi.mom.auth.controller.request.CreateUserRequest;
 import io.github.chrisshi.mom.auth.controller.request.ReplaceUserRolesRequest;
@@ -8,11 +9,10 @@ import io.github.chrisshi.mom.auth.controller.request.ResetUserPasswordRequest;
 import io.github.chrisshi.mom.auth.controller.request.UpdateUserRequest;
 import io.github.chrisshi.mom.auth.controller.response.RoleResponse;
 import io.github.chrisshi.mom.auth.controller.response.UserResponse;
+import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,7 +22,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -63,17 +62,13 @@ public class UserController {
     /**
      * 分页查询用户目录。
      *
-     * @param pageNo 从 1 开始的页码
-     * @param pageSize 每页数量，最大 200
+     * @param pageQuery 包含明确空 Params 和分页信息的唯一请求体
      * @return 统一 Result 包装的 PageResult
      */
-    @GetMapping
+    @PostMapping("/search")
     @PreAuthorize("hasAuthority('auth:user:read')")
-    public Result<PageResult<UserResponse>> list(
-        @RequestParam(defaultValue = "1") @Min(1) long pageNo,
-        @RequestParam(defaultValue = "50") @Min(1) @Max(200) int pageSize
-    ) {
-        return Result.success(userApplication.list(pageNo, pageSize).map(UserResponse::from));
+    public Result<PageResult<UserResponse>> list(@RequestBody PageQuery<UserPageParams> pageQuery) {
+        return Result.success(userApplication.list(pageQuery).map(UserResponse::from));
     }
 
     /**

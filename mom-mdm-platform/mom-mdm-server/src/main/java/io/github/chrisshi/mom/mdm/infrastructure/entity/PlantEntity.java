@@ -16,7 +16,6 @@ import lombok.Setter;
 @TableName("mdm_plant")
 public class PlantEntity extends BaseEntity {
     private String code;
-    private String nameZh;
-    private String nameEn;
+    private String name;
     private String status;
 }

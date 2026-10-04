@@ -35,6 +35,7 @@ class RuntimeSecurityArchitectureTest {
                         "org.springframework.data.redis..",
                         "org.springframework.security..")
                 .because("Domain 必须与认证上下文、远端传输和 Redis 基础设施解耦")
+                .allowEmptyShould(true)
                 .check(productionClasses);
     }
 
@@ -101,6 +102,7 @@ class RuntimeSecurityArchitectureTest {
                         "io.github.chrisshi.mom.cache.redis..",
                         "io.github.chrisshi.mom.cache.config..",
                         "io.github.chrisshi.mom.gateway.security..",
+                        "io.github.chrisshi.mom.security.token..",
                         "io.github.chrisshi.mom.iam.security..",
                         "..infrastructure..",
                         "..configuration..",

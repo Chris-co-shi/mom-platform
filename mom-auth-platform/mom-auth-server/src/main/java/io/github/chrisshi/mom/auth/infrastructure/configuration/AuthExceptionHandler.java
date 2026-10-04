@@ -3,10 +3,12 @@ package io.github.chrisshi.mom.auth.infrastructure.configuration;
 import io.github.chrisshi.mom.auth.application.AuthErrorCode;
 import io.github.chrisshi.mom.auth.application.AuthException;
 import io.github.chrisshi.mom.auth.controller.response.FieldErrorResponse;
+import io.github.chrisshi.mom.core.page.PageQueryValidationException;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -50,6 +52,52 @@ public class AuthExceptionHandler {
         return ResponseEntity.badRequest().body(
             Result.failure("request.validation_failed", "请求参数校验失败", fieldErrors)
         );
+    }
+
+    /** 将配置化分页校验失败转换为稳定的 400 响应。 */
+    @ExceptionHandler(PageQueryValidationException.class)
+    ResponseEntity<Result<List<FieldErrorResponse>>> handlePageQueryValidation(
+        PageQueryValidationException exception
+    ) {
+        return paginationFailure(exception);
+    }
+
+    /**
+     * 将分页记录构造失败或其他不可读 JSON 转换为安全的 400 响应。
+     *
+     * <p>分页紧凑构造器异常会被 Jackson 包装，因此沿 Cause 链识别；其他解析错误不回显内部类型。</p>
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    ResponseEntity<? extends Result<?>> handleUnreadableBody(HttpMessageNotReadableException exception) {
+        PageQueryValidationException pageException = findPageQueryValidation(exception);
+        if (pageException != null) {
+            return paginationFailure(pageException);
+        }
+        return ResponseEntity.badRequest().body(
+            Result.failure("request.invalid_body", "请求体格式或字段类型非法")
+        );
+    }
+
+    private static ResponseEntity<Result<List<FieldErrorResponse>>> paginationFailure(
+        PageQueryValidationException exception
+    ) {
+        List<FieldErrorResponse> errors = List.of(
+            new FieldErrorResponse(exception.field(), "invalid", exception.getMessage())
+        );
+        return ResponseEntity.badRequest().body(
+            Result.failure("request.pagination_invalid", "分页参数非法", errors)
+        );
+    }
+
+    private static PageQueryValidationException findPageQueryValidation(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof PageQueryValidationException pageException) {
+                return pageException;
+            }
+            current = current.getCause();
+        }
+        return null;
     }
 
     private static FieldErrorResponse toFieldError(FieldError error) {

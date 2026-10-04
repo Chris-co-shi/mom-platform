@@ -133,9 +133,16 @@ MOM 不引入通用 `ApiResponse<T>` 成功信封。HTTP 已表达状态；通�
 
 ### 8.1 控制面/中小列表
 
-- 允许 `limit/offset`；默认 `limit=50`，最大 200，`offset >= 0`；非法值返回 400，不静默纠正；
+- 分页检索统一使用 `POST /资源/search`，请求体为强类型 `PageQuery<XxxPageParams>`；集合根路径的
+  `POST` 继续用于创建，禁止同时保留旧 GET 分页协议；
+- `pageNo`、`pageSize` 和 `params` 必填；`pageNo/pageSize` 必须为正数，`params` 没有过滤条件时传
+  空对象 `{}`，禁止传 `null`、无类型 `Map` 或由服务端补默认值；
+- 最大单页条数由 `mom.data.pagination.max-page-size` 配置；超限及其他非法值在 SQL 执行前返回 400，
+  禁止静默纠正或由 MyBatis-Plus 截断；
 - 必须稳定排序；相同排序值追加唯一 String ID 作为 tie-breaker；
-- 不返回 MyBatis `Page`；承诺总数时结构为 `items/total/limit/offset`；不承诺 `total` 时不得伪造或强制昂贵 Count。
+- Controller 与 Application 均只接收 `PageQuery<XxxPageParams>` 这一项分页业务入参；Infrastructure
+  可以接收由它转换出的 `IPage` 与强类型 Params，不得手工重复实现 Count、Offset 或 PageResult；
+- 不返回 MyBatis `Page`；承诺总数时复用平台 `PageResult`；不承诺 `total` 时不得伪造或强制昂贵 Count。
 
 ### 8.2 高数据量流水/事件/审计/追溯
 
@@ -144,7 +151,7 @@ MOM 不引入通用 `ApiResponse<T>` 成功信封。HTTP 已表达状态；通�
 ### 8.3 排序与过滤
 
 - 排序字段必须白名单化并明确 ASC/DESC；客户端字段名不得直接拼 SQL；禁止任意表达式排序；
-- 过滤使用显式 Query 参数或 Query DTO；不支持任意字段/操作符/SQL；
+- 普通分页过滤使用 `PageQuery.params` 内的强类型业务参数；不支持任意字段、无类型操作符或 SQL；
 - 日期范围为闭开区间 `[from, to)`；大小写、模糊匹配、空值语义必须逐接口说明；
 - 批量 ID 查询必须有数量上限。
 

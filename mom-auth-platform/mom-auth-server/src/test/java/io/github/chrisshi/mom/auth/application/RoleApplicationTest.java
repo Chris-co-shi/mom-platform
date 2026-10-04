@@ -7,6 +7,7 @@ import io.github.chrisshi.mom.auth.infrastructure.mapper.PermissionMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RoleMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RolePermissionMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.UserRoleMapper;
+import io.github.chrisshi.mom.data.page.PageAdapter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -41,7 +42,8 @@ class RoleApplicationTest {
         userRoleMapper = mock(UserRoleMapper.class);
         rolePermissionMapper = mock(RolePermissionMapper.class);
         permissionMapper = mock(PermissionMapper.class);
-        application = new RoleApplication(roleMapper, userRoleMapper, rolePermissionMapper, permissionMapper);
+        application = new RoleApplication(roleMapper, userRoleMapper, rolePermissionMapper, permissionMapper,
+            new PageAdapter(200));
     }
 
     @Test

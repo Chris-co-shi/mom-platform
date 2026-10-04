@@ -1,14 +1,16 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.mdm.application.LocationMasterDataApplication;
-import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.LocationTypeView;
-import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.LocationView;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.LocationPageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.LocationTypePageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmMasterDataViews.LocationTypeView;
+import io.github.chrisshi.mom.mdm.application.model.MdmMasterDataViews.LocationView;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,12 +19,11 @@ import org.springframework.web.bind.annotation.*;
 /**
  * LocationType 和统一可寻址 Location 的 HTTP 协议边界。
  *
- * <p>Controller 不解释动态 Type Code，也不暴露占用、预留、库存、容器或 AGV 字段。所有端点要求认证，
- * 引用校验、事务和乐观并发由 Application 负责。</p>
+ * <p>Controller 不解释动态 Type Code，也不暴露占用、预留、库存、容器或 AGV 字段。读写端点分别要求
+ * {@code mdm:location:read} 与 {@code mdm:location:write} 权限，引用校验、事务和乐观并发由 Application 负责。</p>
  */
 @RestController
 @RequestMapping("/api/mdm")
-@PreAuthorize("isAuthenticated()")
 public class LocationMasterDataController {
     private final LocationMasterDataApplication application;
 
@@ -38,38 +39,47 @@ public class LocationMasterDataController {
      */
     @PostMapping("/location-types")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationTypeView> createLocationType(@Valid @RequestBody CreateLocationTypeRequest request) {
-        return Result.success(application.createLocationType(request.code(), request.nameZh(), request.nameEn(), request.status()));
+        return Result.success(application.createLocationType(request.code(), request.name(), request.status()));
     }
 
     /**
      * 更新 LocationType 名称，不接收 Code。
      */
     @PutMapping("/location-types/{id}")
+    @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationTypeView> updateLocationType(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
-        return Result.success(application.updateLocationType(id, request.nameZh(), request.nameEn(), request.version()));
+        return Result.success(application.updateLocationType(id, request.name(), request.version()));
     }
 
     /**
      * 查询 LocationType 详情。
      */
     @GetMapping("/location-types/{id}")
+    @PreAuthorize("hasAuthority('mdm:location:read')")
     public Result<LocationTypeView> getLocationType(@PathVariable String id) {
         return Result.success(application.getLocationType(id));
     }
 
     /**
      * 分页查询 LocationType。
+     *
+     * @param pageQuery 包含空 LocationType Params 和分页信息的唯一请求体
+     * @return 统一 LocationType 分页结果
      */
-    @GetMapping("/location-types")
-    public Result<PageResult<LocationTypeView>> pageLocationTypes(@RequestParam(defaultValue = "1") @Positive long pageNo, @RequestParam(defaultValue = "20") @Positive long pageSize) {
-        return Result.success(application.pageLocationTypes(pageNo, pageSize));
+    @PostMapping("/location-types/search")
+    @PreAuthorize("hasAuthority('mdm:location:read')")
+    public Result<PageResult<LocationTypeView>> pageLocationTypes(
+            @RequestBody PageQuery<LocationTypePageParams> pageQuery) {
+        return Result.success(application.pageLocationTypes(pageQuery));
     }
 
     /**
      * 启用 LocationType，不执行 Type Code 分支。
      */
     @PatchMapping("/location-types/{id}/enable")
+    @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationTypeView> enableLocationType(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableLocationType(id, request.version()));
     }
@@ -78,6 +88,7 @@ public class LocationMasterDataController {
      * 停用 LocationType，不级联 Location。
      */
     @PatchMapping("/location-types/{id}/disable")
+    @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationTypeView> disableLocationType(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableLocationType(id, request.version()));
     }
@@ -87,41 +98,47 @@ public class LocationMasterDataController {
      */
     @PostMapping("/locations")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationView> createLocation(@Valid @RequestBody CreateLocationRequest request) {
-        return Result.success(application.createLocation(request.plantId(), request.warehouseAreaId(), request.locationTypeId(), request.code(), request.nameZh(), request.nameEn(), request.status()));
+        return Result.success(application.createLocation(request.plantId(), request.warehouseAreaId(), request.locationTypeId(), request.code(), request.name(), request.status()));
     }
 
     /**
      * 更新 Location 名称，不接收 Code 或引用字段。
      */
     @PutMapping("/locations/{id}")
+    @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationView> updateLocation(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
-        return Result.success(application.updateLocation(id, request.nameZh(), request.nameEn(), request.version()));
+        return Result.success(application.updateLocation(id, request.name(), request.version()));
     }
 
     /**
      * 查询 Location 详情。
      */
     @GetMapping("/locations/{id}")
+    @PreAuthorize("hasAuthority('mdm:location:read')")
     public Result<LocationView> getLocation(@PathVariable String id) {
         return Result.success(application.getLocation(id));
     }
 
     /**
      * 可按 plantId、warehouseAreaId 组合分页查询 Location。
+     *
+     * @param pageQuery 包含可选 Plant、WarehouseArea ID 和分页信息的唯一请求体
+     * @return 统一 Location 分页结果
      */
-    @GetMapping("/locations")
-    public Result<PageResult<LocationView>> pageLocations(@RequestParam(required = false) String plantId,
-                                                          @RequestParam(required = false) String warehouseAreaId,
-                                                          @RequestParam(defaultValue = "1") @Positive long pageNo,
-                                                          @RequestParam(defaultValue = "20") @Positive long pageSize) {
-        return Result.success(application.pageLocations(plantId, warehouseAreaId, pageNo, pageSize));
+    @PostMapping("/locations/search")
+    @PreAuthorize("hasAuthority('mdm:location:read')")
+    public Result<PageResult<LocationView>> pageLocations(
+            @RequestBody PageQuery<LocationPageParams> pageQuery) {
+        return Result.success(application.pageLocations(pageQuery));
     }
 
     /**
      * 启用 Location。
      */
     @PatchMapping("/locations/{id}/enable")
+    @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationView> enableLocation(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableLocation(id, request.version()));
     }
@@ -130,6 +147,7 @@ public class LocationMasterDataController {
      * 停用 Location，不改变运行时事实。
      */
     @PatchMapping("/locations/{id}/disable")
+    @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationView> disableLocation(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableLocation(id, request.version()));
     }
@@ -138,15 +156,14 @@ public class LocationMasterDataController {
      * LocationType 创建请求。
      */
     public record CreateLocationTypeRequest(@NotBlank @Size(max = 64) String code,
-                                            @NotBlank @Size(max = 200) String nameZh, @Size(max = 200) String nameEn,
-                                            @NotBlank String status) {
+                                            @NotBlank @Size(max = 200) String name, @NotBlank String status) {
     }
 
     /**
      * Location 创建请求；warehouseAreaId 可空，其余引用必填。
      */
-    public record CreateLocationRequest(@NotBlank @Size(max = 64) String code, @NotBlank @Size(max = 200) String nameZh,
-                                        @Size(max = 200) String nameEn, @NotBlank @Size(max = 19) String plantId,
+    public record CreateLocationRequest(@NotBlank @Size(max = 64) String code, @NotBlank @Size(max = 200) String name,
+                                        @NotBlank @Size(max = 19) String plantId,
                                         @Size(max = 19) String warehouseAreaId,
                                         @NotBlank @Size(max = 19) String locationTypeId, @NotBlank String status) {
     }
@@ -154,8 +171,7 @@ public class LocationMasterDataController {
     /**
      * 只更新名称与 Version 的请求，不允许修改 Code 或引用。
      */
-    public record UpdateNameRequest(@NotBlank @Size(max = 200) String nameZh, @Size(max = 200) String nameEn,
-                                    @NotNull Long version) {
+    public record UpdateNameRequest(@NotBlank @Size(max = 200) String name, @NotNull Long version) {
     }
 
     /**

@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.data.page.PageAdapter;
-import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.LocationTypeView;
-import io.github.chrisshi.mom.mdm.application.MdmMasterDataViews.LocationView;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.LocationPageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.LocationTypePageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmMasterDataViews.LocationTypeView;
+import io.github.chrisshi.mom.mdm.application.model.MdmMasterDataViews.LocationView;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.LocationEntity;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.LocationTypeEntity;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.PlantEntity;
@@ -21,11 +23,14 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireVersion;
+
 /**
  * LocationType 与统一可寻址 Location 的 Level 1 用例及本地事务边界。
  *
- * <p>LocationType 是动态分类，代码中不按 Type Code 分支。Location 创建时校验 Plant、LocationType 以及
- * 可选 WarehouseArea 的完整关系；不保存占用、预留、库存、容器或 AGV 运行时事实。</p>
+ * <p>LocationType 是动态分类，代码中不按 Type Code 分支。Location 创建或启用时锁定 Plant 与可选
+ * WarehouseArea，并校验 LocationType 引用，使层级父级停用不能与子级写交叉提交；不保存占用、预留、
+ * 库存、容器或 AGV 运行时事实，数据库或锁等待失败时本地事务整体回滚。</p>
  */
 @Component
 public class LocationMasterDataApplication {
@@ -34,24 +39,35 @@ public class LocationMasterDataApplication {
     private final WarehouseAreaMapper warehouseAreaMapper;
     private final LocationTypeMapper locationTypeMapper;
     private final LocationMapper locationMapper;
+    private final PageAdapter pageAdapter;
 
-    /** 注入 Location 本地引用校验及单表持久化 Mapper。 */
+    /**
+     * 注入 Location 本地引用校验 Mapper、单表持久化 Mapper 与统一分页适配器。
+     *
+     * @param plantMapper Plant 单表 Mapper
+     * @param warehouseMapper Warehouse 单表 Mapper
+     * @param warehouseAreaMapper WarehouseArea 单表 Mapper
+     * @param locationTypeMapper LocationType 单表 Mapper
+     * @param locationMapper Location 单表 Mapper
+     * @param pageAdapter 配置化分页适配器
+     */
     public LocationMasterDataApplication(PlantMapper plantMapper, WarehouseMapper warehouseMapper,
                                          WarehouseAreaMapper warehouseAreaMapper, LocationTypeMapper locationTypeMapper,
-                                         LocationMapper locationMapper) {
+                                         LocationMapper locationMapper, PageAdapter pageAdapter) {
         this.plantMapper = plantMapper;
         this.warehouseMapper = warehouseMapper;
         this.warehouseAreaMapper = warehouseAreaMapper;
         this.locationTypeMapper = locationTypeMapper;
         this.locationMapper = locationMapper;
+        this.pageAdapter = pageAdapter;
     }
 
     /** 创建平台唯一 Code 的动态 LocationType。 */
     @Transactional
-    public LocationTypeView createLocationType(String code, String nameZh, String nameEn, String status) {
+    public LocationTypeView createLocationType(String code, String name, String status) {
         LocationTypeEntity entity = new LocationTypeEntity();
         entity.setCode(MdmMasterDataRules.code(code));
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         entity.setStatus(MdmMasterDataRules.status(status));
         insert(() -> locationTypeMapper.insert(entity), "LocationType");
         return toView(entity);
@@ -59,10 +75,10 @@ public class LocationMasterDataApplication {
 
     /** 更新 LocationType 名称，不允许修改 Code。 */
     @Transactional
-    public LocationTypeView updateLocationType(String id, String nameZh, String nameEn, Long version) {
+    public LocationTypeView updateLocationType(String id, String name, Long version) {
         LocationTypeEntity entity = requireLocationType(id);
         requireVersion(entity.getVersion(), version);
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         requireUpdated(locationTypeMapper.updateById(entity), () -> locationTypeMapper.selectById(entity.getId()),
                 "LocationType");
         return toView(entity);
@@ -72,13 +88,18 @@ public class LocationMasterDataApplication {
     @Transactional(readOnly = true)
     public LocationTypeView getLocationType(String id) { return toView(requireLocationType(id)); }
 
-    /** 稳定排序分页查询 LocationType，分页转换复用 PageAdapter。 */
+    /**
+     * 稳定排序分页查询 LocationType。
+     *
+     * @param pageQuery 包含空 LocationType Params 和分页信息的唯一业务入参
+     * @return 统一分页结果；只读、幂等且无持久化副作用
+     */
     @Transactional(readOnly = true)
-    public PageResult<LocationTypeView> pageLocationTypes(long pageNo, long pageSize) {
-        Page<LocationTypeEntity> page = PageAdapter.toPage(new PageQuery<>(null, pageNo, pageSize));
+    public PageResult<LocationTypeView> pageLocationTypes(PageQuery<LocationTypePageParams> pageQuery) {
+        Page<LocationTypeEntity> page = pageAdapter.toPage(pageQuery);
         locationTypeMapper.selectPage(page, new LambdaQueryWrapper<LocationTypeEntity>()
                 .orderByAsc(LocationTypeEntity::getCode).orderByAsc(LocationTypeEntity::getId));
-        return PageAdapter.toResult(page, LocationMasterDataApplication::toView);
+        return pageAdapter.toResult(page, LocationMasterDataApplication::toView);
     }
 
     /** 启用 LocationType，不按类型 Code 执行任何业务分支。 */
@@ -90,15 +111,15 @@ public class LocationMasterDataApplication {
     public LocationTypeView disableLocationType(String id, Long version) { return changeTypeStatus(id, MdmMasterDataRules.DISABLED, version); }
 
     /**
-     * 创建 Location；Plant 及可选 WarehouseArea 必须已启用，WarehouseArea 非空时还必须通过 Warehouse
+     * 创建 Location；Plant 及可选 Warehouse → WarehouseArea 链必须已启用，WarehouseArea 非空时还必须
      * 归属于同一 Plant。LocationType 是分类引用而非层级父级，本用例仅要求其存在。
      *
      * @throws MdmException Plant、LocationType、WarehouseArea 不存在或区域与 Plant 不一致时抛出
      */
     @Transactional
     public LocationView createLocation(String plantId, String warehouseAreaId, String locationTypeId, String code,
-                                       String nameZh, String nameEn, String status) {
-        PlantEntity plant = requirePlant(plantId);
+                                       String name, String status) {
+        PlantEntity plant = requirePlantForUpdate(plantId);
         LocationTypeEntity locationType = requireLocationType(locationTypeId);
         MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
         String validatedAreaId = validateAreaBelongsToPlant(warehouseAreaId, plant.getId());
@@ -107,7 +128,7 @@ public class LocationMasterDataApplication {
         entity.setWarehouseAreaId(validatedAreaId);
         entity.setLocationTypeId(locationType.getId());
         entity.setCode(MdmMasterDataRules.code(code));
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         entity.setStatus(MdmMasterDataRules.status(status));
         insert(() -> locationMapper.insert(entity), "Location");
         return toView(entity);
@@ -115,10 +136,10 @@ public class LocationMasterDataApplication {
 
     /** 更新 Location 名称，不允许改变 Code、Plant、WarehouseArea 或 LocationType。 */
     @Transactional
-    public LocationView updateLocation(String id, String nameZh, String nameEn, Long version) {
+    public LocationView updateLocation(String id, String name, Long version) {
         LocationEntity entity = requireLocation(id);
         requireVersion(entity.getVersion(), version);
-        setNames(entity, nameZh, nameEn);
+        setName(entity, name);
         requireUpdated(locationMapper.updateById(entity), () -> locationMapper.selectById(entity.getId()), "Location");
         return toView(entity);
     }
@@ -127,18 +148,27 @@ public class LocationMasterDataApplication {
     @Transactional(readOnly = true)
     public LocationView getLocation(String id) { return toView(requireLocation(id)); }
 
-    /** 可按 Plant、WarehouseArea 组合过滤并稳定排序分页查询 Location。 */
+    /**
+     * 可按 Plant、WarehouseArea 组合过滤并稳定排序分页查询 Location。
+     *
+     * @param pageQuery 包含可选 Plant、WarehouseArea ID 和分页信息的唯一业务入参
+     * @return 统一分页结果；只读、幂等且无持久化副作用
+     * @throws MdmException 任一过滤 ID 格式非法时抛出
+     */
     @Transactional(readOnly = true)
-    public PageResult<LocationView> pageLocations(String plantId, String warehouseAreaId, long pageNo, long pageSize) {
-        Page<LocationEntity> page = PageAdapter.toPage(new PageQuery<>(plantId, pageNo, pageSize));
+    public PageResult<LocationView> pageLocations(PageQuery<LocationPageParams> pageQuery) {
+        LocationPageParams params = pageQuery.params();
+        Page<LocationEntity> page = pageAdapter.toPage(pageQuery);
         LambdaQueryWrapper<LocationEntity> query = new LambdaQueryWrapper<>();
+        String plantId = params.plantId();
+        String warehouseAreaId = params.warehouseAreaId();
         if (plantId != null && !plantId.isBlank()) query.eq(LocationEntity::getPlantId,
                 MdmMasterDataRules.id(plantId, "plantId"));
         if (warehouseAreaId != null && !warehouseAreaId.isBlank()) query.eq(LocationEntity::getWarehouseAreaId,
                 MdmMasterDataRules.id(warehouseAreaId, "warehouseAreaId"));
         query.orderByAsc(LocationEntity::getCode).orderByAsc(LocationEntity::getId);
         locationMapper.selectPage(page, query);
-        return PageAdapter.toResult(page, LocationMasterDataApplication::toView);
+        return pageAdapter.toResult(page, LocationMasterDataApplication::toView);
     }
 
     /** 启用 Location。 */
@@ -163,7 +193,7 @@ public class LocationMasterDataApplication {
         LocationEntity entity = requireLocation(id);
         requireVersion(entity.getVersion(), version);
         if (MdmMasterDataRules.ENABLED.equals(status)) {
-            PlantEntity plant = requirePlant(entity.getPlantId());
+            PlantEntity plant = requirePlantForUpdate(entity.getPlantId());
             requireLocationType(entity.getLocationTypeId());
             MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
             validateAreaBelongsToPlant(entity.getWarehouseAreaId(), plant.getId());
@@ -176,11 +206,19 @@ public class LocationMasterDataApplication {
 
     private String validateAreaBelongsToPlant(String areaId, String plantId) {
         if (areaId == null || areaId.isBlank()) return null;
-        WarehouseAreaEntity area = warehouseAreaMapper.selectById(MdmMasterDataRules.id(areaId, "warehouseAreaId"));
-        if (area == null) throw MdmException.notFound("WarehouseArea");
+        String validatedAreaId = MdmMasterDataRules.id(areaId, "warehouseAreaId");
+        WarehouseAreaEntity areaSnapshot = warehouseAreaMapper.selectById(validatedAreaId);
+        if (areaSnapshot == null) throw MdmException.notFound("WarehouseArea");
+        WarehouseEntity warehouseSnapshot = warehouseMapper.selectById(areaSnapshot.getWarehouseId());
+        if (warehouseSnapshot == null) throw MdmException.notFound("Warehouse");
+
+        WarehouseEntity warehouse = warehouseMapper.selectByIdForUpdate(warehouseSnapshot.getId());
+        WarehouseAreaEntity area = warehouseAreaMapper.selectByIdForUpdate(validatedAreaId);
+        if (warehouse == null || area == null || !warehouse.getId().equals(area.getWarehouseId())) {
+            throw MdmException.invalidReference("WarehouseArea 父链在并发修改中发生变化");
+        }
+        MdmMasterDataRules.requireEnabled(warehouse.getStatus(), "Warehouse");
         MdmMasterDataRules.requireEnabled(area.getStatus(), "WarehouseArea");
-        WarehouseEntity warehouse = warehouseMapper.selectById(area.getWarehouseId());
-        if (warehouse == null) throw MdmException.notFound("Warehouse");
         if (!plantId.equals(warehouse.getPlantId())) {
             throw MdmException.invalidReference("WarehouseArea 不属于 Location 指定的 Plant");
         }
@@ -189,6 +227,13 @@ public class LocationMasterDataApplication {
 
     private PlantEntity requirePlant(String id) {
         PlantEntity entity = plantMapper.selectById(MdmMasterDataRules.id(id, "plantId"));
+        if (entity == null) throw MdmException.notFound("Plant");
+        return entity;
+    }
+
+    /** 锁定 Plant，使 Location 创建、启用与 Plant 停用在同一数据库顺序中完成。 */
+    private PlantEntity requirePlantForUpdate(String id) {
+        PlantEntity entity = plantMapper.selectByIdForUpdate(MdmMasterDataRules.id(id, "plantId"));
         if (entity == null) throw MdmException.notFound("Plant");
         return entity;
     }
@@ -205,11 +250,6 @@ public class LocationMasterDataApplication {
         return entity;
     }
 
-    private static void requireVersion(Long actual, Long expected) {
-        long value = MdmMasterDataRules.version(expected);
-        if (actual == null || actual != value) throw MdmException.versionConflict();
-    }
-
     private static void insert(IntOperation operation, String resourceName) {
         try { operation.execute(); } catch (DuplicateKeyException exception) { throw MdmException.codeConflict(resourceName); }
     }
@@ -220,10 +260,10 @@ public class LocationMasterDataApplication {
         throw MdmException.versionConflict();
     }
 
-    private static void setNames(LocationTypeEntity e, String zh, String en) { e.setNameZh(MdmMasterDataRules.nameZh(zh)); e.setNameEn(MdmMasterDataRules.nameEn(en)); }
-    private static void setNames(LocationEntity e, String zh, String en) { e.setNameZh(MdmMasterDataRules.nameZh(zh)); e.setNameEn(MdmMasterDataRules.nameEn(en)); }
-    private static LocationTypeView toView(LocationTypeEntity e) { return new LocationTypeView(e.getId(), e.getCode(), e.getNameZh(), e.getNameEn(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
-    private static LocationView toView(LocationEntity e) { return new LocationView(e.getId(), e.getCode(), e.getNameZh(), e.getNameEn(), e.getPlantId(), e.getWarehouseAreaId(), e.getLocationTypeId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
+    private static void setName(LocationTypeEntity e, String name) { e.setName(MdmMasterDataRules.name(name)); }
+    private static void setName(LocationEntity e, String name) { e.setName(MdmMasterDataRules.name(name)); }
+    private static LocationTypeView toView(LocationTypeEntity e) { return new LocationTypeView(e.getId(), e.getCode(), e.getName(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
+    private static LocationView toView(LocationEntity e) { return new LocationView(e.getId(), e.getCode(), e.getName(), e.getPlantId(), e.getWarehouseAreaId(), e.getLocationTypeId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
 
     @FunctionalInterface private interface IntOperation { int execute(); }
     @FunctionalInterface private interface EntityLookup { Object find(); }
