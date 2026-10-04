@@ -68,6 +68,20 @@ jobs:
 """
 
 
+BOUNDED_LOCK_POLL_SOURCE = """\
+class MdmMasterDataPostgresqlIT {
+    private boolean waitForPlantLockWait() throws Exception {
+        for (int attempt = 0; attempt < 40; attempt++) {
+            String sql = "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query ILIKE '%mdm_plant%FOR UPDATE%'";
+            if (sql.isEmpty()) return true;
+            Thread.sleep(50);
+        }
+        return false;
+    }
+}
+"""
+
+
 class BaselineTest(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
@@ -122,6 +136,24 @@ class BaselineTest(unittest.TestCase):
         path = self.root / "module/src/test/java/SlowTest.java"
         path.parent.mkdir(parents=True)
         path.write_text("class SlowTest { void waitForIt() throws Exception { Thread.sleep(10000); } }", encoding="utf-8")
+        self.assertIn("TB005", self.rules())
+
+    def test_accepts_exact_bounded_postgresql_lock_poll(self) -> None:
+        path = self.root / MODULE.MDM_LOCK_POLL_IT
+        path.parent.mkdir(parents=True)
+        path.write_text(BOUNDED_LOCK_POLL_SOURCE, encoding="utf-8")
+        self.assertNotIn("TB005", self.rules())
+
+    def test_rejects_second_sleep_even_in_bounded_lock_poll_it(self) -> None:
+        path = self.root / MODULE.MDM_LOCK_POLL_IT
+        path.parent.mkdir(parents=True)
+        path.write_text(
+            BOUNDED_LOCK_POLL_SOURCE.replace(
+                "return false;",
+                "Thread.sleep(1000); return false;",
+            ),
+            encoding="utf-8",
+        )
         self.assertIn("TB005", self.rules())
 
     def test_rejects_latest_container_image(self) -> None:
