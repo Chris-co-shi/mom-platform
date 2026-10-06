@@ -47,13 +47,27 @@ public final class DefaultI18nMessageResolver implements I18nMessageResolver {
         if (boundary <= 0 || boundary == messageKey.length() - 1) {
             return messageKey;
         }
-        String namespace = messageKey.substring(0, boundary);
-        if (!namespaces.owns(namespace)) {
-            return messageKey;
+        return resolve(messageKey.substring(0, boundary), messageKey.substring(boundary + 1), locale, args);
+    }
+
+    /**
+     * 业务消息使用显式 namespace 精确查询，支持 mdm.material、mes.work-order 等 Feature namespace。
+     */
+    @Override
+    public String resolve(String namespace, String messageKey, Locale locale, Object... args) {
+        if (namespace == null || namespace.isBlank() || messageKey == null || messageKey.isBlank()) {
+            throw new IllegalArgumentException("namespace 和 messageKey 不能为空");
         }
-        I18nMessage message = store.message(namespace, messageKey.substring(boundary + 1));
+        String stableKey = namespace + "." + messageKey;
+        if ("framework".equals(namespace) || namespace.startsWith("framework.")) {
+            return frameworkResolver.resolve(stableKey, locale, args);
+        }
+        if (!namespaces.owns(namespace)) {
+            return stableKey;
+        }
+        I18nMessage message = store.message(namespace, messageKey);
         if (message == null || !message.enabled()) {
-            return messageKey;
+            return stableKey;
         }
         String effective = locales.effectiveLocale(locale == null ? null : locale.toLanguageTag());
         String base = locales.baseLocale();
@@ -62,7 +76,7 @@ public final class DefaultI18nMessageResolver implements I18nMessageResolver {
         String pattern = translations.stream().filter(item -> item.localeCode().equals(effective))
                 .map(I18nTranslation::messageText).findFirst().orElseGet(() -> translations.stream()
                         .filter(item -> item.localeCode().equals(base))
-                        .map(I18nTranslation::messageText).findFirst().orElse(messageKey));
+                        .map(I18nTranslation::messageText).findFirst().orElse(stableKey));
         return new MessageFormat(pattern, Locale.forLanguageTag(effective)).format(args);
     }
 }
