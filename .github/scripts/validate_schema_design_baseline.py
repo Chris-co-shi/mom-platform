@@ -138,8 +138,9 @@ def check_table(path: str, table: str, statement: str, full_sql: str, report: Re
     report.reviews.append(f"字段长度、索引有效性、生命周期与业务完整性需 Review: {path}#{table_lower}")
 
 
-def check_sql(path: str, sql: str, report: Report, legacy_tables: set[tuple[str, str]] | None = None) -> None:
-    """检查单个 Migration 的表、索引和跨 Schema 引用。"""
+def check_sql(path: str, sql: str, report: Report, legacy_tables: set[tuple[str, str]] | None = None,
+              comment_sql: str | None = None) -> None:
+    """检查单个 Migration；表注释允许由同 bounded context 的后续 Migration 补齐。"""
 
     match = MIGRATION.fullmatch(path)
     if not match:
@@ -152,8 +153,9 @@ def check_sql(path: str, sql: str, report: Report, legacy_tables: set[tuple[str,
     }):
         if target != context:
             report.errors.append(f"Migration 禁止跨 Schema: {path} -> mom_{target}")
+    comments = sql if comment_sql is None else comment_sql
     for table, statement in table_statements(sql):
-        check_table(path, table, statement, sql, report, legacy_tables)
+        check_table(path, table, statement, comments, report, legacy_tables)
     legacy = LEGACY_TABLES if legacy_tables is None else legacy_tables
     created_tables = {table.lower() for table, _ in table_statements(sql)}
     if any((path, table) in legacy for table in created_tables):
@@ -177,12 +179,22 @@ def git_files(root: pathlib.Path) -> list[str]:
 def run(root: pathlib.Path, report: Report) -> None:
     """扫描正式 Migration；版本不可变性由 Persistence Baseline 共同证明。"""
 
+    migrations: list[tuple[str, str, str]] = []
+    context_sql: dict[str, list[str]] = {}
     for relative in git_files(root):
-        if not MIGRATION.fullmatch(relative):
+        match = MIGRATION.fullmatch(relative)
+        if not match:
             continue
         path = root / relative
-        if path.is_file():
-            check_sql(relative, path.read_text(encoding="utf-8"), report)
+        if not path.is_file():
+            continue
+        sql = path.read_text(encoding="utf-8")
+        context = match.group("context")
+        migrations.append((relative, context, sql))
+        context_sql.setdefault(context, []).append(sql)
+
+    for relative, context, sql in migrations:
+        check_sql(relative, sql, report, comment_sql="\n".join(context_sql[context]))
 
 
 def main(argv: list[str] | None = None) -> int:
