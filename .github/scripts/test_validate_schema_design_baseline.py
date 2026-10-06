@@ -56,6 +56,21 @@ class SchemaDesignBaselineTest(unittest.TestCase):
         module.check_sql(self.path, sql, report, set())
         self.assertGreaterEqual(len(report.errors), 7)
 
+    def test_later_migration_comments_can_remediate_existing_table(self):
+        create_sql = """CREATE TABLE system_item (
+          id varchar(19) NOT NULL,
+          version bigint NOT NULL DEFAULT 0,
+          CONSTRAINT pk_system_item PRIMARY KEY (id),
+          CONSTRAINT ck_system_item_version_non_negative CHECK (version >= 0)
+        );"""
+        later_comments = create_sql + """
+        COMMENT ON TABLE system_item IS 'item';
+        COMMENT ON COLUMN system_item.id IS 'id';
+        COMMENT ON COLUMN system_item.version IS 'version';"""
+        report = module.Report()
+        module.check_sql(self.path, create_sql, report, set(), comment_sql=later_comments)
+        self.assertEqual([], report.errors)
+
     def test_cross_schema_is_rejected(self):
         report = module.Report()
         module.check_sql(self.path, "SELECT id FROM mom_iam.iam_user;", report, set())
