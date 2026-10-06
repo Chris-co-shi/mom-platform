@@ -51,7 +51,7 @@ public class MdmExceptionHandler {
     public ResponseEntity<Result<List<FieldErrorView>>> handleValidation(MethodArgumentNotValidException exception,
                                                                            Locale locale) {
         List<FieldErrorView> errors = exception.getBindingResult().getFieldErrors().stream()
-                .map(MdmExceptionHandler::toFieldError).toList();
+                .map(error -> toFieldError(error, locale)).toList();
         return ResponseEntity.badRequest().body(Result.failure(
                 "request.validation_failed", messages.resolve("framework.validation.failed", locale), errors));
     }
@@ -61,7 +61,7 @@ public class MdmExceptionHandler {
     public ResponseEntity<Result<List<FieldErrorView>>> handleMethodValidation(
             HandlerMethodValidationException exception, Locale locale) {
         List<FieldErrorView> errors = exception.getAllErrors().stream()
-                .map(MdmExceptionHandler::toMethodError).toList();
+                .map(error -> toMethodError(error, locale)).toList();
         return ResponseEntity.badRequest().body(Result.failure(
                 "request.validation_failed", messages.resolve("framework.validation.failed", locale), errors));
     }
@@ -93,7 +93,7 @@ public class MdmExceptionHandler {
     private ResponseEntity<Result<List<FieldErrorView>>> paginationFailure(
             PageQueryValidationException exception, Locale locale) {
         List<FieldErrorView> errors = List.of(new FieldErrorView(
-                exception.field(), "invalid", exception.getMessage()));
+                exception.field(), "invalid", messages.resolve("framework.validation.invalid_field", locale)));
         return ResponseEntity.badRequest().body(Result.failure(
                 "request.pagination_invalid", messages.resolve("framework.web.invalid_request", locale), errors));
     }
@@ -109,16 +109,16 @@ public class MdmExceptionHandler {
         return null;
     }
 
-    private static FieldErrorView toFieldError(FieldError error) {
+    private FieldErrorView toFieldError(FieldError error, Locale locale) {
         return new FieldErrorView(error.getField(), error.getCode() == null ? "invalid" : error.getCode(),
-                error.getDefaultMessage() == null ? "参数非法" : error.getDefaultMessage());
+                messages.resolve("framework.validation.invalid_field", locale));
     }
 
-    private static FieldErrorView toMethodError(MessageSourceResolvable error) {
+    private FieldErrorView toMethodError(MessageSourceResolvable error, Locale locale) {
         String[] codes = error.getCodes();
         String code = codes == null || codes.length == 0 ? "invalid" : codes[0];
         return new FieldErrorView("request", code,
-                error.getDefaultMessage() == null ? "参数非法" : error.getDefaultMessage());
+                messages.resolve("framework.validation.invalid_field", locale));
     }
 
     /** 脱敏的字段错误响应。 */
