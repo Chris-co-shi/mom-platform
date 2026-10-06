@@ -26,7 +26,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("${mom.i18n.management.base-path:/i18n/admin/messages}")
-public final class I18nManagementController {
+public class I18nManagementController {
     private final I18nManagementService management;
 
     /** @param management Framework 公共管理用例 */
