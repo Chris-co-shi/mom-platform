@@ -14,9 +14,9 @@ import java.util.Locale;
 /**
  * 业务错误的单条精确查询解析器。
  *
- * <p>完整错误键使用首段作为 Owner 根 namespace，例如 {@code mdm.error.not_found}。
- * Framework 技术错误永远走 classpath，不依赖数据库。单条业务错误只查目标 Message
- * 和至多两种 Locale 的译文，不加载整个 Runtime Bundle；DB 故障向上暴露。</p>
+ * <p>业务调用优先显式传入 namespace + messageKey，可直接支持 {@code mdm.material} 等 Feature namespace；
+ * 旧完整 Key 入口仅保留根 Owner 兼容语义。Framework 技术错误永远走 classpath，不依赖数据库。
+ * 单条业务错误只查目标 Message 和至多两种 Locale 的译文，不加载整个 Runtime Bundle；DB 故障向上暴露。</p>
  */
 public final class DefaultI18nMessageResolver implements I18nMessageResolver {
     private final I18nStore store;
