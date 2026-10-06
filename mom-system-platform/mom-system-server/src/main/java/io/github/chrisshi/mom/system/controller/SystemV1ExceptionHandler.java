@@ -67,6 +67,6 @@ public class SystemV1ExceptionHandler {
 
     private Result<Void> businessError(SystemV1Exception exception, Locale locale) {
         return Result.failure(exception.code(),
-                messageResolver.resolve(exception.messageKey(), locale, exception.args()));
+                messageResolver.resolve(exception.namespace(), exception.messageKey(), locale, exception.args()));
     }
 }

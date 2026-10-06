@@ -8,7 +8,10 @@ package io.github.chrisshi.mom.system.application;
  * Controller 负责映射 HTTP 状态，Infrastructure 不依赖本异常。</p>
  */
 public class SystemV1Exception extends RuntimeException {
+    private static final String OWNER_NAMESPACE = "system";
+
     private final String code;
+    private final String namespace;
     private final String messageKey;
     private final Object[] args;
 
@@ -18,8 +21,19 @@ public class SystemV1Exception extends RuntimeException {
      * @param args 位置占位符参数，不得包含 Secret
      */
     public SystemV1Exception(String code, String messageKey, Object... args) {
-        super(messageKey);
+        this(code, OWNER_NAMESPACE, localMessageKey(messageKey), args);
+    }
+
+    /**
+     * @param code 稳定机器错误码
+     * @param namespace System 自有稳定 namespace
+     * @param messageKey namespace 内稳定消息键
+     * @param args 位置占位符参数
+     */
+    public SystemV1Exception(String code, String namespace, String messageKey, Object... args) {
+        super(namespace + "." + messageKey);
         this.code = code;
+        this.namespace = namespace;
         this.messageKey = messageKey;
         this.args = args == null ? new Object[0] : args.clone();
     }
@@ -29,7 +43,12 @@ public class SystemV1Exception extends RuntimeException {
         return code;
     }
 
-    /** @return 由 I18nMessageResolver 解析的稳定消息键 */
+    /** @return 当前业务消息所属 namespace */
+    public String namespace() {
+        return namespace;
+    }
+
+    /** @return namespace 内稳定消息键 */
     public String messageKey() {
         return messageKey;
     }
@@ -37,6 +56,12 @@ public class SystemV1Exception extends RuntimeException {
     /** @return 防御性复制的位置占位符参数 */
     public Object[] args() {
         return args.clone();
+    }
+
+    private static String localMessageKey(String messageKey) {
+        return messageKey != null && messageKey.startsWith(OWNER_NAMESPACE + ".")
+                ? messageKey.substring(OWNER_NAMESPACE.length() + 1)
+                : messageKey;
     }
 
     /** 资源不存在。 */
