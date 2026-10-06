@@ -41,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     properties = {
         "spring.main.banner-mode=off",
         "mom.security.resource-server.enabled=true",
-        "mom.security.resource-server.public-paths=/public,/actuator/health/**,/error"
+        "mom.security.resource-server.public-paths=/public,/api/system/i18n/locales,/api/system/i18n/runtime/**,/i18n/runtime/**,/api/mdm/i18n/runtime/**,/actuator/health/**,/error"
     }
 )
 class MomServletResourceServerTest {
@@ -101,6 +101,16 @@ class MomServletResourceServerTest {
     }
 
     @Test
+    void i18nRuntimeAndLocalePathsMustRemainAnonymous() throws Exception {
+        mockMvc.perform(get("/api/system/i18n/locales")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/system/i18n/runtime/bundles")).andExpect(status().isOk());
+        mockMvc.perform(get("/i18n/runtime/bundles")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/mdm/i18n/runtime/bundles")).andExpect(status().isOk());
+
+        org.assertj.core.api.Assertions.assertThat(introspector.checks).isZero();
+    }
+
+    @Test
     void validBearerLogoutMustReachBusinessControllerInsteadOfDefaultLogoutFilter() throws Exception {
         mockMvc.perform(post("/logout")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer valid-read-token"))
@@ -130,7 +140,13 @@ class MomServletResourceServerTest {
             return Map.of("userId", authentication.getName());
         }
 
-        @GetMapping("/public")
+        @GetMapping({
+            "/public",
+            "/api/system/i18n/locales",
+            "/api/system/i18n/runtime/bundles",
+            "/i18n/runtime/bundles",
+            "/api/mdm/i18n/runtime/bundles"
+        })
         Map<String, String> publicEndpoint() {
             return Map.of("status", "ok");
         }
