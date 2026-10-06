@@ -49,7 +49,7 @@ public class AuthExceptionHandler {
     ResponseEntity<Result<List<FieldErrorResponse>>> handleBodyValidation(MethodArgumentNotValidException exception,
                                                                             Locale locale) {
         List<FieldErrorResponse> fieldErrors = exception.getBindingResult().getFieldErrors().stream()
-            .map(AuthExceptionHandler::toFieldError)
+            .map(error -> toFieldError(error, locale))
             .toList();
         return ResponseEntity.badRequest().body(
             Result.failure("request.validation_failed", messages.resolve("framework.validation.failed", locale), fieldErrors)
@@ -60,7 +60,7 @@ public class AuthExceptionHandler {
     ResponseEntity<Result<List<FieldErrorResponse>>> handleMethodValidation(HandlerMethodValidationException exception,
                                                                               Locale locale) {
         List<FieldErrorResponse> fieldErrors = exception.getAllErrors().stream()
-            .map(AuthExceptionHandler::toMethodFieldError)
+            .map(error -> toMethodFieldError(error, locale))
             .toList();
         return ResponseEntity.badRequest().body(
             Result.failure("request.validation_failed", messages.resolve("framework.validation.failed", locale), fieldErrors)
@@ -95,7 +95,8 @@ public class AuthExceptionHandler {
         PageQueryValidationException exception, Locale locale
     ) {
         List<FieldErrorResponse> errors = List.of(
-            new FieldErrorResponse(exception.field(), "invalid", exception.getMessage())
+            new FieldErrorResponse(exception.field(), "invalid",
+                messages.resolve("framework.validation.invalid_field", locale))
         );
         return ResponseEntity.badRequest().body(
             Result.failure("request.pagination_invalid", messages.resolve("framework.web.invalid_request", locale), errors)
@@ -113,19 +114,19 @@ public class AuthExceptionHandler {
         return null;
     }
 
-    private static FieldErrorResponse toFieldError(FieldError error) {
+    private FieldErrorResponse toFieldError(FieldError error, Locale locale) {
         return new FieldErrorResponse(
             error.getField(),
             error.getCode() == null ? "invalid" : error.getCode(),
-            error.getDefaultMessage() == null ? "参数非法" : error.getDefaultMessage()
+            messages.resolve("framework.validation.invalid_field", locale)
         );
     }
 
-    private static FieldErrorResponse toMethodFieldError(MessageSourceResolvable error) {
+    private FieldErrorResponse toMethodFieldError(MessageSourceResolvable error, Locale locale) {
         String[] codes = error.getCodes();
         String code = codes == null || codes.length == 0 ? "invalid" : codes[0];
-        String message = error.getDefaultMessage() == null ? "参数非法" : error.getDefaultMessage();
-        return new FieldErrorResponse("request", code, message);
+        return new FieldErrorResponse("request", code,
+                messages.resolve("framework.validation.invalid_field", locale));
     }
 
     private static HttpStatus statusOf(AuthErrorCode errorCode) {
