@@ -41,7 +41,7 @@ public class AuthExceptionHandler {
         HttpStatus status = statusOf(exception.errorCode());
         return ResponseEntity.status(status).body(
             Result.failure(exception.errorCode().code(),
-                    messages.resolve(exception.errorCode().messageKey(), locale))
+                    messages.resolve(exception.errorCode().namespace(), exception.errorCode().localMessageKey(), locale))
         );
     }
 

@@ -5,8 +5,8 @@ import io.github.chrisshi.mom.core.error.ErrorCode;
 /**
  * Mini Auth 稳定错误码。
  *
- * <p>code 是调用方可依赖的机器契约；messageKey 仅预留未来国际化能力，
- * V1 不启用 MessageSource/Locale 转换。</p>
+ * <p>code 是调用方可依赖的机器契约；messageKey 是 Auth Owner 内稳定的数据库国际化键，
+ * HTTP 边界按请求 Locale 解析最终文案，机器 code 不随语言变化。</p>
  */
 public enum AuthErrorCode implements ErrorCode {
     CURRENT_PASSWORD_INVALID("auth.current_password_invalid", "auth.error.current-password-invalid", "原密码不正确"),
@@ -53,6 +53,16 @@ public enum AuthErrorCode implements ErrorCode {
     @Override
     public String messageKey() {
         return messageKey;
+    }
+
+    /** @return Auth Translation Owner 的稳定 namespace */
+    public String namespace() {
+        return "auth";
+    }
+
+    /** @return auth namespace 内的本地 messageKey */
+    public String localMessageKey() {
+        return messageKey.startsWith("auth.") ? messageKey.substring("auth.".length()) : messageKey;
     }
 
     @Override
