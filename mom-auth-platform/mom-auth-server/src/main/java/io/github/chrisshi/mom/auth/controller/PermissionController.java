@@ -49,14 +49,14 @@ public class PermissionController {
     @PreAuthorize("hasAuthority('auth:permission:write')")
     public Result<PermissionResponse> create(@Valid @RequestBody CreatePermissionRequest request) {
         return Result.success(PermissionResponse.from(permissionApplication.create(
-            request.code(), request.name(), request.description(), request.enabled()
+            request.resourceId(), request.actionCode(), request.name(), request.description(), request.enabled()
         )));
     }
 
     /**
      * 分页查询 Permission 目录。
      *
-     * @param pageQuery 包含明确空 Params 和分页信息的唯一请求体
+     * @param pageQuery 包含域、资源、状态、关键字与分页信息的唯一请求体
      * @return 统一分页结果
      */
     @PostMapping("/search")

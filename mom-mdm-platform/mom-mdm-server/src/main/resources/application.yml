@@ -42,6 +42,20 @@ mybatis-plus:
   global-config:
     banner: false
 
+mom:
+  i18n:
+    base-locale: ${MOM_I18N_BASE_LOCALE:zh-CN}
+    runtime:
+      base-path: /api/mdm/i18n/runtime
+    management:
+      base-path: /api/mdm/admin/i18n/messages
+      read-authority: mdm:i18n:read
+      write-authority: mdm:i18n:write
+  security:
+    resource-server:
+      public-paths:
+        - /api/mdm/i18n/runtime/**
+
 management:
   endpoints:
     web:

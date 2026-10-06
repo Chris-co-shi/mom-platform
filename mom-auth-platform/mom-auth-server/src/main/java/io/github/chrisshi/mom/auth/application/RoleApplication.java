@@ -6,10 +6,12 @@ import io.github.chrisshi.mom.auth.application.model.PermissionView;
 import io.github.chrisshi.mom.auth.application.model.RoleView;
 import io.github.chrisshi.mom.auth.application.model.AuthPageParams.RolePageParams;
 import io.github.chrisshi.mom.auth.infrastructure.entity.PermissionEntity;
+import io.github.chrisshi.mom.auth.infrastructure.entity.PermissionResourceEntity;
 import io.github.chrisshi.mom.auth.infrastructure.entity.RoleEntity;
 import io.github.chrisshi.mom.auth.infrastructure.entity.RolePermissionEntity;
 import io.github.chrisshi.mom.auth.infrastructure.entity.UserRoleEntity;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.PermissionMapper;
+import io.github.chrisshi.mom.auth.infrastructure.mapper.PermissionResourceMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RoleMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RolePermissionMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.UserRoleMapper;
@@ -23,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 角色目录与 Role-Permission 关系用例编排。
@@ -39,6 +43,7 @@ public class RoleApplication {
     private final UserRoleMapper userRoleMapper;
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
+    private final PermissionResourceMapper resourceMapper;
     private final PageAdapter pageAdapter;
 
     /**
@@ -48,6 +53,7 @@ public class RoleApplication {
      * @param userRoleMapper User-Role 关系 Mapper
      * @param rolePermissionMapper Role-Permission 关系 Mapper
      * @param permissionMapper Permission 单表 Mapper
+     * @param resourceMapper Permission 所属资源 Mapper，批量补足授权展示元数据
      * @param pageAdapter 配置化分页适配器
      */
     public RoleApplication(
@@ -55,12 +61,14 @@ public class RoleApplication {
         UserRoleMapper userRoleMapper,
         RolePermissionMapper rolePermissionMapper,
         PermissionMapper permissionMapper,
+        PermissionResourceMapper resourceMapper,
         PageAdapter pageAdapter
     ) {
         this.roleMapper = roleMapper;
         this.userRoleMapper = userRoleMapper;
         this.rolePermissionMapper = rolePermissionMapper;
         this.permissionMapper = permissionMapper;
+        this.resourceMapper = resourceMapper;
         this.pageAdapter = pageAdapter;
     }
 
@@ -213,9 +221,19 @@ public class RoleApplication {
         if (permissionIds.isEmpty()) {
             return List.of();
         }
-        return permissionMapper.selectByIds(permissionIds).stream()
+        List<PermissionEntity> permissions = permissionMapper.selectByIds(permissionIds);
+        Map<String, PermissionResourceEntity> resources = resourceMapper.selectByIds(
+            permissions.stream().map(PermissionEntity::getResourceId).distinct().toList()
+        ).stream().collect(Collectors.toMap(PermissionResourceEntity::getId, resource -> resource));
+        return permissions.stream()
             .sorted(java.util.Comparator.comparing(PermissionEntity::getCode).thenComparing(PermissionEntity::getId))
-            .map(PermissionView::from)
+            .map(permission -> {
+                PermissionResourceEntity resource = resources.get(permission.getResourceId());
+                if (resource == null) {
+                    throw new AuthException(AuthErrorCode.RESOURCE_NOT_FOUND, "权限所属资源不存在");
+                }
+                return PermissionView.from(permission, resource);
+            })
             .toList();
     }
 

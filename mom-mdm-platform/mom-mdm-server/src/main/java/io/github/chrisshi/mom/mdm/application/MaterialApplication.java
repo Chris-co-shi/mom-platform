@@ -287,11 +287,11 @@ public class MaterialApplication {
         UomCategoryEntity category = uomCategoryMapper.selectByIdForUpdate(snapshotCategory.getId());
         UomEntity uom = uomMapper.selectByIdForUpdate(validatedId);
         if (dimension == null || category == null || uom == null) {
-            throw MdmException.invalidReference("基础单位引用链不存在");
+            throw MdmException.invalidReference();
         }
         if (!uom.getCategoryId().equals(category.getId())
                 || !category.getDimensionId().equals(dimension.getId())) {
-            throw MdmException.invalidReference("基础单位引用链在并发修改中发生变化");
+            throw MdmException.invalidReference();
         }
         MdmMasterDataRules.requireEnabled(dimension.getStatus(), "Dimension");
         MdmMasterDataRules.requireEnabled(category.getStatus(), "UomCategory");
@@ -353,7 +353,7 @@ public class MaterialApplication {
 
     /** 创建统一输入校验异常。 */
     private static MdmException validationFailed(String message) {
-        return new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.validation_failed", message);
+        return new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.validation_failed", "mdm.error.validation_failed");
     }
 
     /** 判断可选文本是否具有非空白内容。 */

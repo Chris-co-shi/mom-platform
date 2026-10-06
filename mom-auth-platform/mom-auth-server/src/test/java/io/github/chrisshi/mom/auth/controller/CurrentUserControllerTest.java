@@ -39,7 +39,7 @@ class CurrentUserControllerTest {
         when(authentication.getToken()).thenReturn(new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER,
             "test-only", Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2099-01-01T00:00:00Z")));
         mvc = standaloneSetup(new AuthenticationController(mock(AuthenticationApplication.class), users))
-            .setControllerAdvice(new AuthExceptionHandler()).build();
+            .setControllerAdvice(new AuthExceptionHandler((key, locale, args) -> key)).build();
     }
 
     @Test

@@ -39,7 +39,6 @@ public class SupportedLocaleController {
 
     /** 返回平台 Locale 稳定只读列表。 */
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
     public Result<List<SupportedLocaleInfo>> supportedLocales() {
         return Result.success(application.supportedLocales());
     }

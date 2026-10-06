@@ -1,10 +1,13 @@
 package io.github.chrisshi.mom.auth;
 
 import io.github.chrisshi.mom.auth.application.model.AuthPageParams.UserPageParams;
+import io.github.chrisshi.mom.auth.application.model.AuthPageParams.PermissionPageParams;
+import io.github.chrisshi.mom.auth.application.model.AuthPageParams.PermissionResourcePageParams;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.auth.application.AuthErrorCode;
 import io.github.chrisshi.mom.auth.application.AuthException;
 import io.github.chrisshi.mom.auth.application.PermissionApplication;
+import io.github.chrisshi.mom.auth.application.PermissionResourceApplication;
 import io.github.chrisshi.mom.auth.application.RoleApplication;
 import io.github.chrisshi.mom.auth.application.UserApplication;
 import io.github.chrisshi.mom.core.security.ActorType;
@@ -71,6 +74,8 @@ class AuthManagementPostgresqlIT {
     @Autowired
     private PermissionApplication permissionApplication;
     @Autowired
+    private PermissionResourceApplication resourceApplication;
+    @Autowired
     private JdbcTemplate jdbcTemplate;
     @Autowired
     private Flyway flyway;
@@ -121,13 +126,13 @@ class AuthManagementPostgresqlIT {
     void cleanTables() {
         jdbcTemplate.update("""
             TRUNCATE TABLE auth_user_role, auth_role_permission,
-                           auth_user, auth_role, auth_permission
+                           auth_user, auth_role, auth_permission, auth_permission_resource
             """);
     }
 
     @Test
     void flywayAndDatabaseConstraintsMustMatchMiniAuthModel() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("4");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("8");
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("show timezone", String.class)).isEqualTo("UTC");
         assertThat(jdbcTemplate.queryForObject("""
@@ -143,9 +148,73 @@ class AuthManagementPostgresqlIT {
                AND constraint_name IN (
                    'ck_auth_user_version_non_negative',
                    'ck_auth_role_version_non_negative',
-                   'ck_auth_permission_version_non_negative'
+                   'ck_auth_permission_version_non_negative',
+                   'ck_auth_permission_resource_version_non_negative'
                )
-            """, Long.class, SCHEMA)).isEqualTo(3L);
+            """, Long.class, SCHEMA)).isEqualTo(4L);
+    }
+
+    /** 在隔离 Schema 上真实先执行 V1～V4，再升级 V5，验证历史六条授权及角色关系完整保留。 */
+    @Test
+    void v5MustUpgradeExistingSixPermissionsWithoutChangingRoleGrants() {
+        String upgradeSchema = "mom_auth_upgrade";
+        Flyway before = Flyway.configure()
+            .dataSource(POSTGRESQL.getJdbcUrl(), POSTGRESQL.getUsername(), POSTGRESQL.getPassword())
+            .schemas(upgradeSchema)
+            .defaultSchema(upgradeSchema)
+            .locations("classpath:db/migration/auth")
+            .target("4")
+            .load();
+        before.migrate();
+        long oldCount = jdbcTemplate.queryForObject(
+            "select count(*) from mom_auth_upgrade.auth_permission", Long.class);
+        long oldRelations = jdbcTemplate.queryForObject(
+            "select count(*) from mom_auth_upgrade.auth_role_permission", Long.class);
+        Flyway after = Flyway.configure()
+            .dataSource(POSTGRESQL.getJdbcUrl(), POSTGRESQL.getUsername(), POSTGRESQL.getPassword())
+            .schemas(upgradeSchema)
+            .defaultSchema(upgradeSchema)
+            .locations("classpath:db/migration/auth")
+            .target("5")
+            .load();
+        after.migrate();
+        assertThat(after.info().current().getVersion().getVersion()).isEqualTo("5");
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from mom_auth_upgrade.auth_permission", Long.class)).isEqualTo(oldCount);
+        assertThat(jdbcTemplate.queryForObject(
+            "select count(*) from mom_auth_upgrade.auth_role_permission", Long.class)).isEqualTo(oldRelations);
+        assertThat(jdbcTemplate.queryForObject("""
+            select count(*) from mom_auth_upgrade.auth_permission p
+            join mom_auth_upgrade.auth_permission_resource r on r.id = p.resource_id
+            where p.code = lower(r.domain_code || ':' || r.resource_code || ':' || p.action_code)
+            """, Long.class)).isEqualTo(6L);
+    }
+
+    /** V6～V8 在隔离 Schema 中保留四个 System authority，并增加 Owner 文案权限。 */
+    @Test
+    void v6MustSeedSystemPermissionsUnderExplicitResources() {
+        String seedSchema = "mom_auth_system_seed";
+        Flyway seeded = Flyway.configure()
+            .dataSource(POSTGRESQL.getJdbcUrl(), POSTGRESQL.getUsername(), POSTGRESQL.getPassword())
+            .schemas(seedSchema)
+            .defaultSchema(seedSchema)
+            .locations("classpath:db/migration/auth")
+            .load();
+        seeded.migrate();
+        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("8");
+        assertThat(jdbcTemplate.queryForList("""
+            SELECT permission.code
+              FROM mom_auth_system_seed.auth_permission permission
+              JOIN mom_auth_system_seed.auth_permission_resource resource
+                ON resource.id = permission.resource_id
+             WHERE resource.domain_code = 'SYSTEM'
+               AND permission.code = lower(resource.domain_code || ':' || resource.resource_code || ':' || permission.action_code)
+               AND permission.enabled = true AND permission.deleted = false
+             ORDER BY permission.code
+            """, String.class)).containsExactly(
+            "system:dictionary:read", "system:dictionary:write",
+            "system:i18n:read", "system:i18n:write"
+        );
     }
 
     @Test
@@ -195,7 +264,8 @@ class AuthManagementPostgresqlIT {
             .extracting("id").containsExactly(enabledRole.id());
         assertError(() -> roleApplication.delete(enabledRole.id()), AuthErrorCode.RESOURCE_REFERENCED);
 
-        var disabledPermission = permissionApplication.create("auth:test:read", "Test Read", null, false);
+        var testResource = resourceApplication.create("AUTH", "TEST", "测试资源", null, 10, true);
+        var disabledPermission = permissionApplication.create(testResource.id(), "READ", "Test Read", null, false);
         assertError(() -> roleApplication.replacePermissions(
                 enabledRole.id(), List.of(disabledPermission.id())),
             AuthErrorCode.PERMISSION_DISABLED);
@@ -237,8 +307,10 @@ class AuthManagementPostgresqlIT {
     @Test
     void replacePermissionsMustRollbackDeleteWhenRelationInsertFails() {
         var role = roleApplication.create("ROLLBACK", "Rollback", null, true);
-        var original = permissionApplication.create("auth:original:read", "Original", null, true);
-        var rejected = permissionApplication.create("auth:rejected:read", "Rejected", null, true);
+        var originalResource = resourceApplication.create("AUTH", "ORIGINAL", "Original", null, 10, true);
+        var rejectedResource = resourceApplication.create("AUTH", "REJECTED", "Rejected", null, 20, true);
+        var original = permissionApplication.create(originalResource.id(), "READ", "Original", null, true);
+        var rejected = permissionApplication.create(rejectedResource.id(), "READ", "Rejected", null, true);
         roleApplication.replacePermissions(role.id(), List.of(original.id()));
 
         jdbcTemplate.execute("ALTER TABLE auth_role_permission ADD CONSTRAINT ck_test_rejected_permission "
@@ -250,6 +322,49 @@ class AuthManagementPostgresqlIT {
         } finally {
             jdbcTemplate.execute("ALTER TABLE auth_role_permission DROP CONSTRAINT ck_test_rejected_permission");
         }
+    }
+
+    /** 真实 PostgreSQL 验证资源归属、服务端 JOIN 筛选、稳定编码及停用/删除保护。 */
+    @Test
+    void permissionResourceCatalogMustFilterAcrossPagesAndProtectLifecycle() {
+        var resource = resourceApplication.create(" auth ", " user ", "用户管理", "授权目录", 10, true);
+        var other = resourceApplication.create("MDM", "MATERIAL", "物料主数据", null, 20, true);
+        assertError(() -> resourceApplication.create("AUTH", "USER", "重复", null, 30, true),
+            AuthErrorCode.RESOURCE_CODE_CONFLICT);
+
+        var read = permissionApplication.create(resource.id(), " READ ", "用户读取", "可读取用户", true);
+        var write = permissionApplication.create(resource.id(), "WRITE", "用户维护", null, true);
+        permissionApplication.create(other.id(), "READ", "物料读取", null, true);
+        assertThat(read.code()).isEqualTo("auth:user:read");
+        assertThat(read.resourceName()).isEqualTo("用户管理");
+        assertError(() -> permissionApplication.create(resource.id(), "read", "重复", null, true),
+            AuthErrorCode.PERMISSION_CODE_CONFLICT);
+
+        var byResource = permissionApplication.list(new PageQuery<>(
+            new PermissionPageParams(null, resource.id(), null, null), 1, 1));
+        assertThat(byResource.total()).isEqualTo(2);
+        assertThat(byResource.records()).extracting("code").containsExactly("auth:user:read");
+        assertThat(permissionApplication.list(new PageQuery<>(
+            new PermissionPageParams(null, resource.id(), null, null), 2, 1)).records())
+            .extracting("code").containsExactly("auth:user:write");
+        assertThat(permissionApplication.list(new PageQuery<>(
+            new PermissionPageParams("AUTH", null, "用户管理", true), 1, 20)).records())
+            .extracting("id").containsExactly(read.id(), write.id());
+        assertThat(permissionApplication.list(new PageQuery<>(
+            new PermissionPageParams(null, null, "物料主数据", null), 1, 20)).total()).isEqualTo(1);
+        assertThat(resourceApplication.list(new PageQuery<>(
+            new PermissionResourcePageParams("MDM", "物料", true), 1, 20)).records())
+            .extracting("id").containsExactly(other.id());
+
+        var disabled = resourceApplication.disable(resource.id(), resource.version());
+        assertError(() -> permissionApplication.create(resource.id(), "EXPORT", "导出", null, true),
+            AuthErrorCode.RESOURCE_DISABLED);
+        var stopped = permissionApplication.disable(read.id(), read.version());
+        assertError(() -> permissionApplication.enable(read.id(), stopped.version()),
+            AuthErrorCode.RESOURCE_DISABLED);
+        assertThat(permissionApplication.get(write.id()).enabled()).isTrue();
+        assertError(() -> resourceApplication.delete(resource.id()), AuthErrorCode.RESOURCE_REFERENCED);
+        assertThat(resourceApplication.enable(resource.id(), disabled.version()).enabled()).isTrue();
     }
 
     private static void assertError(Runnable action, AuthErrorCode expected) {

@@ -231,7 +231,7 @@ public class WarehouseStructureApplication {
         PlantEntity plant = requirePlantForUpdate(snapshot.getPlantId());
         WarehouseEntity warehouse = warehouseMapper.selectByIdForUpdate(snapshot.getId());
         if (warehouse == null || !plant.getId().equals(warehouse.getPlantId())) {
-            throw MdmException.invalidReference("Warehouse 父链在并发修改中发生变化");
+            throw MdmException.invalidReference();
         }
         MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
         return warehouse;
@@ -243,7 +243,7 @@ public class WarehouseStructureApplication {
         WarehouseEntity warehouse = requireWarehouseForUpdate(snapshot.getWarehouseId());
         WarehouseAreaEntity area = warehouseAreaMapper.selectByIdForUpdate(snapshot.getId());
         if (area == null || !warehouse.getId().equals(area.getWarehouseId())) {
-            throw MdmException.invalidReference("WarehouseArea 父链在并发修改中发生变化");
+            throw MdmException.invalidReference();
         }
         MdmMasterDataRules.requireEnabled(warehouse.getStatus(), "Warehouse");
         return area;

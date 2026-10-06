@@ -39,7 +39,7 @@ class AuthPaginationControllerTest {
     void setUp() {
         application = mock(UserApplication.class);
         mockMvc = standaloneSetup(new UserController(application))
-            .setControllerAdvice(new AuthExceptionHandler())
+            .setControllerAdvice(new AuthExceptionHandler((key, locale, args) -> key))
             .build();
     }
 

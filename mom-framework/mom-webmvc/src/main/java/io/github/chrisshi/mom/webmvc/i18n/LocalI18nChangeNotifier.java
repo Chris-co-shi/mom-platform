@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.webmvc.i18n;
 
+import io.github.chrisshi.mom.i18n.runtime.I18nChangePublisher;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -19,7 +20,7 @@ import java.util.concurrent.ScheduledFuture;
  * 发生在活动 Spring 事务中时注册 {@code afterCommit} 回调，回滚不发送事件。心跳只发送 SSE comment，
  * 不包含业务文案。进程重启会丢失连接与通知历史，这是 V1 单实例、无重放语义的明确取舍。</p>
  */
-public final class LocalI18nChangeNotifier implements I18nChangeNotifier, AutoCloseable {
+public final class LocalI18nChangeNotifier implements I18nChangeNotifier, I18nChangePublisher, AutoCloseable {
     private static final long EMITTER_TIMEOUT_MILLIS = Duration.ofMinutes(30).toMillis();
 
     private final Map<String, SseEmitter> subscribers = new ConcurrentHashMap<>();

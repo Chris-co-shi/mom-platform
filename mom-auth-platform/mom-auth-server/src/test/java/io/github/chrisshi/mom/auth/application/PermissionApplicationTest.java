@@ -1,8 +1,11 @@
 package io.github.chrisshi.mom.auth.application;
 
 import io.github.chrisshi.mom.auth.infrastructure.entity.PermissionEntity;
+import io.github.chrisshi.mom.auth.infrastructure.entity.PermissionResourceEntity;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.PermissionMapper;
+import io.github.chrisshi.mom.auth.infrastructure.mapper.PermissionResourceMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RolePermissionMapper;
+import io.github.chrisshi.mom.auth.infrastructure.query.PermissionCatalogQueryMapper;
 import io.github.chrisshi.mom.data.page.PageAdapter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,13 +24,18 @@ class PermissionApplicationTest {
 
     private PermissionMapper permissionMapper;
     private RolePermissionMapper rolePermissionMapper;
+    private PermissionResourceMapper resourceMapper;
     private PermissionApplication application;
 
     @BeforeEach
     void setUp() {
         permissionMapper = mock(PermissionMapper.class);
         rolePermissionMapper = mock(RolePermissionMapper.class);
-        application = new PermissionApplication(permissionMapper, rolePermissionMapper, new PageAdapter(200));
+        resourceMapper = mock(PermissionResourceMapper.class);
+        when(resourceMapper.selectOne(any())).thenReturn(resource(true));
+        when(resourceMapper.selectById("resource-1")).thenReturn(resource(true));
+        application = new PermissionApplication(permissionMapper, resourceMapper,
+            mock(PermissionCatalogQueryMapper.class), rolePermissionMapper, new PageAdapter(200));
     }
 
     @Test
@@ -37,7 +45,7 @@ class PermissionApplicationTest {
             entity.setId("permission-1");
             return 1;
         });
-        var created = application.create(" auth:user:read ", " User Read ", "  description  ", true);
+        var created = application.create("resource-1", " READ ", " User Read ", "  description  ", true);
         assertThat(created.code()).isEqualTo("auth:user:read");
         assertThat(created.name()).isEqualTo("User Read");
         assertThat(created.description()).isEqualTo("description");
@@ -51,7 +59,7 @@ class PermissionApplicationTest {
         assertThat(updated.enabled()).isFalse();
 
         when(permissionMapper.selectCount(any())).thenReturn(1L);
-        assertError(() -> application.create("auth:user:read", "Read", null, true),
+        assertError(() -> application.create("resource-1", "READ", "Read", null, true),
             AuthErrorCode.PERMISSION_CODE_CONFLICT);
     }
 
@@ -59,8 +67,24 @@ class PermissionApplicationTest {
     void createMustMapConcurrentCodeConflict() {
         doThrow(new DuplicateKeyException("uk_auth_permission_code"))
             .when(permissionMapper).insert(any(PermissionEntity.class));
-        assertError(() -> application.create("auth:user:read", "Read", null, true),
+        assertError(() -> application.create("resource-1", "READ", "Read", null, true),
             AuthErrorCode.PERMISSION_CODE_CONFLICT);
+    }
+
+    @Test
+    void createAndEnableMustRejectMissingOrDisabledResourceAndInvalidAction() {
+        when(resourceMapper.selectOne(any())).thenReturn(null);
+        assertError(() -> application.create("missing", "READ", "读取", null, true),
+            AuthErrorCode.RESOURCE_NOT_FOUND);
+        when(resourceMapper.selectOne(any())).thenReturn(resource(false));
+        assertError(() -> application.create("resource-1", "READ", "读取", null, true),
+            AuthErrorCode.RESOURCE_DISABLED);
+        assertError(() -> application.create("resource-1", "READ:ALL", "读取", null, false),
+            AuthErrorCode.RESOURCE_INVALID_CODE);
+        PermissionEntity disabled = permission("permission-2", false, 0L);
+        when(permissionMapper.selectById("permission-2")).thenReturn(disabled);
+        assertError(() -> application.enable("permission-2", 0L), AuthErrorCode.RESOURCE_DISABLED);
+        verify(permissionMapper, never()).updateById(disabled);
     }
 
     @Test
@@ -118,10 +142,23 @@ class PermissionApplicationTest {
     private static PermissionEntity permission(String id, boolean enabled, long version) {
         PermissionEntity entity = new PermissionEntity();
         entity.setId(id);
+        entity.setResourceId("resource-1");
+        entity.setActionCode("READ");
         entity.setCode(id);
         entity.setName(id);
         entity.setEnabled(enabled);
         entity.setVersion(version);
+        return entity;
+    }
+
+    private static PermissionResourceEntity resource(boolean enabled) {
+        PermissionResourceEntity entity = new PermissionResourceEntity();
+        entity.setId("resource-1");
+        entity.setDomainCode("AUTH");
+        entity.setResourceCode("USER");
+        entity.setName("用户管理");
+        entity.setEnabled(enabled);
+        entity.setVersion(0L);
         return entity;
     }
 

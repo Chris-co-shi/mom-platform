@@ -5,26 +5,36 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.auth.application.model.PermissionView;
 import io.github.chrisshi.mom.auth.application.model.AuthPageParams.PermissionPageParams;
 import io.github.chrisshi.mom.auth.infrastructure.entity.PermissionEntity;
+import io.github.chrisshi.mom.auth.infrastructure.entity.PermissionResourceEntity;
 import io.github.chrisshi.mom.auth.infrastructure.entity.RolePermissionEntity;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.PermissionMapper;
+import io.github.chrisshi.mom.auth.infrastructure.mapper.PermissionResourceMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RolePermissionMapper;
+import io.github.chrisshi.mom.auth.infrastructure.query.PermissionCatalogQueryMapper;
+import io.github.chrisshi.mom.auth.infrastructure.query.PermissionCatalogRow;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.data.page.PageAdapter;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * Permission 目录管理与引用保护用例。
  *
- * <p>Permission 是 RBAC 的最终业务授权单元。该 Application 负责目录 CRUD、乐观锁和删除前引用检查；
- * 它不根据特殊 Role 做权限绕过，也不承担 Spring Security Authentication 的生成。</p>
+ * <p>Permission 是 Resource 下的 Action，也是 RBAC 的最终业务授权单元。该 Application 从权威 Resource
+ * 生成 code，负责本地引用、乐观锁和删除保护；不根据特殊 Role 绕过权限，也不承担登录认证。
+ * 创建、启用与 Resource 删除通过资源行锁串行化，无物理 FK 下避免新增孤儿；数据库故障失败关闭。</p>
  */
 @Component
 public class PermissionApplication {
+    private static final Pattern ACTION_CODE = Pattern.compile("[A-Z][A-Z0-9_-]*");
 
     private final PermissionMapper permissionMapper;
+    private final PermissionResourceMapper resourceMapper;
+    private final PermissionCatalogQueryMapper catalogQueryMapper;
     private final RolePermissionMapper rolePermissionMapper;
     private final PageAdapter pageAdapter;
 
@@ -32,12 +42,19 @@ public class PermissionApplication {
      * 注入 Permission、Role-Permission 持久化能力与统一分页适配器。
      *
      * @param permissionMapper Permission 单表 Mapper
+     * @param resourceMapper 授权资源 Mapper
+     * @param catalogQueryMapper 本地一对一 JOIN 分页 Mapper
      * @param rolePermissionMapper Role-Permission 关系 Mapper
      * @param pageAdapter 配置化分页适配器
      */
-    public PermissionApplication(PermissionMapper permissionMapper, RolePermissionMapper rolePermissionMapper,
-                                 PageAdapter pageAdapter) {
+    public PermissionApplication(
+        PermissionMapper permissionMapper, PermissionResourceMapper resourceMapper,
+        PermissionCatalogQueryMapper catalogQueryMapper, RolePermissionMapper rolePermissionMapper,
+        PageAdapter pageAdapter
+    ) {
         this.permissionMapper = permissionMapper;
+        this.resourceMapper = resourceMapper;
+        this.catalogQueryMapper = catalogQueryMapper;
         this.rolePermissionMapper = rolePermissionMapper;
         this.pageAdapter = pageAdapter;
     }
@@ -45,7 +62,8 @@ public class PermissionApplication {
     /**
      * 创建 Permission。
      *
-     * @param code 权限唯一编码，例如 auth:user:read
+     * @param resourceId 权威 Resource 主键
+     * @param actionCode 资源内动作编码
      * @param name 权限名称
      * @param description 可选描述
      * @param enabled 是否参与授权聚合
@@ -53,10 +71,19 @@ public class PermissionApplication {
      * @throws AuthException 权限编码冲突时抛出
      */
     @Transactional
-    public PermissionView create(String code, String name, String description, boolean enabled) {
-        String normalizedCode = code.strip();
+    public PermissionView create(String resourceId, String actionCode, String name, String description, boolean enabled) {
+        PermissionResourceEntity resource = requireResourceForWrite(resourceId);
+        if (enabled && !Boolean.TRUE.equals(resource.getEnabled())) {
+            throw new AuthException(AuthErrorCode.RESOURCE_DISABLED);
+        }
+        String normalizedAction = normalizeAction(actionCode);
+        String normalizedCode = (resource.getDomainCode() + ":" + resource.getResourceCode() + ":" + normalizedAction)
+            .toLowerCase(Locale.ROOT);
+        if (normalizedCode.length() > 160) throw new AuthException(AuthErrorCode.RESOURCE_INVALID_CODE);
         ensureCodeAvailable(normalizedCode);
         PermissionEntity entity = new PermissionEntity();
+        entity.setResourceId(resourceId);
+        entity.setActionCode(normalizedAction);
         entity.setCode(normalizedCode);
         entity.setName(name.strip());
         entity.setDescription(trimNullable(description));
@@ -70,7 +97,7 @@ public class PermissionApplication {
                 exception
             );
         }
-        return PermissionView.from(entity);
+        return PermissionView.from(entity, resource);
     }
 
     /**
@@ -81,25 +108,26 @@ public class PermissionApplication {
      * @throws AuthException Permission 不存在时抛出
      */
     public PermissionView get(String id) {
-        return PermissionView.from(requirePermission(id));
+        PermissionEntity entity = requirePermission(id);
+        return PermissionView.from(entity, requireResource(entity.getResourceId()));
     }
 
     /**
      * 分页查询 Permission 目录。
      *
-     * <p>统一使用 PageAdapter 适配分页，排序固定为 code、id。</p>
+     * <p>本地 Permission→Resource 一对一 JOIN 先由 SQL 过滤再分页，避免前端当前页筛选和 N+1。
+     * 统一使用 PageAdapter，排序固定为 code、id。</p>
      *
-     * @param pageQuery 包含明确空 Params 和分页信息的唯一业务入参
+     * @param pageQuery 带强类型域、资源、关键字与状态过滤的分页请求
      * @return 平台统一分页结果
      */
     public PageResult<PermissionView> list(PageQuery<PermissionPageParams> pageQuery) {
-        Page<PermissionEntity> page = pageAdapter.toPage(pageQuery);
-        permissionMapper.selectPage(
-            page,
-            new LambdaQueryWrapper<PermissionEntity>()
-                .orderByAsc(PermissionEntity::getCode)
-                .orderByAsc(PermissionEntity::getId)
-        );
+        Page<PermissionCatalogRow> page = pageAdapter.toPage(pageQuery);
+        PermissionPageParams params = pageQuery.params();
+        catalogQueryMapper.searchCatalog(page, new PermissionPageParams(
+            normalizeOptional(params.domainCode()), trimNullable(params.resourceId()),
+            trimNullable(params.keyword()), params.enabled()
+        ));
         return pageAdapter.toResult(page, PermissionView::from);
     }
 
@@ -120,9 +148,12 @@ public class PermissionApplication {
         requireVersion(entity.getVersion(), version);
         entity.setName(name.strip());
         entity.setDescription(trimNullable(description));
+        if (enabled && !Boolean.TRUE.equals(entity.getEnabled())) {
+            requireEnabledResource(entity.getResourceId());
+        }
         entity.setEnabled(enabled);
         requireUpdateSucceeded(id, permissionMapper.updateById(entity));
-        return PermissionView.from(entity);
+        return PermissionView.from(entity, requireResource(entity.getResourceId()));
     }
 
     /**
@@ -196,11 +227,46 @@ public class PermissionApplication {
         PermissionEntity entity = requirePermission(id);
         requireVersion(entity.getVersion(), version);
         if (Boolean.valueOf(enabled).equals(entity.getEnabled())) {
-            return PermissionView.from(entity);
+            return PermissionView.from(entity, requireResource(entity.getResourceId()));
         }
+        if (enabled) requireEnabledResource(entity.getResourceId());
         entity.setEnabled(enabled);
         requireUpdateSucceeded(id, permissionMapper.updateById(entity));
-        return PermissionView.from(entity);
+        return PermissionView.from(entity, requireResource(entity.getResourceId()));
+    }
+
+    private PermissionResourceEntity requireResource(String id) {
+        PermissionResourceEntity resource = resourceMapper.selectById(id);
+        if (resource == null) throw new AuthException(AuthErrorCode.RESOURCE_NOT_FOUND, "权限所属资源不存在");
+        return resource;
+    }
+
+    private PermissionResourceEntity requireResourceForWrite(String id) {
+        PermissionResourceEntity resource = resourceMapper.selectOne(
+            new LambdaQueryWrapper<PermissionResourceEntity>()
+                .eq(PermissionResourceEntity::getId, id).last("FOR UPDATE")
+        );
+        if (resource == null) throw new AuthException(AuthErrorCode.RESOURCE_NOT_FOUND, "权限所属资源不存在");
+        return resource;
+    }
+
+    private void requireEnabledResource(String id) {
+        if (!Boolean.TRUE.equals(requireResourceForWrite(id).getEnabled())) {
+            throw new AuthException(AuthErrorCode.RESOURCE_DISABLED);
+        }
+    }
+
+    private static String normalizeAction(String actionCode) {
+        if (actionCode == null) throw new AuthException(AuthErrorCode.RESOURCE_INVALID_CODE);
+        String normalized = actionCode.strip().toUpperCase(Locale.ROOT);
+        if (normalized.length() > 60 || !ACTION_CODE.matcher(normalized).matches()) {
+            throw new AuthException(AuthErrorCode.RESOURCE_INVALID_CODE);
+        }
+        return normalized;
+    }
+
+    private static String normalizeOptional(String value) {
+        return value == null || value.isBlank() ? null : value.strip().toUpperCase(Locale.ROOT);
     }
 
     private void requireUpdateSucceeded(String id, int affectedRows) {

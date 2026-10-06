@@ -210,7 +210,7 @@ public class MaterialCategoryApplication {
     private String validateParent(String categoryId, String parentId, boolean rejectMaterialReference) {
         if (parentId == null) return null;
         if (parentId.equals(categoryId)) {
-            throw MdmException.invalidReference("MaterialCategory 不能将自己设为父分类");
+            throw MdmException.invalidReference();
         }
         MaterialCategoryEntity directParent = materialCategoryMapper.selectByIdForUpdate(parentId);
         if (directParent == null) throw MdmException.notFound("MaterialCategory parent");
@@ -222,15 +222,15 @@ public class MaterialCategoryApplication {
         MaterialCategoryEntity current = directParent;
         while (current != null) {
             if (!visited.add(current.getId())) {
-                throw MdmException.invalidReference("MaterialCategory 现有父级链包含循环");
+                throw MdmException.invalidReference();
             }
             if (current.getId().equals(categoryId)) {
-                throw MdmException.invalidReference("MaterialCategory 移动后不能形成循环");
+                throw MdmException.invalidReference();
             }
             if (current.getParentId() == null) break;
             current = materialCategoryMapper.selectById(current.getParentId());
             if (current == null) {
-                throw MdmException.invalidReference("MaterialCategory 现有父级链引用不存在");
+                throw MdmException.invalidReference();
             }
         }
         return directParent.getId();
@@ -283,7 +283,7 @@ public class MaterialCategoryApplication {
 
     /** 创建统一输入校验异常。 */
     private static MdmException validationFailed(String message) {
-        return new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.validation_failed", message);
+        return new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.validation_failed", "mdm.error.validation_failed");
     }
 
     /** 判断可选文本是否具有非空白内容。 */

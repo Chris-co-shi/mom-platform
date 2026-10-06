@@ -215,12 +215,12 @@ public class LocationMasterDataApplication {
         WarehouseEntity warehouse = warehouseMapper.selectByIdForUpdate(warehouseSnapshot.getId());
         WarehouseAreaEntity area = warehouseAreaMapper.selectByIdForUpdate(validatedAreaId);
         if (warehouse == null || area == null || !warehouse.getId().equals(area.getWarehouseId())) {
-            throw MdmException.invalidReference("WarehouseArea 父链在并发修改中发生变化");
+            throw MdmException.invalidReference();
         }
         MdmMasterDataRules.requireEnabled(warehouse.getStatus(), "Warehouse");
         MdmMasterDataRules.requireEnabled(area.getStatus(), "WarehouseArea");
         if (!plantId.equals(warehouse.getPlantId())) {
-            throw MdmException.invalidReference("WarehouseArea 不属于 Location 指定的 Plant");
+            throw MdmException.invalidReference();
         }
         return area.getId();
     }

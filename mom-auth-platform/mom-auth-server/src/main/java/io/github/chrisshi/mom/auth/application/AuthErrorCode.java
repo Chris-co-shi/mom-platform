@@ -21,6 +21,9 @@ public enum AuthErrorCode implements ErrorCode {
     USERNAME_CONFLICT("auth.username_conflict", "auth.error.username-conflict", "用户名已存在"),
     ROLE_CODE_CONFLICT("auth.role_code_conflict", "auth.error.role-code-conflict", "角色编码已存在"),
     PERMISSION_CODE_CONFLICT("auth.permission_code_conflict", "auth.error.permission-code-conflict", "权限编码已存在"),
+    RESOURCE_CODE_CONFLICT("auth.resource_code_conflict", "auth.error.resource-code-conflict", "授权资源编码已存在"),
+    RESOURCE_INVALID_CODE("auth.resource_invalid_code", "auth.error.resource-invalid-code", "授权资源或动作编码格式非法"),
+    RESOURCE_DISABLED("auth.resource_disabled", "auth.error.resource-disabled", "资源已停用，不能新建或启用权限"),
     ROLE_DISABLED("auth.role_disabled", "auth.error.role-disabled", "已停用角色不能分配给用户"),
     PERMISSION_DISABLED("auth.permission_disabled", "auth.error.permission-disabled", "已停用权限不能分配给角色"),
     RELATION_SELECTION_TOO_LARGE(

@@ -1,9 +1,11 @@
 package io.github.chrisshi.mom.auth.application;
 
 import io.github.chrisshi.mom.auth.infrastructure.entity.PermissionEntity;
+import io.github.chrisshi.mom.auth.infrastructure.entity.PermissionResourceEntity;
 import io.github.chrisshi.mom.auth.infrastructure.entity.RoleEntity;
 import io.github.chrisshi.mom.auth.infrastructure.entity.RolePermissionEntity;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.PermissionMapper;
+import io.github.chrisshi.mom.auth.infrastructure.mapper.PermissionResourceMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RoleMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.RolePermissionMapper;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.UserRoleMapper;
@@ -34,6 +36,7 @@ class RoleApplicationTest {
     private UserRoleMapper userRoleMapper;
     private RolePermissionMapper rolePermissionMapper;
     private PermissionMapper permissionMapper;
+    private PermissionResourceMapper resourceMapper;
     private RoleApplication application;
 
     @BeforeEach
@@ -42,8 +45,15 @@ class RoleApplicationTest {
         userRoleMapper = mock(UserRoleMapper.class);
         rolePermissionMapper = mock(RolePermissionMapper.class);
         permissionMapper = mock(PermissionMapper.class);
+        resourceMapper = mock(PermissionResourceMapper.class);
+        PermissionResourceEntity resource = new PermissionResourceEntity();
+        resource.setId("resource-1");
+        resource.setDomainCode("AUTH");
+        resource.setResourceCode("USER");
+        resource.setName("用户管理");
+        when(resourceMapper.selectByIds(any())).thenReturn(List.of(resource));
         application = new RoleApplication(roleMapper, userRoleMapper, rolePermissionMapper, permissionMapper,
-            new PageAdapter(200));
+            resourceMapper, new PageAdapter(200));
     }
 
     @Test
@@ -197,6 +207,8 @@ class RoleApplicationTest {
     private static PermissionEntity permission(String id, String code, boolean enabled) {
         PermissionEntity entity = new PermissionEntity();
         entity.setId(id);
+        entity.setResourceId("resource-1");
+        entity.setActionCode("READ");
         entity.setCode(code);
         entity.setName(code);
         entity.setEnabled(enabled);

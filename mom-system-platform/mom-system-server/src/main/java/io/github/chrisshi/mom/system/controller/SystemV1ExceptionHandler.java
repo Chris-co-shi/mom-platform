@@ -2,7 +2,6 @@ package io.github.chrisshi.mom.system.controller;
 
 import io.github.chrisshi.mom.system.application.SystemV1Exception;
 import io.github.chrisshi.mom.system.controller.dictionary.DictionaryController;
-import io.github.chrisshi.mom.system.controller.i18n.I18nManagementController;
 import io.github.chrisshi.mom.system.controller.i18n.SupportedLocaleController;
 import io.github.chrisshi.mom.core.i18n.I18nMessageResolver;
 import io.github.chrisshi.mom.webmvc.response.Result;
@@ -25,8 +24,7 @@ import java.util.Locale;
  */
 @RestControllerAdvice(assignableTypes = {
         DictionaryController.class,
-        SupportedLocaleController.class,
-        I18nManagementController.class
+        SupportedLocaleController.class
 })
 public class SystemV1ExceptionHandler {
     private final I18nMessageResolver messageResolver;

@@ -40,7 +40,7 @@ class MdmPaginationControllerTest {
     void setUp() {
         application = mock(UomMasterDataApplication.class);
         mockMvc = standaloneSetup(new UomMasterDataController(application))
-                .setControllerAdvice(new MdmExceptionHandler())
+                .setControllerAdvice(new MdmExceptionHandler((key, locale, args) -> key))
                 .build();
     }
 

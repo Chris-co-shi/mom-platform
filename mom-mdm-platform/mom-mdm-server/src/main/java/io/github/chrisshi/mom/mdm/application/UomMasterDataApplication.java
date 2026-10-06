@@ -373,7 +373,7 @@ public class UomMasterDataApplication {
     public RuleView publishRule(String uomId, Integer expectedVersionNo, BigDecimal multiplier, BigDecimal offset,
                                 Integer precision, String roundingMode) {
         UomEntity unit = lockEnabledUomChain(MdmMasterDataRules.id(uomId, "uomId"));
-        if (Boolean.TRUE.equals(unit.getReferenceUnit())) throw MdmException.immutable("基准单位不需要换算规则");
+        if (Boolean.TRUE.equals(unit.getReferenceUnit())) throw MdmException.immutable();
         MdmMasterDataRules.requireEnabled(unit.getStatus(), "Uom");
         UomConversionRuleEntity current = requireCurrentRule(unit.getId());
         if (expectedVersionNo == null || !Objects.equals(current.getVersionNo(), expectedVersionNo)) throw MdmException.versionConflict();
@@ -462,7 +462,7 @@ public class UomMasterDataApplication {
         if (unit == null) throw MdmException.notFound("Uom");
         requireVersion(unit.getVersion(), version);
         if (Boolean.TRUE.equals(unit.getReferenceUnit())) {
-            throw MdmException.immutable("基准单位只能随计量单位类别启停");
+            throw MdmException.immutable();
         }
         if (MdmMasterDataRules.DISABLED.equals(status) && materialMapper.existsByUomId(unit.getId())) {
             throw MdmException.resourceReferenced("Uom");
@@ -569,7 +569,7 @@ public class UomMasterDataApplication {
         DimensionEntity dimension = requireDimensionForUpdate(snapshot.getDimensionId());
         UomCategoryEntity category = categoryMapper.selectByIdForUpdate(snapshot.getId());
         if (category == null || !dimension.getId().equals(category.getDimensionId())) {
-            throw MdmException.invalidReference("计量单位类别父链在并发修改中发生变化");
+            throw MdmException.invalidReference();
         }
         MdmMasterDataRules.requireEnabled(dimension.getStatus(), "Dimension");
         MdmMasterDataRules.requireEnabled(category.getStatus(), "UomCategory");
@@ -582,7 +582,7 @@ public class UomMasterDataApplication {
         DimensionEntity dimension = requireDimensionForUpdate(snapshot.getDimensionId());
         UomCategoryEntity category = categoryMapper.selectByIdForUpdate(snapshot.getId());
         if (category == null || !dimension.getId().equals(category.getDimensionId())) {
-            throw MdmException.invalidReference("计量单位类别父链在并发修改中发生变化");
+            throw MdmException.invalidReference();
         }
         MdmMasterDataRules.requireEnabled(dimension.getStatus(), "Dimension");
         return category;
@@ -600,7 +600,7 @@ public class UomMasterDataApplication {
         if (category == null || unit == null
                 || !category.getId().equals(unit.getCategoryId())
                 || !dimension.getId().equals(category.getDimensionId())) {
-            throw MdmException.invalidReference("计量单位父链在并发修改中发生变化");
+            throw MdmException.invalidReference();
         }
         MdmMasterDataRules.requireEnabled(dimension.getStatus(), "Dimension");
         MdmMasterDataRules.requireEnabled(category.getStatus(), "UomCategory");
@@ -722,7 +722,7 @@ public class UomMasterDataApplication {
             throw validation(field + "必须符合 numeric(50,30)");
         }
     }
-    private static MdmException validation(String message) { return new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.validation_failed", message); }
+    private static MdmException validation(String message) { return new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.validation_failed", "mdm.error.validation_failed"); }
 
     static DimensionView dimensionView(DimensionEntity e) { return new DimensionView(e.getId(), e.getCode(), e.getName(), e.getTimeExponent(), e.getLengthExponent(), e.getMassExponent(), e.getElectricCurrentExponent(), e.getTemperatureExponent(), e.getAmountExponent(), e.getLuminousIntensityExponent(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
     static CategoryView categoryView(UomCategoryEntity e, String referenceId) { return new CategoryView(e.getId(), e.getCode(), e.getName(), e.getDimensionId(), referenceId, e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }

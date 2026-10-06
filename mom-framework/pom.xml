@@ -7,6 +7,7 @@
   <name>MOM Framework</name>
   <modules>
     <module>mom-core</module>
+    <module>mom-i18n</module>
     <module>mom-webmvc</module>
     <module>mom-security</module>
     <module>mom-data</module>
