@@ -53,6 +53,7 @@ mom:
       write-authority: mdm:i18n:write
   security:
     resource-server:
+      enabled: ${MOM_RESOURCE_SERVER_ENABLED:true}
       public-paths:
         - /api/mdm/i18n/runtime/**
 
