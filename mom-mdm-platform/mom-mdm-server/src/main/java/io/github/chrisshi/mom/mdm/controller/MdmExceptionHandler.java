@@ -43,7 +43,7 @@ public class MdmExceptionHandler {
             case CONFLICT -> HttpStatus.CONFLICT;
         };
         return ResponseEntity.status(status).body(Result.failure(exception.code(),
-                messages.resolve(exception.messageKey(), locale, exception.args())));
+                messages.resolve(exception.namespace(), exception.messageKey(), locale, exception.args())));
     }
 
     /** 将请求体字段校验错误转换为稳定的 400 响应，不产生业务写副作用。 */

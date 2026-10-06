@@ -9,6 +9,7 @@ package io.github.chrisshi.mom.mdm.application;
 public final class MdmException extends RuntimeException {
     private final String code;
     private final Kind kind;
+    private final String namespace;
     private final String messageKey;
     private final Object[] args;
 
@@ -18,13 +19,15 @@ public final class MdmException extends RuntimeException {
     /**
      * @param kind HTTP 适配所需异常类别
      * @param code 稳定机器错误码
-     * @param messageKey MDM 自有的稳定译文键
+     * @param namespace MDM 自有稳定 namespace
+     * @param messageKey namespace 内稳定译文键
      * @param args 数字占位符参数，不得包含 Secret
      */
-    public MdmException(Kind kind, String code, String messageKey, Object... args) {
-        super(messageKey);
+    public MdmException(Kind kind, String code, String namespace, String messageKey, Object... args) {
+        super(namespace + "." + messageKey);
         this.kind = kind;
         this.code = code;
+        this.namespace = namespace;
         this.messageKey = messageKey;
         this.args = args == null ? new Object[0] : args.clone();
     }
@@ -39,7 +42,12 @@ public final class MdmException extends RuntimeException {
         return kind;
     }
 
-    /** @return 当前 Owner 的稳定译文键 */
+    /** @return 当前业务消息所属 namespace */
+    public String namespace() {
+        return namespace;
+    }
+
+    /** @return namespace 内稳定译文键 */
     public String messageKey() {
         return messageKey;
     }
@@ -51,64 +59,64 @@ public final class MdmException extends RuntimeException {
 
     /** 创建资源不存在异常。 */
     public static MdmException notFound(String resourceName) {
-        return new MdmException(Kind.NOT_FOUND, "mdm.resource_not_found", "mdm.error.resource_not_found", resourceName);
+        return new MdmException(Kind.NOT_FOUND, "mdm.resource_not_found", "mdm", "error.resource_not_found", resourceName);
     }
 
     /** 创建业务编码唯一冲突异常。 */
     public static MdmException codeConflict(String resourceName) {
-        return new MdmException(Kind.CONFLICT, "mdm.code_conflict", "mdm.error.code_conflict", resourceName);
+        return new MdmException(Kind.CONFLICT, "mdm.code_conflict", "mdm", "error.code_conflict", resourceName);
     }
 
     /** 创建量纲编码或七维向量唯一性冲突异常，不向调用方暴露数据库约束名。 */
     public static MdmException dimensionConflict() {
-        return new MdmException(Kind.CONFLICT, "mdm.dimension_conflict", "mdm.error.dimension_conflict");
+        return new MdmException(Kind.CONFLICT, "mdm.dimension_conflict", "mdm", "error.dimension_conflict");
     }
 
     /** 创建乐观锁冲突异常。 */
     public static MdmException versionConflict() {
-        return new MdmException(Kind.CONFLICT, "mdm.version_conflict", "mdm.error.version_conflict");
+        return new MdmException(Kind.CONFLICT, "mdm.version_conflict", "mdm", "error.version_conflict");
     }
 
     /** 创建父级或引用主数据已停用的冲突异常。 */
     public static MdmException parentDisabled(String resourceName) {
-        return new MdmException(Kind.CONFLICT, "mdm.parent_disabled", "mdm.error.parent_disabled", resourceName);
+        return new MdmException(Kind.CONFLICT, "mdm.parent_disabled", "mdm", "error.parent_disabled", resourceName);
     }
 
     /** 创建引用关系非法异常。 */
     public static MdmException invalidReference() {
-        return new MdmException(Kind.BAD_REQUEST, "mdm.invalid_reference", "mdm.error.invalid_reference");
+        return new MdmException(Kind.BAD_REQUEST, "mdm.invalid_reference", "mdm", "error.invalid_reference");
     }
 
     /** 创建不可变业务身份被普通入口修改的冲突异常。 */
     public static MdmException immutable() {
-        return new MdmException(Kind.CONFLICT, "mdm.immutable_master_data", "mdm.error.immutable_master_data");
+        return new MdmException(Kind.CONFLICT, "mdm.immutable_master_data", "mdm", "error.immutable_master_data");
     }
 
     /** 创建仍被非删除业务数据引用的生命周期冲突异常。 */
     public static MdmException resourceReferenced(String resourceName) {
         return new MdmException(Kind.CONFLICT, "mdm.resource_referenced",
-                "mdm.error.resource_referenced", resourceName);
+                "mdm", "error.resource_referenced", resourceName);
     }
 
     /** 创建物料分类不是叶子节点的稳定冲突异常。 */
     public static MdmException categoryNotLeaf() {
         return new MdmException(Kind.CONFLICT, "mdm.material_category_not_leaf",
-                "mdm.error.material_category_not_leaf");
+                "mdm", "error.material_category_not_leaf");
     }
 
     /** 创建分类级联规模超过 V1 单事务保护上限的稳定冲突异常。 */
     public static MdmException categoryCascadeTooLarge(int limit) {
         return new MdmException(Kind.CONFLICT, "mdm.material_category_cascade_too_large",
-                "mdm.error.material_category_cascade_too_large", limit);
+                "mdm", "error.material_category_cascade_too_large", limit);
     }
 
     /** 创建单位不在同一换算类别的输入异常。 */
     public static MdmException incompatibleUom() {
-        return new MdmException(Kind.BAD_REQUEST, "mdm.incompatible_uom", "mdm.error.incompatible_uom");
+        return new MdmException(Kind.BAD_REQUEST, "mdm.incompatible_uom", "mdm", "error.incompatible_uom");
     }
 
     /** 创建因规则要求精确计算但结果无法精确表示而产生的稳定输入异常。 */
     public static MdmException conversionInexact() {
-        return new MdmException(Kind.BAD_REQUEST, "mdm.conversion_inexact", "mdm.error.conversion_inexact");
+        return new MdmException(Kind.BAD_REQUEST, "mdm.conversion_inexact", "mdm", "error.conversion_inexact");
     }
 }
