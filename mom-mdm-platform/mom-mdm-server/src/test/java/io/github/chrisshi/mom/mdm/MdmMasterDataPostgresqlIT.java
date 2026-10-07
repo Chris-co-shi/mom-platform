@@ -150,7 +150,8 @@ class MdmMasterDataPostgresqlIT {
                 "uk_mdm_location_type_code", "uk_mdm_location_plant_code",
                 "uk_mdm_material_category_code", "uk_mdm_dimension_code", "uk_mdm_dimension_vector",
                 "uk_mdm_uom_category_code", "uk_mdm_uom_code", "uk_mdm_uom_conversion_rule_version",
-                "uk_mdm_material_code");
+                "uk_mdm_material_code", "uk_mdm_i18n_message_definition_key",
+                "uk_mdm_i18n_translation_message_locale");
         assertThat(jdbcTemplate.queryForList("""
                 SELECT constraint_name FROM information_schema.table_constraints
                  WHERE table_schema = ? AND table_name = 'mdm_material_category'

@@ -55,7 +55,7 @@ public class UomConversionCalculator {
     private static void requireAffine(UomConversionRuleEntity rule) {
         if (rule == null || !"AFFINE".equals(rule.getAlgorithmType()) || rule.getMultiplier() == null
                 || rule.getMultiplier().signum() <= 0 || rule.getOffset() == null) {
-            throw new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.invalid_conversion_rule", "mdm.error.invalid_conversion_rule");
+            throw new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.invalid_conversion_rule", "mdm", "error.invalid_conversion_rule");
         }
     }
 
@@ -64,7 +64,7 @@ public class UomConversionCalculator {
         try {
             return new MathContext(rule.getCalculationPrecision(), RoundingMode.valueOf(rule.getRoundingMode()));
         } catch (RuntimeException exception) {
-            throw new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.invalid_conversion_rule", "mdm.error.invalid_conversion_rule");
+            throw new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.invalid_conversion_rule", "mdm", "error.invalid_conversion_rule");
         }
     }
 }

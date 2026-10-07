@@ -15,6 +15,7 @@ import java.util.Locale;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 class DefaultI18nMessageResolverTest {
@@ -68,5 +69,30 @@ class DefaultI18nMessageResolverTest {
 
         assertThat(resolver.resolve("framework.web.invalid_request", Locale.US))
                 .isEqualTo("classpath:framework.web.invalid_request");
+    }
+
+    @Test
+    void updatedMdmTranslationMustBeVisibleWithoutRecreatingResolver() {
+        I18nStore store = mock(I18nStore.class);
+        I18nMessage message = new I18nMessage(
+                "1001", "mdm", "error.not_found", null, true, 0, Instant.EPOCH);
+        when(store.message("mdm", "error.not_found")).thenReturn(message);
+        when(store.translations(List.of("1001"), List.of("en-US", "zh-CN")))
+                .thenReturn(List.of(
+                        new I18nTranslation("2001", "1001", "en-US", "Not found", 0, Instant.EPOCH),
+                        new I18nTranslation("2002", "1001", "zh-CN", "未找到", 0, Instant.EPOCH)))
+                .thenReturn(List.of(
+                        new I18nTranslation("2001", "1001", "en-US", "Resource missing", 1, Instant.EPOCH),
+                        new I18nTranslation("2002", "1001", "zh-CN", "未找到", 0, Instant.EPOCH)));
+        when(store.translations(List.of("1001"), List.of("zh-CN"))).thenReturn(List.of(
+                new I18nTranslation("2002", "1001", "zh-CN", "未找到", 0, Instant.EPOCH)));
+        DefaultI18nMessageResolver resolver = new DefaultI18nMessageResolver(store,
+                namespace -> namespace.equals("mdm"), new LocalBaseLocalePolicy("zh-CN"),
+                (key, locale, args) -> key);
+
+        assertThat(resolver.resolve("mdm", "error.not_found", Locale.US)).isEqualTo("Not found");
+        assertThat(resolver.resolve("mdm", "error.not_found", Locale.US)).isEqualTo("Resource missing");
+        verify(store, times(2)).translations(List.of("1001"), List.of("en-US", "zh-CN"));
+        assertThat(resolver.resolve("mdm", "error.not_found", Locale.SIMPLIFIED_CHINESE)).isEqualTo("未找到");
     }
 }

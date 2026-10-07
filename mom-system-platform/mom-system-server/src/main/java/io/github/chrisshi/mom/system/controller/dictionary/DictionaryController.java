@@ -33,7 +33,7 @@ import java.util.List;
  * Security Filter Chain 处理，业务与输入异常由统一 System ControllerAdvice 本地化。</p>
  */
 @RestController
-@RequestMapping("/api/system")
+@RequestMapping
 public class DictionaryController {
     private final DictionaryApplication application;
 
@@ -60,7 +60,7 @@ public class DictionaryController {
     }
 
     /** 版本化启停字典类型。 */
-    @PatchMapping("/admin/dictionaries/{id}/status")
+    @PatchMapping("/{id}/status")
     @PreAuthorize("hasAuthority('system:dictionary:write')")
     public Result<TypeView> changeTypeStatus(@PathVariable String id, @RequestBody StatusRequest request) {
         return Result.success(application.changeTypeStatus(

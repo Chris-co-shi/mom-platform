@@ -1,6 +1,12 @@
 server:
   port: ${SERVER_PORT:20300}
 
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 spring:
   application:
     name: mom-system-server
@@ -53,17 +59,17 @@ mybatis-plus:
 mom:
   i18n:
     runtime:
-      base-path: /api/system/i18n/runtime
+      base-path: /i18n/runtime
     management:
-      base-path: /api/system/admin/i18n/messages
+      base-path: /admin/i18n/messages
       read-authority: system:i18n:read
       write-authority: system:i18n:write
   security:
     resource-server:
       enabled: ${MOM_RESOURCE_SERVER_ENABLED:true}
       public-paths:
-        - /api/system/i18n/locales
-        - /api/system/i18n/runtime/**
+        - /i18n/locales
+        - /i18n/runtime/**
         - /actuator/health/**
         - /actuator/info
         - /error

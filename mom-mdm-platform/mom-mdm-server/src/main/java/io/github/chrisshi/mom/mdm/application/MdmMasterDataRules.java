@@ -83,6 +83,6 @@ public final class MdmMasterDataRules {
     }
 
     private static MdmException invalid(String message) {
-        return new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.validation_failed", "mdm.error.validation_failed");
+        return new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.validation_failed", "mdm", "error.validation_failed");
     }
 }

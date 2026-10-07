@@ -722,7 +722,7 @@ public class UomMasterDataApplication {
             throw validation(field + "必须符合 numeric(50,30)");
         }
     }
-    private static MdmException validation(String message) { return new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.validation_failed", "mdm.error.validation_failed"); }
+    private static MdmException validation(String message) { return new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.validation_failed", "mdm", "error.validation_failed"); }
 
     static DimensionView dimensionView(DimensionEntity e) { return new DimensionView(e.getId(), e.getCode(), e.getName(), e.getTimeExponent(), e.getLengthExponent(), e.getMassExponent(), e.getElectricCurrentExponent(), e.getTemperatureExponent(), e.getAmountExponent(), e.getLuminousIntensityExponent(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
     static CategoryView categoryView(UomCategoryEntity e, String referenceId) { return new CategoryView(e.getId(), e.getCode(), e.getName(), e.getDimensionId(), referenceId, e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }

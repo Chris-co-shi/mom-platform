@@ -1,6 +1,12 @@
 server:
   port: ${SERVER_PORT:20200}
 
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 spring:
   application:
     name: mom-mdm-server

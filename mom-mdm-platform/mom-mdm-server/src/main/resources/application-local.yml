@@ -1,0 +1,18 @@
+# 仅供本机联调；MDM 仍保留既有服务内部 /api/mdm 路径。
+server:
+  address: 127.0.0.1
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+mom:
+  security:
+    resource-server:
+      public-paths:
+        - /api/mdm/i18n/runtime/**
+        - /v3/api-docs/**
+        - /swagger-ui/**
+        - /swagger-ui.html

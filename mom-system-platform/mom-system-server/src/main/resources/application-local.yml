@@ -1,0 +1,22 @@
+# 仅供本机联调；保留 Base 的匿名路径，并在 local Profile 开放文档。
+server:
+  address: 127.0.0.1
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+mom:
+  security:
+    resource-server:
+      public-paths:
+        - /i18n/locales
+        - /i18n/runtime/**
+        - /actuator/health/**
+        - /actuator/info
+        - /error
+        - /v3/api-docs/**
+        - /swagger-ui/**
+        - /swagger-ui.html

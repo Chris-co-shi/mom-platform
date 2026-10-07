@@ -27,6 +27,7 @@
     <testcontainers.version>2.0.5</testcontainers.version>
     <archunit.version>1.4.2</archunit.version>
     <okio.version>3.16.4</okio.version>
+    <springdoc.version>3.1.0</springdoc.version>
 
     <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
     <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
@@ -107,6 +108,11 @@
         <groupId>com.squareup.okio</groupId>
         <artifactId>okio-jvm</artifactId>
         <version>${okio.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        <version>${springdoc.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

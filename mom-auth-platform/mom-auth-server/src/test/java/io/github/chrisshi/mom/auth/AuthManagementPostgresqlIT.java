@@ -132,7 +132,7 @@ class AuthManagementPostgresqlIT {
 
     @Test
     void flywayAndDatabaseConstraintsMustMatchMiniAuthModel() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("8");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("show timezone", String.class)).isEqualTo("UTC");
         assertThat(jdbcTemplate.queryForObject("""
@@ -190,7 +190,7 @@ class AuthManagementPostgresqlIT {
             """, Long.class)).isEqualTo(6L);
     }
 
-    /** V6～V8 在隔离 Schema 中保留四个 System authority，并增加 Owner 文案权限。 */
+    /** 现行迁移在隔离 Schema 中保留四个 System authority，并增加 Owner 文案权限。 */
     @Test
     void v6MustSeedSystemPermissionsUnderExplicitResources() {
         String seedSchema = "mom_auth_system_seed";
@@ -201,7 +201,7 @@ class AuthManagementPostgresqlIT {
             .locations("classpath:db/migration/auth")
             .load();
         seeded.migrate();
-        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("8");
+        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("10");
         assertThat(jdbcTemplate.queryForList("""
             SELECT permission.code
               FROM mom_auth_system_seed.auth_permission permission
@@ -215,6 +215,22 @@ class AuthManagementPostgresqlIT {
             "system:dictionary:read", "system:dictionary:write",
             "system:i18n:read", "system:i18n:write"
         );
+    }
+
+    /** Auth Shell 导航独立于 IAM 正文，六个稳定 Key 均有双语译文。 */
+    @Test
+    void authNavigationMigrationMustSeedBilingualShellKeys() {
+        assertThat(jdbcTemplate.queryForObject("""
+            select count(*) from auth_i18n_message_definition
+            where namespace = 'auth.navigation' and message_key like 'navigation.%'
+              and enabled = true and deleted = false
+            """, Long.class)).isEqualTo(6L);
+        assertThat(jdbcTemplate.queryForObject("""
+            select count(*) from auth_i18n_translation t
+              join auth_i18n_message_definition m on m.id = t.message_id
+            where m.namespace = 'auth.navigation' and m.message_key like 'navigation.%'
+              and t.locale_code in ('zh-CN', 'en-US') and not t.deleted
+            """, Long.class)).isEqualTo(12L);
     }
 
     @Test

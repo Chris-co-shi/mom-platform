@@ -353,7 +353,7 @@ public class MaterialApplication {
 
     /** 创建统一输入校验异常。 */
     private static MdmException validationFailed(String message) {
-        return new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.validation_failed", "mdm.error.validation_failed");
+        return new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.validation_failed", "mdm", "error.validation_failed");
     }
 
     /** 判断可选文本是否具有非空白内容。 */

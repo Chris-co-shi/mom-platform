@@ -28,7 +28,7 @@ import java.util.List;
  * localeCode；内部 ID 仅出现在管理 API。事务、默认切换与启停规则全部位于 Application。</p>
  */
 @RestController
-@RequestMapping("/api/system/i18n/locales")
+@RequestMapping("/i18n/locales")
 public class SupportedLocaleController {
     private final SupportedLocaleApplication application;
 

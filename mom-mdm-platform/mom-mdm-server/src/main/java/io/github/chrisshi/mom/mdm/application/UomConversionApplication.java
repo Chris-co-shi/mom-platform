@@ -191,5 +191,5 @@ public class UomConversionApplication {
     private DimensionEntity requireDimension(String id) { var e = dimensionMapper.selectById(id); if (e == null) throw MdmException.notFound("Dimension"); return e; }
     private static BigDecimal decimal(String value) { try { return new BigDecimal(value); } catch (RuntimeException e) { throw validation("value 必须是十进制字符串"); } }
     private static String plain(BigDecimal value) { BigDecimal normalized = value.stripTrailingZeros(); return normalized.signum() == 0 ? "0" : normalized.toPlainString(); }
-    private static MdmException validation(String message) { return new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.validation_failed", "mdm.error.validation_failed"); }
+    private static MdmException validation(String message) { return new MdmException(MdmException.Kind.BAD_REQUEST, "mdm.validation_failed", "mdm", "error.validation_failed"); }
 }

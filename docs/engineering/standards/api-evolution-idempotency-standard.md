@@ -34,7 +34,16 @@
 - S01 不引入运行时 OpenAPI 依赖。维护方资料表明 springdoc-openapi 3.x 支持 Spring Boot 4，但正式引入前仍需在仓库锁定的 Boot 4.1.0、Framework 7.1、Jackson 3 组合上做生成、启动和契约验证；
 - 可先维护审阅过的静态 OpenAPI 文件；生成产物必须可重复、纳入版本控制策略并能与基线比较。
 
-维护方证据：[springdoc-openapi 3.x / Spring Boot 4 文档](https://springdoc.org/v4/)。springdoc 是社区项目，不是 Spring 官方组件，因此该兼容声明不得写成 Spring 官方保证。
+维护方证据：[springdoc-openapi 3.x / Spring Boot 4 文档](https://springdoc.org/)。springdoc 是社区项目，不是 Spring 官方组件，因此该兼容声明不得写成 Spring 官方保证。
+
+### 2.1 当前本地文档落地
+
+S01 的“不引入运行时依赖”是当时 Slice 的范围，不禁止后续显式验证后接入。
+Auth、System、MDM 现使用 `springdoc-openapi-starter-webmvc-ui` 3.1.0；Base 关闭，`local` Profile
+仅绑定 loopback 并开放文档页。服务内部 OpenAPI 快照存放在 `docs/api/snapshots/`，导出和比对入口为
+`scripts/export-api-docs.sh`。变更 Controller 路径、请求/响应 Schema 或状态码时必须更新快照并 Review 差异；
+Gateway 与前端代理的重写路径需另行核对，不能把服务内部 `paths` 直接当成浏览器 URL。
+具体访问方式和已知路由差异见 `docs/api/README.md`。
 
 未来契约检查至少检测：路径删除、字段删除、必填字段增加、类型变化、Enum 收窄、状态码变化、安全方案变化和分页语义变化。工具选择与 CI 集成在有真实 OpenAPI 产物后实施，S01 不强行增加依赖。
 

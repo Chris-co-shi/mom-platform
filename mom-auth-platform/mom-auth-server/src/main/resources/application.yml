@@ -1,5 +1,10 @@
 server:
   port: 20001
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
 spring:
   application:
     name: mom-auth-server

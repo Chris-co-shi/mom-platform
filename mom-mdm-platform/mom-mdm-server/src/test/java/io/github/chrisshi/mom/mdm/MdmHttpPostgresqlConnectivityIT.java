@@ -230,6 +230,46 @@ class MdmHttpPostgresqlConnectivityIT {
     }
 
     /**
+     * 真实 HTTP 边界按请求语言解析数据库译文；同一 JVM 更新译文后下次请求立即可见。
+     * 测试结束恢复种子译文，避免影响同容器中的其他用例。
+     */
+    @Test
+    void mdmErrorMustFollowAcceptLanguageAndObserveUpdatedTranslation() throws Exception {
+        String missingId = "999999999999999999";
+        mockMvc.perform(get("/api/mdm/i18n/runtime/bundles")
+                        .param("locale", "zh-CN").param("namespaces", "mdm"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/mdm/admin/i18n/messages").param("namespace", "mdm"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/mdm/uoms/{id}", missingId))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/mdm/uoms/{id}", missingId).with(readOnlyActor())
+                        .header("Accept-Language", "zh-CN"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("mdm.resource_not_found"))
+                .andExpect(jsonPath("$.message").value("Uom不存在"))
+                .andExpect(jsonPath("$.namespace").doesNotExist())
+                .andExpect(jsonPath("$.messageKey").doesNotExist());
+        mockMvc.perform(get("/api/mdm/uoms/{id}", missingId).with(readOnlyActor())
+                        .header("Accept-Language", "en-US"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("The Uom does not exist"));
+
+        try {
+            jdbcTemplate.update("UPDATE mdm_i18n_translation SET message_text = ? WHERE id = ?",
+                    "Unit {0} is absent", "9720000000000000002");
+            mockMvc.perform(get("/api/mdm/uoms/{id}", missingId).with(readOnlyActor())
+                            .header("Accept-Language", "en-US"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.message").value("Unit Uom is absent"));
+        } finally {
+            jdbcTemplate.update("UPDATE mdm_i18n_translation SET message_text = ? WHERE id = ?",
+                    "The {0} does not exist", "9720000000000000002");
+        }
+    }
+
+    /**
      * 执行创建请求并从统一 Result 信封提取服务端生成的 String ID。
      *
      * @param path 创建端点

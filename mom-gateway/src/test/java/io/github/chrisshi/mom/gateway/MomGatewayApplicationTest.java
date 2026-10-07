@@ -78,9 +78,11 @@ class MomGatewayApplicationTest {
                     .orElseThrow();
             assertEquals(URI.create("lb://mom-system-server"), systemRoute.getUri());
             assertTrue(systemRoute.getPredicates().stream()
-                    .anyMatch(predicate -> predicate.getArgs().containsValue("/api/system/**")));
+                    .anyMatch(predicate -> predicate.getArgs().containsValue("/system/**")),
+                    () -> "实际 System Route Predicates: " + systemRoute.getPredicates());
             assertTrue(systemRoute.getFilters().stream()
-                    .noneMatch(filter -> "StripPrefix".equals(filter.getName())));
+                    .anyMatch(filter -> "StripPrefix".equals(filter.getName())
+                            && filter.getArgs().containsValue("1")));
 
             RouteDefinition integrationRoute = routes.stream()
                     .filter(route -> "integration-service".equals(route.getId()))

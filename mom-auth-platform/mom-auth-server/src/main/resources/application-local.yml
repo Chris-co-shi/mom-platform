@@ -1,0 +1,19 @@
+# 仅供本机联调；正式环境不激活 local Profile。
+server:
+  address: 127.0.0.1
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+mom:
+  security:
+    resource-server:
+      public-paths:
+        - /login
+        - /i18n/runtime/**
+        - /v3/api-docs/**
+        - /swagger-ui/**
+        - /swagger-ui.html
