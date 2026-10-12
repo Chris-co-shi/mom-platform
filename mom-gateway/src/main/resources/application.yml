@@ -66,24 +66,6 @@ spring:
                     redis-rate-limiter.burstCapacity: ${GATEWAY_AUTH_LOGIN_RATE_LIMIT_BURST_CAPACITY:300}
                     redis-rate-limiter.requestedTokens: ${GATEWAY_AUTH_LOGIN_RATE_LIMIT_REQUESTED_TOKENS:60}
 
-            # Web 的统一 /api/auth 前缀；与旧 /auth 登录入口使用相同限流语义。
-            - id: auth-login-api
-              order: -10
-              uri: lb://mom-auth-server
-              predicates:
-                - Path=/api/auth/login
-                - Method=POST
-              filters:
-                - StripPrefix=2
-                - name: RequestRateLimiter
-                  args:
-                    rate-limiter: "#{@momFailClosedRedisRateLimiter}"
-                    key-resolver: "#{@requestIdentityKeyResolver}"
-                    redis-rate-limiter.replenishRate: ${GATEWAY_AUTH_LOGIN_RATE_LIMIT_REPLENISH_RATE:5}
-                    redis-rate-limiter.burstCapacity: ${GATEWAY_AUTH_LOGIN_RATE_LIMIT_BURST_CAPACITY:300}
-                    redis-rate-limiter.requestedTokens: ${GATEWAY_AUTH_LOGIN_RATE_LIMIT_REQUESTED_TOKENS:60}
-
-            # Auth 常规 API。
             - id: auth-api
               order: 0
               uri: lb://mom-auth-server
@@ -91,21 +73,6 @@ spring:
                 - Path=/auth/**
               filters:
                 - StripPrefix=1
-                - name: RequestRateLimiter
-                  args:
-                    rate-limiter: "#{@momFailClosedRedisRateLimiter}"
-                    key-resolver: "#{@requestIdentityKeyResolver}"
-                    redis-rate-limiter.replenishRate: ${GATEWAY_AUTH_RATE_LIMIT_REPLENISH_RATE:10}
-                    redis-rate-limiter.burstCapacity: ${GATEWAY_AUTH_RATE_LIMIT_BURST_CAPACITY:20}
-                    redis-rate-limiter.requestedTokens: ${GATEWAY_AUTH_RATE_LIMIT_REQUESTED_TOKENS:1}
-
-            - id: auth-api-unified
-              order: 0
-              uri: lb://mom-auth-server
-              predicates:
-                - Path=/api/auth/**
-              filters:
-                - StripPrefix=2
                 - name: RequestRateLimiter
                   args:
                     rate-limiter: "#{@momFailClosedRedisRateLimiter}"
@@ -136,7 +103,7 @@ spring:
               predicates:
                 - Path=/mdm/**
               filters:
-                - StripPrefix=1
+                - PrefixPath=/api
                 - name: RequestRateLimiter
                   args:
                     rate-limiter: "#{@momFailClosedRedisRateLimiter}"
