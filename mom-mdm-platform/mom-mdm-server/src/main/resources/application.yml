@@ -12,8 +12,8 @@ spring:
     name: mom-mdm-server
   datasource:
     url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_mdm}&tcpKeepAlive=${POSTGRES_TCP_KEEP_ALIVE:true}&ApplicationName=${POSTGRES_APPLICATION_NAME:mom-mdm-server}}
-    username: ${POSTGRES_USERNAME:mom}
-    password: ${POSTGRES_PASSWORD:}
+    username: ${POSTGRES_USERNAME:postgres}
+    password: ${POSTGRES_PASSWORD:12345678}
     hikari:
       pool-name: ${POSTGRES_POOL_NAME:mom-mdm-hikari}
       minimum-idle: ${POSTGRES_MINIMUM_IDLE:1}
@@ -22,6 +22,14 @@ spring:
       validation-timeout: ${POSTGRES_VALIDATION_TIMEOUT:2000}
       leak-detection-threshold: ${POSTGRES_LEAK_DETECTION_THRESHOLD:0}
       connection-init-sql: SET TIME ZONE 'UTC'
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:123456789}
+      database: ${REDIS_DATABASE:0}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${REDIS_COMMAND_TIMEOUT:2s}
   flyway:
     enabled: ${FLYWAY_ENABLED:true}
     create-schemas: true
@@ -34,10 +42,10 @@ spring:
   cloud:
     nacos:
       discovery:
-        enabled: ${NACOS_DISCOVERY_ENABLED:false}
+        enabled: ${NACOS_DISCOVERY_ENABLED:true}
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:}
+        password: ${NACOS_PASSWORD:12345678}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
@@ -50,18 +58,17 @@ mybatis-plus:
 
 mom:
   i18n:
-    base-locale: ${MOM_I18N_BASE_LOCALE:zh-CN}
     runtime:
-      base-path: /api/mdm/i18n/runtime
+      base-path: /i18n/runtime
     management:
-      base-path: /api/mdm/admin/i18n/messages
-      read-authority: mdm:i18n:read
-      write-authority: mdm:i18n:write
+      base-path: /admin/i18n/messages
+      read-authority: system:i18n:read
+      write-authority: system:i18n:write
   security:
     resource-server:
       enabled: ${MOM_RESOURCE_SERVER_ENABLED:true}
       public-paths:
-        - /api/mdm/i18n/runtime/**
+        - /mdm/i18n/runtime/**
 
 management:
   endpoints:
