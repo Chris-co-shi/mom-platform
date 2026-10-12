@@ -1,0 +1,8 @@
+INSERT INTO system_i18n_message_definition (id,namespace,message_key,description,enabled,version,deleted,created_by,created_at,updated_by,updated_at) VALUES
+('9650000000000003001','system.navigation','navigation.mdmCategories',NULL,true,0,false,'MDM_WEB_MIGRATION',CURRENT_TIMESTAMP,'MDM_WEB_MIGRATION',CURRENT_TIMESTAMP),
+('9650000000000003002','system.navigation','navigation.mdmMaterials',NULL,true,0,false,'MDM_WEB_MIGRATION',CURRENT_TIMESTAMP,'MDM_WEB_MIGRATION',CURRENT_TIMESTAMP);
+INSERT INTO system_i18n_translation (id,message_id,locale_code,message_text,version,deleted,created_by,created_at,updated_by,updated_at) VALUES
+('9660000000000003001','9650000000000003001','zh-CN','物料分类',0,false,'MDM_WEB_MIGRATION',CURRENT_TIMESTAMP,'MDM_WEB_MIGRATION',CURRENT_TIMESTAMP),
+('9660000000000003002','9650000000000003001','en-US','Material Categories',0,false,'MDM_WEB_MIGRATION',CURRENT_TIMESTAMP,'MDM_WEB_MIGRATION',CURRENT_TIMESTAMP),
+('9660000000000003003','9650000000000003002','zh-CN','物料管理',0,false,'MDM_WEB_MIGRATION',CURRENT_TIMESTAMP,'MDM_WEB_MIGRATION',CURRENT_TIMESTAMP),
+('9660000000000003004','9650000000000003002','en-US','Materials',0,false,'MDM_WEB_MIGRATION',CURRENT_TIMESTAMP,'MDM_WEB_MIGRATION',CURRENT_TIMESTAMP);
