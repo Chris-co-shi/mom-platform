@@ -84,6 +84,23 @@ class MomGatewayApplicationTest {
                     .anyMatch(filter -> "StripPrefix".equals(filter.getName())
                             && filter.getArgs().containsValue("1")));
 
+            // 浏览器/Gateway 不接受 /api/auth；MDM 保留 Server 内部 /api/mdm Controller 前缀。
+            assertTrue(routes.stream().noneMatch(route ->
+                    "auth-api-unified".equals(route.getId()) || "auth-login-api".equals(route.getId())));
+
+            RouteDefinition mdmRoute = routes.stream()
+                    .filter(route -> "mdm-api".equals(route.getId()))
+                    .findFirst()
+                    .orElseThrow();
+            assertEquals(URI.create("lb://mom-mdm-server"), mdmRoute.getUri());
+            assertTrue(mdmRoute.getPredicates().stream()
+                    .anyMatch(predicate -> predicate.getArgs().containsValue("/mdm/**")));
+            assertTrue(mdmRoute.getFilters().stream()
+                    .anyMatch(filter -> "PrefixPath".equals(filter.getName())
+                            && filter.getArgs().containsValue("/api")));
+            assertTrue(mdmRoute.getFilters().stream()
+                    .noneMatch(filter -> "StripPrefix".equals(filter.getName())));
+
             RouteDefinition integrationRoute = routes.stream()
                     .filter(route -> "integration-service".equals(route.getId()))
                     .findFirst()
