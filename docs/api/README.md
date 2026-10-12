@@ -17,9 +17,18 @@ Auth、System、MDM 在 `local` Profile 下生成 OpenAPI 3.1 文档。Base 与�
 浏览器 URL → 前端代理后的 Gateway URL → Gateway 转发后的 Controller URL
 ```
 
-例如当前 Auth 登录链条是 `/api/auth/login → /auth/login → /login`。System 语言目录的目标链条是
-`/api/system/i18n/locales → /system/i18n/locales → /i18n/locales`；对应 Gateway 路由和前端代理
-必须同时匹配。MDM 路径尚处于对齐阶段，不得从服务内部 `/api/mdm/...` 推断现行 Gateway 对外地址。
+浏览器到 Gateway 的模块路由**不使用** `/api` 前缀。当前约定的三跳对应关系：
+
+```text
+/auth/login                 → /auth/login                 → /login
+/system/i18n/locales        → /system/i18n/locales        → /i18n/locales
+/mdm/materials/search       → /mdm/materials/search       → /api/mdm/materials/search
+```
+
+前端开发代理必须原样转发模块前缀。Gateway 对 Auth/System 执行 `StripPrefix=1`，
+对 MDM 执行 `PrefixPath=/api` 而不是 `StripPrefix=1`；MDM Resource Server 负责最终鉴权。
+不得在浏览器请求上叠加 /api，也不因为 Gateway 契约而批量更改现有内部 Controller Path。
+
 当前 System 字典类型启停在服务文档中显示为 `PATCH /{id}/status`，应作为独立路由问题审查，
 不在文档接入 Slice 中静默修改。
 
