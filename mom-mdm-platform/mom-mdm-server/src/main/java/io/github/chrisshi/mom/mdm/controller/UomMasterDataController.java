@@ -24,7 +24,7 @@ import java.math.BigDecimal;
  * 读写分别要求 {@code mdm:uom:read/write} 权限；事务、不变量和数据库失败策略均由 Application 负责。</p>
  */
 @RestController
-@RequestMapping("/api/mdm")
+@RequestMapping("/uom")
 public class UomMasterDataController {
     private final UomMasterDataApplication application;
 

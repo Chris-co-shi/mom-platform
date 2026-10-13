@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 也不泄露 SQL 与约束细节。</p>
  */
 @RestController
-@RequestMapping("/api/mdm/material-categories")
+@RequestMapping("/material-categories")
 public class MaterialCategoryController {
     private final MaterialCategoryApplication application;
 
