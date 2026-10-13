@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
  * fail-closed 行为均在 Application。所有端点只读但仍要求明确的 {@code mdm:uom:read} 权限。</p>
  */
 @RestController
-@RequestMapping("/api/mdm/uom-conversions")
+@RequestMapping("/uom-conversions")
 @PreAuthorize("hasAuthority('mdm:uom:read')")
 public class UomConversionController {
     private final UomConversionApplication application;

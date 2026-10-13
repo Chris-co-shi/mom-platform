@@ -132,7 +132,7 @@ class AuthManagementPostgresqlIT {
 
     @Test
     void flywayAndDatabaseConstraintsMustMatchMiniAuthModel() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("11");
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("show timezone", String.class)).isEqualTo("UTC");
         assertThat(jdbcTemplate.queryForObject("""
@@ -201,7 +201,7 @@ class AuthManagementPostgresqlIT {
             .locations("classpath:db/migration/auth")
             .load();
         seeded.migrate();
-        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("10");
+        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("11");
         assertThat(jdbcTemplate.queryForList("""
             SELECT permission.code
               FROM mom_auth_system_seed.auth_permission permission
@@ -215,6 +215,59 @@ class AuthManagementPostgresqlIT {
             "system:dictionary:read", "system:dictionary:write",
             "system:i18n:read", "system:i18n:write"
         );
+    }
+
+    /** 单独迁移隔离 Schema，证明 MDM 权限目录、十条 Authority 与 Admin 显式授权都被初始化。 */
+    @Test
+    void mdmV11MustSeedResourcesPermissionsAndAdminGrants() {
+        String seedSchema = "mom_auth_mdm_seed";
+        Flyway seeded = Flyway.configure()
+            .dataSource(POSTGRESQL.getJdbcUrl(), POSTGRESQL.getUsername(), POSTGRESQL.getPassword())
+            .schemas(seedSchema)
+            .defaultSchema(seedSchema)
+            .locations("classpath:db/migration/auth")
+            .load();
+        seeded.migrate();
+        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("11");
+
+        assertThat(jdbcTemplate.queryForObject("""
+            SELECT COUNT(*) FROM mom_auth_mdm_seed.auth_permission_resource
+            WHERE domain_code = 'MDM' AND enabled = true AND deleted = false
+            """, Long.class)).isEqualTo(5L);
+
+        assertThat(jdbcTemplate.queryForList("""
+            SELECT permission.code FROM mom_auth_mdm_seed.auth_permission permission
+            JOIN mom_auth_mdm_seed.auth_permission_resource resource
+              ON resource.id = permission.resource_id
+            WHERE resource.domain_code = 'MDM'
+              AND permission.enabled = true AND permission.deleted = false
+              AND resource.enabled = true AND resource.deleted = false
+              AND permission.code = lower(resource.domain_code || ':' || resource.resource_code || ':' || permission.action_code)
+            ORDER BY permission.code
+            """, String.class)).containsExactly(
+            "mdm:factory:read", "mdm:factory:write",
+            "mdm:location:read", "mdm:location:write",
+            "mdm:material:read", "mdm:material:write",
+            "mdm:uom:read", "mdm:uom:write",
+            "mdm:warehouse:read", "mdm:warehouse:write"
+        );
+
+        assertThat(jdbcTemplate.queryForObject("""
+            SELECT COUNT(*) FROM mom_auth_mdm_seed.auth_role_permission grants
+            JOIN mom_auth_mdm_seed.auth_role role ON role.id = grants.role_id
+            JOIN mom_auth_mdm_seed.auth_permission permission ON permission.id = grants.permission_id
+            WHERE role.code = 'PLATFORM_ADMIN' AND role.enabled = true AND role.deleted = false
+              AND permission.code LIKE 'mdm:%' AND permission.enabled = true AND permission.deleted = false
+            """, Long.class)).isEqualTo(10L);
+
+        assertThat(jdbcTemplate.queryForObject("""
+            SELECT COUNT(*) FROM mom_auth_mdm_seed.auth_user user_account
+            JOIN mom_auth_mdm_seed.auth_user_role membership ON membership.user_id = user_account.id
+            JOIN mom_auth_mdm_seed.auth_role role ON role.id = membership.role_id
+            WHERE user_account.username = 'admin' AND user_account.enabled = true
+              AND user_account.deleted = false AND role.code = 'PLATFORM_ADMIN'
+              AND role.enabled = true AND role.deleted = false
+            """, Long.class)).isEqualTo(1L);
     }
 
     /** Auth Shell 导航独立于 IAM 正文，六个稳定 Key 均有双语译文。 */

@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.*;
  * {@code mdm:location:read} 与 {@code mdm:location:write} 权限，引用校验、事务和乐观并发由 Application 负责。</p>
  */
 @RestController
-@RequestMapping("/api/mdm")
+@RequestMapping("/location")
 public class LocationMasterDataController {
     private final LocationMasterDataApplication application;
 

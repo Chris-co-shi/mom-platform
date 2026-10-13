@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * System V1 在真实 PostgreSQL 17 上的 Migration、约束、事务、回退和 Runtime 聚合验收。
  *
  * <p>容器使用独立 mom_system Schema，完整执行现行 Migration。测试只清理本次动态数据，
- * 保留 V10/V11 初始 Locale、错误与 Web Translation；不启动 Nacos、Redis、RocketMQ 或 Seata。Docker 不可用时测试
+ * 保留 V10～V15 初始 Locale、错误与 Web Translation；不启动 Nacos、Redis、RocketMQ 或 Seata。Docker 不可用时测试
  * 明确跳过，不能把跳过描述为 PostgreSQL 验收成功。</p>
  */
 @Testcontainers(disabledWithoutDocker = true)
@@ -92,18 +92,18 @@ class SystemV1PostgresqlIT {
     /** 每例保留 Migration 种子并删除测试创建的数据。 */
     @BeforeEach
     void resetCurrentV1Data() {
-        jdbc.update("DELETE FROM system_i18n_translation WHERE id NOT LIKE '93000000000000000%' AND id NOT LIKE '964%'");
-        jdbc.update("DELETE FROM system_i18n_message_definition WHERE id NOT LIKE '92000000000000000%' AND id NOT LIKE '963%'");
+        jdbc.update("DELETE FROM system_i18n_translation WHERE id NOT LIKE '93000000000000000%' AND id NOT LIKE '964%' AND id NOT LIKE '966%'");
+        jdbc.update("DELETE FROM system_i18n_message_definition WHERE id NOT LIKE '92000000000000000%' AND id NOT LIKE '963%' AND id NOT LIKE '965%'");
         jdbc.update("DELETE FROM system_supported_locale WHERE id NOT LIKE '910000000000000000%'");
         jdbc.update("UPDATE system_supported_locale SET is_default=false, enabled=true WHERE is_default=true");
         jdbc.update("UPDATE system_supported_locale SET is_default=true WHERE locale_code='zh-CN'");
         jdbc.update("TRUNCATE TABLE system_dictionary_item, system_dictionary");
     }
 
-    /** 历史 Migration 保持存在，V11 Web 文案种子已生效。 */
+    /** 历史 Migration 保持存在，V11～V15 Web 文案种子已生效。 */
     @Test
     void migrationMustPreserveHistoryAndCreateOnlyCurrentV1Tables() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("11");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("15");
         assertThat(jdbc.queryForList("""
                 SELECT table_name FROM information_schema.tables
                  WHERE table_schema=? AND table_name IN (
@@ -121,6 +121,25 @@ class SystemV1PostgresqlIT {
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM system_supported_locale WHERE is_default AND enabled", Long.class))
                 .isEqualTo(1L);
+    }
+
+    /** System 仅保存 MDM 导航译文，不重新启用 ADR-043 已废弃的 Catalog/Navigation 运行时表。 */
+    @Test
+    void mdmNavigationTranslationsMustExistWithoutRevivingDeprecatedMenuRuntime() {
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM system_i18n_message_definition
+            WHERE namespace = 'system.navigation' AND message_key LIKE 'navigation.mdm%'
+              AND enabled = true AND deleted = false
+            """, Long.class)).isEqualTo(12L);
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM system_i18n_translation t
+            JOIN system_i18n_message_definition m ON m.id = t.message_id
+            WHERE m.namespace = 'system.navigation' AND m.message_key LIKE 'navigation.mdm%'
+              AND t.locale_code IN ('zh-CN', 'en-US') AND t.deleted = false
+            """, Long.class)).isEqualTo(24L);
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM system_application WHERE application_code = 'mdm'
+            """, Long.class)).isZero();
     }
 
     /** 数据库唯一约束与 Application 禁用语义共同保护 Dictionary。 */

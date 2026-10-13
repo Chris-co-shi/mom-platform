@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 成功或暴露 SQL 信息。</p>
  */
 @RestController
-@RequestMapping("/api/mdm/materials")
+@RequestMapping("/materials")
 public class MaterialController {
     private final MaterialApplication application;
 
