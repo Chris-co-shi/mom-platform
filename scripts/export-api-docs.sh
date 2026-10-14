@@ -40,12 +40,14 @@ export_one() {
     return 1
   fi
 
-  protected_status="$(curl --silent --show-error --max-time 10 --output /dev/null \
-    --write-out '%{http_code}' "$base_url$protected_path")"
-  if [[ "$protected_status" != "401" ]]; then
-    rm -f "$raw" "$normalized"
-    printf '匿名业务接口未按预期返回 401: %s (HTTP %s)\n' "$base_url$protected_path" "$protected_status" >&2
-    return 1
+  if [[ -n "$protected_path" ]]; then
+    protected_status="$(curl --silent --show-error --max-time 10 --output /dev/null \
+      --write-out '%{http_code}' "$base_url$protected_path")"
+    if [[ "$protected_status" != "401" ]]; then
+      rm -f "$raw" "$normalized"
+      printf '匿名业务接口未按预期返回 401: %s (HTTP %s)\n' "$base_url$protected_path" "$protected_status" >&2
+      return 1
+    fi
   fi
 
   if [[ "$mode" == "--check" ]]; then
@@ -63,6 +65,13 @@ export_one() {
   fi
 }
 
-export_one auth "${MOM_AUTH_DOC_URL:-http://127.0.0.1:20001/v3/api-docs}" 'MOM Auth Service API' '/me'
-export_one system "${MOM_SYSTEM_DOC_URL:-http://127.0.0.1:20300/v3/api-docs}" 'MOM System Service API' '/admin/dictionaries'
-export_one mdm "${MOM_MDM_DOC_URL:-http://127.0.0.1:20200/v3/api-docs}" 'MOM MDM Service API' '/api/mdm/materials'
+IFS=',' read -r -a owners <<< "${MOM_API_DOC_OWNERS:-auth,system,mdm,integration}"
+for owner in "${owners[@]}"; do
+  case "$owner" in
+    auth) export_one auth "${MOM_AUTH_DOC_URL:-http://127.0.0.1:20001/v3/api-docs}" 'MOM Auth Service API' '/users/me' ;;
+    system) export_one system "${MOM_SYSTEM_DOC_URL:-http://127.0.0.1:20300/v3/api-docs}" 'MOM System Service API' '/dictionary-types' ;;
+    mdm) export_one mdm "${MOM_MDM_DOC_URL:-http://127.0.0.1:20200/v3/api-docs}" 'MOM MDM Service API' '/materials' ;;
+    integration) export_one integration "${MOM_INTEGRATION_DOC_URL:-http://127.0.0.1:20800/v3/api-docs}" 'MOM Integration Service API' '' ;;
+    *) printf '未知 OpenAPI Owner: %s\n' "$owner" >&2; exit 2 ;;
+  esac
+done

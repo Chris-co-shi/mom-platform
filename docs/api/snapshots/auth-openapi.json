@@ -133,9 +133,6 @@
           },
           "messageKey": {
             "type": "string"
-          },
-          "namespace": {
-            "type": "string"
           }
         },
         "type": "object"
@@ -213,17 +210,14 @@
       },
       "I18nBundle": {
         "properties": {
-          "bundles": {
-            "additionalProperties": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "type": "object"
-          },
           "effectiveLocale": {
             "type": "string"
+          },
+          "messages": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
           },
           "requestedLocale": {
             "type": "string"
@@ -243,9 +237,6 @@
             "type": "string"
           },
           "messageKey": {
-            "type": "string"
-          },
-          "namespace": {
             "type": "string"
           },
           "updatedAt": {
@@ -784,6 +775,23 @@
         },
         "type": "object"
       },
+      "ResultListString": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "data": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ResultLoginResponse": {
         "properties": {
           "code": {
@@ -1189,19 +1197,9 @@
   },
   "openapi": "3.1.0",
   "paths": {
-    "/admin/i18n/messages": {
+    "/i18n/messages": {
       "get": {
         "operationId": "messages",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "namespace",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -1247,7 +1245,55 @@
         ]
       }
     },
-    "/admin/i18n/messages/{id}": {
+    "/i18n/messages/duplicate-check/{messageId}/{localeCode}": {
+      "post": {
+        "operationId": "duplicateMessageKeys",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "localeCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultListString"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "i-18n-management-controller"
+        ]
+      }
+    },
+    "/i18n/messages/{id}": {
       "put": {
         "operationId": "update_4",
         "parameters": [
@@ -1287,7 +1333,7 @@
         ]
       }
     },
-    "/admin/i18n/messages/{messageId}/translations": {
+    "/i18n/messages/{messageId}/translations": {
       "get": {
         "operationId": "translations",
         "parameters": [
@@ -1317,7 +1363,7 @@
         ]
       }
     },
-    "/admin/i18n/messages/{messageId}/translations/{localeCode}": {
+    "/i18n/messages/{messageId}/translations/{localeCode}": {
       "put": {
         "operationId": "saveTranslation",
         "parameters": [
@@ -1376,17 +1422,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "in": "query",
-            "name": "namespaces",
-            "required": true,
-            "schema": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            }
           }
         ],
         "responses": {
@@ -1426,136 +1461,6 @@
         ]
       }
     },
-    "/login": {
-      "post": {
-        "operationId": "login",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultLoginResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "authentication-controller"
-        ]
-      }
-    },
-    "/logout": {
-      "post": {
-        "operationId": "logout",
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "authentication-controller"
-        ]
-      }
-    },
-    "/me": {
-      "get": {
-        "operationId": "me",
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultCurrentSessionResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "authentication-controller"
-        ]
-      }
-    },
-    "/me/password": {
-      "put": {
-        "operationId": "changePassword",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChangeOwnPasswordRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultCurrentSessionResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "authentication-controller"
-        ]
-      }
-    },
-    "/me/profile": {
-      "put": {
-        "operationId": "updateProfile",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateOwnProfileRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultCurrentSessionResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "authentication-controller"
-        ]
-      }
-    },
     "/permission-resources": {
       "post": {
         "operationId": "create_3",
@@ -1579,6 +1484,86 @@
               }
             },
             "description": "Created"
+          }
+        },
+        "tags": [
+          "permission-resource-controller"
+        ]
+      }
+    },
+    "/permission-resources/disable/{id}": {
+      "put": {
+        "operationId": "disable_3",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultPermissionResourceResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "permission-resource-controller"
+        ]
+      }
+    },
+    "/permission-resources/enable/{id}": {
+      "put": {
+        "operationId": "enable_3",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultPermissionResourceResponse"
+                }
+              }
+            },
+            "description": "OK"
           }
         },
         "tags": [
@@ -1712,86 +1697,6 @@
         ]
       }
     },
-    "/permission-resources/{id}/disable": {
-      "put": {
-        "operationId": "disable_3",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChangeStatusRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultPermissionResourceResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "permission-resource-controller"
-        ]
-      }
-    },
-    "/permission-resources/{id}/enable": {
-      "put": {
-        "operationId": "enable_3",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChangeStatusRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultPermissionResourceResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "permission-resource-controller"
-        ]
-      }
-    },
     "/permissions": {
       "post": {
         "operationId": "create_2",
@@ -1815,6 +1720,86 @@
               }
             },
             "description": "Created"
+          }
+        },
+        "tags": [
+          "permission-controller"
+        ]
+      }
+    },
+    "/permissions/disable/{id}": {
+      "put": {
+        "operationId": "disable_2",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultPermissionResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "permission-controller"
+        ]
+      }
+    },
+    "/permissions/enable/{id}": {
+      "put": {
+        "operationId": "enable_2",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultPermissionResponse"
+                }
+              }
+            },
+            "description": "OK"
           }
         },
         "tags": [
@@ -1948,86 +1933,6 @@
         ]
       }
     },
-    "/permissions/{id}/disable": {
-      "put": {
-        "operationId": "disable_2",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChangeStatusRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultPermissionResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "permission-controller"
-        ]
-      }
-    },
-    "/permissions/{id}/enable": {
-      "put": {
-        "operationId": "enable_2",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChangeStatusRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultPermissionResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "permission-controller"
-        ]
-      }
-    },
     "/roles": {
       "post": {
         "operationId": "create_1",
@@ -2051,6 +1956,86 @@
               }
             },
             "description": "Created"
+          }
+        },
+        "tags": [
+          "role-controller"
+        ]
+      }
+    },
+    "/roles/disable/{id}": {
+      "put": {
+        "operationId": "disable_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultRoleResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "role-controller"
+        ]
+      }
+    },
+    "/roles/enable/{id}": {
+      "put": {
+        "operationId": "enable_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultRoleResponse"
+                }
+              }
+            },
+            "description": "OK"
           }
         },
         "tags": [
@@ -2184,86 +2169,6 @@
         ]
       }
     },
-    "/roles/{id}/disable": {
-      "put": {
-        "operationId": "disable_1",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChangeStatusRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultRoleResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "role-controller"
-        ]
-      }
-    },
-    "/roles/{id}/enable": {
-      "put": {
-        "operationId": "enable_1",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChangeStatusRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultRoleResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "role-controller"
-        ]
-      }
-    },
     "/roles/{id}/permissions": {
       "get": {
         "operationId": "permissions",
@@ -2332,6 +2237,56 @@
         ]
       }
     },
+    "/sessions/login": {
+      "post": {
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultLoginResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "authentication-controller"
+        ]
+      }
+    },
+    "/sessions/logout": {
+      "post": {
+        "operationId": "logout",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "authentication-controller"
+        ]
+      }
+    },
     "/users": {
       "post": {
         "operationId": "create",
@@ -2359,6 +2314,206 @@
         },
         "tags": [
           "user-controller"
+        ]
+      }
+    },
+    "/users/change-password/me": {
+      "put": {
+        "operationId": "changePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeOwnPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultCurrentSessionResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "current-user-controller"
+        ]
+      }
+    },
+    "/users/change-password/{id}": {
+      "put": {
+        "operationId": "resetPassword",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetUserPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultUserResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "user-controller"
+        ]
+      }
+    },
+    "/users/disable/{id}": {
+      "put": {
+        "operationId": "disable",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultUserResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "user-controller"
+        ]
+      }
+    },
+    "/users/enable/{id}": {
+      "put": {
+        "operationId": "enable",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultUserResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "user-controller"
+        ]
+      }
+    },
+    "/users/me": {
+      "get": {
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultCurrentSessionResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "current-user-controller"
+        ]
+      }
+    },
+    "/users/me/profile": {
+      "put": {
+        "operationId": "updateProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOwnProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultCurrentSessionResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "current-user-controller"
         ]
       }
     },
@@ -2466,126 +2621,6 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateUserRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultUserResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "user-controller"
-        ]
-      }
-    },
-    "/users/{id}/disable": {
-      "put": {
-        "operationId": "disable",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChangeStatusRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultUserResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "user-controller"
-        ]
-      }
-    },
-    "/users/{id}/enable": {
-      "put": {
-        "operationId": "enable",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChangeStatusRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultUserResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "user-controller"
-        ]
-      }
-    },
-    "/users/{id}/password": {
-      "put": {
-        "operationId": "resetPassword",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ResetUserPasswordRequest"
               }
             }
           },

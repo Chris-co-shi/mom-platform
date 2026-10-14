@@ -53,9 +53,6 @@
           },
           "messageKey": {
             "type": "string"
-          },
-          "namespace": {
-            "type": "string"
           }
         },
         "type": "object"
@@ -79,17 +76,14 @@
       },
       "I18nBundle": {
         "properties": {
-          "bundles": {
-            "additionalProperties": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "type": "object"
-          },
           "effectiveLocale": {
             "type": "string"
+          },
+          "messages": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
           },
           "requestedLocale": {
             "type": "string"
@@ -109,9 +103,6 @@
             "type": "string"
           },
           "messageKey": {
-            "type": "string"
-          },
-          "namespace": {
             "type": "string"
           },
           "updatedAt": {
@@ -352,6 +343,23 @@
           "data": {
             "items": {
               "$ref": "#/components/schemas/LocaleView"
+            },
+            "type": "array"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ResultListString": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "data": {
+            "items": {
+              "type": "string"
             },
             "type": "array"
           },
@@ -655,15 +663,25 @@
   },
   "openapi": "3.1.0",
   "paths": {
-    "/admin/dictionaries": {
+    "/dictionaries/{dictionaryCode}/items": {
       "get": {
-        "operationId": "listTypes",
+        "operationId": "activeItems",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dictionaryCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResultListTypeView"
+                  "$ref": "#/components/schemas/ResultListSystemDictionaryItemOption"
                 }
               }
             },
@@ -711,31 +729,41 @@
           }
         },
         "tags": [
-          "dictionary-controller"
+          "runtime-dictionary-controller"
         ]
-      },
-      "post": {
-        "operationId": "createType",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateTypeRequest"
-              }
+      }
+    },
+    "/dictionaries/{dictionaryCode}/items/{key}": {
+      "get": {
+        "operationId": "resolveItem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dictionaryCode",
+            "required": true,
+            "schema": {
+              "type": "string"
             }
           },
-          "required": true
-        },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResultTypeView"
+                  "$ref": "#/components/schemas/ResultResolvedSystemDictionaryItem"
                 }
               }
             },
-            "description": "Created"
+            "description": "OK"
           },
           "400": {
             "content": {
@@ -779,17 +807,25 @@
           }
         },
         "tags": [
-          "dictionary-controller"
+          "runtime-dictionary-controller"
         ]
       }
     },
-    "/admin/dictionaries/{id}": {
-      "put": {
-        "operationId": "updateType",
+    "/dictionary-items/change-status/{typeId}/{itemId}": {
+      "patch": {
+        "operationId": "changeStatus_2",
         "parameters": [
           {
             "in": "path",
-            "name": "id",
+            "name": "typeId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
             "required": true,
             "schema": {
               "type": "string"
@@ -800,7 +836,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateTypeRequest"
+                "$ref": "#/components/schemas/StatusRequest"
               }
             }
           },
@@ -811,7 +847,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResultTypeView"
+                  "$ref": "#/components/schemas/ResultItemView"
                 }
               }
             },
@@ -859,13 +895,13 @@
           }
         },
         "tags": [
-          "dictionary-controller"
+          "dictionary-item-controller"
         ]
       }
     },
-    "/admin/dictionaries/{typeId}/items": {
+    "/dictionary-items/{typeId}": {
       "get": {
-        "operationId": "listItems",
+        "operationId": "list_2",
         "parameters": [
           {
             "in": "path",
@@ -929,11 +965,11 @@
           }
         },
         "tags": [
-          "dictionary-controller"
+          "dictionary-item-controller"
         ]
       },
       "post": {
-        "operationId": "createItem",
+        "operationId": "create_3",
         "parameters": [
           {
             "in": "path",
@@ -1007,13 +1043,13 @@
           }
         },
         "tags": [
-          "dictionary-controller"
+          "dictionary-item-controller"
         ]
       }
     },
-    "/admin/dictionaries/{typeId}/items/{itemId}": {
+    "/dictionary-items/{typeId}/{itemId}": {
       "put": {
-        "operationId": "updateItem",
+        "operationId": "update_3",
         "parameters": [
           {
             "in": "path",
@@ -1095,25 +1131,145 @@
           }
         },
         "tags": [
-          "dictionary-controller"
+          "dictionary-item-controller"
         ]
       }
     },
-    "/admin/dictionaries/{typeId}/items/{itemId}/status": {
+    "/dictionary-types": {
+      "get": {
+        "operationId": "list_1",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultListTypeView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "dictionary-type-controller"
+        ]
+      },
+      "post": {
+        "operationId": "create_2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTypeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultTypeView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "dictionary-type-controller"
+        ]
+      }
+    },
+    "/dictionary-types/change-status/{id}": {
       "patch": {
-        "operationId": "changeItemStatus",
+        "operationId": "changeStatus_1",
         "parameters": [
           {
             "in": "path",
-            "name": "typeId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "itemId",
+            "name": "id",
             "required": true,
             "schema": {
               "type": "string"
@@ -1135,7 +1291,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResultItemView"
+                  "$ref": "#/components/schemas/ResultTypeView"
                 }
               }
             },
@@ -1183,71 +1339,13 @@
           }
         },
         "tags": [
-          "dictionary-controller"
+          "dictionary-type-controller"
         ]
       }
     },
-    "/admin/i18n/messages": {
-      "get": {
-        "operationId": "messages",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "namespace",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultListI18nMessage"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "i-18n-management-controller"
-        ]
-      },
-      "post": {
-        "operationId": "create_1",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultI18nMessage"
-                }
-              }
-            },
-            "description": "Created"
-          }
-        },
-        "tags": [
-          "i-18n-management-controller"
-        ]
-      }
-    },
-    "/admin/i18n/messages/{id}": {
+    "/dictionary-types/{id}": {
       "put": {
-        "operationId": "update_1",
+        "operationId": "update_2",
         "parameters": [
           {
             "in": "path",
@@ -1262,7 +1360,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateRequest"
+                "$ref": "#/components/schemas/UpdateTypeRequest"
               }
             }
           },
@@ -1273,115 +1371,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResultI18nMessage"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "i-18n-management-controller"
-        ]
-      }
-    },
-    "/admin/i18n/messages/{messageId}/translations": {
-      "get": {
-        "operationId": "translations",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "messageId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultListI18nTranslation"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "i-18n-management-controller"
-        ]
-      }
-    },
-    "/admin/i18n/messages/{messageId}/translations/{localeCode}": {
-      "put": {
-        "operationId": "saveTranslation",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "messageId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "localeCode",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TranslationRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultI18nTranslation"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "i-18n-management-controller"
-        ]
-      }
-    },
-    "/dictionaries/{dictionaryCode}/items": {
-      "get": {
-        "operationId": "activeItems",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "dictionaryCode",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultListSystemDictionaryItemOption"
+                  "$ref": "#/components/schemas/ResultTypeView"
                 }
               }
             },
@@ -1429,149 +1419,11 @@
           }
         },
         "tags": [
-          "dictionary-controller"
+          "dictionary-type-controller"
         ]
       }
     },
-    "/dictionaries/{dictionaryCode}/items/{key}": {
-      "get": {
-        "operationId": "resolveItem",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "dictionaryCode",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "key",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultResolvedSystemDictionaryItem"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "400": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "404": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "503": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "Service Unavailable"
-          }
-        },
-        "tags": [
-          "dictionary-controller"
-        ]
-      }
-    },
-    "/i18n/locales": {
-      "get": {
-        "operationId": "supportedLocales",
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultListSupportedLocaleInfo"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "400": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "404": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "503": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "Service Unavailable"
-          }
-        },
-        "tags": [
-          "supported-locale-controller"
-        ]
-      }
-    },
-    "/i18n/locales/admin": {
+    "/i18n/locale-catalog": {
       "get": {
         "operationId": "list",
         "responses": {
@@ -1627,11 +1479,11 @@
           }
         },
         "tags": [
-          "supported-locale-controller"
+          "locale-catalog-controller"
         ]
       },
       "post": {
-        "operationId": "create",
+        "operationId": "create_1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1695,171 +1547,11 @@
           }
         },
         "tags": [
-          "supported-locale-controller"
+          "locale-catalog-controller"
         ]
       }
     },
-    "/i18n/locales/admin/{id}": {
-      "put": {
-        "operationId": "update",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateLocaleRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultLocaleView"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "400": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "404": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "503": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "Service Unavailable"
-          }
-        },
-        "tags": [
-          "supported-locale-controller"
-        ]
-      }
-    },
-    "/i18n/locales/admin/{id}/default": {
-      "post": {
-        "operationId": "makeDefault",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultLocaleView"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "400": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "404": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "503": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description": "Service Unavailable"
-          }
-        },
-        "tags": [
-          "supported-locale-controller"
-        ]
-      }
-    },
-    "/i18n/locales/admin/{id}/status": {
+    "/i18n/locale-catalog/change-status/{id}": {
       "patch": {
         "operationId": "changeStatus",
         "parameters": [
@@ -1935,74 +1627,13 @@
           }
         },
         "tags": [
-          "supported-locale-controller"
+          "locale-catalog-controller"
         ]
       }
     },
-    "/i18n/runtime/bundles": {
-      "get": {
-        "operationId": "bundles",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "locale",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "namespaces",
-            "required": true,
-            "schema": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultI18nBundle"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "i-18n-runtime-controller"
-        ]
-      }
-    },
-    "/i18n/runtime/events": {
-      "get": {
-        "operationId": "events",
-        "responses": {
-          "200": {
-            "content": {
-              "text/event-stream": {
-                "schema": {
-                  "$ref": "#/components/schemas/SseEmitter"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "i-18n-sse-controller"
-        ]
-      }
-    },
-    "/{id}/status": {
-      "patch": {
-        "operationId": "changeTypeStatus",
+    "/i18n/locale-catalog/make-default/{id}": {
+      "post": {
+        "operationId": "makeDefault",
         "parameters": [
           {
             "in": "path",
@@ -2017,7 +1648,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/StatusRequest"
+                "$ref": "#/components/schemas/VersionRequest"
               }
             }
           },
@@ -2028,7 +1659,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResultTypeView"
+                  "$ref": "#/components/schemas/ResultLocaleView"
                 }
               }
             },
@@ -2076,7 +1707,411 @@
           }
         },
         "tags": [
-          "dictionary-controller"
+          "locale-catalog-controller"
+        ]
+      }
+    },
+    "/i18n/locale-catalog/{id}": {
+      "put": {
+        "operationId": "update_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLocaleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultLocaleView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "locale-catalog-controller"
+        ]
+      }
+    },
+    "/i18n/locales": {
+      "get": {
+        "operationId": "supportedLocales",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultListSupportedLocaleInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "supported-locale-controller"
+        ]
+      }
+    },
+    "/i18n/messages": {
+      "get": {
+        "operationId": "messages",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultListI18nMessage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "i-18n-management-controller"
+        ]
+      },
+      "post": {
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultI18nMessage"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "i-18n-management-controller"
+        ]
+      }
+    },
+    "/i18n/messages/duplicate-check/{messageId}/{localeCode}": {
+      "post": {
+        "operationId": "duplicateMessageKeys",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "localeCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultListString"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "i-18n-management-controller"
+        ]
+      }
+    },
+    "/i18n/messages/{id}": {
+      "put": {
+        "operationId": "update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultI18nMessage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "i-18n-management-controller"
+        ]
+      }
+    },
+    "/i18n/messages/{messageId}/translations": {
+      "get": {
+        "operationId": "translations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultListI18nTranslation"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "i-18n-management-controller"
+        ]
+      }
+    },
+    "/i18n/messages/{messageId}/translations/{localeCode}": {
+      "put": {
+        "operationId": "saveTranslation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "localeCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultI18nTranslation"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "i-18n-management-controller"
+        ]
+      }
+    },
+    "/i18n/runtime/bundles": {
+      "get": {
+        "operationId": "bundles",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultI18nBundle"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "i-18n-runtime-controller"
+        ]
+      }
+    },
+    "/i18n/runtime/events": {
+      "get": {
+        "operationId": "events",
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/SseEmitter"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "i-18n-sse-controller"
         ]
       }
     }

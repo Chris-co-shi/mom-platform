@@ -48,10 +48,10 @@ Business Resource Server
 
 | Gateway 入口 | 下游服务 | 改写规则 | 说明 |
 |---|---|---|---|
-| `POST /auth/login` | `lb://mom-auth-server` | `StripPrefix=1` → `/login` | 独立、较严格 IP 限流 |
+| `POST /auth/sessions/login` | `lb://mom-auth-server` | `StripPrefix=1` → `/sessions/login` | 独立、较严格 IP 限流 |
 | `/auth/**` | `lb://mom-auth-server` | `StripPrefix=1` | Auth 常规 API |
 | `/api/system/**` | `lb://mom-system-server` | 不改写 | 与 System Controller 的 `/api/system` 前缀一致 |
-| `/api/integration/**` | `lb://mom-integration-server` | `StripPrefix=1` → `/integration/**` | Integration API |
+| `/integration/**` | `lb://mom-integration-server` | `StripPrefix=1` → `/**` | Integration 技术探针 |
 
 Nacos Discovery 在 Base 默认关闭，由部署环境显式启用。服务名路由依赖 Nacos 与 LoadBalancer 均健康；发现或
 连接失败不能降级为业务成功。

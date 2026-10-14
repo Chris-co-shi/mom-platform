@@ -79,7 +79,7 @@ public class WarehouseStructureController {
     /**
      * 启用 Warehouse，不级联修改区域。
      */
-    @PatchMapping("/warehouses/{id}/enable")
+    @PatchMapping("/warehouses/enable/{id}")
     @PreAuthorize("hasAuthority('mdm:warehouse:write')")
     public Result<WarehouseView> enableWarehouse(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableWarehouse(id, request.version()));
@@ -88,7 +88,7 @@ public class WarehouseStructureController {
     /**
      * 停用 Warehouse，不级联修改区域。
      */
-    @PatchMapping("/warehouses/{id}/disable")
+    @PatchMapping("/warehouses/disable/{id}")
     @PreAuthorize("hasAuthority('mdm:warehouse:write')")
     public Result<WarehouseView> disableWarehouse(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableWarehouse(id, request.version()));
@@ -138,7 +138,7 @@ public class WarehouseStructureController {
     /**
      * 启用 WarehouseArea。
      */
-    @PatchMapping("/warehouse-areas/{id}/enable")
+    @PatchMapping("/warehouse-areas/enable/{id}")
     @PreAuthorize("hasAuthority('mdm:warehouse:write')")
     public Result<WarehouseAreaView> enableWarehouseArea(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableWarehouseArea(id, request.version()));
@@ -147,7 +147,7 @@ public class WarehouseStructureController {
     /**
      * 停用 WarehouseArea。
      */
-    @PatchMapping("/warehouse-areas/{id}/disable")
+    @PatchMapping("/warehouse-areas/disable/{id}")
     @PreAuthorize("hasAuthority('mdm:warehouse:write')")
     public Result<WarehouseAreaView> disableWarehouseArea(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableWarehouseArea(id, request.version()));

@@ -122,13 +122,13 @@ class MdmMasterDataPostgresqlIT {
                 """);
     }
 
-    /** 验证截至 V107 的表、命名约束、查询索引和无物理外键策略。 */
+    /** 验证截至 V113 的表、命名约束、查询索引和无物理外键策略。 */
     @Test
     void migrationMustCreateMasterTablesAndDatabaseConstraints() {
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT version FROM flyway_schema_history
                  WHERE success = true ORDER BY installed_rank DESC LIMIT 1
-                """, String.class)).isEqualTo("107");
+                """, String.class)).isEqualTo("113");
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT count(*) FROM information_schema.tables

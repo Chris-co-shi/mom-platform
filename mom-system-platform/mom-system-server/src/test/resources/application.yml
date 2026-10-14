@@ -10,5 +10,5 @@ spring:
       leak-detection-threshold: 0
       connection-init-sql: SET TIME ZONE 'UTC'
   flyway:
-    # 集成测试完整执行当前 V11 Web 文案种子及此前全部不可修改迁移。
-    target: 11
+    # 集成测试执行当前全部 Migration，包含 V17 I18n Key 迁移。
+    target: 17

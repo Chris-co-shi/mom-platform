@@ -93,9 +93,9 @@ namespace 的键值 Map。客户端收到 SSE 后重新拉取，而不是把 SSE
 
 ## 6. API 边界
 
-- `/api/system/admin/dictionaries` 与 `/api/system/dictionaries/{code}/items`：字典管理与运行时读取；
+- `/system/dictionary-types`、`/system/dictionary-items` 与 `/system/dictionaries/{code}/items`：字典管理与运行时读取；
 - `/api/system/i18n/locales`：支持 Locale 读取，`/admin` 子路径负责管理；
-- `/api/system/admin/i18n/messages`：Message/Translation 管理；
+- `/system/i18n/messages`：Message/Translation 管理；
 - `/api/system/i18n/runtime/bundles`：一个或多个 namespace 的运行时 Bundle；
 - `/api/system/i18n/runtime/events`：当前实例 SSE 失效通知。
 

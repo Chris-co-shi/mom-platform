@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -79,7 +78,7 @@ public class I18nManagementController {
     }
 
     /** 查询精确重复译文供前端提醒；不会限制后续保存。 */
-    @PostMapping("/{messageId}/translations/{localeCode}/duplicate-check")
+    @PostMapping("/duplicate-check/{messageId}/{localeCode}")
     @PreAuthorize("@i18nManagementAccess.canRead(authentication)")
     public Result<List<String>> duplicateMessageKeys(@PathVariable String messageId,
                                                       @PathVariable String localeCode,

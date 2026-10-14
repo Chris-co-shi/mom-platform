@@ -73,5 +73,5 @@ mom:
     resource-server:
       enabled: true
       public-paths:
-        - /login
+        - /sessions/login
         - /i18n/runtime/**

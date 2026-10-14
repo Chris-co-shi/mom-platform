@@ -38,7 +38,7 @@ class CurrentUserControllerTest {
         when(authentication.getAuthorities()).thenReturn(List.of());
         when(authentication.getToken()).thenReturn(new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER,
             "test-only", Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2099-01-01T00:00:00Z")));
-        mvc = standaloneSetup(new AuthenticationController(mock(AuthenticationApplication.class), users))
+        mvc = standaloneSetup(new CurrentUserController(users))
             .setControllerAdvice(new AuthExceptionHandler((key, locale, args) -> key)).build();
     }
 
@@ -46,7 +46,7 @@ class CurrentUserControllerTest {
     void profileMustUsePrincipalAndIgnoreAdministrativeFields() throws Exception {
         when(users.updateOwnProfile("self", "My name", 3L)).thenReturn(
             new UserView("self", "operator", "My name", true, 4L, null, null));
-        mvc.perform(put("/me/profile").principal(authentication).contentType(MediaType.APPLICATION_JSON).content("""
+        mvc.perform(put("/users/me/profile").principal(authentication).contentType(MediaType.APPLICATION_JSON).content("""
             {"userId":"victim","username":"admin","enabled":true,"roles":["ADMIN"],"displayName":"My name","version":3}
             """))
             .andExpect(status().isOk())
@@ -64,7 +64,7 @@ class CurrentUserControllerTest {
     void passwordMustUsePrincipalAndKeepBadPasswordDistinctFromExpiredSession() throws Exception {
         when(users.changeOwnPassword("self", " wrong ", " new password ", 3L))
             .thenThrow(new AuthException(AuthErrorCode.CURRENT_PASSWORD_INVALID));
-        mvc.perform(put("/me/password").principal(authentication).contentType(MediaType.APPLICATION_JSON).content("""
+        mvc.perform(put("/users/change-password/me").principal(authentication).contentType(MediaType.APPLICATION_JSON).content("""
             {"userId":"victim","currentPassword":" wrong ","newPassword":" new password ","version":3}
             """))
             .andExpect(status().isBadRequest())
@@ -74,10 +74,10 @@ class CurrentUserControllerTest {
 
     @Test
     void invalidFieldsMustFailBeforeApplication() throws Exception {
-        mvc.perform(put("/me/profile").principal(authentication).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(put("/users/me/profile").principal(authentication).contentType(MediaType.APPLICATION_JSON)
             .content("{\"displayName\":\"  \",\"version\":-1}"))
             .andExpect(status().isBadRequest());
-        mvc.perform(put("/me/password").principal(authentication).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(put("/users/change-password/me").principal(authentication).contentType(MediaType.APPLICATION_JSON)
             .content("{\"currentPassword\":\"\",\"newPassword\":\"short\"}"))
             .andExpect(status().isBadRequest());
         verifyNoInteractions(users);
@@ -86,7 +86,7 @@ class CurrentUserControllerTest {
     @Test
     void versionConflictMustRemain409() throws Exception {
         when(users.updateOwnProfile(any(), any(), anyLong())).thenThrow(new AuthException(AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT));
-        mvc.perform(put("/me/profile").principal(authentication).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(put("/users/me/profile").principal(authentication).contentType(MediaType.APPLICATION_JSON)
             .content("{\"displayName\":\"Name\",\"version\":0}"))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("auth.optimistic_lock_conflict"));

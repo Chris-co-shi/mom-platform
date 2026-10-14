@@ -7,7 +7,7 @@
 - 决策人：Chris
 - 关联：[ADR-023](ADR-023-Locale时区与用户偏好边界.md)、[ADR-024](ADR-024-PC-JSON与Mobile-PKCE-OIDC双通道.md)、[S11 现状与迁移边界报告](../engineering/P1.6-S11-数据所有权现状与迁移边界报告.md)
 
-> **Accepted Decision。** Chris 于 2026-07-29 接受方案 C 与本 ADR 第 23 节七项决策，S11 数据所有权边界已经冻结。本次仍只完成文档收口：不创建 `mom-system-platform`，不修改 IAM、API、Schema、Flyway 或运行时行为。Accepted 不会自动实施 S12；S12 只能由独立任务启动，且不得提前实现 S13～S17。
+> **Accepted Decision（局部被取代）。** Chris 于 2026-07-29 接受方案 C 与本 ADR 第 23 节七项决策。2026-10-14 接受的 [ADR-044](ADR-044-MDM静态主数据与WMS-MES运行时所有权边界.md) 仅取代本 ADR 关于仓库/库位静态主数据以及产线/工位静态主数据的所有权结论；其余决策继续有效。读取本 ADR 的相关对象时必须以 ADR-044 为准。
 
 ## 1. Context
 
@@ -72,7 +72,7 @@ IAM OAuth Client / Permission ≠ System Application Catalog / Menu ≠ Web Rout
 - 采购/SRM 业务域是供应商准入、评级、采购关系、供货能力、采购结算关系、供应商绩效及采购业务状态的 Recommended Future Owner / Planned Authority；当前 Not Implemented。
 - 销售/CRM 业务域是客户等级、销售关系、信用、价格关系、收款条件及销售业务状态的 Recommended Future Owner / Planned Authority；当前 Not Implemented。
 - IAM 只 Own 账号与 Party 的身份绑定、Party Binding 授权关系，以及由此引起的 Session、Claim 和撤销行为；不保存 Party、Supplier、Customer 完整业务主数据。
-- WMS Own Warehouse、Storage Location/Bin、Warehouse Status 与 Factory-Warehouse 业务关系。
+- MDM Own Warehouse、Warehouse Area、Location Type、Location 的稳定身份、静态描述、层级和基础启停；WMS Own 库存、占用、容器位置、仓储作业及库位运行时可用性。两者边界以 ADR-044 为准。
 - EAM Own Equipment Asset、Machine、设备台账状态及 Factory/Location 资产归属；Device Credential 预留给未来 Device IAM/IoT Security。
 - MES/制造资源边界推荐 Own Production Line/Work Center 的生产能力与排程语义；EAM 只引用并管理挂接设备，最终对象形态由相应业务 Slice 决定。
 
@@ -106,9 +106,9 @@ IAM OAuth Client / Permission ≠ System Application Catalog / Menu ≠ Web Rout
 | Supplier Procurement Relationship | Not Implemented | 采购/SRM Planned Authority；Recommended Future Owner | MDM Party Reference；IAM 仅 Party Binding | Party ID 与采购业务事实 | IAM/MDM 中的采购关系第二权威 | API/事件 | 未来采购/SRM Slice 新建 |
 | Customer Sales Relationship | Not Implemented | 销售/CRM Planned Authority；Recommended Future Owner | MDM Party Reference；IAM 仅 Party Binding | Party ID 与销售业务事实 | IAM/MDM 中的销售关系第二权威 | API/事件 | 未来销售/CRM Slice 新建 |
 | Base Contact Identity | 仅文档规划 | MDM Own | 业务域 Reference/业务快照 | 基础联系人身份与通用联系方式 | IAM 内完整联系人主数据 | API/事件 | 未来 MDM 新建 |
-| Warehouse | 未实现 | WMS Own | 其他领域 Reference | Warehouse ID | 通用字典副本 | WMS API/事件 | 未来 WMS 新建 |
-| Storage Location/Bin/Warehouse Status | 未实现 | WMS Own | Reference/Projection | Location ID、业务历史快照 | System/IAM 权威副本 | WMS API/事件 | 未来 WMS 新建 |
-| Factory-Warehouse Relation | 未实现 | WMS Own | MDM Factory Reference | Factory ID + Warehouse ID | IAM Warehouse Scope（无需求时） | WMS 事务，MDM Factory 校验 | 未来 WMS 新建 |
+| Warehouse/Warehouse Area/Location Type/Location 静态主档 | MDM 已实现 | MDM Own（ADR-044） | WMS Reference | MDM 稳定 ID；业务历史快照 | WMS 中第二套可编辑仓库/库位主档 | MDM API；具体读取/失效契约由 WMS Slice 定义 | MDM 现有数据不迁移 |
+| 库存、占用、容器位置、收发存作业、库位运行时可用性 | 未实现 | WMS Own（ADR-044） | MDM 不复制运行时状态 | WMS 业务事实与 MDM 静态 ID 引用 | MDM 静态启停冒充实时可用性 | WMS 本地事务；跨域契约由 WMS Slice 定义 | 未来 WMS 新建 |
+| Factory-Warehouse 业务关系 | 未实现 | ADR-044 范围外；WMS Slice 明确业务含义后确定写入权威 | MDM Factory/Warehouse ID Reference | Factory ID + Warehouse ID | IAM Warehouse Scope 或静态目录关系的隐式副本 | 后续业务设计与 ADR 决定 | 不在本 ADR 预先指定 |
 | Equipment Asset/Machine/Status | 未实现 | EAM Own | 其他领域 Reference/Projection | Equipment ID；业务历史快照 | System 字典或当前 IAM 副本 | EAM API/事件 | 未来 EAM 新建 |
 | Device Identity/IoT Connection | 未实现 | EAM Own（业务身份/连接归属） | IoT Security Reference | Device/Equipment ID、连接端点标识 | 用户 IAM 账号模型复用 | EAM 与未来 IoT Security 契约 | 未来新建 |
 | Device Credential | 未实现 | Future Device IAM/IoT Security Own | Forbidden Copy | EAM 只存凭据引用/状态摘要 | Secret、证书私钥、Token | 专用安全边界；Fail Closed | 非本阶段 |
@@ -156,9 +156,9 @@ Person/Employee：IAM 只保存稳定 `personId`、`employeeId` 或过渡期 `em
 Party：MDM 只 Own Party ID/Code/Type、名称、基础启停状态、基础联系人身份与通用联系方式，以及 Supplier/Customer 统一主体身份。供应商准入、评级、采购关系、供货能力、采购结算关系、绩效和采购业务状态由未来采购/SRM 业务域 Own；客户等级、销售关系、信用、价格关系、收款条件和销售业务状态由未来销售/CRM 业务域 Own。上述业务域当前均为 Recommended Future Owner / Planned Authority / Not Implemented。IAM 只 Own Party Binding 及其安全后果。
 
 Factory ID 由 MDM 生成。Factory Code 是否允许修改由 MDM 决定；跨域引用必须使用 ID。停用后 IAM 不再新增/签发包含无效 Factory 的授权上下文，已有 Preference 自动失效并回退。物理删除前必须完成引用影响分析。
-## 11. WMS Boundary
+## 11. WMS Boundary（仓库/库位静态主档部分已由 ADR-044 取代）
 
-Warehouse 权威固定属于 WMS。WMS 定义 Warehouse、Storage Location/Bin、状态、层级、Factory-Warehouse 关系及其生命周期。其他领域只引用 Warehouse/Location ID，必要时保存业务发生时的不可变快照。
+本节关于静态 Warehouse、Storage Location/Bin 及其层级/基础启停由 ADR-044 取代：这些静态主数据由 MDM 唯一写入，WMS 以稳定 ID 引用。WMS Own 库存、占用、容器/托盘位置、收发存作业和库位实时可用性等运行时事实；不得在 WMS 再建一套可独立编辑的仓库/库位静态主档，也不得把 MDM 静态启停解释为实时可用状态。Factory-Warehouse 关系的业务语义和具体写入权威不由 ADR-044 预设，留待 WMS 业务 Slice 明确。
 
 System 不把 Warehouse 作为通用字典；IAM 当前没有真实 Warehouse 授权需求，因此不新增 Warehouse Scope。未来若出现必须先新增 ADR/安全设计，不能从 Factory Scope 推导或在 Preference 中模拟。
 
@@ -283,7 +283,7 @@ Chris 于 2026-07-29 接受方案 C，并批准以下七项决策：
 Acceptance Gate 已于 2026-07-29 由 Chris 通过：
 
 - 方案 C 与七项决策已接受；
-- Permission 继续由 IAM Own，Warehouse 由 WMS Own，Equipment Ledger 由 EAM Own；
+- Permission 继续由 IAM Own，Equipment Ledger 由 EAM Own；Warehouse/Location 静态主档与 WMS 运行时事实按 ADR-044 分属 MDM/WMS；
 - Preference 不参与 Authorization，System 参数禁止 Secret；
 - IAM 结论为 **No current production migration required**，`IamAdminService` 不迁移；
 - S11 状态可收口为 Completed，S12 仍为 Not Started。
@@ -314,6 +314,8 @@ mom-system-platform
 本 ADR 已 Accepted，但本次仍是纯文档决策收口，没有生产回滚、数据库迁移或 Token 失效。S11-A 两个已推送文档 Commit 与 S11-B 新文档收口 Commit 均保留，不改写历史。
 
 若未来边界变化，创建新的 ADR 并将 ADR-025 标记为 Superseded，不静默改写本决策；对应实现和数据迁移必须使用独立扩展—迁移—收缩方案。
+
+2026-10-14 起，仓库与库位静态主数据的所有权按 ADR-044 由 MDM 持有，WMS 持有对应库存与作业运行时事实；产线/工位静态主数据由 MDM 持有，MES 持有生产能力与执行运行时事实。该补充只替代本 ADR 与上述静态/运行时拆分冲突的段落，其余决策继续有效。未改写本 ADR 原始接受时点和历史实现事实。
 
 ## 27. S15-B 后续批准记录
 

@@ -69,6 +69,23 @@ class I18nManagementServiceTest {
     }
 
     @Test
+    void duplicateTranslationLookupMustOnlyWarnAndMustNotBlockSaving() {
+        when(store.message("1001", false)).thenReturn(message(3, true));
+        when(store.duplicateMessageKeys("1001", "en-US", "Same text"))
+                .thenReturn(List.of("mdm.material.name"));
+        assertThat(service.duplicateMessageKeys("1001", "en-US", " Same text "))
+                .containsExactly("mdm.material.name");
+
+        when(store.message("1001", true)).thenReturn(message(3, true));
+        when(store.translations("1001")).thenReturn(List.of());
+        when(store.createTranslation("1001", "en-US", "Same text"))
+                .thenReturn(translation("en-US", "Same text", 0));
+        assertThat(service.saveTranslation("1001", "en-US", "Same text", null).messageText())
+                .isEqualTo("Same text");
+        verify(store).createTranslation("1001", "en-US", "Same text");
+    }
+
+    @Test
     void staleMessageVersionMustNotWriteOrNotify() {
         when(store.message("1001", false)).thenReturn(message(3, true));
 

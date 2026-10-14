@@ -69,7 +69,7 @@ class RequestIdentityKeyResolverTest {
         RequestIdentityKeyResolver resolver = resolver(List.of());
 
         assertEquals("ip:unknown", resolver.resolve(MockServerWebExchange.from(
-                MockServerHttpRequest.get("/auth/login").build())).block());
+                MockServerHttpRequest.get("/auth/sessions/login").build())).block());
     }
 
     @Test
@@ -94,7 +94,7 @@ class RequestIdentityKeyResolverTest {
     }
 
     private static MockServerWebExchange exchange(String remoteAddress, String... header) throws Exception {
-        MockServerHttpRequest.BaseBuilder<?> request = MockServerHttpRequest.get("/auth/login")
+        MockServerHttpRequest.BaseBuilder<?> request = MockServerHttpRequest.get("/auth/sessions/login")
                 .remoteAddress(new InetSocketAddress(InetAddress.getByName(remoteAddress), 12345));
         if (header.length > 0) {
             request.header(header[0], java.util.Arrays.copyOfRange(header, 1, header.length));

@@ -1,7 +1,10 @@
 package io.github.chrisshi.mom.system.controller;
 
 import io.github.chrisshi.mom.system.application.SystemV1Exception;
-import io.github.chrisshi.mom.system.controller.dictionary.DictionaryController;
+import io.github.chrisshi.mom.system.controller.dictionary.DictionaryItemController;
+import io.github.chrisshi.mom.system.controller.dictionary.DictionaryTypeController;
+import io.github.chrisshi.mom.system.controller.dictionary.RuntimeDictionaryController;
+import io.github.chrisshi.mom.system.controller.i18n.LocaleCatalogController;
 import io.github.chrisshi.mom.system.controller.i18n.SupportedLocaleController;
 import io.github.chrisshi.mom.core.i18n.I18nMessageResolver;
 import io.github.chrisshi.mom.webmvc.response.Result;
@@ -23,8 +26,11 @@ import java.util.Locale;
  * Chain 处理，不假设进入 ControllerAdvice。</p>
  */
 @RestControllerAdvice(assignableTypes = {
-        DictionaryController.class,
-        SupportedLocaleController.class
+        DictionaryTypeController.class,
+        DictionaryItemController.class,
+        RuntimeDictionaryController.class,
+        SupportedLocaleController.class,
+        LocaleCatalogController.class
 })
 public class SystemV1ExceptionHandler {
     private final I18nMessageResolver messageResolver;

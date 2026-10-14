@@ -78,7 +78,7 @@ public class LocationMasterDataController {
     /**
      * 启用 LocationType，不执行 Type Code 分支。
      */
-    @PatchMapping("/location-types/{id}/enable")
+    @PatchMapping("/location-types/enable/{id}")
     @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationTypeView> enableLocationType(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableLocationType(id, request.version()));
@@ -87,7 +87,7 @@ public class LocationMasterDataController {
     /**
      * 停用 LocationType，不级联 Location。
      */
-    @PatchMapping("/location-types/{id}/disable")
+    @PatchMapping("/location-types/disable/{id}")
     @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationTypeView> disableLocationType(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableLocationType(id, request.version()));
@@ -137,7 +137,7 @@ public class LocationMasterDataController {
     /**
      * 启用 Location。
      */
-    @PatchMapping("/locations/{id}/enable")
+    @PatchMapping("/locations/enable/{id}")
     @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationView> enableLocation(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableLocation(id, request.version()));
@@ -146,7 +146,7 @@ public class LocationMasterDataController {
     /**
      * 停用 Location，不改变运行时事实。
      */
-    @PatchMapping("/locations/{id}/disable")
+    @PatchMapping("/locations/disable/{id}")
     @PreAuthorize("hasAuthority('mdm:location:write')")
     public Result<LocationView> disableLocation(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableLocation(id, request.version()));

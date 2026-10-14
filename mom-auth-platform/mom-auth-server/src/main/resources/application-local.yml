@@ -12,7 +12,7 @@ mom:
   security:
     resource-server:
       public-paths:
-        - /login
+        - /sessions/login
         - /i18n/runtime/**
         - /v3/api-docs/**
         - /swagger-ui/**

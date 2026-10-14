@@ -88,6 +88,13 @@ Framework 不拥有业务表、不反向依赖 System、不实现 Redis 缓存�
 
 ## 4. 后果
 
+### 4.1 后续决策补充：I18n Key 维度与 Owner 边界
+
+2026-10-14 确认取消 I18n namespace。Auth、MDM、System 各自的服务 Schema 仍是数据 Owner；`message_key` 在
+Owner 内唯一且不可改名，不同 Owner 可使用相同 Key。新规则、数据迁移、重复文案提醒及接口契约详见
+[I18n Key 维度与 Owner 边界设计](../architecture/I18n-Key维度与Owner边界设计.md)，并在冲突处取代本 ADR
+中标记为历史的 namespace 子分组和 Runtime 分组规则。
+
 正向后果：System 调用链、事务边界和数据归属显著缩短；业务模块可以独立发布文案；System 故障不会阻断其他
 服务解析本地文案；V1 无需 Redis、RocketMQ 或新的基础设施。
 

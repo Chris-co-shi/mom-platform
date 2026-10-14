@@ -100,22 +100,21 @@ class SystemV1PostgresqlIT {
         jdbc.update("TRUNCATE TABLE system_dictionary_item, system_dictionary");
     }
 
-    /** 服务范围查询保留不同 namespace 的同名 Key、停用项与精确筛选兼容性。 */
+    /** 当前 Owner 的 Key 全局唯一，管理查询包含启用与停用定义。 */
     @Test
-    void serviceWideMessagesMustReadAllOwnedNamespaces() {
-        var first = i18n.createMessage("system.test-a", "same.key", "第一组", true);
-        var second = i18n.createMessage("system.test-b", "same.key", "第二组", false);
-        assertThat(i18n.messages(null)).extracting(message -> message.id())
+    void ownerWideMessagesMustEnforceUniqueKeys() {
+        var first = i18n.createMessage("system.test.a", "第一组", true);
+        var second = i18n.createMessage("system.test.b", "第二组", false);
+        assertThat(i18n.messages()).extracting(message -> message.id())
                 .containsSubsequence(first.id(), second.id());
-        assertThat(i18n.messages("system.test-b")).containsExactly(second);
-        assertThat(i18n.messages(null)).allMatch(message -> message.namespace().equals("system")
-                || message.namespace().startsWith("system."));
+        assertThatThrownBy(() -> i18n.createMessage("system.test.a", "重复", true))
+                .isInstanceOf(I18nFailure.class);
     }
 
     /** 历史 Migration 保持存在，V11～V15 Web 文案种子已生效。 */
     @Test
     void migrationMustPreserveHistoryAndCreateOnlyCurrentV1Tables() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("15");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("17");
         assertThat(jdbc.queryForList("""
                 SELECT table_name FROM information_schema.tables
                  WHERE table_schema=? AND table_name IN (
@@ -140,13 +139,13 @@ class SystemV1PostgresqlIT {
     void mdmNavigationTranslationsMustExistWithoutRevivingDeprecatedMenuRuntime() {
         assertThat(jdbc.queryForObject("""
             SELECT count(*) FROM system_i18n_message_definition
-            WHERE namespace = 'system.navigation' AND message_key LIKE 'navigation.mdm%'
+            WHERE message_key LIKE 'navigation.mdm%'
               AND enabled = true AND deleted = false
             """, Long.class)).isEqualTo(12L);
         assertThat(jdbc.queryForObject("""
             SELECT count(*) FROM system_i18n_translation t
             JOIN system_i18n_message_definition m ON m.id = t.message_id
-            WHERE m.namespace = 'system.navigation' AND m.message_key LIKE 'navigation.mdm%'
+            WHERE m.message_key LIKE 'navigation.mdm%'
               AND t.locale_code IN ('zh-CN', 'en-US') AND t.deleted = false
             """, Long.class)).isEqualTo(24L);
         assertThat(jdbc.queryForObject("""
@@ -191,30 +190,29 @@ class SystemV1PostgresqlIT {
         assertThat(locales.resolve("en-US").effectiveLocale()).isEqualTo("cs-CZ");
     }
 
-    /** Translation 必须保持 placeholder 合同，Runtime 支持多 namespace 与逐 Key fallback。 */
+    /** Translation 必须保持 placeholder 合同，Runtime 返回当前 Owner 的扁平 Bundle 并逐 Key fallback。 */
     @Test
     void i18nMustValidatePlaceholderAndAggregateRuntimeBundles() {
-        var greeting = i18n.createMessage("system", "test.greeting", "测试问候", true);
+        var greeting = i18n.createMessage("system.test.greeting", "测试问候", true);
         i18n.saveTranslation(greeting.id(), "zh-CN", "你好 {0}", 0L);
         assertThatThrownBy(() -> i18n.saveTranslation(
                 greeting.id(), "en-US", "Hello", 0L))
                 .isInstanceOf(I18nFailure.class);
         i18n.saveTranslation(greeting.id(), "en-US", "Hello {0}", 0L);
 
-        var material = i18n.createMessage("system.material", "missing", "测试缺失", true);
+        var material = i18n.createMessage("system.material.missing", "测试缺失", true);
         i18n.saveTranslation(material.id(), "zh-CN", "物料不存在", 0L);
         var cs = locales.create(new CreateLocale("cs-CZ", "捷克语", "Čeština", true, 30));
         assertThat(cs.enabled()).isTrue();
 
-        var bundle = runtime.load("cs-CZ", List.of("system", "system.material"));
+        var bundle = runtime.load("cs-CZ");
         assertThat(bundle.effectiveLocale()).isEqualTo("cs-CZ");
-        assertThat(bundle.bundles().get("system")).containsEntry("test.greeting", "你好 {0}");
-        assertThat(bundle.bundles().get("system.material")).containsEntry("missing", "物料不存在");
+        assertThat(bundle.messages()).containsEntry("system.test.greeting", "你好 {0}");
+        assertThat(bundle.messages()).containsEntry("system.material.missing", "物料不存在");
 
         var updated = i18n.updateMessage(material.id(), material.description(), false, material.version());
         assertThat(updated.enabled()).isFalse();
-        assertThat(runtime.load("cs-CZ", List.of("system.material")).bundles().get("system.material"))
-                .doesNotContainKey("missing");
+        assertThat(runtime.load("cs-CZ").messages()).doesNotContainKey("system.material.missing");
     }
 
     /** 测试环境提供稳定认证 Actor；生产继续由 SecurityCurrentActorProvider 解析可信 Token。 */

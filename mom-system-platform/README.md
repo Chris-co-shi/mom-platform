@@ -33,12 +33,14 @@ Placeholder 一致性；当前没有建立 Domain、Repository Port/Adapter、Co
 
 - `system_dictionary`、`system_dictionary_item`：沿用历史表作为当前字典存储；
 - `system_supported_locale`：V10 新增，初始化 `zh-CN` 与 `en-US`，且只有一个默认 Locale；
-- `system_i18n_message_definition`：V10 新增，只接受 `system` / `system.*` namespace；
+- `system_i18n_message_definition`：V10 新增，V17 后以 System Owner 内唯一的小写 `message_key` 标识；
 - `system_i18n_translation`：V10 新增，保存纯文本 Translation。
 
 V1～V9 Migration 不修改。旧表仍可存在于 `mom_system`，但当前运行时代码不读写。
 
 ## I18n 语义
+
+当前有效规则见 [I18n Key 与 Owner 边界设计](../docs/architecture/I18n-Key维度与Owner边界设计.md)：不再使用 namespace；System Schema 是数据 Owner，Key 在 System 内全局唯一，运行时返回扁平 Bundle。下面的历史 Key 前缀只表示稳定 Key 命名，不代表 namespace。
 
 ```text
 framework.* → mom-webmvc classpath Resource Bundle
@@ -68,6 +70,6 @@ bash .github/scripts/system-postgresql-smoke.sh
 
 ## 后续业务模块
 
-MDM、MES、WMS、QMS 的 namespace、表和 Translation 归各自 bounded context 所有。开始实现前阅读
+MDM、MES、WMS、QMS 的表和 Translation 归各自 bounded context 所有；I18n Key 仅在各自 Owner 内唯一，不再以 namespace 分组。开始实现前阅读
 [业务模块 I18n 后续设计手册](../docs/engineering/System-I18n业务模块后续设计手册.md)，并为每个真实 Slice 单独
 确认数据所有权、失败语义、权限和测试证据。

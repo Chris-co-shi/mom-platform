@@ -104,7 +104,7 @@ public class PermissionController {
      * @param request 包含乐观锁 version 的状态变更请求
      * @return 启用后的 Permission 响应
      */
-    @PutMapping("/{id}/enable")
+    @PutMapping("/enable/{id}")
     @PreAuthorize("hasAuthority('auth:permission:write')")
     public Result<PermissionResponse> enable(
         @PathVariable String id,
@@ -122,7 +122,7 @@ public class PermissionController {
      * @param request 包含乐观锁 version 的状态变更请求
      * @return 停用后的 Permission 响应
      */
-    @PutMapping("/{id}/disable")
+    @PutMapping("/disable/{id}")
     @PreAuthorize("hasAuthority('auth:permission:write')")
     public Result<PermissionResponse> disable(
         @PathVariable String id,

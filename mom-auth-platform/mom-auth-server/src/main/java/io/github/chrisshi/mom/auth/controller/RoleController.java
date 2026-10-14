@@ -103,7 +103,7 @@ public class RoleController {
      * @param request 包含乐观锁 version 的状态变更请求
      * @return 启用后的角色响应
      */
-    @PutMapping("/{id}/enable")
+    @PutMapping("/enable/{id}")
     @PreAuthorize("hasAuthority('auth:role:write')")
     public Result<RoleResponse> enable(
         @PathVariable String id,
@@ -121,7 +121,7 @@ public class RoleController {
      * @param request 包含乐观锁 version 的状态变更请求
      * @return 停用后的角色响应
      */
-    @PutMapping("/{id}/disable")
+    @PutMapping("/disable/{id}")
     @PreAuthorize("hasAuthority('auth:role:write')")
     public Result<RoleResponse> disable(
         @PathVariable String id,

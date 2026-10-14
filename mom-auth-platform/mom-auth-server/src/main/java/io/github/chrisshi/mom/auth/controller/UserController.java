@@ -107,7 +107,7 @@ public class UserController {
      * @param request 新密码与乐观锁 version
      * @return 更新后的用户响应
      */
-    @PutMapping("/{id}/password")
+    @PutMapping("/change-password/{id}")
     @PreAuthorize("hasAuthority('auth:user:write')")
     public Result<UserResponse> resetPassword(
         @PathVariable String id,
@@ -125,7 +125,7 @@ public class UserController {
      * @param request 包含乐观锁 version 的状态变更请求
      * @return 启用后的用户响应
      */
-    @PutMapping("/{id}/enable")
+    @PutMapping("/enable/{id}")
     @PreAuthorize("hasAuthority('auth:user:write')")
     public Result<UserResponse> enable(
         @PathVariable String id,
@@ -143,7 +143,7 @@ public class UserController {
      * @param request 包含乐观锁 version 的状态变更请求
      * @return 停用后的用户响应
      */
-    @PutMapping("/{id}/disable")
+    @PutMapping("/disable/{id}")
     @PreAuthorize("hasAuthority('auth:user:write')")
     public Result<UserResponse> disable(
         @PathVariable String id,

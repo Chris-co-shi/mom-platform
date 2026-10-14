@@ -123,7 +123,6 @@ public final class LocalI18nChangeNotifier implements I18nChangeNotifier, I18nCh
      *
      * @param type 稳定事件类型
      * @param locale Locale 变化事件可为空
-     * @param locale Locale 列表变化事件可为空
      */
     public record I18nChangeEvent(String type, String locale) {
     }

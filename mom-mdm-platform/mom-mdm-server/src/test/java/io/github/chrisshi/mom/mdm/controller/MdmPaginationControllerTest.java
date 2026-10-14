@@ -49,7 +49,7 @@ class MdmPaginationControllerTest {
     void shouldBindTypedPageQueryFromPostBody() throws Exception {
         when(application.pageUoms(any())).thenReturn(new PageResult<>(List.of(), 2, 25, 0, 0));
 
-        mockMvc.perform(post("/api/mdm/uoms/search")
+        mockMvc.perform(post("/uoms/search")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -77,14 +77,14 @@ class MdmPaginationControllerTest {
     /** 旧 GET 集合分页入口必须删除，不能与 POST 查询协议并存。 */
     @Test
     void shouldRejectRemovedGetPaginationEndpoint() throws Exception {
-        mockMvc.perform(get("/api/mdm/uoms"))
+        mockMvc.perform(get("/uoms"))
                 .andExpect(status().isMethodNotAllowed());
     }
 
     /** params 为 null 时 PageQuery 构造失败必须转换为稳定 400，而不是泄露 Jackson 异常。 */
     @Test
     void shouldRejectNullParamsWithStableBadRequest() throws Exception {
-        mockMvc.perform(post("/api/mdm/uoms/search")
+        mockMvc.perform(post("/uoms/search")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"params": null, "pageNo": 1, "pageSize": 20}
@@ -97,7 +97,7 @@ class MdmPaginationControllerTest {
     /** 缺失必填页码时必须作为不可读请求返回 400，不能把不完整请求交给业务查询。 */
     @Test
     void shouldRejectMissingPageNumberWithStableBadRequest() throws Exception {
-        mockMvc.perform(post("/api/mdm/uoms/search")
+        mockMvc.perform(post("/uoms/search")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"params": {}, "pageSize": 20}
@@ -114,7 +114,7 @@ class MdmPaginationControllerTest {
         when(application.pageUoms(any())).thenThrow(
                 new PageQueryValidationException("pageSize", "每页条数不能超过 200"));
 
-        mockMvc.perform(post("/api/mdm/uoms/search")
+        mockMvc.perform(post("/uoms/search")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"params": {}, "pageNo": 1, "pageSize": 201}

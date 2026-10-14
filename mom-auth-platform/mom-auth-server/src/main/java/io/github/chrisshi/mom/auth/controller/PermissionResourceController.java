@@ -108,7 +108,7 @@ public class PermissionResourceController {
      * @param request 乐观版本
      * @return 更新后资源
      */
-    @PutMapping("/{id}/enable")
+    @PutMapping("/enable/{id}")
     @PreAuthorize("hasAuthority('auth:permission:write')")
     public Result<PermissionResourceResponse> enable(
         @PathVariable String id, @Valid @RequestBody ChangeStatusRequest request
@@ -123,7 +123,7 @@ public class PermissionResourceController {
      * @param request 乐观版本
      * @return 更新后资源
      */
-    @PutMapping("/{id}/disable")
+    @PutMapping("/disable/{id}")
     @PreAuthorize("hasAuthority('auth:permission:write')")
     public Result<PermissionResourceResponse> disable(
         @PathVariable String id, @Valid @RequestBody ChangeStatusRequest request

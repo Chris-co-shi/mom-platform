@@ -68,7 +68,7 @@ mom:
     resource-server:
       enabled: ${MOM_RESOURCE_SERVER_ENABLED:true}
       public-paths:
-        - /mdm/i18n/runtime/**
+        - /i18n/runtime/**
 
 management:
   endpoints:

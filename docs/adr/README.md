@@ -65,6 +65,7 @@ ADR 用于记录重要架构决策的背景、候选方案、最终选择、后�
 | [ADR-041](ADR-041-Mini-Auth简化三层包结构.md) | Mini Auth 简化三层包结构（历史 `service` 命名） | Superseded by ADR-042 |
 | [ADR-042](ADR-042-MOM渐进式分层与对象模型.md) | MOM 渐进式分层、3+1 对象模型与按复杂度升级原则 | Accepted |
 | [ADR-043](ADR-043-System-V1能力与I18n数据所有权.md) | System V1 能力与 I18n 数据所有权 | Accepted |
+| [ADR-044](ADR-044-MDM静态主数据与WMS-MES运行时所有权边界.md) | MDM 静态主数据与 WMS/MES 运行时所有权边界 | Accepted；仅替代 ADR-025 对仓储/制造结构静态主档的相冲突部分 |
 
 ## 4. 当前认证决策
 

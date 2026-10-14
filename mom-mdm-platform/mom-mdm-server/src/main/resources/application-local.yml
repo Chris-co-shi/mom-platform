@@ -1,4 +1,4 @@
-# 仅供本机联调；MDM 仍保留既有服务内部 /api/mdm 路径。
+# 仅供本机联调；Gateway 对外使用 /mdm 前缀并剥除，服务内部路由不带模块前缀。
 server:
   address: 127.0.0.1
 
@@ -12,7 +12,7 @@ mom:
   security:
     resource-server:
       public-paths:
-        - /api/mdm/i18n/runtime/**
+        - /i18n/runtime/**
         - /v3/api-docs/**
         - /swagger-ui/**
         - /swagger-ui.html

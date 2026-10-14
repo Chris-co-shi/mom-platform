@@ -110,54 +110,54 @@ class MdmHttpPostgresqlConnectivityIT {
      */
     @Test
     void shouldConnectAllCurrentMdmSlicesThroughHttpAndPostgresql() throws Exception {
-        String plantId = create("/api/mdm/plants", """
+        String plantId = create("/plants", """
                 {"code":"PLANT-E2E","name":"端到端工厂","status":"ENABLED"}
                 """);
-        String workshopId = create("/api/mdm/workshops", """
+        String workshopId = create("/workshops", """
                 {"plantId":"%s","code":"WORKSHOP-E2E","name":"端到端车间","status":"ENABLED"}
                 """.formatted(plantId));
-        String productionLineId = create("/api/mdm/production-lines", """
+        String productionLineId = create("/production-lines", """
                 {"workshopId":"%s","code":"LINE-E2E","name":"端到端产线","status":"ENABLED"}
                 """.formatted(workshopId));
-        create("/api/mdm/workstations", """
+        create("/workstations", """
                 {"productionLineId":"%s","code":"STATION-E2E","name":"端到端工位","status":"ENABLED"}
                 """.formatted(productionLineId));
 
-        String warehouseId = create("/api/mdm/warehouses", """
+        String warehouseId = create("/warehouses", """
                 {"plantId":"%s","code":"WAREHOUSE-E2E","name":"端到端仓库","status":"ENABLED"}
                 """.formatted(plantId));
-        String warehouseAreaId = create("/api/mdm/warehouse-areas", """
+        String warehouseAreaId = create("/warehouse-areas", """
                 {"warehouseId":"%s","code":"AREA-E2E","name":"端到端库区","status":"ENABLED"}
                 """.formatted(warehouseId));
-        String locationTypeId = create("/api/mdm/location-types", """
+        String locationTypeId = create("/location-types", """
                 {"code":"TYPE-E2E","name":"端到端位置类型","status":"ENABLED"}
                 """);
-        String locationId = create("/api/mdm/locations", """
+        String locationId = create("/locations", """
                 {"code":"LOCATION-E2E","name":"端到端位置","plantId":"%s",
                  "warehouseAreaId":"%s","locationTypeId":"%s","status":"ENABLED"}
                 """.formatted(plantId, warehouseAreaId, locationTypeId));
 
-        String rootCategoryId = create("/api/mdm/material-categories", """
+        String rootCategoryId = create("/material-categories", """
                 {"code":"CATEGORY-ROOT-E2E","name":"端到端根分类","parentId":null,
                  "sort":10,"defaultShelfLifeDays":180,"status":"ENABLED"}
                 """);
-        String leafCategoryId = create("/api/mdm/material-categories", """
+        String leafCategoryId = create("/material-categories", """
                 {"code":"CATEGORY-LEAF-E2E","name":"端到端叶子分类","parentId":"%s",
                  "sort":20,"defaultShelfLifeDays":90,"status":"ENABLED"}
                 """.formatted(rootCategoryId));
-        String materialId = create("/api/mdm/materials", """
+        String materialId = create("/materials", """
                 {"code":"MATERIAL-E2E","name":"端到端物料","categoryId":"%s",
                  "baseUomId":"%s","shelfLifeSource":"CATEGORY_DEFAULT","status":"ENABLED"}
                 """.formatted(leafCategoryId, KILOGRAM_ID));
 
-        performPost("/api/mdm/locations/search", """
+        performPost("/locations/search", """
                 {"params":{"warehouseAreaId":"%s"},"pageNo":1,"pageSize":20}
                 """.formatted(warehouseAreaId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(1))
                 .andExpect(jsonPath("$.data.records[0].id").value(locationId));
 
-        performPost("/api/mdm/materials/search", """
+        performPost("/materials/search", """
                 {"params":{"categoryId":"%s","baseUomId":"%s","status":"ENABLED"},
                  "pageNo":1,"pageSize":20}
                 """.formatted(leafCategoryId, KILOGRAM_ID))
@@ -166,10 +166,10 @@ class MdmHttpPostgresqlConnectivityIT {
                 .andExpect(jsonPath("$.data.records[0].id").value(materialId))
                 .andExpect(jsonPath("$.data.records[0].shelfLifeDays").value(90));
 
-        mockMvc.perform(get("/api/mdm/uoms/{id}", KILOGRAM_ID).with(actor()))
+        mockMvc.perform(get("/uoms/{id}", KILOGRAM_ID).with(actor()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.code").value("kg"));
-        performPost("/api/mdm/uom-conversions/convert", """
+        performPost("/uom-conversions/convert", """
                 {"value":"1000","sourceUomId":"%s","targetUomId":"%s"}
                 """.formatted(GRAM_ID, KILOGRAM_ID))
                 .andExpect(status().isOk())
@@ -192,17 +192,17 @@ class MdmHttpPostgresqlConnectivityIT {
      */
     @Test
     void shouldEnforceAuthenticationAndDomainReadWriteAuthorities() throws Exception {
-        mockMvc.perform(get("/api/mdm/uoms/{id}", KILOGRAM_ID))
+        mockMvc.perform(get("/uoms/{id}", KILOGRAM_ID))
                 .andExpect(status().isUnauthorized());
 
-        String plantId = create("/api/mdm/plants", """
+        String plantId = create("/plants", """
                 {"code":"PLANT-AUTH","name":"权限测试工厂","status":"ENABLED"}
                 """);
-        mockMvc.perform(get("/api/mdm/plants/{id}", plantId).with(readOnlyActor()))
+        mockMvc.perform(get("/plants/{id}", plantId).with(readOnlyActor()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(plantId));
 
-        mockMvc.perform(post("/api/mdm/plants")
+        mockMvc.perform(post("/plants")
                         .with(readOnlyActor())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -210,7 +210,7 @@ class MdmHttpPostgresqlConnectivityIT {
                                 """))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(post("/api/mdm/dimensions")
+        mockMvc.perform(post("/dimensions")
                         .with(readOnlyActor())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -236,22 +236,22 @@ class MdmHttpPostgresqlConnectivityIT {
     @Test
     void mdmErrorMustFollowAcceptLanguageAndObserveUpdatedTranslation() throws Exception {
         String missingId = "999999999999999999";
-        mockMvc.perform(get("/api/mdm/i18n/runtime/bundles")
-                        .param("locale", "zh-CN").param("namespaces", "mdm"))
+        mockMvc.perform(get("/i18n/runtime/bundles")
+                        .param("locale", "zh-CN"))
                 .andExpect(status().isOk());
-        mockMvc.perform(get("/api/mdm/admin/i18n/messages").param("namespace", "mdm"))
+        mockMvc.perform(get("/i18n/messages"))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(get("/api/mdm/uoms/{id}", missingId))
+        mockMvc.perform(get("/uoms/{id}", missingId))
                 .andExpect(status().isUnauthorized());
 
-        mockMvc.perform(get("/api/mdm/uoms/{id}", missingId).with(readOnlyActor())
+        mockMvc.perform(get("/uoms/{id}", missingId).with(readOnlyActor())
                         .header("Accept-Language", "zh-CN"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("mdm.resource_not_found"))
                 .andExpect(jsonPath("$.message").value("Uom不存在"))
                 .andExpect(jsonPath("$.namespace").doesNotExist())
                 .andExpect(jsonPath("$.messageKey").doesNotExist());
-        mockMvc.perform(get("/api/mdm/uoms/{id}", missingId).with(readOnlyActor())
+        mockMvc.perform(get("/uoms/{id}", missingId).with(readOnlyActor())
                         .header("Accept-Language", "en-US"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("The Uom does not exist"));
@@ -259,7 +259,7 @@ class MdmHttpPostgresqlConnectivityIT {
         try {
             jdbcTemplate.update("UPDATE mdm_i18n_translation SET message_text = ? WHERE id = ?",
                     "Unit {0} is absent", "9720000000000000002");
-            mockMvc.perform(get("/api/mdm/uoms/{id}", missingId).with(readOnlyActor())
+            mockMvc.perform(get("/uoms/{id}", missingId).with(readOnlyActor())
                             .header("Accept-Language", "en-US"))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message").value("Unit Uom is absent"));

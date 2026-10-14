@@ -80,7 +80,7 @@ public class UomMasterDataController {
     /**
      * 启用量纲且不级联类别。 @param id 量纲 ID @param r 版本请求 @return 统一结果 @throws io.github.chrisshi.mom.mdm.application.MdmException 冲突时抛出
      */
-    @PatchMapping("/dimensions/{id}/enable")
+    @PatchMapping("/dimensions/enable/{id}")
     @PreAuthorize("hasAuthority('mdm:uom:write')")
     public Result<DimensionView> enableDimension(@PathVariable String id, @Valid @RequestBody VersionRequest r) {
         return Result.success(application.enableDimension(id, r.version()));
@@ -89,7 +89,7 @@ public class UomMasterDataController {
     /**
      * 停用量纲且不级联类别。 @param id 量纲 ID @param r 版本请求 @return 统一结果 @throws io.github.chrisshi.mom.mdm.application.MdmException 冲突时抛出
      */
-    @PatchMapping("/dimensions/{id}/disable")
+    @PatchMapping("/dimensions/disable/{id}")
     @PreAuthorize("hasAuthority('mdm:uom:write')")
     public Result<DimensionView> disableDimension(@PathVariable String id, @Valid @RequestBody VersionRequest r) {
         return Result.success(application.disableDimension(id, r.version()));
@@ -135,7 +135,7 @@ public class UomMasterDataController {
     /**
      * 启用类别并恢复基准单位。 @param id 类别 ID @param r 版本请求 @return 统一结果 @throws io.github.chrisshi.mom.mdm.application.MdmException 父级或冲突时抛出
      */
-    @PatchMapping("/uom-categories/{id}/enable")
+    @PatchMapping("/uom-categories/enable/{id}")
     @PreAuthorize("hasAuthority('mdm:uom:write')")
     public Result<CategoryView> enableCategory(@PathVariable String id, @Valid @RequestBody VersionRequest r) {
         return Result.success(application.enableCategory(id, r.version()));
@@ -144,7 +144,7 @@ public class UomMasterDataController {
     /**
      * 停用类别并同步停用基准单位。 @param id 类别 ID @param r 版本请求 @return 统一结果 @throws io.github.chrisshi.mom.mdm.application.MdmException 冲突时抛出
      */
-    @PatchMapping("/uom-categories/{id}/disable")
+    @PatchMapping("/uom-categories/disable/{id}")
     @PreAuthorize("hasAuthority('mdm:uom:write')")
     public Result<CategoryView> disableCategory(@PathVariable String id, @Valid @RequestBody VersionRequest r) {
         return Result.success(application.disableCategory(id, r.version()));
@@ -190,7 +190,7 @@ public class UomMasterDataController {
     /**
      * 启用普通单位。 @param id 单位 ID @param r 版本请求 @return 统一结果 @throws io.github.chrisshi.mom.mdm.application.MdmException 父级、基准身份或冲突时抛出
      */
-    @PatchMapping("/uoms/{id}/enable")
+    @PatchMapping("/uoms/enable/{id}")
     @PreAuthorize("hasAuthority('mdm:uom:write')")
     public Result<UomView> enableUom(@PathVariable String id, @Valid @RequestBody VersionRequest r) {
         return Result.success(application.enableUom(id, r.version()));
@@ -199,7 +199,7 @@ public class UomMasterDataController {
     /**
      * 停用普通单位。 @param id 单位 ID @param r 版本请求 @return 统一结果 @throws io.github.chrisshi.mom.mdm.application.MdmException 基准身份或冲突时抛出
      */
-    @PatchMapping("/uoms/{id}/disable")
+    @PatchMapping("/uoms/disable/{id}")
     @PreAuthorize("hasAuthority('mdm:uom:write')")
     public Result<UomView> disableUom(@PathVariable String id, @Valid @RequestBody VersionRequest r) {
         return Result.success(application.disableUom(id, r.version()));

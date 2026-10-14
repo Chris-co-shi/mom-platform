@@ -132,7 +132,7 @@ class AuthManagementPostgresqlIT {
 
     @Test
     void flywayAndDatabaseConstraintsMustMatchMiniAuthModel() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("11");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("14");
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("show timezone", String.class)).isEqualTo("UTC");
         assertThat(jdbcTemplate.queryForObject("""
@@ -201,7 +201,7 @@ class AuthManagementPostgresqlIT {
             .locations("classpath:db/migration/auth")
             .load();
         seeded.migrate();
-        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("11");
+        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("14");
         assertThat(jdbcTemplate.queryForList("""
             SELECT permission.code
               FROM mom_auth_system_seed.auth_permission permission
@@ -228,11 +228,12 @@ class AuthManagementPostgresqlIT {
             .locations("classpath:db/migration/auth")
             .load();
         seeded.migrate();
-        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("11");
+        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("14");
 
         assertThat(jdbcTemplate.queryForObject("""
             SELECT COUNT(*) FROM mom_auth_mdm_seed.auth_permission_resource
             WHERE domain_code = 'MDM' AND enabled = true AND deleted = false
+              AND resource_code IN ('FACTORY', 'WAREHOUSE', 'LOCATION', 'UOM', 'MATERIAL')
             """, Long.class)).isEqualTo(5L);
 
         assertThat(jdbcTemplate.queryForList("""
@@ -240,6 +241,7 @@ class AuthManagementPostgresqlIT {
             JOIN mom_auth_mdm_seed.auth_permission_resource resource
               ON resource.id = permission.resource_id
             WHERE resource.domain_code = 'MDM'
+              AND resource.resource_code IN ('FACTORY', 'WAREHOUSE', 'LOCATION', 'UOM', 'MATERIAL')
               AND permission.enabled = true AND permission.deleted = false
               AND resource.enabled = true AND resource.deleted = false
               AND permission.code = lower(resource.domain_code || ':' || resource.resource_code || ':' || permission.action_code)
@@ -256,8 +258,10 @@ class AuthManagementPostgresqlIT {
             SELECT COUNT(*) FROM mom_auth_mdm_seed.auth_role_permission grants
             JOIN mom_auth_mdm_seed.auth_role role ON role.id = grants.role_id
             JOIN mom_auth_mdm_seed.auth_permission permission ON permission.id = grants.permission_id
+            JOIN mom_auth_mdm_seed.auth_permission_resource resource ON resource.id = permission.resource_id
             WHERE role.code = 'PLATFORM_ADMIN' AND role.enabled = true AND role.deleted = false
               AND permission.code LIKE 'mdm:%' AND permission.enabled = true AND permission.deleted = false
+              AND resource.resource_code IN ('FACTORY', 'WAREHOUSE', 'LOCATION', 'UOM', 'MATERIAL')
             """, Long.class)).isEqualTo(10L);
 
         assertThat(jdbcTemplate.queryForObject("""
@@ -275,13 +279,13 @@ class AuthManagementPostgresqlIT {
     void authNavigationMigrationMustSeedBilingualShellKeys() {
         assertThat(jdbcTemplate.queryForObject("""
             select count(*) from auth_i18n_message_definition
-            where namespace = 'auth.navigation' and message_key like 'navigation.%'
+            where message_key like 'navigation.%'
               and enabled = true and deleted = false
             """, Long.class)).isEqualTo(6L);
         assertThat(jdbcTemplate.queryForObject("""
             select count(*) from auth_i18n_translation t
               join auth_i18n_message_definition m on m.id = t.message_id
-            where m.namespace = 'auth.navigation' and m.message_key like 'navigation.%'
+            where m.message_key like 'navigation.%'
               and t.locale_code in ('zh-CN', 'en-US') and not t.deleted
             """, Long.class)).isEqualTo(12L);
     }

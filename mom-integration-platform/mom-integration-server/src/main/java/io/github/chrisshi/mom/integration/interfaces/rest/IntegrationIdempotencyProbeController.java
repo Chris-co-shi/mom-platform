@@ -26,7 +26,7 @@ import java.util.UUID;
  * 幂等占位：首次请求返回 201，重复请求返回 409，Redis 不可用且 fail-closed 时返回 503。</p>
  */
 @RestController
-@RequestMapping("/integration")
+@RequestMapping("/idempotency-probe")
 @ConditionalOnProperty(prefix = "mom.technical-probe", name = "enabled", havingValue = "true")
 public class IntegrationIdempotencyProbeController {
 
@@ -54,7 +54,7 @@ public class IntegrationIdempotencyProbeController {
      * @param idempotencyKey 调用方提供的幂等标识；相同业务意图重试时必须保持一致
      * @return 201 表示首次取得，409 表示重复，202 表示 fail-open 绕过，503 表示 fail-closed
      */
-    @PostMapping("/idempotency-probe")
+    @PostMapping
     public ResponseEntity<IdempotencyProbeResponse> acquire(
             @RequestHeader(IdempotencyHeaders.IDEMPOTENCY_KEY) String idempotencyKey) {
         String correlationId = currentCorrelationId();

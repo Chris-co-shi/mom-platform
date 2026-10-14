@@ -53,20 +53,44 @@ VALUES
 INSERT INTO system_i18n_translation (
     id, message_id, locale_code, message_text, version, deleted, created_by, created_at, updated_by, updated_at)
 VALUES
-    ('9300000000000000030', '9200000000000000016', 'zh-CN', 'Key 仅允许英文字母、数字及 . _ - 分段；不得包含空格或全角字符，保存时会统一为小写。', 0, false, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP),
-    ('9300000000000000031', '9200000000000000016', 'en-US', 'Use ASCII letters, digits, and . _ - separators only; no spaces or full-width characters. Keys are stored in lowercase.', 0, false, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP),
-    ('9300000000000000032', '9200000000000000017', 'zh-CN', '该译文与以下 Key 的内容完全相同：{0}。如果这是有意复用，请确认后继续保存。', 0, false, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP),
-    ('9300000000000000033', '9200000000000000017', 'en-US', 'This exact translation is already used by these keys: {0}. If this reuse is intentional, confirm and continue saving.', 0, false, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP),
-    ('9300000000000000034', '9200000000000000018', 'zh-CN', '仍然保存', 0, false, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP),
-    ('9300000000000000035', '9200000000000000018', 'en-US', 'Save anyway', 0, false, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP),
-    ('9300000000000000036', '9200000000000000019', 'zh-CN', '该 Key 已存在。Key 是文案的唯一身份，请使用已有 Key 管理译文，不要为相同文案创建另一个 Key。', 0, false, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP),
-    ('9300000000000000037', '9200000000000000019', 'en-US', 'This key already exists. A key is the unique identity of a message; use the existing key instead of creating another one for the same message.', 0, false, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP);
+    ('9300000000000000031', '9200000000000000016', 'zh-CN', 'Key 仅允许英文字母、数字及 . _ - 分段；不得包含空格或全角字符，保存时会统一为小写。', 0, false, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP),
+    ('9300000000000000032', '9200000000000000016', 'en-US', 'Use ASCII letters, digits, and . _ - separators only; no spaces or full-width characters. Keys are stored in lowercase.', 0, false, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP),
+    ('9300000000000000033', '9200000000000000017', 'zh-CN', '该译文与以下 Key 的内容完全相同：{0}。如果这是有意复用，请确认后继续保存。', 0, false, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP),
+    ('9300000000000000034', '9200000000000000017', 'en-US', 'This exact translation is already used by these keys: {0}. If this reuse is intentional, confirm and continue saving.', 0, false, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP),
+    ('9300000000000000035', '9200000000000000018', 'zh-CN', '仍然保存', 0, false, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP),
+    ('9300000000000000036', '9200000000000000018', 'en-US', 'Save anyway', 0, false, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP),
+    ('9300000000000000037', '9200000000000000019', 'zh-CN', '该 Key 已存在。Key 是文案的唯一身份，请使用已有 Key 管理译文，不要为相同文案创建另一个 Key。', 0, false, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP),
+    ('9300000000000000038', '9200000000000000019', 'en-US', 'This key already exists. A key is the unique identity of a message; use the existing key instead of creating another one for the same message.', 0, false, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP, 'SYSTEM_MIGRATION', CURRENT_TIMESTAMP);
 
 UPDATE system_i18n_translation SET message_text = CASE locale_code
     WHEN 'zh-CN' THEN 'Key 保存前会统一转为小写；不得含空格、全角或非 ASCII 字符，仅允许字母、数字及 . _ - 分段。'
     WHEN 'en-US' THEN 'Keys are stored in lowercase. Do not use spaces, full-width, or non-ASCII characters; use letters, digits, and . _ - separators only.'
     ELSE message_text END
 WHERE message_id = '9200000000000000016';
+
+UPDATE system_i18n_translation
+SET message_text = CASE id
+        WHEN '9640000000000000291' THEN '按归属服务维护文案定义与多语言译文；每个服务内的 Key 全局唯一。'
+        WHEN '9640000000000000292' THEN 'Manage messages and translations by owner; each key is unique within its service.'
+        WHEN '9640000000000000299' THEN 'Key 创建后不可修改；保存时统一为小写，不得包含空格、全角或非 ASCII 字符。'
+        WHEN '9640000000000000300' THEN 'Keys are immutable after creation, stored in lowercase, and cannot contain spaces, full-width, or non-ASCII characters.'
+        ELSE message_text
+    END,
+    version = version + 1,
+    updated_by = 'SYSTEM_MIGRATION',
+    updated_at = CURRENT_TIMESTAMP
+WHERE id IN ('9640000000000000291', '9640000000000000292',
+             '9640000000000000299', '9640000000000000300');
+
+-- namespace 筛选相关字段已从管理界面移除；保留旧记录但不再进入 Runtime Bundle。
+UPDATE system_i18n_message_definition
+SET enabled = false, deleted = true, version = version + 1,
+    updated_by = 'SYSTEM_MIGRATION', updated_at = CURRENT_TIMESTAMP
+WHERE id IN ('9630000000000000151', '9630000000000000152', '9630000000000000155');
+UPDATE system_i18n_translation
+SET deleted = true, version = version + 1,
+    updated_by = 'SYSTEM_MIGRATION', updated_at = CURRENT_TIMESTAMP
+WHERE message_id IN ('9630000000000000151', '9630000000000000152', '9630000000000000155');
 
 COMMENT ON TABLE system_i18n_message_definition IS 'System Owner 内唯一、不可变的稳定 I18n Key 定义';
 COMMENT ON COLUMN system_i18n_message_definition.message_key IS 'Owner 内唯一且创建后不可修改的小写稳定消息键';

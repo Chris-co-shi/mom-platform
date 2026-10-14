@@ -43,7 +43,7 @@ class AuthenticationControllerTest {
         when(authentication.getToken()).thenReturn(token);
         when(token.getExpiresAt()).thenReturn(expiresAt);
 
-        Result<CurrentSessionResponse> result = new AuthenticationController(application, users).me(authentication);
+        Result<CurrentSessionResponse> result = new CurrentUserController(users).me(authentication);
 
         assertThat(result.code()).isEqualTo(Result.SUCCESS_CODE);
         assertThat(result.data()).isEqualTo(new CurrentSessionResponse(

@@ -26,7 +26,7 @@ class LocalI18nChangeNotifierTest {
             assertThat(notifier.activeSubscriberCount()).isEqualTo(1);
             assertThat(Arrays.stream(LocalI18nChangeNotifier.I18nChangeEvent.class.getRecordComponents())
                     .map(component -> component.getName()))
-                    .containsExactly("type", "locale", "namespace")
+                    .containsExactly("type", "locale")
                     .doesNotContain("messageText", "translation", "messages");
         } finally {
             notifier.close();

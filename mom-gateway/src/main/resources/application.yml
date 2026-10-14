@@ -54,7 +54,7 @@ spring:
               order: -10
               uri: lb://mom-auth-server
               predicates:
-                - Path=/auth/login
+                - Path=/auth/sessions/login
                 - Method=POST
               filters:
                 - StripPrefix=1
@@ -116,7 +116,7 @@ spring:
               order: 0
               uri: lb://mom-integration-server
               predicates:
-                - Path=/api/integration/**
+                - Path=/integration/**
               filters:
                 - StripPrefix=1
                 - name: RequestRateLimiter

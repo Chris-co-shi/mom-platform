@@ -1,0 +1,19 @@
+# 仅本机验证技术探针与其 OpenAPI；正式环境不激活 local Profile。
+server:
+  address: 127.0.0.1
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+mom:
+  technical-probe:
+    enabled: true
+  security:
+    resource-server:
+      public-paths:
+        - /v3/api-docs/**
+        - /swagger-ui/**
+        - /swagger-ui.html

@@ -124,7 +124,7 @@ public class MaterialCategoryController {
      *
      * <p>不会级联启用子分类或 Material。</p>
      */
-    @PatchMapping("/{id}/enable")
+    @PatchMapping("/enable/{id}")
     @PreAuthorize("hasAuthority('mdm:material:write')")
     public Result<MaterialCategoryView> enableMaterialCategory(
             @PathVariable String id, @Valid @RequestBody VersionRequest request) {
@@ -141,7 +141,7 @@ public class MaterialCategoryController {
      *
      * <p>不会停用或修改 Material；失败时不产生部分停用。</p>
      */
-    @PatchMapping("/{id}/disable")
+    @PatchMapping("/disable/{id}")
     @PreAuthorize("hasAuthority('mdm:material:write')")
     public Result<MaterialCategoryView> disableMaterialCategory(
             @PathVariable String id, @Valid @RequestBody VersionRequest request) {

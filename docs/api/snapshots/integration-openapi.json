@@ -1,0 +1,68 @@
+{
+  "components": {
+    "schemas": {
+      "IdempotencyProbeResponse": {
+        "properties": {
+          "correlationId": {
+            "type": "string"
+          },
+          "failureReason": {
+            "type": "string"
+          },
+          "mayProceed": {
+            "type": "boolean"
+          },
+          "service": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "ttlSeconds": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "仅包含本地启用的 Integration 技术探针，不代表正式业务 API。",
+    "title": "MOM Integration Service API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/idempotency-probe": {
+      "post": {
+        "operationId": "acquire",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdempotencyProbeResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "integration-idempotency-probe-controller"
+        ]
+      }
+    }
+  }
+}

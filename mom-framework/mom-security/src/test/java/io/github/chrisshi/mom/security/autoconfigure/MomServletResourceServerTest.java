@@ -57,6 +57,7 @@ class MomServletResourceServerTest {
     @BeforeEach
     void setUp() {
         introspector.checks = 0;
+        introspector.failWithInfrastructureError = false;
         mockMvc = MockMvcBuilders.webAppContextSetup(applicationContext)
             .apply(springSecurity())
             .build();
@@ -83,6 +84,18 @@ class MomServletResourceServerTest {
         mockMvc.perform(get("/api/protected")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token"))
             .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void tokenStoreFailureMustNotAuthorizeProtectedRequest() throws Exception {
+        introspector.failWithInfrastructureError = true;
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mockMvc.perform(get("/api/protected")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer valid-read-token")))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("token store unavailable");
+
+        org.assertj.core.api.Assertions.assertThat(introspector.checks).isEqualTo(1);
     }
 
     @Test
@@ -159,10 +172,14 @@ class MomServletResourceServerTest {
 
     static final class TestOpaqueTokenIntrospector implements OpaqueTokenIntrospector {
         private int checks;
+        private boolean failWithInfrastructureError;
 
         @Override
         public OAuth2AuthenticatedPrincipal introspect(String token) {
             checks++;
+            if (failWithInfrastructureError) {
+                throw new IllegalStateException("token store unavailable");
+            }
 
             if ("valid-read-token".equals(token)) {
                 return principal(

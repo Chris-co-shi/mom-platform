@@ -21,14 +21,13 @@
 
 ## 2. 路径与资源
 
-1. 现有 `/api/iam/**` 等公开路径在 S01 保持不变，不批量增加 `/v1`。
-2. MOM 内部第一方正式 API 默认使用 `/api/{bounded-context}/...`。
-3. 集合使用复数名词；路径表达稳定业务资源，不暴露数据库表名。
-4. CRUD 使用 GET/POST/PUT/PATCH/DELETE 的标准语义；GET 不得产生隐藏写副作用。
-5. 真实业务命令无法自然表达为资源状态变化时，允许 `/users/{id}/unlock`、`/sessions/{id}/revoke` 等领域命令；禁止 `/doSomething`、`/executeAction`。
-6. 仅在外部第三方公开、存在不可兼容变更且有并行兼容/退役计划时引入 URI Major Version。
-7. 新 DELETE 默认不使用 Request Body；确需使用必须记录调用方兼容证据。IAM Admin 当前带 Body 的 DELETE 是已发布兼容现状，S01 不修改。
-8. 批量接口必须明确最大条数、全成全败或部分失败结构，以及幂等策略；超过协议上限返回 413。
+1. 浏览器完整路径为 `/{模块前缀}/{Controller资源根}[/{业务操作}/{参数}]`。Gateway 模块前缀由 Gateway 配置（如 `/auth`、`/system`、`/mdm`、`/integration`），`StripPrefix=1` 后才进入服务；Controller 不重复声明模块前缀。第一方路径不包含 `/api`。
+2. Controller 类级路径定义一个清晰的复数资源根；不同资源使用不同 Controller。集合使用复数名词，路径表达稳定业务资源，不暴露数据库表名。
+3. 普通 CRUD 由 HTTP 方法表达操作：集合 `POST` 创建、`GET` 查询，单资源 `GET/PUT/DELETE` 操作资源；禁止仅为描述 CRUD 而在 URL 中重复 `create`、`get`、`update`、`delete`。
+4. 状态切换、改密、设为默认等命令操作使用明确业务动词，动作放在资源参数前，例如 `PATCH /dictionary-items/change-status/{typeId}/{itemId}`；禁止 `/doSomething`、`/executeAction`。关系仍属于子资源时保留子资源路径，不改成替换命令。
+5. GET 不得产生隐藏写副作用。仅在外部第三方公开、存在不可兼容变更且有并行兼容/退役计划时引入 URI Major Version。
+6. 新 DELETE 默认不使用 Request Body；确需使用必须记录调用方兼容证据。IAM Admin 当前带 Body 的 DELETE 是已发布兼容现状，S01 不修改。
+7. 批量接口必须明确最大条数、全成全败或部分失败结构，以及幂等策略；超过协议上限返回 413。
 
 ## 3. Request 与 Response DTO
 
@@ -83,7 +82,7 @@ MOM 不引入通用 `ApiResponse<T>` 成功信封。HTTP 已表达状态；通�
   "title": "Resource conflict",
   "status": 409,
   "detail": "资源状态不允许当前操作",
-  "instance": "/api/wms/reservations/123",
+  "instance": "/wms/reservations/123",
   "code": "wms.reservation.state_conflict",
   "correlationId": "...",
   "fieldErrors": [

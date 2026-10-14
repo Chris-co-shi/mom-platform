@@ -81,7 +81,7 @@ public class FactoryStructureController {
     /**
      * 启用 Plant。
      */
-    @PatchMapping("/plants/{id}/enable")
+    @PatchMapping("/plants/enable/{id}")
     @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<PlantView> enablePlant(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enablePlant(id, request.version()));
@@ -90,7 +90,7 @@ public class FactoryStructureController {
     /**
      * 停用 Plant。
      */
-    @PatchMapping("/plants/{id}/disable")
+    @PatchMapping("/plants/disable/{id}")
     @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<PlantView> disablePlant(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disablePlant(id, request.version()));
@@ -140,7 +140,7 @@ public class FactoryStructureController {
     /**
      * 启用 Workshop。
      */
-    @PatchMapping("/workshops/{id}/enable")
+    @PatchMapping("/workshops/enable/{id}")
     @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<WorkshopView> enableWorkshop(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableWorkshop(id, request.version()));
@@ -149,7 +149,7 @@ public class FactoryStructureController {
     /**
      * 停用 Workshop。
      */
-    @PatchMapping("/workshops/{id}/disable")
+    @PatchMapping("/workshops/disable/{id}")
     @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<WorkshopView> disableWorkshop(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableWorkshop(id, request.version()));
@@ -199,7 +199,7 @@ public class FactoryStructureController {
     /**
      * 启用 ProductionLine。
      */
-    @PatchMapping("/production-lines/{id}/enable")
+    @PatchMapping("/production-lines/enable/{id}")
     @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<ProductionLineView> enableProductionLine(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableProductionLine(id, request.version()));
@@ -208,7 +208,7 @@ public class FactoryStructureController {
     /**
      * 停用 ProductionLine。
      */
-    @PatchMapping("/production-lines/{id}/disable")
+    @PatchMapping("/production-lines/disable/{id}")
     @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<ProductionLineView> disableProductionLine(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableProductionLine(id, request.version()));
@@ -258,7 +258,7 @@ public class FactoryStructureController {
     /**
      * 启用 Workstation。
      */
-    @PatchMapping("/workstations/{id}/enable")
+    @PatchMapping("/workstations/enable/{id}")
     @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<WorkstationView> enableWorkstation(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.enableWorkstation(id, request.version()));
@@ -267,7 +267,7 @@ public class FactoryStructureController {
     /**
      * 停用 Workstation。
      */
-    @PatchMapping("/workstations/{id}/disable")
+    @PatchMapping("/workstations/disable/{id}")
     @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<WorkstationView> disableWorkstation(@PathVariable String id, @Valid @RequestBody VersionRequest request) {
         return Result.success(application.disableWorkstation(id, request.version()));

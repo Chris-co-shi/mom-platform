@@ -118,7 +118,7 @@ public class MaterialController {
      * @return 启用后的物料
      * @throws io.github.chrisshi.mom.mdm.application.MdmException 引用或版本校验失败时抛出
      */
-    @PatchMapping("/{id}/enable")
+    @PatchMapping("/enable/{id}")
     @PreAuthorize("hasAuthority('mdm:material:write')")
     public Result<MaterialView> enableMaterial(
             @PathVariable String id, @Valid @RequestBody VersionRequest request) {
@@ -133,7 +133,7 @@ public class MaterialController {
      * @return 停用后的物料
      * @throws io.github.chrisshi.mom.mdm.application.MdmException 资源或版本校验失败时抛出
      */
-    @PatchMapping("/{id}/disable")
+    @PatchMapping("/disable/{id}")
     @PreAuthorize("hasAuthority('mdm:material:write')")
     public Result<MaterialView> disableMaterial(
             @PathVariable String id, @Valid @RequestBody VersionRequest request) {

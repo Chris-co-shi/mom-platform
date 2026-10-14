@@ -1,6 +1,5 @@
 package io.github.chrisshi.mom.architecture;
 
-import io.github.chrisshi.mom.i18n.namespace.I18nNamespacePolicy;
 import io.github.chrisshi.mom.i18n.runtime.I18nLocalePolicy;
 import io.github.chrisshi.mom.i18n.store.I18nStore;
 import io.github.chrisshi.mom.webmvc.autoconfigure.I18nWebMvcAutoConfiguration;
@@ -36,17 +35,17 @@ class I18nHostSecurityConfigurationTest {
     @Test
     void systemHostMustExposeOnlyAnonymousRuntimeAndLocaleCatalog() throws Exception {
         assertHost(SYSTEM, List.of("/i18n/locales", "/i18n/runtime/**"),
-                "/admin/i18n/messages");
+                "/i18n/messages");
     }
 
     @Test
     void authHostMustExposeOnlyLoginAndAnonymousRuntime() throws Exception {
-        assertHost(AUTH, List.of("/login", "/i18n/runtime/**"), "/admin/i18n/messages");
+        assertHost(AUTH, List.of("/sessions/login", "/i18n/runtime/**"), "/i18n/messages");
     }
 
     @Test
     void mdmHostMustExposeOnlyAnonymousRuntime() throws Exception {
-        assertHost(MDM, List.of("/api/mdm/i18n/runtime/**"), "/api/mdm/admin/i18n/messages");
+        assertHost(MDM, List.of("/i18n/runtime/**"), "/i18n/messages");
     }
 
     private void assertHost(String relative, List<String> expectedPublic, String managementPath) throws Exception {
@@ -92,11 +91,10 @@ class I18nHostSecurityConfigurationTest {
         throw new IllegalStateException("无法定位 MOM Reactor 根目录");
     }
 
-    /** 以宿主真实提供的四种 SPI 类型模拟 Bean 注册前提；不替代宿主集成测试。 */
+    /** 以宿主真实提供的三种 SPI 类型模拟 Bean 注册前提；不替代宿主集成测试。 */
     @Configuration(proxyBeanMethods = false)
     static class HostI18nBeans {
         @Bean I18nStore store() { return mock(I18nStore.class); }
-        @Bean I18nNamespacePolicy namespaces() { return value -> true; }
         @Bean I18nLocalePolicy locales() { return mock(I18nLocalePolicy.class); }
         @Bean LocalI18nChangeNotifier notifier() { return mock(LocalI18nChangeNotifier.class); }
     }

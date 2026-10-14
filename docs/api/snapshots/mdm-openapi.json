@@ -423,9 +423,6 @@
           },
           "messageKey": {
             "type": "string"
-          },
-          "namespace": {
-            "type": "string"
           }
         },
         "type": "object"
@@ -708,17 +705,14 @@
       },
       "I18nBundle": {
         "properties": {
-          "bundles": {
-            "additionalProperties": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "type": "object"
-          },
           "effectiveLocale": {
             "type": "string"
+          },
+          "messages": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
           },
           "requestedLocale": {
             "type": "string"
@@ -738,9 +732,6 @@
             "type": "string"
           },
           "messageKey": {
-            "type": "string"
-          },
-          "namespace": {
             "type": "string"
           },
           "updatedAt": {
@@ -1895,6 +1886,23 @@
         },
         "type": "object"
       },
+      "ResultListString": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "data": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ResultLocationTypeView": {
         "properties": {
           "code": {
@@ -2719,183 +2727,7 @@
   },
   "openapi": "3.1.0",
   "paths": {
-    "/api/mdm/admin/i18n/messages": {
-      "get": {
-        "operationId": "messages",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "namespace",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultListI18nMessage"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "i-18n-management-controller"
-        ]
-      },
-      "post": {
-        "operationId": "create",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultI18nMessage"
-                }
-              }
-            },
-            "description": "Created"
-          }
-        },
-        "tags": [
-          "i-18n-management-controller"
-        ]
-      }
-    },
-    "/api/mdm/admin/i18n/messages/{id}": {
-      "put": {
-        "operationId": "update",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultI18nMessage"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "i-18n-management-controller"
-        ]
-      }
-    },
-    "/api/mdm/admin/i18n/messages/{messageId}/translations": {
-      "get": {
-        "operationId": "translations",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "messageId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultListI18nTranslation"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "i-18n-management-controller"
-        ]
-      }
-    },
-    "/api/mdm/admin/i18n/messages/{messageId}/translations/{localeCode}": {
-      "put": {
-        "operationId": "saveTranslation",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "messageId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "localeCode",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TranslationRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultI18nTranslation"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "i-18n-management-controller"
-        ]
-      }
-    },
-    "/api/mdm/dimensions": {
+    "/dimensions": {
       "post": {
         "operationId": "createDimension",
         "requestBody": {
@@ -2925,7 +2757,87 @@
         ]
       }
     },
-    "/api/mdm/dimensions/search": {
+    "/dimensions/disable/{id}": {
+      "patch": {
+        "operationId": "disableDimension",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultDimensionView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "uom-master-data-controller"
+        ]
+      }
+    },
+    "/dimensions/enable/{id}": {
+      "patch": {
+        "operationId": "enableDimension",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultDimensionView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "uom-master-data-controller"
+        ]
+      }
+    },
+    "/dimensions/search": {
       "post": {
         "operationId": "pageDimensions",
         "requestBody": {
@@ -2955,7 +2867,7 @@
         ]
       }
     },
-    "/api/mdm/dimensions/{id}": {
+    "/dimensions/{id}": {
       "get": {
         "operationId": "getDimension",
         "parameters": [
@@ -3023,9 +2935,105 @@
         ]
       }
     },
-    "/api/mdm/dimensions/{id}/disable": {
-      "patch": {
-        "operationId": "disableDimension",
+    "/i18n/messages": {
+      "get": {
+        "operationId": "messages",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultListI18nMessage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "i-18n-management-controller"
+        ]
+      },
+      "post": {
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultI18nMessage"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "i-18n-management-controller"
+        ]
+      }
+    },
+    "/i18n/messages/duplicate-check/{messageId}/{localeCode}": {
+      "post": {
+        "operationId": "duplicateMessageKeys",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "localeCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultListString"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "i-18n-management-controller"
+        ]
+      }
+    },
+    "/i18n/messages/{id}": {
+      "put": {
+        "operationId": "update",
         "parameters": [
           {
             "in": "path",
@@ -3040,7 +3048,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
+                "$ref": "#/components/schemas/UpdateRequest"
               }
             }
           },
@@ -3051,7 +3059,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResultDimensionView"
+                  "$ref": "#/components/schemas/ResultI18nMessage"
                 }
               }
             },
@@ -3059,17 +3067,55 @@
           }
         },
         "tags": [
-          "uom-master-data-controller"
+          "i-18n-management-controller"
         ]
       }
     },
-    "/api/mdm/dimensions/{id}/enable": {
-      "patch": {
-        "operationId": "enableDimension",
+    "/i18n/messages/{messageId}/translations": {
+      "get": {
+        "operationId": "translations",
         "parameters": [
           {
             "in": "path",
-            "name": "id",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultListI18nTranslation"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "i-18n-management-controller"
+        ]
+      }
+    },
+    "/i18n/messages/{messageId}/translations/{localeCode}": {
+      "put": {
+        "operationId": "saveTranslation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "localeCode",
             "required": true,
             "schema": {
               "type": "string"
@@ -3080,7 +3126,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
+                "$ref": "#/components/schemas/TranslationRequest"
               }
             }
           },
@@ -3091,7 +3137,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResultDimensionView"
+                  "$ref": "#/components/schemas/ResultI18nTranslation"
                 }
               }
             },
@@ -3099,11 +3145,11 @@
           }
         },
         "tags": [
-          "uom-master-data-controller"
+          "i-18n-management-controller"
         ]
       }
     },
-    "/api/mdm/i18n/runtime/bundles": {
+    "/i18n/runtime/bundles": {
       "get": {
         "operationId": "bundles",
         "parameters": [
@@ -3113,17 +3159,6 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "namespaces",
-            "required": true,
-            "schema": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
             }
           }
         ],
@@ -3144,7 +3179,7 @@
         ]
       }
     },
-    "/api/mdm/i18n/runtime/events": {
+    "/i18n/runtime/events": {
       "get": {
         "operationId": "events",
         "responses": {
@@ -3164,7 +3199,7 @@
         ]
       }
     },
-    "/api/mdm/location-types": {
+    "/location-types": {
       "post": {
         "operationId": "createLocationType",
         "requestBody": {
@@ -3194,7 +3229,87 @@
         ]
       }
     },
-    "/api/mdm/location-types/search": {
+    "/location-types/disable/{id}": {
+      "patch": {
+        "operationId": "disableLocationType",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultLocationTypeView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "location-master-data-controller"
+        ]
+      }
+    },
+    "/location-types/enable/{id}": {
+      "patch": {
+        "operationId": "enableLocationType",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultLocationTypeView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "location-master-data-controller"
+        ]
+      }
+    },
+    "/location-types/search": {
       "post": {
         "operationId": "pageLocationTypes",
         "requestBody": {
@@ -3224,7 +3339,7 @@
         ]
       }
     },
-    "/api/mdm/location-types/{id}": {
+    "/location-types/{id}": {
       "get": {
         "operationId": "getLocationType",
         "parameters": [
@@ -3292,87 +3407,7 @@
         ]
       }
     },
-    "/api/mdm/location-types/{id}/disable": {
-      "patch": {
-        "operationId": "disableLocationType",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultLocationTypeView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "location-master-data-controller"
-        ]
-      }
-    },
-    "/api/mdm/location-types/{id}/enable": {
-      "patch": {
-        "operationId": "enableLocationType",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultLocationTypeView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "location-master-data-controller"
-        ]
-      }
-    },
-    "/api/mdm/locations": {
+    "/locations": {
       "post": {
         "operationId": "createLocation",
         "requestBody": {
@@ -3402,7 +3437,87 @@
         ]
       }
     },
-    "/api/mdm/locations/search": {
+    "/locations/disable/{id}": {
+      "patch": {
+        "operationId": "disableLocation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultLocationView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "location-master-data-controller"
+        ]
+      }
+    },
+    "/locations/enable/{id}": {
+      "patch": {
+        "operationId": "enableLocation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultLocationView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "location-master-data-controller"
+        ]
+      }
+    },
+    "/locations/search": {
       "post": {
         "operationId": "pageLocations",
         "requestBody": {
@@ -3432,7 +3547,7 @@
         ]
       }
     },
-    "/api/mdm/locations/{id}": {
+    "/locations/{id}": {
       "get": {
         "operationId": "getLocation",
         "parameters": [
@@ -3500,87 +3615,7 @@
         ]
       }
     },
-    "/api/mdm/locations/{id}/disable": {
-      "patch": {
-        "operationId": "disableLocation",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultLocationView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "location-master-data-controller"
-        ]
-      }
-    },
-    "/api/mdm/locations/{id}/enable": {
-      "patch": {
-        "operationId": "enableLocation",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultLocationView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "location-master-data-controller"
-        ]
-      }
-    },
-    "/api/mdm/material-categories": {
+    "/material-categories": {
       "post": {
         "operationId": "createMaterialCategory",
         "requestBody": {
@@ -3610,7 +3645,87 @@
         ]
       }
     },
-    "/api/mdm/material-categories/search": {
+    "/material-categories/disable/{id}": {
+      "patch": {
+        "operationId": "disableMaterialCategory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultMaterialCategoryView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "material-category-controller"
+        ]
+      }
+    },
+    "/material-categories/enable/{id}": {
+      "patch": {
+        "operationId": "enableMaterialCategory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultMaterialCategoryView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "material-category-controller"
+        ]
+      }
+    },
+    "/material-categories/search": {
       "post": {
         "operationId": "pageMaterialCategories",
         "requestBody": {
@@ -3640,7 +3755,7 @@
         ]
       }
     },
-    "/api/mdm/material-categories/{id}": {
+    "/material-categories/{id}": {
       "get": {
         "operationId": "getMaterialCategory",
         "parameters": [
@@ -3708,87 +3823,7 @@
         ]
       }
     },
-    "/api/mdm/material-categories/{id}/disable": {
-      "patch": {
-        "operationId": "disableMaterialCategory",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultMaterialCategoryView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "material-category-controller"
-        ]
-      }
-    },
-    "/api/mdm/material-categories/{id}/enable": {
-      "patch": {
-        "operationId": "enableMaterialCategory",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultMaterialCategoryView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "material-category-controller"
-        ]
-      }
-    },
-    "/api/mdm/materials": {
+    "/materials": {
       "post": {
         "operationId": "createMaterial",
         "requestBody": {
@@ -3818,7 +3853,87 @@
         ]
       }
     },
-    "/api/mdm/materials/search": {
+    "/materials/disable/{id}": {
+      "patch": {
+        "operationId": "disableMaterial",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultMaterialView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "material-controller"
+        ]
+      }
+    },
+    "/materials/enable/{id}": {
+      "patch": {
+        "operationId": "enableMaterial",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultMaterialView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "material-controller"
+        ]
+      }
+    },
+    "/materials/search": {
       "post": {
         "operationId": "pageMaterials",
         "requestBody": {
@@ -3848,7 +3963,7 @@
         ]
       }
     },
-    "/api/mdm/materials/{id}": {
+    "/materials/{id}": {
       "get": {
         "operationId": "getMaterial",
         "parameters": [
@@ -3916,87 +4031,7 @@
         ]
       }
     },
-    "/api/mdm/materials/{id}/disable": {
-      "patch": {
-        "operationId": "disableMaterial",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultMaterialView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "material-controller"
-        ]
-      }
-    },
-    "/api/mdm/materials/{id}/enable": {
-      "patch": {
-        "operationId": "enableMaterial",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultMaterialView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "material-controller"
-        ]
-      }
-    },
-    "/api/mdm/plants": {
+    "/plants": {
       "post": {
         "operationId": "createPlant",
         "requestBody": {
@@ -4026,7 +4061,87 @@
         ]
       }
     },
-    "/api/mdm/plants/search": {
+    "/plants/disable/{id}": {
+      "patch": {
+        "operationId": "disablePlant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultPlantView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "factory-structure-controller"
+        ]
+      }
+    },
+    "/plants/enable/{id}": {
+      "patch": {
+        "operationId": "enablePlant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultPlantView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "factory-structure-controller"
+        ]
+      }
+    },
+    "/plants/search": {
       "post": {
         "operationId": "pagePlants",
         "requestBody": {
@@ -4056,7 +4171,7 @@
         ]
       }
     },
-    "/api/mdm/plants/{id}": {
+    "/plants/{id}": {
       "get": {
         "operationId": "getPlant",
         "parameters": [
@@ -4124,87 +4239,7 @@
         ]
       }
     },
-    "/api/mdm/plants/{id}/disable": {
-      "patch": {
-        "operationId": "disablePlant",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultPlantView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "factory-structure-controller"
-        ]
-      }
-    },
-    "/api/mdm/plants/{id}/enable": {
-      "patch": {
-        "operationId": "enablePlant",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultPlantView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "factory-structure-controller"
-        ]
-      }
-    },
-    "/api/mdm/production-lines": {
+    "/production-lines": {
       "post": {
         "operationId": "createProductionLine",
         "requestBody": {
@@ -4234,7 +4269,87 @@
         ]
       }
     },
-    "/api/mdm/production-lines/search": {
+    "/production-lines/disable/{id}": {
+      "patch": {
+        "operationId": "disableProductionLine",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultProductionLineView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "factory-structure-controller"
+        ]
+      }
+    },
+    "/production-lines/enable/{id}": {
+      "patch": {
+        "operationId": "enableProductionLine",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultProductionLineView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "factory-structure-controller"
+        ]
+      }
+    },
+    "/production-lines/search": {
       "post": {
         "operationId": "pageProductionLines",
         "requestBody": {
@@ -4264,7 +4379,7 @@
         ]
       }
     },
-    "/api/mdm/production-lines/{id}": {
+    "/production-lines/{id}": {
       "get": {
         "operationId": "getProductionLine",
         "parameters": [
@@ -4332,87 +4447,7 @@
         ]
       }
     },
-    "/api/mdm/production-lines/{id}/disable": {
-      "patch": {
-        "operationId": "disableProductionLine",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultProductionLineView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "factory-structure-controller"
-        ]
-      }
-    },
-    "/api/mdm/production-lines/{id}/enable": {
-      "patch": {
-        "operationId": "enableProductionLine",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultProductionLineView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "factory-structure-controller"
-        ]
-      }
-    },
-    "/api/mdm/uom-categories": {
+    "/uom-categories": {
       "post": {
         "operationId": "createCategory",
         "requestBody": {
@@ -4442,7 +4477,87 @@
         ]
       }
     },
-    "/api/mdm/uom-categories/search": {
+    "/uom-categories/disable/{id}": {
+      "patch": {
+        "operationId": "disableCategory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultCategoryView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "uom-master-data-controller"
+        ]
+      }
+    },
+    "/uom-categories/enable/{id}": {
+      "patch": {
+        "operationId": "enableCategory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultCategoryView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "uom-master-data-controller"
+        ]
+      }
+    },
+    "/uom-categories/search": {
       "post": {
         "operationId": "pageCategories",
         "requestBody": {
@@ -4472,7 +4587,7 @@
         ]
       }
     },
-    "/api/mdm/uom-categories/{id}": {
+    "/uom-categories/{id}": {
       "get": {
         "operationId": "getCategory",
         "parameters": [
@@ -4540,87 +4655,7 @@
         ]
       }
     },
-    "/api/mdm/uom-categories/{id}/disable": {
-      "patch": {
-        "operationId": "disableCategory",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultCategoryView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "uom-master-data-controller"
-        ]
-      }
-    },
-    "/api/mdm/uom-categories/{id}/enable": {
-      "patch": {
-        "operationId": "enableCategory",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultCategoryView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "uom-master-data-controller"
-        ]
-      }
-    },
-    "/api/mdm/uom-conversion-rules/search": {
+    "/uom-conversion-rules/search": {
       "post": {
         "operationId": "pageRules",
         "requestBody": {
@@ -4650,7 +4685,7 @@
         ]
       }
     },
-    "/api/mdm/uom-conversions/compatibility": {
+    "/uom-conversions/compatibility": {
       "get": {
         "operationId": "compatibility",
         "parameters": [
@@ -4692,7 +4727,7 @@
         ]
       }
     },
-    "/api/mdm/uom-conversions/convert": {
+    "/uom-conversions/convert": {
       "post": {
         "operationId": "convert",
         "requestBody": {
@@ -4722,7 +4757,7 @@
         ]
       }
     },
-    "/api/mdm/uom-conversions/replay": {
+    "/uom-conversions/replay": {
       "post": {
         "operationId": "replay",
         "requestBody": {
@@ -4752,7 +4787,7 @@
         ]
       }
     },
-    "/api/mdm/uoms": {
+    "/uoms": {
       "post": {
         "operationId": "createUom",
         "requestBody": {
@@ -4782,7 +4817,87 @@
         ]
       }
     },
-    "/api/mdm/uoms/search": {
+    "/uoms/disable/{id}": {
+      "patch": {
+        "operationId": "disableUom",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultUomView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "uom-master-data-controller"
+        ]
+      }
+    },
+    "/uoms/enable/{id}": {
+      "patch": {
+        "operationId": "enableUom",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultUomView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "uom-master-data-controller"
+        ]
+      }
+    },
+    "/uoms/search": {
       "post": {
         "operationId": "pageUoms",
         "requestBody": {
@@ -4812,7 +4927,7 @@
         ]
       }
     },
-    "/api/mdm/uoms/{id}": {
+    "/uoms/{id}": {
       "get": {
         "operationId": "getUom",
         "parameters": [
@@ -4880,7 +4995,7 @@
         ]
       }
     },
-    "/api/mdm/uoms/{id}/conversion-rules": {
+    "/uoms/{id}/conversion-rules": {
       "post": {
         "operationId": "publishRule",
         "parameters": [
@@ -4920,7 +5035,7 @@
         ]
       }
     },
-    "/api/mdm/uoms/{id}/conversion-rules/current": {
+    "/uoms/{id}/conversion-rules/current": {
       "get": {
         "operationId": "getCurrentRule",
         "parameters": [
@@ -4950,87 +5065,7 @@
         ]
       }
     },
-    "/api/mdm/uoms/{id}/disable": {
-      "patch": {
-        "operationId": "disableUom",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultUomView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "uom-master-data-controller"
-        ]
-      }
-    },
-    "/api/mdm/uoms/{id}/enable": {
-      "patch": {
-        "operationId": "enableUom",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultUomView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "uom-master-data-controller"
-        ]
-      }
-    },
-    "/api/mdm/warehouse-areas": {
+    "/warehouse-areas": {
       "post": {
         "operationId": "createWarehouseArea",
         "requestBody": {
@@ -5060,7 +5095,87 @@
         ]
       }
     },
-    "/api/mdm/warehouse-areas/search": {
+    "/warehouse-areas/disable/{id}": {
+      "patch": {
+        "operationId": "disableWarehouseArea",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultWarehouseAreaView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "warehouse-structure-controller"
+        ]
+      }
+    },
+    "/warehouse-areas/enable/{id}": {
+      "patch": {
+        "operationId": "enableWarehouseArea",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultWarehouseAreaView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "warehouse-structure-controller"
+        ]
+      }
+    },
+    "/warehouse-areas/search": {
       "post": {
         "operationId": "pageWarehouseAreas",
         "requestBody": {
@@ -5090,7 +5205,7 @@
         ]
       }
     },
-    "/api/mdm/warehouse-areas/{id}": {
+    "/warehouse-areas/{id}": {
       "get": {
         "operationId": "getWarehouseArea",
         "parameters": [
@@ -5158,87 +5273,7 @@
         ]
       }
     },
-    "/api/mdm/warehouse-areas/{id}/disable": {
-      "patch": {
-        "operationId": "disableWarehouseArea",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultWarehouseAreaView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "warehouse-structure-controller"
-        ]
-      }
-    },
-    "/api/mdm/warehouse-areas/{id}/enable": {
-      "patch": {
-        "operationId": "enableWarehouseArea",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultWarehouseAreaView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "warehouse-structure-controller"
-        ]
-      }
-    },
-    "/api/mdm/warehouses": {
+    "/warehouses": {
       "post": {
         "operationId": "createWarehouse",
         "requestBody": {
@@ -5268,7 +5303,87 @@
         ]
       }
     },
-    "/api/mdm/warehouses/search": {
+    "/warehouses/disable/{id}": {
+      "patch": {
+        "operationId": "disableWarehouse",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultWarehouseView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "warehouse-structure-controller"
+        ]
+      }
+    },
+    "/warehouses/enable/{id}": {
+      "patch": {
+        "operationId": "enableWarehouse",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultWarehouseView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "warehouse-structure-controller"
+        ]
+      }
+    },
+    "/warehouses/search": {
       "post": {
         "operationId": "pageWarehouses",
         "requestBody": {
@@ -5298,7 +5413,7 @@
         ]
       }
     },
-    "/api/mdm/warehouses/{id}": {
+    "/warehouses/{id}": {
       "get": {
         "operationId": "getWarehouse",
         "parameters": [
@@ -5366,87 +5481,7 @@
         ]
       }
     },
-    "/api/mdm/warehouses/{id}/disable": {
-      "patch": {
-        "operationId": "disableWarehouse",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultWarehouseView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "warehouse-structure-controller"
-        ]
-      }
-    },
-    "/api/mdm/warehouses/{id}/enable": {
-      "patch": {
-        "operationId": "enableWarehouse",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultWarehouseView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "warehouse-structure-controller"
-        ]
-      }
-    },
-    "/api/mdm/workshops": {
+    "/workshops": {
       "post": {
         "operationId": "createWorkshop",
         "requestBody": {
@@ -5476,7 +5511,87 @@
         ]
       }
     },
-    "/api/mdm/workshops/search": {
+    "/workshops/disable/{id}": {
+      "patch": {
+        "operationId": "disableWorkshop",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultWorkshopView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "factory-structure-controller"
+        ]
+      }
+    },
+    "/workshops/enable/{id}": {
+      "patch": {
+        "operationId": "enableWorkshop",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultWorkshopView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "factory-structure-controller"
+        ]
+      }
+    },
+    "/workshops/search": {
       "post": {
         "operationId": "pageWorkshops",
         "requestBody": {
@@ -5506,7 +5621,7 @@
         ]
       }
     },
-    "/api/mdm/workshops/{id}": {
+    "/workshops/{id}": {
       "get": {
         "operationId": "getWorkshop",
         "parameters": [
@@ -5574,87 +5689,7 @@
         ]
       }
     },
-    "/api/mdm/workshops/{id}/disable": {
-      "patch": {
-        "operationId": "disableWorkshop",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultWorkshopView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "factory-structure-controller"
-        ]
-      }
-    },
-    "/api/mdm/workshops/{id}/enable": {
-      "patch": {
-        "operationId": "enableWorkshop",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultWorkshopView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "factory-structure-controller"
-        ]
-      }
-    },
-    "/api/mdm/workstations": {
+    "/workstations": {
       "post": {
         "operationId": "createWorkstation",
         "requestBody": {
@@ -5684,7 +5719,87 @@
         ]
       }
     },
-    "/api/mdm/workstations/search": {
+    "/workstations/disable/{id}": {
+      "patch": {
+        "operationId": "disableWorkstation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultWorkstationView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "factory-structure-controller"
+        ]
+      }
+    },
+    "/workstations/enable/{id}": {
+      "patch": {
+        "operationId": "enableWorkstation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultWorkstationView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "factory-structure-controller"
+        ]
+      }
+    },
+    "/workstations/search": {
       "post": {
         "operationId": "pageWorkstations",
         "requestBody": {
@@ -5714,7 +5829,7 @@
         ]
       }
     },
-    "/api/mdm/workstations/{id}": {
+    "/workstations/{id}": {
       "get": {
         "operationId": "getWorkstation",
         "parameters": [
@@ -5760,86 +5875,6 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateNameRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultWorkstationView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "factory-structure-controller"
-        ]
-      }
-    },
-    "/api/mdm/workstations/{id}/disable": {
-      "patch": {
-        "operationId": "disableWorkstation",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultWorkstationView"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "factory-structure-controller"
-        ]
-      }
-    },
-    "/api/mdm/workstations/{id}/enable": {
-      "patch": {
-        "operationId": "enableWorkstation",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VersionRequest"
               }
             }
           },
