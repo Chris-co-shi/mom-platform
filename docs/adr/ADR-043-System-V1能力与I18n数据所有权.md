@@ -39,6 +39,8 @@ System 当前没有复杂聚合状态机、多个持久化实现或需要隔离�
 
 ### 2.3 I18n 所有权按 namespace 与数据库共同隔离
 
+> 历史决策。namespace 子分组规则已由 2026-10-14 决策补充取代；服务 Owner / Schema 数据所有权继续有效。
+
 - Framework 持有 `framework.*`，使用 classpath `MessageSource`，至少提供 `zh-CN` 和 `en-US`；
 - System 只持有 `system.*`，保存于 `mom_system`；
 - MDM、MES、WMS、QMS 等服务分别持有 `mdm.*`、`mes.*`、`wms.*`、`qms.*`，并保存到自己的 Schema；
@@ -46,6 +48,8 @@ System 当前没有复杂聚合状态机、多个持久化实现或需要隔离�
 - 稳定错误 `code` 不本地化，`messageKey` 稳定，最终展示 `message` 可本地化。
 
 ### 2.4 Framework 只提供薄运行时协议
+
+> 历史决策。Runtime namespace 选择与按 namespace 分组已由 2026-10-14 决策补充取代。
 
 `mom-core` 提供无框架依赖的 `I18nMessageResolver` 契约；`mom-webmvc` 提供：
 

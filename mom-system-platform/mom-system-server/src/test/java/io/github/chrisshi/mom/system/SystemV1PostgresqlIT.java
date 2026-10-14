@@ -100,6 +100,18 @@ class SystemV1PostgresqlIT {
         jdbc.update("TRUNCATE TABLE system_dictionary_item, system_dictionary");
     }
 
+    /** 服务范围查询保留不同 namespace 的同名 Key、停用项与精确筛选兼容性。 */
+    @Test
+    void serviceWideMessagesMustReadAllOwnedNamespaces() {
+        var first = i18n.createMessage("system.test-a", "same.key", "第一组", true);
+        var second = i18n.createMessage("system.test-b", "same.key", "第二组", false);
+        assertThat(i18n.messages(null)).extracting(message -> message.id())
+                .containsSubsequence(first.id(), second.id());
+        assertThat(i18n.messages("system.test-b")).containsExactly(second);
+        assertThat(i18n.messages(null)).allMatch(message -> message.namespace().equals("system")
+                || message.namespace().startsWith("system."));
+    }
+
     /** 历史 Migration 保持存在，V11～V15 Web 文案种子已生效。 */
     @Test
     void migrationMustPreserveHistoryAndCreateOnlyCurrentV1Tables() {

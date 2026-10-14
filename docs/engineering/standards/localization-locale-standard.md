@@ -19,7 +19,9 @@ BCP 47 定义语言 Tag；HTTP `Accept-Language` 表达客户端语言偏好；O
 - mom-web 各应用：按钮、标签、菜单固定标题、帮助和前端固定校验。
 - mom-mobile：移动端静态资源。
 - Framework：`framework.*` 固定框架错误，使用 classpath 双语 Resource Bundle。
-- 各后端服务：拥有本 bounded context 的固定与动态业务错误；动态资源使用本服务 namespace 和数据库。
+- 各后端服务：拥有本 bounded context 的固定与动态业务错误；动态资源使用本服务 Owner 和数据库。
+
+服务 Owner 是数据边界，不作为 Key 的 namespace 维度。同一服务内 `message_key` 全局唯一且不可改名；不同服务可以存在相同 Key。写入前以 Locale.ROOT 统一为小写，拒绝空白、全角和非 ASCII；运行时以小写稳定 Key 查询。相同 Locale 下完全相同的译文只触发管理端提醒并列出其他 Key，用户确认后仍可保存；数据库不得对译文文本设置唯一约束。详情见 `docs/architecture/I18n-Key维度与Owner边界设计.md`。
 - System：拥有平台支持 Locale、受限字典与 `system.*` 动态文案，不持有 MDM/MES/WMS/QMS Translation。
 
 平台不建立中央 Translation Center，也不以 Nacos 或数据库替换全部应用内置 Resource Bundle。资源文件启用

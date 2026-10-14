@@ -103,7 +103,7 @@ spring:
               predicates:
                 - Path=/mdm/**
               filters:
-                - PrefixPath=/api
+                - StripPrefix=1
                 - name: RequestRateLimiter
                   args:
                     rate-limiter: "#{@momFailClosedRedisRateLimiter}"

@@ -1196,7 +1196,7 @@
           {
             "in": "query",
             "name": "namespace",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }

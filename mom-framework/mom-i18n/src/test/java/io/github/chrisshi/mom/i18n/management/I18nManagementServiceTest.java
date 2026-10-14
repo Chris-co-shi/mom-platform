@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 /**
- * 验证 Framework 管理用例的 Owner 隔离、版本和译文约束，不启动数据库。
+ * 验证 Framework 管理用例的 Key 规范化、版本和译文约束，不启动数据库。
  * Store 由宿主提供；本测试只断言管理层在写入前后的行为，提交后通知由独立测试覆盖。
  */
 class I18nManagementServiceTest {
@@ -29,24 +29,41 @@ class I18nManagementServiceTest {
     void setUp() {
         store = mock(I18nStore.class);
         changes = mock(I18nChangePublisher.class);
-        service = new I18nManagementService(store,
-                namespace -> namespace.equals("mdm") || namespace.startsWith("mdm."),
-                new LocalBaseLocalePolicy("zh-CN"), changes);
+        service = new I18nManagementService(store, new LocalBaseLocalePolicy("zh-CN"), changes);
     }
 
     @Test
-    void foreignNamespaceMustFailBeforeStoreAccess() {
-        assertThatThrownBy(() -> service.createMessage("mes.work-order", "title", null, true))
+    void ownerStoreReturnsAllMessagesWithoutSubgroups() {
+        I18nMessage first = message(3, true);
+        I18nMessage second = new I18nMessage("1002", "mdm.uom.title", null, false, 1, Instant.EPOCH);
+        when(store.messages()).thenReturn(List.of(first, second));
+
+        assertThat(service.messages()).containsExactly(first, second);
+        verifyNoInteractions(changes);
+    }
+
+    @Test
+    void invalidKeyMustFailBeforeStoreAccess() {
+        assertThatThrownBy(() -> service.createMessage("has space", null, true))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.createMessage("全角key", null, true))
                 .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(store, changes);
     }
 
     @Test
+    void serviceWideReadFailureMustNotBecomeEmptySuccess() {
+        when(store.messages()).thenThrow(new IllegalStateException("database unavailable"));
+        assertThatThrownBy(service::messages)
+                .isInstanceOf(IllegalStateException.class).hasMessage("database unavailable");
+    }
+
+    @Test
     void uniqueConflictMustUseStableFailureCode() {
-        when(store.createMessage("mdm.material", "title", null, true))
+        when(store.createMessage("mdm.material.title", null, true))
                 .thenThrow(new DataIntegrityViolationException("unique constraint"));
 
-        assertFailure(() -> service.createMessage("mdm.material", "title", null, true),
+        assertFailure(() -> service.createMessage("MDM.Material.Title", null, true),
                 "i18n.message_key_conflict");
         verifyNoInteractions(changes);
     }
@@ -83,18 +100,18 @@ class I18nManagementServiceTest {
     }
 
     @Test
-    void enabledChangeAndTranslationSaveMustPublishCorrectNamespaceAndLocale() {
+    void enabledChangeAndTranslationSaveMustPublishLocaleInvalidation() {
         when(store.message("1001", false)).thenReturn(message(3, true), message(4, false));
         when(store.updateMessage("1001", null, false, 3)).thenReturn(true);
         service.updateMessage("1001", null, false, 3L);
-        verify(changes).bundleChanged("*", "mdm.material");
+        verify(changes).bundleChanged("*");
 
         when(store.message("1001", true)).thenReturn(message(4, false));
         when(store.translations("1001")).thenReturn(List.of());
         when(store.createTranslation("1001", "en-US", "Hello {0}"))
                 .thenReturn(translation("en-US", "Hello {0}", 0));
         service.saveTranslation("1001", "en-US", "Hello {0}", null);
-        verify(changes).bundleChanged("en-US", "mdm.material");
+        verify(changes).bundleChanged("en-US");
     }
 
     private void assertFailure(Runnable operation, String code) {
@@ -103,7 +120,7 @@ class I18nManagementServiceTest {
     }
 
     private I18nMessage message(long version, boolean enabled) {
-        return new I18nMessage("1001", "mdm.material", "title", null, enabled, version, Instant.EPOCH);
+        return new I18nMessage("1001", "mdm.material.title", null, enabled, version, Instant.EPOCH);
     }
 
     private I18nTranslation translation(String locale, String text, long version) {

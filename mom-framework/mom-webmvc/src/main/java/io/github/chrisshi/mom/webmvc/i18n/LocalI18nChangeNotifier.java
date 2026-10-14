@@ -50,23 +50,23 @@ public final class LocalI18nChangeNotifier implements I18nChangeNotifier, I18nCh
         emitter.onTimeout(cleanup);
         emitter.onError(ignored -> cleanup.run());
         send(subscriberId, emitter, SseEmitter.event().name("I18N_CONNECTED")
-                .data(new I18nChangeEvent("I18N_CONNECTED", null, null)));
+                .data(new I18nChangeEvent("I18N_CONNECTED", null)));
         return emitter;
     }
 
     /** {@inheritDoc} */
     @Override
-    public void bundleChanged(String localeCode, String namespace) {
-        if (localeCode == null || localeCode.isBlank() || namespace == null || namespace.isBlank()) {
-            throw new IllegalArgumentException("localeCode 和 namespace 不能为空");
+    public void bundleChanged(String localeCode) {
+        if (localeCode == null || localeCode.isBlank()) {
+            throw new IllegalArgumentException("localeCode 不能为空");
         }
-        publishAfterCommit(new I18nChangeEvent("I18N_BUNDLE_CHANGED", localeCode, namespace));
+        publishAfterCommit(new I18nChangeEvent("I18N_BUNDLE_CHANGED", localeCode));
     }
 
     /** {@inheritDoc} */
     @Override
     public void localesChanged() {
-        publishAfterCommit(new I18nChangeEvent("I18N_LOCALES_CHANGED", null, null));
+        publishAfterCommit(new I18nChangeEvent("I18N_LOCALES_CHANGED", null));
     }
 
     /** {@inheritDoc} */
@@ -123,8 +123,8 @@ public final class LocalI18nChangeNotifier implements I18nChangeNotifier, I18nCh
      *
      * @param type 稳定事件类型
      * @param locale Locale 变化事件可为空
-     * @param namespace Locale 列表变化事件可为空
+     * @param locale Locale 列表变化事件可为空
      */
-    public record I18nChangeEvent(String type, String locale, String namespace) {
+    public record I18nChangeEvent(String type, String locale) {
     }
 }

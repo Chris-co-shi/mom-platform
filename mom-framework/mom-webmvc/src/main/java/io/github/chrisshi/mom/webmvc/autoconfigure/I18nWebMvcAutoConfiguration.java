@@ -2,7 +2,6 @@ package io.github.chrisshi.mom.webmvc.autoconfigure;
 
 import io.github.chrisshi.mom.core.i18n.I18nMessageResolver;
 import io.github.chrisshi.mom.i18n.management.I18nManagementService;
-import io.github.chrisshi.mom.i18n.namespace.I18nNamespacePolicy;
 import io.github.chrisshi.mom.i18n.resolver.DefaultI18nMessageResolver;
 import io.github.chrisshi.mom.i18n.runtime.I18nLocalePolicy;
 import io.github.chrisshi.mom.i18n.runtime.I18nChangePublisher;
@@ -31,7 +30,7 @@ import java.time.Duration;
 /**
  * Servlet 服务通用 I18n Runtime 与 Framework classpath 消息解析自动配置。
  *
- * <p>Framework classpath Resolver 始终可用；只有宿主显式提供 {@link I18nStore}、namespace 和 Locale
+ * <p>Framework classpath Resolver 始终可用；只有宿主显式提供 {@link I18nStore} 和 Locale
  * 策略时才注册 Runtime、Management 与 SSE。所有 Bean 都允许宿主替换。调度器只有一个
  * daemon 线程，关闭 ApplicationContext 时释放；通知失败不影响数据库事务。</p>
  */
@@ -70,29 +69,27 @@ public class I18nWebMvcAutoConfiguration {
 
     /** @return 复用宿主 Store 的公共批量 Runtime 用例 */
     @Bean
-    @ConditionalOnBean({I18nStore.class, I18nNamespacePolicy.class, I18nLocalePolicy.class})
-    I18nRuntimeService i18nRuntimeService(I18nStore store, I18nNamespacePolicy namespaces,
-                                          I18nLocalePolicy locales) {
-        return new I18nRuntimeService(store, namespaces, locales);
+    @ConditionalOnBean({I18nStore.class, I18nLocalePolicy.class})
+    I18nRuntimeService i18nRuntimeService(I18nStore store, I18nLocalePolicy locales) {
+        return new I18nRuntimeService(store, locales);
     }
 
     /** @return 单条业务 Error 使用的精确查询 Resolver，Framework 技术错误仍走 classpath */
     @Bean
     @Primary
-    @ConditionalOnBean({I18nStore.class, I18nNamespacePolicy.class, I18nLocalePolicy.class})
-    I18nMessageResolver ownerI18nMessageResolver(I18nStore store, I18nNamespacePolicy namespaces,
-                                                  I18nLocalePolicy locales) {
-        return new DefaultI18nMessageResolver(store, namespaces, locales,
+    @ConditionalOnBean({I18nStore.class, I18nLocalePolicy.class})
+    I18nMessageResolver ownerI18nMessageResolver(I18nStore store, I18nLocalePolicy locales) {
+        return new DefaultI18nMessageResolver(store, locales,
                 new ClasspathI18nMessageResolver());
     }
 
     /** @return Framework 公共事务管理用例 */
     @Bean
-    @ConditionalOnBean({I18nStore.class, I18nNamespacePolicy.class, I18nLocalePolicy.class,
+    @ConditionalOnBean({I18nStore.class, I18nLocalePolicy.class,
             I18nChangePublisher.class})
-    I18nManagementService i18nManagementService(I18nStore store, I18nNamespacePolicy namespaces,
+    I18nManagementService i18nManagementService(I18nStore store,
                                                  I18nLocalePolicy locales, I18nChangePublisher notifier) {
-        return new I18nManagementService(store, namespaces, locales, notifier);
+        return new I18nManagementService(store, locales, notifier);
     }
 
     /** @return 宿主明确配置的管理权限；未配置时不会意外授予权限 */

@@ -10,7 +10,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * 复用 Framework 本地连接注册表的 I18n SSE Controller。
  *
  * <p>该入口只建立当前 JVM 的失效通知连接，不读取或推送 Translation 正文。客户端断线后继续使用最后
- * Bundle，重连后应主动重新加载已使用的 namespace；V1 不提供 Last-Event-ID、历史重放或跨实例广播。</p>
+ * Bundle，重连后应主动重新加载当前 Owner Bundle；V1 不提供 Last-Event-ID、历史重放或跨实例广播。</p>
  */
 @RestController
 @RequestMapping("${mom.i18n.runtime.base-path:/i18n/runtime}")

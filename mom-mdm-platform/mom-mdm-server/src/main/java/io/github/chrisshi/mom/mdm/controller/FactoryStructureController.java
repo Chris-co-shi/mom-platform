@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.*;
  * {@code mdm:factory:read}，写入和启停要求 {@code mdm:factory:write}；业务事务与一致性由 Application 负责。</p>
  */
 @RestController
-@RequestMapping("/factory")
+@RequestMapping
 public class FactoryStructureController {
     private final FactoryStructureApplication application;
 

@@ -19,12 +19,11 @@ public interface I18nChangeNotifier {
     SseEmitter subscribe();
 
     /**
-     * 在事务提交后通知指定 Locale/namespace 的 Bundle 已变化。
+     * 在事务提交后通知当前服务 Owner 的指定 Locale Bundle 已变化。
      *
      * @param localeCode BCP 47 Locale Tag
-     * @param namespace 数据 Owner 的 namespace
      */
-    void bundleChanged(String localeCode, String namespace);
+    void bundleChanged(String localeCode);
 
     /** 在事务提交后通知 SupportedLocale 列表或默认 Locale 已变化。 */
     void localesChanged();

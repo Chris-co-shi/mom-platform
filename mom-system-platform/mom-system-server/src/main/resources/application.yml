@@ -61,7 +61,7 @@ mom:
     runtime:
       base-path: /i18n/runtime
     management:
-      base-path: /admin/i18n/messages
+      base-path: /i18n/messages
       read-authority: system:i18n:read
       write-authority: system:i18n:write
   security:

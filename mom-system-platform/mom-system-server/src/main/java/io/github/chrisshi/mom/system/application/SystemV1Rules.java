@@ -7,7 +7,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * System V1 Dictionary、Locale 与动态 I18n 的无状态输入规则。
+ * System V1 Dictionary 与 Locale 的无状态输入规则。
  *
  * <p>规则只依赖 JDK，可被 Application 和快速单元测试直接复用。所有方法无共享可变状态且线程安全；
  * 它们只做确定性规范化与拒绝，不访问数据库或外部基础设施。这里不实现 ICU、HTML 清洗、脚本执行或
@@ -18,9 +18,6 @@ public final class SystemV1Rules {
     private static final Pattern ITEM_KEY = Pattern.compile("^[a-z][a-z0-9_-]{0,63}$");
     private static final Pattern LOCALE_CODE = Pattern.compile(
             "^[a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-(?:[A-Z]{2}|[0-9]{3}))?$");
-    private static final Pattern NAMESPACE = Pattern.compile("^system(?:\\.[a-z][a-z0-9-]*)*$");
-    private static final Pattern MESSAGE_KEY = Pattern.compile(
-            "^[a-zA-Z][a-zA-Z0-9]*(?:[._-][a-zA-Z0-9]+)*$");
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{([0-9]+)}");
 
     private SystemV1Rules() {
@@ -77,24 +74,6 @@ public final class SystemV1Rules {
         String normalized = locale.toLanguageTag();
         if ("und".equals(normalized) || !LOCALE_CODE.matcher(normalized).matches()) {
             throw new IllegalArgumentException("localeCode 必须是受支持格式的 BCP 47 Tag");
-        }
-        return normalized;
-    }
-
-    /** @return 只允许 System ownership 的 namespace */
-    public static String namespace(String value) {
-        String normalized = requiredText(value, "namespace", 128).toLowerCase(Locale.ROOT);
-        if (!NAMESPACE.matcher(normalized).matches()) {
-            throw new IllegalArgumentException("System 只允许 system 或 system.* namespace");
-        }
-        return normalized;
-    }
-
-    /** @return namespace 内稳定且大小写保留的消息键 */
-    public static String messageKey(String value) {
-        String normalized = requiredText(value, "messageKey", 160);
-        if (!MESSAGE_KEY.matcher(normalized).matches()) {
-            throw new IllegalArgumentException("messageKey 格式非法");
         }
         return normalized;
     }

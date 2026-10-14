@@ -55,16 +55,6 @@ public enum AuthErrorCode implements ErrorCode {
         return messageKey;
     }
 
-    /** @return Auth Translation Owner 的稳定 namespace */
-    public String namespace() {
-        return "auth";
-    }
-
-    /** @return auth namespace 内的本地 messageKey */
-    public String localMessageKey() {
-        return messageKey.startsWith("auth.") ? messageKey.substring("auth.".length()) : messageKey;
-    }
-
     @Override
     public String defaultMessage() {
         return defaultMessage;

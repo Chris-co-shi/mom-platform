@@ -1,5 +1,26 @@
 # System V1 与 I18n 运行时设计
 
+## 2026-10-14 管理列表兼容扩展
+
+> 本节保留为变更历史。2026-10-14 后续设计补充 `I18n-Key维度与Owner边界设计.md` 已取代本节及本文后续关于 namespace 筛选、创建、Runtime 分组和 SSE namespace 失效维度的决策；服务 Owner / Schema 所有权不变。
+
+用户确认管理界面按服务查看全部文案，取消主区域 Namespace 筛选。共享
+`I18nManagementController` 的既有 GET 列表参数 `namespace` 改为可选：
+
+- 省略参数：查询当前宿主 Schema 中本服务拥有的文案，包含启用/停用及不同 namespace；
+- 显式参数：保留原精确 namespace 筛选；空字符串、非法值及外服务 namespace 仍拒绝；
+- 响应保持 `Result<List<I18nMessage>>`，排序为 namespace/messageKey/ID；不同 namespace 同名 Key 不合并；
+- 三个宿主仍执行各自读权限和 namespace 所有权策略，不跨服务聚合、不改变 Runtime、SSE 或写入契约；
+- 创建仍要求明确 namespace，稳定键不可编辑，版本与占位符约束不变。
+
+调用链：Web Owner → 目标服务管理 Controller → `I18nManagementService` 只读事务 →
+Auth/System/MDM 的本地 `I18nStore` → 既有 MyBatis-Plus Mapper。没有新增表、索引、迁移、写入或通知。
+数据库异常原样进入既有异常处理，不返回空成功。保留历史数组响应是本次兼容选择，不代表已经实现
+服务端分页；全量读取仍有查询/传输/内存成本，文案规模增长时应独立演进为标准分页检索，不能静默截断。
+
+OpenAPI 快照此次仅同步 `namespace.required=false`，未从重新启动后的三个宿主重新导出；
+快照其他路径仍可能反映历史状态。本次不修改 Gateway 或既有 Controller 路径改动。
+
 ## 1. 文档定位
 
 本文描述 `fix/system` 收敛后的当前实现，是 System V1 的代码导航、数据模型、事务与失败语义说明。架构决策以

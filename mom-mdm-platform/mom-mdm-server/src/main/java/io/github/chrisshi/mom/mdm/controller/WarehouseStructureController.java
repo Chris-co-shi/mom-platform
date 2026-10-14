@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.*;
  * Application 负责。</p>
  */
 @RestController
-@RequestMapping("/warehouse")
+@RequestMapping
 public class WarehouseStructureController {
     private final WarehouseStructureApplication application;
 

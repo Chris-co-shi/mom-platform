@@ -39,7 +39,7 @@ public class I18nManagementController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@i18nManagementAccess.canWrite(authentication)")
     public Result<I18nMessage> create(@RequestBody CreateRequest request) {
-        return Result.success(management.createMessage(request.namespace(), request.messageKey(),
+        return Result.success(management.createMessage(request.messageKey(),
                 request.description(), request.enabled()));
     }
 
@@ -51,11 +51,14 @@ public class I18nManagementController {
                 request.enabled(), request.version()));
     }
 
-    /** 查询当前 Owner 的单个 namespace。 */
+    /**
+     * 查询当前服务 Owner 的全部文案。
+     * @return 沿用既有数组响应；读取无写副作用，故障沿用统一异常处理
+     */
     @GetMapping
     @PreAuthorize("@i18nManagementAccess.canRead(authentication)")
-    public Result<List<I18nMessage>> messages(@RequestParam String namespace) {
-        return Result.success(management.messages(namespace));
+    public Result<List<I18nMessage>> messages() {
+        return Result.success(management.messages());
     }
 
     /** 新增或版本化保存一个 Locale 译文。 */
@@ -75,8 +78,17 @@ public class I18nManagementController {
         return Result.success(management.translations(messageId));
     }
 
-    /** 创建请求，namespace/messageKey 创建后不可改。 */
-    public record CreateRequest(String namespace, String messageKey, String description, Boolean enabled) {
+    /** 查询精确重复译文供前端提醒；不会限制后续保存。 */
+    @PostMapping("/{messageId}/translations/{localeCode}/duplicate-check")
+    @PreAuthorize("@i18nManagementAccess.canRead(authentication)")
+    public Result<List<String>> duplicateMessageKeys(@PathVariable String messageId,
+                                                      @PathVariable String localeCode,
+                                                      @RequestBody TranslationRequest request) {
+        return Result.success(management.duplicateMessageKeys(messageId, localeCode, request.messageText()));
+    }
+
+    /** 创建请求，messageKey 创建后不可改。 */
+    public record CreateRequest(String messageKey, String description, Boolean enabled) {
     }
 
     /** 版本化更新请求，不允许 Rename。 */

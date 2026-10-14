@@ -9,14 +9,12 @@ import java.util.regex.Pattern;
 /**
  * 各 Owner 共用的稳定键、Locale 与纯文本规则。
  *
- * <p>规则只做无状态输入校验，不访问数据库或业务服务，因而可并发复用。namespace
- * 的归属还必须由宿主 {@code I18nNamespacePolicy} 单独判断。</p>
+ * <p>规则只做无状态输入校验，不访问数据库或业务服务，因而可并发复用。Owner 由注入的
+ * 本地 Store 确定，不进入 Key。</p>
  */
 public final class I18nRules {
-    private static final Pattern NAMESPACE = Pattern.compile(
-            "^[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)*$");
     private static final Pattern MESSAGE_KEY = Pattern.compile(
-            "^[a-zA-Z][a-zA-Z0-9]*(?:[._-][a-zA-Z0-9]+)*$");
+            "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$");
     private static final Pattern LOCALE = Pattern.compile(
             "^[a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-(?:[A-Z]{2}|[0-9]{3}))?$");
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{([0-9]+)}");
@@ -24,20 +22,15 @@ public final class I18nRules {
     private I18nRules() {
     }
 
-    /** @return 规范化的小写点分段 namespace */
-    public static String namespace(String value) {
-        String normalized = required(value, "namespace", 128).toLowerCase(Locale.ROOT);
-        if (!NAMESPACE.matcher(normalized).matches()) {
-            throw new IllegalArgumentException("namespace 格式非法");
-        }
-        return normalized;
-    }
-
-    /** @return 保留大小写的稳定 messageKey */
+    /** @return Locale.ROOT 小写化后的稳定 messageKey；空白和全角字符会被拒绝而非修剪 */
     public static String messageKey(String value) {
-        String normalized = required(value, "messageKey", 160);
+        if (value == null || value.isBlank() || value.length() > 160
+                || !value.equals(value.strip()) || value.chars().anyMatch(Character::isWhitespace)) {
+            throw new IllegalArgumentException("messageKey 不得为空、含空白或超过 160 个字符");
+        }
+        String normalized = value.toLowerCase(Locale.ROOT);
         if (!MESSAGE_KEY.matcher(normalized).matches()) {
-            throw new IllegalArgumentException("messageKey 格式非法");
+            throw new IllegalArgumentException("messageKey 仅允许 ASCII 小写字母、数字及 . _ - 分段");
         }
         return normalized;
     }
@@ -94,6 +87,11 @@ public final class I18nRules {
             throw new IllegalArgumentException("placeholder 只支持 {0}、{1} 等数字位置格式");
         }
         return Set.copyOf(positions);
+    }
+
+    /** @return 仅执行边界校验和首尾空白规范化后的译文 */
+    public static String translationText(String value) {
+        return required(value, "messageText", 4096);
     }
 
     private static String required(String value, String field, int maxLength) {

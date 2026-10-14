@@ -43,18 +43,16 @@ public class AuthI18nStore implements I18nStore {
 
     /** {@inheritDoc} */
     @Override
-    public I18nMessage message(String namespace, String messageKey) {
+    public I18nMessage message(String messageKey) {
         I18nMessageEntity entity = messages.selectOne(Wrappers.<I18nMessageEntity>lambdaQuery()
-                .eq(I18nMessageEntity::getNamespace, namespace)
                 .eq(I18nMessageEntity::getMessageKey, messageKey));
         return entity == null ? null : toMessage(entity);
     }
 
     /** {@inheritDoc} */
     @Override
-    public List<I18nMessage> messages(String namespace) {
+    public List<I18nMessage> messages() {
         return messages.selectList(Wrappers.<I18nMessageEntity>lambdaQuery()
-                        .eq(I18nMessageEntity::getNamespace, namespace)
                         .orderByAsc(I18nMessageEntity::getMessageKey)
                         .orderByAsc(I18nMessageEntity::getId))
                 .stream().map(AuthI18nStore::toMessage).toList();
@@ -62,12 +60,9 @@ public class AuthI18nStore implements I18nStore {
 
     /** {@inheritDoc} */
     @Override
-    public List<I18nMessage> enabledMessages(List<String> namespaces) {
-        if (namespaces.isEmpty()) return List.of();
+    public List<I18nMessage> enabledMessages() {
         return messages.selectList(Wrappers.<I18nMessageEntity>lambdaQuery()
-                        .in(I18nMessageEntity::getNamespace, namespaces)
                         .eq(I18nMessageEntity::getEnabled, true)
-                        .orderByAsc(I18nMessageEntity::getNamespace)
                         .orderByAsc(I18nMessageEntity::getMessageKey)
                         .orderByAsc(I18nMessageEntity::getId))
                 .stream().map(AuthI18nStore::toMessage).toList();
@@ -95,14 +90,29 @@ public class AuthI18nStore implements I18nStore {
 
     /** {@inheritDoc} */
     @Override
-    public I18nMessage createMessage(String namespace, String messageKey, String description, boolean enabled) {
+    public I18nMessage createMessage(String messageKey, String description, boolean enabled) {
         I18nMessageEntity entity = new I18nMessageEntity();
-        entity.setNamespace(namespace);
         entity.setMessageKey(messageKey);
         entity.setDescription(description);
         entity.setEnabled(enabled);
         messages.insert(entity);
         return toMessage(entity);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public List<String> duplicateMessageKeys(String currentMessageId, String localeCode, String messageText) {
+        List<String> messageIds = translations.selectList(Wrappers.<I18nTranslationEntity>lambdaQuery()
+                        .eq(I18nTranslationEntity::getLocaleCode, localeCode)
+                        .eq(I18nTranslationEntity::getMessageText, messageText)
+                        .ne(I18nTranslationEntity::getMessageId, currentMessageId)
+                        .select(I18nTranslationEntity::getMessageId)).stream()
+                .map(I18nTranslationEntity::getMessageId).distinct().toList();
+        if (messageIds.isEmpty()) return List.of();
+        return messages.selectList(Wrappers.<I18nMessageEntity>lambdaQuery()
+                        .in(I18nMessageEntity::getId, messageIds)
+                        .orderByAsc(I18nMessageEntity::getMessageKey))
+                .stream().map(I18nMessageEntity::getMessageKey).toList();
     }
 
     /** {@inheritDoc} */
@@ -138,7 +148,7 @@ public class AuthI18nStore implements I18nStore {
     }
 
     private static I18nMessage toMessage(I18nMessageEntity entity) {
-        return new I18nMessage(entity.getId(), entity.getNamespace(), entity.getMessageKey(),
+        return new I18nMessage(entity.getId(), entity.getMessageKey(),
                 entity.getDescription(), Boolean.TRUE.equals(entity.getEnabled()), entity.getVersion(),
                 entity.getUpdatedAt());
     }
