@@ -21,7 +21,7 @@
 - `mom-security`：Redis Opaque Token、TokenStore、Introspector、Servlet Resource Server 已收敛。
 - `mom-gateway`：旧 JWT/JWK/Audience/revoked-sid 链已移除；当前使用 Bearer 形态检查、`X-MOM-*` 清洗、Gateway 本地 Redis 限流与统一异常响应。
 - `mom-openfeign`：已收敛为 MOM 内部同步 RPC 基础设施，全局传播 Correlation ID 和当前 Servlet 请求中的原始 Bearer；不再依赖 `mom-resilience` 或预置 CircuitBreaker 命名策略。
-- `mom-auth-platform`：`mom-auth-api` / `mom-auth-server`、`mom_auth` Schema、5 张核心表和管理员初始化脚本已建立；业务代码下一步开始。
+- `mom-auth-platform`：`mom-auth-api` / `mom-auth-server`、`mom_auth` Schema、5 张核心表和管理员初始化脚本已建立；已实现认证、User/Role/Permission 与 PermissionResource 等管理用例；具体范围以当前源码、Migration 和接口快照为准。
 - `mom-system-platform`：收敛为受限字典、支持 Locale 与 `system.*` Dynamic I18n；历史 Parameter、Preference、Catalog、发布快照、缓存和 MQ 运行时已退出当前代码。
 
 ## Mini Auth V1 当前权威文档
@@ -67,15 +67,15 @@ SAP、LIMS、PCS、AGV 等第三方/外部系统调用不得复用 `mom-openfeig
 io.github.chrisshi.mom.auth
 ├── AuthApplication
 ├── controller
-├── service
+├── application
 └── infrastructure
 ```
 
 ```text
-controller → service → infrastructure
+controller → application → infrastructure
 ```
 
-`service` 直接承担业务用例和聚合职责，不额外创建 `application` / `domain` 顶层包。
+当前由 `application` 承担用例、事务和关系编排；不要沿用旧文档中的 `service` 分层描述。
 
 ## Mini Auth 当前数据库
 
@@ -90,6 +90,7 @@ auth_role_permission
 
 V1__create_auth_core_tables.sql
 V2__seed_platform_admin.sql
+V3～V13 为后续迁移，具体表结构与状态以现有 Flyway 文件为准
 admin → PLATFORM_ADMIN
 ```
 
