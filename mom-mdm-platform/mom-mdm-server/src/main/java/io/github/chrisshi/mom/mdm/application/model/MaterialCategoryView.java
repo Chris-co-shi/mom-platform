@@ -23,6 +23,7 @@ import java.time.Instant;
  */
 public record MaterialCategoryView(
         String id, String code, String name, String parentId, Integer sort,
-        Integer defaultShelfLifeDays, String status, Instant createdAt, String createdBy,
+        Integer defaultShelfLifeDays, String defaultBatchTrackingPolicy,
+        String status, Instant createdAt, String createdBy,
         Instant updatedAt, String updatedBy, Long version) {
 }

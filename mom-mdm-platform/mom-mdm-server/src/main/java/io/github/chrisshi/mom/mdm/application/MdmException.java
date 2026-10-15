@@ -84,6 +84,12 @@ public final class MdmException extends RuntimeException {
         return new MdmException(Kind.CONFLICT, "mdm.immutable_master_data", "mdm.error.immutable_master_data");
     }
 
+    /** 创建同工厂、同产出物料已发布生产版本有效期重叠的冲突异常。 */
+    public static MdmException productionVersionOverlap() {
+        return new MdmException(Kind.CONFLICT, "mdm.production_version_overlap",
+                "mdm.error.production_version_overlap");
+    }
+
     /** 创建仍被非删除业务数据引用的生命周期冲突异常。 */
     public static MdmException resourceReferenced(String resourceName) {
         return new MdmException(Kind.CONFLICT, "mdm.resource_referenced",

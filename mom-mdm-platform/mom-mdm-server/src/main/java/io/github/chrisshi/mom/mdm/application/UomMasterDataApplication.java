@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.data.page.PageAdapter;
+import io.github.chrisshi.mom.mdm.api.UomReference;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.DimensionPageParams;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.UomCategoryPageParams;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.UomConversionRulePageParams;
@@ -317,6 +318,23 @@ public class UomMasterDataApplication {
      */
     @Transactional(readOnly = true)
     public UomView getUom(String id) { return uomView(requireUom(id)); }
+
+    /** 查询当前单位引用有效性；只读且不推断历史换算规则。 */
+    @Transactional(readOnly = true)
+    public UomReference getUomReference(String id) {
+        UomEntity uom = requireUom(id);
+        UomCategoryEntity category = categoryMapper.selectById(uom.getCategoryId());
+        DimensionEntity dimension = category == null ? null : dimensionMapper.selectById(category.getDimensionId());
+        String reason = null;
+        if (!MdmMasterDataRules.ENABLED.equals(uom.getStatus())) reason = "UOM_DISABLED";
+        else if (category == null) reason = "UOM_CATEGORY_MISSING";
+        else if (!MdmMasterDataRules.ENABLED.equals(category.getStatus())) reason = "UOM_CATEGORY_DISABLED";
+        else if (dimension == null) reason = "DIMENSION_MISSING";
+        else if (!MdmMasterDataRules.ENABLED.equals(dimension.getStatus())) reason = "DIMENSION_DISABLED";
+        return new UomReference(uom.getId(), uom.getCode(), uom.getName(), uom.getSymbol(),
+                uom.getCategoryId(), dimension == null ? null : dimension.getId(), uom.getReferenceUnit(),
+                null, uom.getVersion(), reason == null, reason);
+    }
 
     /**
      * 按类别、状态和基准标记分页单位，复用统一分页转换。

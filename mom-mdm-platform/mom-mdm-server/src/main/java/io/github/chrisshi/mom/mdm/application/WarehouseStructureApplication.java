@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.data.page.PageAdapter;
+import io.github.chrisshi.mom.mdm.api.WarehouseResourceReference;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.WarehouseAreaPageParams;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.WarehousePageParams;
 import io.github.chrisshi.mom.mdm.application.model.MdmMasterDataViews.WarehouseAreaView;
@@ -56,6 +57,7 @@ public class WarehouseStructureApplication {
     public WarehouseView createWarehouse(String plantId, String code, String name, String status) {
         PlantEntity plant = requirePlantForUpdate(plantId);
         MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
+        if (plant.getTimeZoneId() == null) throw MdmException.invalidReference();
         WarehouseEntity entity = new WarehouseEntity();
         entity.setPlantId(plant.getId());
         entity.setCode(MdmMasterDataRules.code(code));
@@ -78,6 +80,51 @@ public class WarehouseStructureApplication {
     /** 按 ID 查询 Warehouse。 */
     @Transactional(readOnly = true)
     public WarehouseView getWarehouse(String id) { return toView(requireWarehouse(id)); }
+
+    /** 返回 Warehouse 当前新业务引用有效性，不查询 WMS 动态状态。 */
+    @Transactional(readOnly = true)
+    public WarehouseResourceReference getWarehouseReference(String id) {
+        WarehouseEntity warehouse = requireWarehouse(id);
+        PlantEntity plant = plantMapper.selectById(warehouse.getPlantId());
+        String reason = plant == null ? "PLANT_MISSING" : plantReason(plant);
+        if (reason == null && !MdmMasterDataRules.ENABLED.equals(warehouse.getStatus())) {
+            reason = "WAREHOUSE_DISABLED";
+        }
+        return warehouseReference("WAREHOUSE", warehouse.getId(), warehouse.getCode(), warehouse.getName(),
+                warehouse.getPlantId(), warehouse.getVersion(), plant, reason);
+    }
+
+    /** 返回 WarehouseArea 及其 Warehouse/Plant 父链当前新业务引用有效性。 */
+    @Transactional(readOnly = true)
+    public WarehouseResourceReference getWarehouseAreaReference(String id) {
+        WarehouseAreaEntity area = requireWarehouseArea(id);
+        WarehouseEntity warehouse = warehouseMapper.selectById(area.getWarehouseId());
+        PlantEntity plant = warehouse == null ? null : plantMapper.selectById(warehouse.getPlantId());
+        String reason = warehouse == null ? "WAREHOUSE_MISSING" : plant == null ? "PLANT_MISSING"
+                : plantReason(plant);
+        if (reason == null && !MdmMasterDataRules.ENABLED.equals(warehouse.getStatus())) {
+            reason = "WAREHOUSE_DISABLED";
+        }
+        if (reason == null && !MdmMasterDataRules.ENABLED.equals(area.getStatus())) {
+            reason = "WAREHOUSE_AREA_DISABLED";
+        }
+        return warehouseReference("WAREHOUSE_AREA", area.getId(), area.getCode(), area.getName(),
+                area.getWarehouseId(), area.getVersion(), plant, reason);
+    }
+
+    private static WarehouseResourceReference warehouseReference(
+            String type, String id, String code, String name, String parentId,
+            Long version, PlantEntity plant, String reason) {
+        return new WarehouseResourceReference(type, id, code, name, parentId,
+                plant == null ? null : plant.getId(), plant == null ? null : plant.getTimeZoneId(),
+                null, version, reason == null, reason);
+    }
+
+    private static String plantReason(PlantEntity plant) {
+        if (!MdmMasterDataRules.ENABLED.equals(plant.getStatus())) return "PLANT_DISABLED";
+        if (plant.getTimeZoneId() == null) return "PLANT_TIME_ZONE_MISSING";
+        return null;
+    }
 
     /**
      * 可按 Plant 过滤并稳定排序分页 Warehouse。
@@ -110,7 +157,7 @@ public class WarehouseStructureApplication {
     @Transactional
     public WarehouseAreaView createWarehouseArea(String warehouseId, String code, String name,
                                                  String status) {
-        WarehouseEntity warehouse = requireWarehouseForUpdate(warehouseId);
+        WarehouseEntity warehouse = lockWarehouseWithEnabledPlant(warehouseId);
         MdmMasterDataRules.requireEnabled(warehouse.getStatus(), "Warehouse");
         WarehouseAreaEntity entity = new WarehouseAreaEntity();
         entity.setWarehouseId(warehouse.getId());
@@ -218,13 +265,6 @@ public class WarehouseStructureApplication {
         return entity;
     }
 
-    /** 锁定 Warehouse，使 WarehouseArea 创建、启用与 Warehouse 停用串行执行。 */
-    private WarehouseEntity requireWarehouseForUpdate(String id) {
-        WarehouseEntity entity = warehouseMapper.selectByIdForUpdate(MdmMasterDataRules.id(id, "warehouseId"));
-        if (entity == null) throw MdmException.notFound("Warehouse");
-        return entity;
-    }
-
     /** 以 Plant → Warehouse 顺序锁定启用链，避免父子启用与停用形成反向锁序。 */
     private WarehouseEntity lockWarehouseWithEnabledPlant(String id) {
         WarehouseEntity snapshot = requireWarehouse(id);
@@ -234,13 +274,14 @@ public class WarehouseStructureApplication {
             throw MdmException.invalidReference();
         }
         MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
+        if (plant.getTimeZoneId() == null) throw MdmException.invalidReference();
         return warehouse;
     }
 
-    /** 以 Warehouse → WarehouseArea 顺序锁定直接父子链，并要求父仓库已启用。 */
+    /** 以 Plant → Warehouse → WarehouseArea 顺序锁定完整父链，并要求祖先启用。 */
     private WarehouseAreaEntity lockAreaWithEnabledWarehouse(String id) {
         WarehouseAreaEntity snapshot = requireWarehouseArea(id);
-        WarehouseEntity warehouse = requireWarehouseForUpdate(snapshot.getWarehouseId());
+        WarehouseEntity warehouse = lockWarehouseWithEnabledPlant(snapshot.getWarehouseId());
         WarehouseAreaEntity area = warehouseAreaMapper.selectByIdForUpdate(snapshot.getId());
         if (area == null || !warehouse.getId().equals(area.getWarehouseId())) {
             throw MdmException.invalidReference();

@@ -45,7 +45,7 @@ public class FactoryStructureController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('mdm:factory:write')")
     public Result<PlantView> createPlant(@Valid @RequestBody CreateRootRequest request) {
-        return Result.success(application.createPlant(request.code(), request.name(), request.status()));
+        return Result.success(application.createPlant(request.code(), request.name(), request.timeZoneId(), request.status()));
     }
 
     /**
@@ -53,8 +53,8 @@ public class FactoryStructureController {
      */
     @PutMapping("/plants/{id}")
     @PreAuthorize("hasAuthority('mdm:factory:write')")
-    public Result<PlantView> updatePlant(@PathVariable String id, @Valid @RequestBody UpdateNameRequest request) {
-        return Result.success(application.updatePlant(id, request.name(), request.version()));
+    public Result<PlantView> updatePlant(@PathVariable String id, @Valid @RequestBody UpdatePlantRequest request) {
+        return Result.success(application.updatePlant(id, request.name(), request.timeZoneId(), request.version()));
     }
 
     /**
@@ -277,7 +277,12 @@ public class FactoryStructureController {
      * 顶层主数据创建请求。
      */
     public record CreateRootRequest(@NotBlank @Size(max = 64) String code, @NotBlank @Size(max = 200) String name,
-                                    @NotBlank String status) {
+                                    @NotBlank String timeZoneId, @NotBlank String status) {
+    }
+
+    /** Plant 更新允许存量记录通过可选 timeZoneId 补齐权威业务时区；null 保持原值。 */
+    public record UpdatePlantRequest(@NotBlank @Size(max = 200) String name,
+                                     String timeZoneId, @NotNull Long version) {
     }
 
     /**

@@ -17,5 +17,6 @@ import lombok.Setter;
 public class PlantEntity extends BaseEntity {
     private String code;
     private String name;
+    private String timeZoneId;
     private String status;
 }

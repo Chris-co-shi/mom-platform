@@ -71,6 +71,15 @@ public class MaterialCategoryApplication {
     @Transactional
     public MaterialCategoryView createMaterialCategory(String code, String name, String parentId, Integer sort,
                                                        Integer defaultShelfLifeDays, String status) {
+        return createMaterialCategory(code, name, parentId, sort, defaultShelfLifeDays, null, status);
+    }
+
+    /** 创建分类并保存可空的批次追踪默认建议，不回写已存在物料。 */
+    @Transactional
+    public MaterialCategoryView createMaterialCategory(String code, String name, String parentId, Integer sort,
+                                                       Integer defaultShelfLifeDays,
+                                                       MaterialApplication.BatchTrackingPolicy defaultBatchPolicy,
+                                                       String status) {
         String validatedParentId = validateParent(null, normalizeParentId(parentId), true);
         MaterialCategoryEntity entity = new MaterialCategoryEntity();
         entity.setCode(MdmMasterDataRules.code(code));
@@ -78,6 +87,7 @@ public class MaterialCategoryApplication {
         entity.setParentId(validatedParentId);
         entity.setSort(requireSort(sort));
         entity.setDefaultShelfLifeDays(validateShelfLifeDays(defaultShelfLifeDays));
+        entity.setDefaultBatchTrackingPolicy(validDefaultBatchPolicy(defaultBatchPolicy));
         entity.setStatus(MdmMasterDataRules.status(status));
         insert(entity);
         return toView(entity);
@@ -100,6 +110,18 @@ public class MaterialCategoryApplication {
     @Transactional
     public MaterialCategoryView updateMaterialCategory(String id, String name, String parentId, Integer sort,
                                                        Integer defaultShelfLifeDays, Long version) {
+        MaterialCategoryEntity current = requireCategory(id);
+        MaterialApplication.BatchTrackingPolicy policy = current.getDefaultBatchTrackingPolicy() == null ? null
+                : MaterialApplication.BatchTrackingPolicy.valueOf(current.getDefaultBatchTrackingPolicy());
+        return updateMaterialCategory(id, name, parentId, sort, defaultShelfLifeDays, policy, version);
+    }
+
+    /** 更新分类默认建议；已创建 Material 的独立策略保持不变。 */
+    @Transactional
+    public MaterialCategoryView updateMaterialCategory(String id, String name, String parentId, Integer sort,
+                                                       Integer defaultShelfLifeDays,
+                                                       MaterialApplication.BatchTrackingPolicy defaultBatchPolicy,
+                                                       Long version) {
         MaterialCategoryEntity entity = requireCategoryForUpdate(id);
         requireVersion(entity.getVersion(), version);
         String normalizedParentId = normalizeParentId(parentId);
@@ -109,6 +131,7 @@ public class MaterialCategoryApplication {
         entity.setName(MdmMasterDataRules.name(name));
         entity.setSort(requireSort(sort));
         entity.setDefaultShelfLifeDays(validateShelfLifeDays(defaultShelfLifeDays));
+        entity.setDefaultBatchTrackingPolicy(validDefaultBatchPolicy(defaultBatchPolicy));
         requireUpdated(materialCategoryMapper.updateById(entity), entity.getId());
         return toView(entity);
     }
@@ -253,6 +276,14 @@ public class MaterialCategoryApplication {
         return days;
     }
 
+    /** 分类建议允许空值，但不能把存量待治理语义提供给新物料。 */
+    private static String validDefaultBatchPolicy(MaterialApplication.BatchTrackingPolicy policy) {
+        if (policy == MaterialApplication.BatchTrackingPolicy.UNSPECIFIED) {
+            throw validationFailed("分类默认批次策略不能为 UNSPECIFIED");
+        }
+        return policy == null ? null : policy.name();
+    }
+
     /** 按 ID 读取有效分类。 */
     private MaterialCategoryEntity requireCategory(String id) {
         MaterialCategoryEntity entity = materialCategoryMapper.selectById(MdmMasterDataRules.id(id, "categoryId"));
@@ -292,7 +323,8 @@ public class MaterialCategoryApplication {
     /** 将实体转换为不暴露逻辑删除字段的 Application 视图。 */
     private static MaterialCategoryView toView(MaterialCategoryEntity entity) {
         return new MaterialCategoryView(entity.getId(), entity.getCode(), entity.getName(), entity.getParentId(),
-                entity.getSort(), entity.getDefaultShelfLifeDays(), entity.getStatus(), entity.getCreatedAt(),
+                entity.getSort(), entity.getDefaultShelfLifeDays(), entity.getDefaultBatchTrackingPolicy(),
+                entity.getStatus(), entity.getCreatedAt(),
                 entity.getCreatedBy(), entity.getUpdatedAt(), entity.getUpdatedBy(), entity.getVersion());
     }
 }

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.data.page.PageAdapter;
+import io.github.chrisshi.mom.mdm.api.ManufacturingResourceReference;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.PlantPageParams;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.ProductionLinePageParams;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.WorkshopPageParams;
@@ -24,6 +25,8 @@ import io.github.chrisshi.mom.mdm.infrastructure.mapper.WorkstationMapper;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.ZoneId;
 
 import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireVersion;
 
@@ -63,21 +66,23 @@ public class FactoryStructureApplication {
 
     /** 创建平台编码唯一的 Plant；重复请求不会视为幂等成功。 */
     @Transactional
-    public PlantView createPlant(String code, String name, String status) {
+    public PlantView createPlant(String code, String name, String timeZoneId, String status) {
         PlantEntity entity = new PlantEntity();
         entity.setCode(MdmMasterDataRules.code(code));
         setName(entity, name);
+        entity.setTimeZoneId(requireIanaTimeZone(timeZoneId));
         entity.setStatus(MdmMasterDataRules.status(status));
         insert(() -> plantMapper.insert(entity), "Plant");
         return toView(entity);
     }
 
-    /** 更新 Plant 名称；请求不接收 Code，因此不会改变业务身份。 */
+    /** 更新 Plant 名称并可补齐或调整权威业务时区；请求不接收 Code。 */
     @Transactional
-    public PlantView updatePlant(String id, String name, Long version) {
+    public PlantView updatePlant(String id, String name, String timeZoneId, Long version) {
         PlantEntity entity = requirePlant(id);
         requireVersion(entity.getVersion(), version);
         setName(entity, name);
+        if (timeZoneId != null) entity.setTimeZoneId(requireIanaTimeZone(timeZoneId));
         requireUpdated(plantMapper.updateById(entity), () -> plantMapper.selectById(entity.getId()), "Plant");
         return toView(entity);
     }
@@ -86,6 +91,74 @@ public class FactoryStructureApplication {
     @Transactional(readOnly = true)
     public PlantView getPlant(String id) {
         return toView(requirePlant(id));
+    }
+
+    /** 沿父链读取当前资源快照；停用仅拒绝新引用，不改写子资源或历史业务。 */
+    @Transactional(readOnly = true)
+    public ManufacturingResourceReference getManufacturingResourceReference(String resourceType, String id) {
+        return switch (resourceType) {
+            case "PLANT" -> {
+                PlantEntity plant = requirePlant(id);
+                yield resourceReference("PLANT", plant.getId(), plant.getCode(), plant.getName(),
+                        null, plant, plant.getVersion(), plantReason(plant));
+            }
+            case "WORKSHOP" -> {
+                WorkshopEntity workshop = requireWorkshop(id);
+                PlantEntity plant = plantMapper.selectById(workshop.getPlantId());
+                String reason = plant == null ? "PLANT_MISSING" : firstReason(plantReason(plant),
+                        disabledReason(workshop.getStatus(), "WORKSHOP"));
+                yield resourceReference("WORKSHOP", workshop.getId(), workshop.getCode(), workshop.getName(),
+                        workshop.getPlantId(), plant, workshop.getVersion(), reason);
+            }
+            case "PRODUCTION_LINE" -> {
+                ProductionLineEntity line = requireProductionLine(id);
+                WorkshopEntity workshop = workshopMapper.selectById(line.getWorkshopId());
+                PlantEntity plant = workshop == null ? null : plantMapper.selectById(workshop.getPlantId());
+                String reason = workshop == null ? "WORKSHOP_MISSING" : plant == null ? "PLANT_MISSING"
+                        : firstReason(plantReason(plant), disabledReason(workshop.getStatus(), "WORKSHOP"),
+                                disabledReason(line.getStatus(), "PRODUCTION_LINE"));
+                yield resourceReference("PRODUCTION_LINE", line.getId(), line.getCode(), line.getName(),
+                        line.getWorkshopId(), plant, line.getVersion(), reason);
+            }
+            case "WORKSTATION" -> {
+                WorkstationEntity station = requireWorkstation(id);
+                ProductionLineEntity line = productionLineMapper.selectById(station.getProductionLineId());
+                WorkshopEntity workshop = line == null ? null : workshopMapper.selectById(line.getWorkshopId());
+                PlantEntity plant = workshop == null ? null : plantMapper.selectById(workshop.getPlantId());
+                String reason = line == null ? "PRODUCTION_LINE_MISSING" : workshop == null ? "WORKSHOP_MISSING"
+                        : plant == null ? "PLANT_MISSING"
+                        : firstReason(plantReason(plant), disabledReason(workshop.getStatus(), "WORKSHOP"),
+                                disabledReason(line.getStatus(), "PRODUCTION_LINE"),
+                                disabledReason(station.getStatus(), "WORKSTATION"));
+                yield resourceReference("WORKSTATION", station.getId(), station.getCode(), station.getName(),
+                        station.getProductionLineId(), plant, station.getVersion(), reason);
+            }
+            default -> throw new MdmException(MdmException.Kind.BAD_REQUEST,
+                    "mdm.validation_failed", "mdm.error.validation_failed");
+        };
+    }
+
+    private static ManufacturingResourceReference resourceReference(
+            String type, String id, String code, String name, String parentId,
+            PlantEntity plant, Long version, String reason) {
+        return new ManufacturingResourceReference(type, id, code, name, parentId,
+                plant == null ? null : plant.getId(), plant == null ? null : plant.getTimeZoneId(),
+                null, version, reason == null, reason);
+    }
+
+    private static String plantReason(PlantEntity plant) {
+        if (!MdmMasterDataRules.ENABLED.equals(plant.getStatus())) return "PLANT_DISABLED";
+        if (plant.getTimeZoneId() == null) return "PLANT_TIME_ZONE_MISSING";
+        return null;
+    }
+
+    private static String disabledReason(String status, String type) {
+        return MdmMasterDataRules.ENABLED.equals(status) ? null : type + "_DISABLED";
+    }
+
+    private static String firstReason(String... reasons) {
+        for (String reason : reasons) if (reason != null) return reason;
+        return null;
     }
 
     /**
@@ -117,8 +190,7 @@ public class FactoryStructureApplication {
     /** 在已启用 Plant 下创建 Workshop，同一 Plant 内 Code 唯一。 */
     @Transactional
     public WorkshopView createWorkshop(String plantId, String code, String name, String status) {
-        PlantEntity plant = requirePlantForUpdate(plantId);
-        MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
+        PlantEntity plant = lockUsablePlant(plantId);
         WorkshopEntity entity = new WorkshopEntity();
         entity.setPlantId(plant.getId());
         entity.setCode(MdmMasterDataRules.code(code));
@@ -181,8 +253,7 @@ public class FactoryStructureApplication {
     @Transactional
     public ProductionLineView createProductionLine(String workshopId, String code, String name,
                                                    String status) {
-        WorkshopEntity workshop = requireWorkshopForUpdate(workshopId);
-        MdmMasterDataRules.requireEnabled(workshop.getStatus(), "Workshop");
+        WorkshopEntity workshop = lockUsableWorkshopChain(workshopId);
         ProductionLineEntity entity = new ProductionLineEntity();
         entity.setWorkshopId(workshop.getId());
         entity.setCode(MdmMasterDataRules.code(code));
@@ -246,8 +317,7 @@ public class FactoryStructureApplication {
     @Transactional
     public WorkstationView createWorkstation(String productionLineId, String code, String name,
                                              String status) {
-        ProductionLineEntity productionLine = requireProductionLineForUpdate(productionLineId);
-        MdmMasterDataRules.requireEnabled(productionLine.getStatus(), "ProductionLine");
+        ProductionLineEntity productionLine = lockUsableProductionLineChain(productionLineId);
         WorkstationEntity entity = new WorkstationEntity();
         entity.setProductionLineId(productionLine.getId());
         entity.setCode(MdmMasterDataRules.code(code));
@@ -263,7 +333,7 @@ public class FactoryStructureApplication {
         WorkstationEntity entity = requireWorkstation(id);
         requireVersion(entity.getVersion(), version);
         setName(entity, name);
-        requireUpdated(workstationMapper.updateById(entity), () -> workstationMapper.selectById(entity.getId()),
+        requireUpdated(workstationMapper.updateById(entity), () -> workstationMapper.selectById(id),
                 "Workstation");
         return toView(entity);
     }
@@ -318,11 +388,9 @@ public class FactoryStructureApplication {
     }
 
     private WorkshopView changeWorkshopStatus(String id, String status, Long version) {
-        WorkshopEntity entity = requireWorkshopForUpdate(id);
+        WorkshopEntity entity = MdmMasterDataRules.ENABLED.equals(status)
+                ? lockWorkshopAfterPlant(id) : requireWorkshopForUpdate(id);
         requireVersion(entity.getVersion(), version);
-        if (MdmMasterDataRules.ENABLED.equals(status)) {
-            MdmMasterDataRules.requireEnabled(requirePlantForUpdate(entity.getPlantId()).getStatus(), "Plant");
-        }
         if (status.equals(entity.getStatus())) return toView(entity);
         entity.setStatus(status);
         requireUpdated(workshopMapper.updateById(entity), () -> workshopMapper.selectById(entity.getId()), "Workshop");
@@ -330,12 +398,9 @@ public class FactoryStructureApplication {
     }
 
     private ProductionLineView changeProductionLineStatus(String id, String status, Long version) {
-        ProductionLineEntity entity = requireProductionLineForUpdate(id);
+        ProductionLineEntity entity = MdmMasterDataRules.ENABLED.equals(status)
+                ? lockProductionLineAfterAncestors(id) : requireProductionLineForUpdate(id);
         requireVersion(entity.getVersion(), version);
-        if (MdmMasterDataRules.ENABLED.equals(status)) {
-            MdmMasterDataRules.requireEnabled(
-                    requireWorkshopForUpdate(entity.getWorkshopId()).getStatus(), "Workshop");
-        }
         if (status.equals(entity.getStatus())) return toView(entity);
         entity.setStatus(status);
         requireUpdated(productionLineMapper.updateById(entity),
@@ -345,14 +410,14 @@ public class FactoryStructureApplication {
 
     private WorkstationView changeWorkstationStatus(String id, String status, Long version) {
         WorkstationEntity entity = requireWorkstation(id);
-        requireVersion(entity.getVersion(), version);
         if (MdmMasterDataRules.ENABLED.equals(status)) {
-            MdmMasterDataRules.requireEnabled(
-                    requireProductionLineForUpdate(entity.getProductionLineId()).getStatus(), "ProductionLine");
+            lockUsableProductionLineChain(entity.getProductionLineId());
+            entity = requireWorkstation(id);
         }
+        requireVersion(entity.getVersion(), version);
         if (status.equals(entity.getStatus())) return toView(entity);
         entity.setStatus(status);
-        requireUpdated(workstationMapper.updateById(entity), () -> workstationMapper.selectById(entity.getId()),
+        requireUpdated(workstationMapper.updateById(entity), () -> workstationMapper.selectById(id),
                 "Workstation");
         return toView(entity);
     }
@@ -403,6 +468,48 @@ public class FactoryStructureApplication {
         return entity;
     }
 
+    /** 统一按 Plant → Workshop → ProductionLine 锁顺序，阻止祖先停用与子级新引用交叉提交。 */
+    private PlantEntity lockUsablePlant(String id) {
+        PlantEntity plant = requirePlantForUpdate(id);
+        MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
+        if (plant.getTimeZoneId() == null) throw MdmException.invalidReference();
+        return plant;
+    }
+
+    private WorkshopEntity lockUsableWorkshopChain(String id) {
+        WorkshopEntity snapshot = requireWorkshop(id);
+        PlantEntity plant = lockUsablePlant(snapshot.getPlantId());
+        WorkshopEntity workshop = requireWorkshopForUpdate(id);
+        if (!plant.getId().equals(workshop.getPlantId())) throw MdmException.invalidReference();
+        MdmMasterDataRules.requireEnabled(workshop.getStatus(), "Workshop");
+        return workshop;
+    }
+
+    private ProductionLineEntity lockUsableProductionLineChain(String id) {
+        ProductionLineEntity snapshot = requireProductionLine(id);
+        WorkshopEntity workshop = lockUsableWorkshopChain(snapshot.getWorkshopId());
+        ProductionLineEntity line = requireProductionLineForUpdate(id);
+        if (!workshop.getId().equals(line.getWorkshopId())) throw MdmException.invalidReference();
+        MdmMasterDataRules.requireEnabled(line.getStatus(), "ProductionLine");
+        return line;
+    }
+
+    private WorkshopEntity lockWorkshopAfterPlant(String id) {
+        WorkshopEntity snapshot = requireWorkshop(id);
+        PlantEntity plant = lockUsablePlant(snapshot.getPlantId());
+        WorkshopEntity workshop = requireWorkshopForUpdate(id);
+        if (!plant.getId().equals(workshop.getPlantId())) throw MdmException.invalidReference();
+        return workshop;
+    }
+
+    private ProductionLineEntity lockProductionLineAfterAncestors(String id) {
+        ProductionLineEntity snapshot = requireProductionLine(id);
+        WorkshopEntity workshop = lockUsableWorkshopChain(snapshot.getWorkshopId());
+        ProductionLineEntity line = requireProductionLineForUpdate(id);
+        if (!workshop.getId().equals(line.getWorkshopId())) throw MdmException.invalidReference();
+        return line;
+    }
+
     private static void insert(IntOperation operation, String resourceName) {
         try {
             operation.execute();
@@ -422,7 +529,17 @@ public class FactoryStructureApplication {
     private static void setName(ProductionLineEntity e, String name) { e.setName(MdmMasterDataRules.name(name)); }
     private static void setName(WorkstationEntity e, String name) { e.setName(MdmMasterDataRules.name(name)); }
 
-    private static PlantView toView(PlantEntity e) { return new PlantView(e.getId(), e.getCode(), e.getName(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
+    private static PlantView toView(PlantEntity e) { return new PlantView(e.getId(), e.getCode(), e.getName(), e.getTimeZoneId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
+
+    /** IANA TZDB 标识白名单拒绝固定 Offset 与 GMT+8 一类会丢失 DST 规则的输入。 */
+    private static String requireIanaTimeZone(String value) {
+        if (value == null || value.isBlank() || value.length() > 64
+                || !ZoneId.getAvailableZoneIds().contains(value)) {
+            throw new MdmException(MdmException.Kind.BAD_REQUEST,
+                    "mdm.validation_failed", "mdm.error.validation_failed");
+        }
+        return value;
+    }
     private static WorkshopView toView(WorkshopEntity e) { return new WorkshopView(e.getId(), e.getCode(), e.getName(), e.getPlantId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
     private static ProductionLineView toView(ProductionLineEntity e) { return new ProductionLineView(e.getId(), e.getCode(), e.getName(), e.getWorkshopId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }
     private static WorkstationView toView(WorkstationEntity e) { return new WorkstationView(e.getId(), e.getCode(), e.getName(), e.getProductionLineId(), e.getStatus(), e.getCreatedAt(), e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion()); }

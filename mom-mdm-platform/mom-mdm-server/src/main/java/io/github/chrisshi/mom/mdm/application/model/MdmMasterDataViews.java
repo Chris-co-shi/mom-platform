@@ -13,7 +13,7 @@ public final class MdmMasterDataViews {
     }
 
     /** Plant 详情与分页视图。 */
-    public record PlantView(String id, String code, String name, String status,
+    public record PlantView(String id, String code, String name, String timeZoneId, String status,
                             Instant createdAt, String createdBy, Instant updatedAt, String updatedBy, Long version) { }
 
     /** Workshop 详情与分页视图。 */

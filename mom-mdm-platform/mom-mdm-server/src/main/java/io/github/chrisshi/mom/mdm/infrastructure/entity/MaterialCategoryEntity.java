@@ -26,5 +26,7 @@ public class MaterialCategoryEntity extends BaseEntity {
     private Integer sort;
     @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Integer defaultShelfLifeDays;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private String defaultBatchTrackingPolicy;
     private String status;
 }

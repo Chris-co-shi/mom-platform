@@ -21,7 +21,7 @@ public interface PlantMapper extends MomBaseMapper<PlantEntity> {
      * @return 已锁定 Plant；不存在或已逻辑删除时返回 null
      */
     @Select("""
-            SELECT id, code, name, status, created_at, created_by, updated_at, updated_by, version, deleted
+            SELECT id, code, name, time_zone_id, status, created_at, created_by, updated_at, updated_by, version, deleted
               FROM mdm_plant
              WHERE id = #{id} AND deleted = false
              FOR UPDATE

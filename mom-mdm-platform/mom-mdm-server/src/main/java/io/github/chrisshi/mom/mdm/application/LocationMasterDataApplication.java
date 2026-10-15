@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.data.page.PageAdapter;
+import io.github.chrisshi.mom.mdm.api.LocationReference;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.LocationPageParams;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.LocationTypePageParams;
 import io.github.chrisshi.mom.mdm.application.model.MdmMasterDataViews.LocationTypeView;
@@ -122,6 +123,7 @@ public class LocationMasterDataApplication {
         PlantEntity plant = requirePlantForUpdate(plantId);
         LocationTypeEntity locationType = requireLocationType(locationTypeId);
         MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
+        if (plant.getTimeZoneId() == null) throw MdmException.invalidReference();
         String validatedAreaId = validateAreaBelongsToPlant(warehouseAreaId, plant.getId());
         LocationEntity entity = new LocationEntity();
         entity.setPlantId(plant.getId());
@@ -147,6 +149,34 @@ public class LocationMasterDataApplication {
     /** 按 ID 查询 Location。 */
     @Transactional(readOnly = true)
     public LocationView getLocation(String id) { return toView(requireLocation(id)); }
+
+    /** 沿当前工厂和可选仓储区域父链检查静态位置；不读取 WMS 动态状态。 */
+    @Transactional(readOnly = true)
+    public LocationReference getLocationReference(String id) {
+        LocationEntity location = requireLocation(id);
+        PlantEntity plant = plantMapper.selectById(location.getPlantId());
+        LocationTypeEntity type = locationTypeMapper.selectById(location.getLocationTypeId());
+        WarehouseAreaEntity area = location.getWarehouseAreaId() == null ? null
+                : warehouseAreaMapper.selectById(location.getWarehouseAreaId());
+        WarehouseEntity warehouse = area == null ? null : warehouseMapper.selectById(area.getWarehouseId());
+
+        String reason = null;
+        if (!MdmMasterDataRules.ENABLED.equals(location.getStatus())) reason = "LOCATION_DISABLED";
+        else if (plant == null) reason = "PLANT_MISSING";
+        else if (!MdmMasterDataRules.ENABLED.equals(plant.getStatus())) reason = "PLANT_DISABLED";
+        else if (plant.getTimeZoneId() == null) reason = "PLANT_TIME_ZONE_MISSING";
+        else if (type == null) reason = "LOCATION_TYPE_MISSING";
+        else if (location.getWarehouseAreaId() != null && area == null) reason = "WAREHOUSE_AREA_MISSING";
+        else if (area != null && warehouse == null) reason = "WAREHOUSE_MISSING";
+        else if (warehouse != null && !plant.getId().equals(warehouse.getPlantId())) reason = "PLANT_MISMATCH";
+        else if (warehouse != null && !MdmMasterDataRules.ENABLED.equals(warehouse.getStatus())) reason = "WAREHOUSE_DISABLED";
+        else if (area != null && !MdmMasterDataRules.ENABLED.equals(area.getStatus())) reason = "WAREHOUSE_AREA_DISABLED";
+
+        return new LocationReference(location.getId(), location.getCode(), location.getName(),
+                location.getPlantId(), plant == null ? null : plant.getTimeZoneId(),
+                location.getWarehouseAreaId(), location.getLocationTypeId(), null, location.getVersion(),
+                reason == null, reason);
+    }
 
     /**
      * 可按 Plant、WarehouseArea 组合过滤并稳定排序分页查询 Location。
@@ -196,6 +226,7 @@ public class LocationMasterDataApplication {
             PlantEntity plant = requirePlantForUpdate(entity.getPlantId());
             requireLocationType(entity.getLocationTypeId());
             MdmMasterDataRules.requireEnabled(plant.getStatus(), "Plant");
+            if (plant.getTimeZoneId() == null) throw MdmException.invalidReference();
             validateAreaBelongsToPlant(entity.getWarehouseAreaId(), plant.getId());
         }
         if (status.equals(entity.getStatus())) return toView(entity);

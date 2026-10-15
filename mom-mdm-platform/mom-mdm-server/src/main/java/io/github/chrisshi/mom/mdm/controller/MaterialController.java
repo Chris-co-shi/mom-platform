@@ -1,9 +1,14 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.mdm.application.MaterialApplication;
 import io.github.chrisshi.mom.mdm.application.MaterialApplication.ShelfLifeSource;
+import io.github.chrisshi.mom.mdm.application.MaterialApplication.MaterialType;
+import io.github.chrisshi.mom.mdm.application.MaterialApplication.BatchTrackingSource;
+import io.github.chrisshi.mom.mdm.application.MaterialApplication.BatchTrackingPolicy;
 import io.github.chrisshi.mom.mdm.application.model.MaterialView;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.MaterialPageParams;
 import io.github.chrisshi.mom.webmvc.response.Result;
@@ -61,6 +66,7 @@ public class MaterialController {
     public Result<MaterialView> createMaterial(@Valid @RequestBody CreateMaterialRequest request) {
         return Result.success(application.createMaterial(
                 request.code(), request.name(), request.categoryId(), request.baseUomId(),
+                request.materialType(), request.batchTrackingSource(), request.batchTrackingPolicy(),
                 request.shelfLifeSource(), request.shelfLifeDays(), request.status()));
     }
 
@@ -79,7 +85,7 @@ public class MaterialController {
     public Result<MaterialView> updateMaterial(
             @PathVariable String id, @Valid @RequestBody UpdateMaterialRequest request) {
         return Result.success(application.updateMaterial(
-                id, request.name(), request.categoryId(), request.baseUomId(),
+                id, request.name(), request.categoryId(), request.batchTrackingPolicy(),
                 request.shelfLifeDays(), request.version()));
     }
 
@@ -143,13 +149,16 @@ public class MaterialController {
     /**
      * Material 创建协议。
      *
-     * <p>该记录只属于 Controller 入站边界；CATEGORY_DEFAULT 不得同时提交 shelfLifeDays，EXPLICIT
-     * 允许 shelfLifeDays 为 null。更深层引用和并发规则由 Application 处理。</p>
+     * <p>该记录只属于 Controller 入站边界；CATEGORY_DEFAULT 不得同时提交对应显式值，EXPLICIT
+     * 的 shelfLifeDays 允许为 null。更深层引用和并发规则由 Application 处理。</p>
      *
      * @param code 平台全局唯一业务编码
      * @param name 必填业务名称
      * @param categoryId 唯一物料分类 ID
      * @param baseUomId 基础计量单位 ID
+     * @param materialType 创建后不可普通修改的物料用途
+     * @param batchTrackingSource 分类默认或显式批次策略来源
+     * @param batchTrackingPolicy 显式来源时的批次策略
      * @param shelfLifeSource CATEGORY_DEFAULT 或 EXPLICIT
      * @param shelfLifeDays 显式来源时的可空非负天数
      * @param status ENABLED 或 DISABLED
@@ -159,26 +168,45 @@ public class MaterialController {
             @NotBlank @Size(max = 200) String name,
             @NotBlank @Size(max = 19) String categoryId,
             @NotBlank @Size(max = 19) String baseUomId,
+            @NotNull MaterialType materialType,
+            @NotNull BatchTrackingSource batchTrackingSource,
+            BatchTrackingPolicy batchTrackingPolicy,
             @NotNull ShelfLifeSource shelfLifeSource,
             @PositiveOrZero Integer shelfLifeDays,
             @NotBlank String status) {
     }
 
     /**
-     * Material 更新协议，不包含不可普通修改的 Code 与生命周期 Status。
+     * Material 更新协议，不包含不可普通修改的 Code、基础单位、用途与生命周期 Status。
      *
      * @param name 必填业务名称
      * @param categoryId 新的唯一分类 ID
-     * @param baseUomId 新的基础计量单位 ID
+     * @param batchTrackingPolicy 物料独立批次追踪策略
      * @param shelfLifeDays 可空非负天数；null 表示清空
      * @param version 调用方读取到的乐观锁版本
      */
     public record UpdateMaterialRequest(
             @NotBlank @Size(max = 200) String name,
             @NotBlank @Size(max = 19) String categoryId,
-            @NotBlank @Size(max = 19) String baseUomId,
+            @NotNull BatchTrackingPolicy batchTrackingPolicy,
             @PositiveOrZero Integer shelfLifeDays,
             @NotNull @PositiveOrZero Long version) {
+
+        /** 拒绝旧客户端继续提交不可变身份字段，避免 JSON 未知字段被静默忽略。 */
+        @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
+        public static UpdateMaterialRequest fromJson(
+                @JsonProperty("name") String name,
+                @JsonProperty("categoryId") String categoryId,
+                @JsonProperty("batchTrackingPolicy") BatchTrackingPolicy batchTrackingPolicy,
+                @JsonProperty("shelfLifeDays") Integer shelfLifeDays,
+                @JsonProperty("version") Long version,
+                @JsonProperty("baseUomId") String baseUomId,
+                @JsonProperty("materialType") String materialType) {
+            if (baseUomId != null || materialType != null) {
+                throw new IllegalArgumentException("物料基础单位和用途创建后不可修改");
+            }
+            return new UpdateMaterialRequest(name, categoryId, batchTrackingPolicy, shelfLifeDays, version);
+        }
     }
 
     /**

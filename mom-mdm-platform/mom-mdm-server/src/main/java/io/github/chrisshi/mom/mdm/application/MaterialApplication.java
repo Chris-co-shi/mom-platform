@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.data.page.PageAdapter;
+import io.github.chrisshi.mom.mdm.api.MaterialReference;
 import io.github.chrisshi.mom.mdm.application.model.MaterialView;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.MaterialPageParams;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.DimensionEntity;
@@ -21,13 +22,15 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Objects;
+
 import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireVersion;
 
 /**
  * Material 主数据的 Level 1 用例与本地事务边界。
  *
  * <p>调用方向保持 Controller → Application → Mapper。该类负责唯一分类、叶子分类、完整启用单位链、
- * 保质期取值、生命周期和乐观并发，不引入包装、批次、库存、动态属性或 Repository 抽象。创建、修改
+ * 批次追踪策略、保质期取值、生命周期和乐观并发，不引入实际批次、库存、动态属性或 Repository 抽象。创建、修改
  * 和启用会按 Dimension → UOM Category → UOM 的稳定顺序加行锁，并锁定 MaterialCategory，和父数据停用
  * 操作串行化；数据库不可用或锁等待失败时 fail-closed，由 Spring 本地事务整体回滚。</p>
  *
@@ -71,12 +74,15 @@ public class MaterialApplication {
     }
 
     /**
-     * 创建物料并固化本次选择得到的保质期天数。
+     * 创建物料并固化物料用途、批次策略和本次选择得到的保质期天数。
      *
      * @param code 平台全局唯一业务编码
      * @param name 必填业务名称
      * @param categoryId 已启用叶子物料分类 ID
      * @param baseUomId 已启用且父链完整启用的基础单位 ID
+     * @param materialType 物料用途，创建后不可普通修改
+     * @param batchTrackingSource 批次策略取值来源
+     * @param batchTrackingPolicy 显式来源时的批次策略
      * @param shelfLifeSource 保质期取值来源
      * @param shelfLifeDays 显式来源时使用的可空非负天数
      * @param status 初始 ENABLED 或 DISABLED 状态
@@ -91,6 +97,9 @@ public class MaterialApplication {
             String name,
             String categoryId,
             String baseUomId,
+            MaterialType materialType,
+            BatchTrackingSource batchTrackingSource,
+            BatchTrackingPolicy batchTrackingPolicy,
             ShelfLifeSource shelfLifeSource,
             Integer shelfLifeDays,
             String status) {
@@ -102,6 +111,10 @@ public class MaterialApplication {
         entity.setName(MdmMasterDataRules.name(name));
         entity.setCategoryId(category.getId());
         entity.setBaseUomId(baseUom.getId());
+        entity.setMaterialType(requireMaterialType(materialType).name());
+        entity.setBatchTrackingPolicy(resolveBatchTrackingPolicy(
+                category, batchTrackingSource, batchTrackingPolicy).name());
+        entity.setRevisionNo(1);
         entity.setShelfLifeDays(resolveShelfLife(category, shelfLifeSource, shelfLifeDays));
         entity.setStatus(MdmMasterDataRules.status(status));
         try {
@@ -113,36 +126,45 @@ public class MaterialApplication {
     }
 
     /**
-     * 修正物料允许变化的名称、分类、基础单位和保质期。
+     * 修正物料允许变化的名称、分类、批次策略和保质期。
      *
      * @param id 物料 ID
      * @param name 必填业务名称
      * @param categoryId 新的已启用叶子分类 ID
-     * @param baseUomId 新的已启用基础单位 ID
+     * @param batchTrackingPolicy 物料独立批次策略
      * @param shelfLifeDays 可空非负保质期天数；null 表示明确清空
      * @param version 调用方读取到的非负乐观锁版本
      * @return 更新后的物料视图，ID 与 Code 保持不变
      * @throws MdmException 资源、引用、叶子规则、输入或版本校验失败时抛出
      *
-     * <p>成功只更新当前物料且推进 Version，不回写历史业务事实，也不自动执行单位换算。</p>
+     * <p>成功只更新当前物料且推进技术 Version；分类、批次策略或保质期变化才推进业务修订号。
+     * 不回写历史业务事实，也不自动执行单位换算。</p>
      */
     @Transactional
     public MaterialView updateMaterial(
             String id,
             String name,
             String categoryId,
-            String baseUomId,
+            BatchTrackingPolicy batchTrackingPolicy,
             Integer shelfLifeDays,
             Long version) {
         MaterialEntity entity = requireMaterialForUpdate(id);
         requireVersion(entity.getVersion(), version);
         MaterialCategoryEntity category = lockEnabledLeafCategory(categoryId);
-        UomEntity baseUom = lockEnabledUomChain(baseUomId);
+        lockEnabledUomChain(entity.getBaseUomId());
+
+        BatchTrackingPolicy policy = requireBatchTrackingPolicy(batchTrackingPolicy);
+        Integer validatedDays = validateShelfLifeDays(shelfLifeDays);
+        if (!Objects.equals(entity.getCategoryId(), category.getId())
+                || !Objects.equals(entity.getBatchTrackingPolicy(), policy.name())
+                || !Objects.equals(entity.getShelfLifeDays(), validatedDays)) {
+            entity.setRevisionNo(entity.getRevisionNo() + 1);
+        }
 
         entity.setName(MdmMasterDataRules.name(name));
         entity.setCategoryId(category.getId());
-        entity.setBaseUomId(baseUom.getId());
-        entity.setShelfLifeDays(validateShelfLifeDays(shelfLifeDays));
+        entity.setBatchTrackingPolicy(policy.name());
+        entity.setShelfLifeDays(validatedDays);
         requireUpdated(materialMapper.updateById(entity), entity.getId());
         return toView(entity);
     }
@@ -159,6 +181,40 @@ public class MaterialApplication {
     @Transactional(readOnly = true)
     public MaterialView getMaterial(String id) {
         return toView(requireMaterial(id));
+    }
+
+    /** 返回当前物料引用快照；无效引用返回稳定原因，不把历史记录抹除。 */
+    @Transactional(readOnly = true)
+    public MaterialReference getMaterialReference(String id) {
+        MaterialEntity material = requireMaterial(id);
+        String reason = materialInvalidReason(material);
+        return new MaterialReference(
+                material.getId(), material.getCode(), material.getName(), material.getCategoryId(),
+                material.getBaseUomId(), material.getMaterialType(), material.getBatchTrackingPolicy(),
+                material.getShelfLifeDays(), material.getRevisionNo(), material.getVersion(),
+                reason == null, reason);
+    }
+
+    /** 同一 MDM Schema 的只读父链检查；不存在或停用都禁止新业务引用。 */
+    private String materialInvalidReason(MaterialEntity material) {
+        if (!MdmMasterDataRules.ENABLED.equals(material.getStatus())) return "MATERIAL_DISABLED";
+        if ("UNSPECIFIED".equals(material.getMaterialType())
+                || "UNSPECIFIED".equals(material.getBatchTrackingPolicy())) return "LEGACY_UNSPECIFIED";
+        MaterialCategoryEntity category = materialCategoryMapper.selectById(material.getCategoryId());
+        if (category == null) return "CATEGORY_MISSING";
+        if (!MdmMasterDataRules.ENABLED.equals(category.getStatus())) return "CATEGORY_DISABLED";
+        if (materialCategoryMapper.selectCount(new LambdaQueryWrapper<MaterialCategoryEntity>()
+                .eq(MaterialCategoryEntity::getParentId, category.getId())) > 0) return "CATEGORY_NOT_LEAF";
+        UomEntity uom = uomMapper.selectById(material.getBaseUomId());
+        if (uom == null) return "UOM_MISSING";
+        if (!MdmMasterDataRules.ENABLED.equals(uom.getStatus())) return "UOM_DISABLED";
+        UomCategoryEntity uomCategory = uomCategoryMapper.selectById(uom.getCategoryId());
+        if (uomCategory == null) return "UOM_CATEGORY_MISSING";
+        if (!MdmMasterDataRules.ENABLED.equals(uomCategory.getStatus())) return "UOM_CATEGORY_DISABLED";
+        DimensionEntity dimension = dimensionMapper.selectById(uomCategory.getDimensionId());
+        if (dimension == null) return "DIMENSION_MISSING";
+        if (!MdmMasterDataRules.ENABLED.equals(dimension.getStatus())) return "DIMENSION_DISABLED";
+        return null;
     }
 
     /**
@@ -314,6 +370,35 @@ public class MaterialApplication {
         return validateShelfLifeDays(explicitDays);
     }
 
+    /** 分类默认值只作为创建建议；最终策略必须显式固化为 NONE 或 REQUIRED。 */
+    private static BatchTrackingPolicy resolveBatchTrackingPolicy(
+            MaterialCategoryEntity category, BatchTrackingSource source, BatchTrackingPolicy explicitPolicy) {
+        if (source == null) throw validationFailed("batchTrackingSource 不能为空");
+        if (source == BatchTrackingSource.CATEGORY_DEFAULT) {
+            if (explicitPolicy != null || category.getDefaultBatchTrackingPolicy() == null) {
+                throw validationFailed("分类默认批次策略不存在或请求重复指定策略");
+            }
+            return requireBatchTrackingPolicy(BatchTrackingPolicy.valueOf(category.getDefaultBatchTrackingPolicy()));
+        }
+        return requireBatchTrackingPolicy(explicitPolicy);
+    }
+
+    /** UNSPECIFIED 仅供迁移前存量记录识别，禁止新建或更新选择。 */
+    private static BatchTrackingPolicy requireBatchTrackingPolicy(BatchTrackingPolicy policy) {
+        if (policy == null || policy == BatchTrackingPolicy.UNSPECIFIED) {
+            throw validationFailed("batchTrackingPolicy 必须为 NONE 或 REQUIRED");
+        }
+        return policy;
+    }
+
+    /** UNSPECIFIED 仅供迁移前存量记录识别。 */
+    private static MaterialType requireMaterialType(MaterialType type) {
+        if (type == null || type == MaterialType.UNSPECIFIED) {
+            throw validationFailed("materialType 必须明确选择");
+        }
+        return type;
+    }
+
     /** 校验可空保质期天数；负数由 Application 和数据库 Check 双重拒绝。 */
     private static Integer validateShelfLifeDays(Integer days) {
         if (days != null && days < 0) {
@@ -365,6 +450,7 @@ public class MaterialApplication {
     private static MaterialView toView(MaterialEntity entity) {
         return new MaterialView(
                 entity.getId(), entity.getCode(), entity.getName(), entity.getCategoryId(), entity.getBaseUomId(),
+                entity.getMaterialType(), entity.getBatchTrackingPolicy(), entity.getRevisionNo(),
                 entity.getShelfLifeDays(), entity.getStatus(), entity.getCreatedAt(), entity.getCreatedBy(),
                 entity.getUpdatedAt(), entity.getUpdatedBy(), entity.getVersion());
     }
@@ -379,4 +465,13 @@ public class MaterialApplication {
         CATEGORY_DEFAULT,
         EXPLICIT
     }
+
+    /** 物料在制造过程中的用途；UNSPECIFIED 仅用于历史迁移。 */
+    public enum MaterialType { UNSPECIFIED, RAW_MATERIAL, SEMI_FINISHED, FINISHED_PRODUCT }
+
+    /** Material 独立保存的批次追踪要求；不是实际业务 Lot。 */
+    public enum BatchTrackingPolicy { UNSPECIFIED, NONE, REQUIRED }
+
+    /** 创建时批次策略的取值来源，分类建议只复制一次。 */
+    public enum BatchTrackingSource { CATEGORY_DEFAULT, EXPLICIT }
 }

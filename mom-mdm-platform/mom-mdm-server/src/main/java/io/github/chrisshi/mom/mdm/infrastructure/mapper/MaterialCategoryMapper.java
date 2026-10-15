@@ -22,7 +22,8 @@ public interface MaterialCategoryMapper extends MomBaseMapper<MaterialCategoryEn
      * @return 被行锁锁定的分类；不存在时返回 null
      */
     @Select("""
-            SELECT id, code, name, parent_id, sort, default_shelf_life_days, status,
+            SELECT id, code, name, parent_id, sort, default_shelf_life_days,
+                   default_batch_tracking_policy, status,
                    created_at, created_by, updated_at, updated_by, version, deleted
               FROM mdm_material_category
              WHERE id = #{id} AND deleted = false
@@ -49,6 +50,7 @@ public interface MaterialCategoryMapper extends MomBaseMapper<MaterialCategoryEn
                  WHERE child.deleted = false AND NOT child.id = ANY(parent.path)
             )
             SELECT c.id, c.code, c.name, c.parent_id, c.sort, c.default_shelf_life_days,
+                   c.default_batch_tracking_policy,
                    c.status, c.created_at, c.created_by, c.updated_at, c.updated_by,
                    c.version, c.deleted
               FROM mdm_material_category c

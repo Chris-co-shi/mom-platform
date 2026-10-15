@@ -25,7 +25,8 @@ public interface MaterialMapper extends MomBaseMapper<MaterialEntity> {
      * @return 被锁定的物料；不存在或已逻辑删除时返回 null
      */
     @Select("""
-            SELECT id, code, name, category_id, base_uom_id, shelf_life_days, status,
+            SELECT id, code, name, category_id, base_uom_id, material_type,
+                   batch_tracking_policy, revision_no, shelf_life_days, status,
                    created_at, created_by, updated_at, updated_by, version, deleted
               FROM mdm_material
              WHERE id = #{id} AND deleted = false

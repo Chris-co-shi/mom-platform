@@ -10,7 +10,7 @@ import lombok.Setter;
 /**
  * Material 单表持久化实体，属于 MDM Infrastructure 数据库边界。
  *
- * <p>该类型只保存物料业务身份、唯一分类、基础单位、可选保质期和简单生命周期，不承载包装、批次、
+ * <p>该类型只保存物料业务身份、用途、独立批次追踪策略、唯一分类、基础单位、业务修订、可选保质期和简单生命周期，不承载包装、实际批次、
  * 库存、供应商或动态规格。引用完整性和并发互斥由 Application 本地事务与行锁保证，数据库不可用时
  * 操作直接失败且不降级；可选保质期允许被明确清空。</p>
  */
@@ -22,6 +22,9 @@ public class MaterialEntity extends BaseEntity {
     private String name;
     private String categoryId;
     private String baseUomId;
+    private String materialType;
+    private String batchTrackingPolicy;
+    private Integer revisionNo;
     @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Integer shelfLifeDays;
     private String status;

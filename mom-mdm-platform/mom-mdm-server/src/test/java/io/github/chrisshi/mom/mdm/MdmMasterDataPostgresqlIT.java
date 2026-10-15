@@ -8,7 +8,12 @@ import io.github.chrisshi.mom.core.security.CurrentActorProvider;
 import io.github.chrisshi.mom.mdm.application.FactoryStructureApplication;
 import io.github.chrisshi.mom.mdm.application.LocationMasterDataApplication;
 import io.github.chrisshi.mom.mdm.application.MaterialApplication;
+import io.github.chrisshi.mom.mdm.application.MasterDataGovernanceApplication;
+import io.github.chrisshi.mom.mdm.application.model.GovernanceModels.Scope;
 import io.github.chrisshi.mom.mdm.application.MaterialApplication.ShelfLifeSource;
+import io.github.chrisshi.mom.mdm.application.MaterialApplication.MaterialType;
+import io.github.chrisshi.mom.mdm.application.MaterialApplication.BatchTrackingSource;
+import io.github.chrisshi.mom.mdm.application.MaterialApplication.BatchTrackingPolicy;
 import io.github.chrisshi.mom.mdm.application.MaterialCategoryApplication;
 import io.github.chrisshi.mom.mdm.application.MdmException;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataRules;
@@ -92,6 +97,7 @@ class MdmMasterDataPostgresqlIT {
     @Autowired private MaterialApplication materialApplication;
     @Autowired private UomMasterDataApplication uomMasterDataApplication;
     @Autowired private UomConversionApplication uomConversionApplication;
+    @Autowired private MasterDataGovernanceApplication governanceApplication;
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private PlatformTransactionManager transactionManager;
 
@@ -110,6 +116,11 @@ class MdmMasterDataPostgresqlIT {
     /** 每个测试清理 MDM 普通主数据；没有物理外键，因此不依赖级联顺序。 */
     @BeforeEach
     void cleanTables() {
+        jdbcTemplate.update("""
+                TRUNCATE TABLE mdm_production_version,
+                               mdm_routing_step, mdm_routing_revision, mdm_routing,
+                               mdm_formula_item, mdm_formula_revision, mdm_formula
+                """);
         jdbcTemplate.update("DELETE FROM mdm_material");
         jdbcTemplate.update("DELETE FROM mdm_uom_conversion_rule WHERE created_by <> 'flyway:uom-seed'");
         jdbcTemplate.update("DELETE FROM mdm_uom WHERE created_by <> 'flyway:uom-seed'");
@@ -122,13 +133,13 @@ class MdmMasterDataPostgresqlIT {
                 """);
     }
 
-    /** 验证截至 V113 的表、命名约束、查询索引和无物理外键策略。 */
+    /** 验证截至 V124 的表、命名约束、查询索引和无物理外键策略。 */
     @Test
     void migrationMustCreateMasterTablesAndDatabaseConstraints() {
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT version FROM flyway_schema_history
                  WHERE success = true ORDER BY installed_rank DESC LIMIT 1
-                """, String.class)).isEqualTo("113");
+                """, String.class)).isEqualTo("125");
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT count(*) FROM information_schema.tables
@@ -136,8 +147,11 @@ class MdmMasterDataPostgresqlIT {
                    'mdm_plant', 'mdm_workshop', 'mdm_production_line', 'mdm_workstation',
                    'mdm_warehouse', 'mdm_warehouse_area', 'mdm_location_type', 'mdm_location',
                    'mdm_material_category', 'mdm_dimension', 'mdm_uom_category', 'mdm_uom',
-                   'mdm_uom_conversion_rule', 'mdm_material')
-                """, Long.class, SCHEMA)).isEqualTo(14L);
+                   'mdm_uom_conversion_rule', 'mdm_material',
+                   'mdm_formula', 'mdm_formula_revision', 'mdm_formula_item',
+                   'mdm_routing', 'mdm_routing_revision', 'mdm_routing_step',
+                   'mdm_production_version')
+                """, Long.class, SCHEMA)).isEqualTo(21L);
         assertThat(jdbcTemplate.queryForList("""
                 SELECT constraint_name FROM information_schema.table_constraints
                  WHERE table_schema = ? AND constraint_type = 'UNIQUE'
@@ -150,7 +164,11 @@ class MdmMasterDataPostgresqlIT {
                 "uk_mdm_location_type_code", "uk_mdm_location_plant_code",
                 "uk_mdm_material_category_code", "uk_mdm_dimension_code", "uk_mdm_dimension_vector",
                 "uk_mdm_uom_category_code", "uk_mdm_uom_code", "uk_mdm_uom_conversion_rule_version",
-                "uk_mdm_material_code", "uk_mdm_i18n_message_definition_key",
+                "uk_mdm_material_code", "uk_mdm_formula_code", "uk_mdm_formula_revision_no",
+                "uk_mdm_formula_item_sequence", "uk_mdm_routing_code",
+                "uk_mdm_routing_revision_no", "uk_mdm_routing_step_sequence",
+                "uk_mdm_production_version_code", "uk_mdm_production_version_business",
+                "uk_mdm_i18n_message_definition_key",
                 "uk_mdm_i18n_translation_message_locale");
         assertThat(jdbcTemplate.queryForList("""
                 SELECT constraint_name FROM information_schema.table_constraints
@@ -187,6 +205,36 @@ class MdmMasterDataPostgresqlIT {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM mdm_uom_conversion_rule WHERE created_by = 'flyway:uom-seed'", Long.class))
                 .isEqualTo(13L);
+    }
+
+    /** 治理扫描只读发现父链、跨工厂位置和物料基础单位断链，不自动修复脏数据。 */
+    @Test
+    void governanceCheckMustReportStableReasonsWithoutMutatingData() {
+        var plantA=factoryApplication.createPlant("GOV-A","治理工厂甲","Asia/Shanghai",MdmMasterDataRules.ENABLED);
+        var plantB=factoryApplication.createPlant("GOV-B","治理工厂乙","Asia/Shanghai",MdmMasterDataRules.ENABLED);
+        factoryApplication.createWorkshop(plantA.id(),"GOV-WS","治理车间",MdmMasterDataRules.ENABLED);
+        var warehouse=warehouseApplication.createWarehouse(plantA.id(),"GOV-WH","治理仓库",MdmMasterDataRules.ENABLED);
+        var area=warehouseApplication.createWarehouseArea(warehouse.id(),"GOV-A1","治理库区",MdmMasterDataRules.ENABLED);
+        var type=locationApplication.createLocationType("GOV-TYPE","治理位置类型",MdmMasterDataRules.ENABLED);
+        var location=locationApplication.createLocation(plantA.id(),area.id(),type.id(),"GOV-LOC","治理位置",MdmMasterDataRules.ENABLED);
+        var category=materialCategoryApplication.createMaterialCategory("GOV-MAT","治理物料分类",null,1,null,MdmMasterDataRules.ENABLED);
+        var dimension=uomMasterDataApplication.createDimension("GOV-DIM","治理量纲",1,1,0,0,0,0,0,MdmMasterDataRules.ENABLED);
+        var uomCategory=uomMasterDataApplication.createCategory("GOV-UOM","治理单位",dimension.id(),MdmMasterDataRules.ENABLED,
+                "mom:gov","治理基准单位","g","治理测试单位");
+        var material=materialApplication.createMaterial("GOV-DMC","治理 DMC",category.id(),uomCategory.referenceUomId(),
+                MaterialType.RAW_MATERIAL,BatchTrackingSource.EXPLICIT,BatchTrackingPolicy.REQUIRED,
+                ShelfLifeSource.EXPLICIT,365,MdmMasterDataRules.ENABLED);
+
+        jdbcTemplate.update("UPDATE mdm_plant SET time_zone_id=NULL WHERE id=?",plantA.id());
+        jdbcTemplate.update("UPDATE mdm_location SET plant_id=? WHERE id=?",plantB.id(),location.id());
+        jdbcTemplate.update("UPDATE mdm_material SET base_uom_id='9999999999999999999' WHERE id=?",material.id());
+
+        var report=governanceApplication.check(Scope.ALL);
+        assertThat(report.issues()).extracting(issue->issue.reasonCode()).contains(
+                "PLANT_TIME_ZONE_MISSING","LOCATION_WAREHOUSE_PLANT_MISMATCH","BASE_UOM_MISSING");
+        assertThat(report.truncated()).isFalse();
+        assertThat(jdbcTemplate.queryForObject("SELECT plant_id FROM mdm_location WHERE id=?",String.class,location.id()))
+                .isEqualTo(plantB.id());
     }
 
     /** 覆盖根/子分类创建、默认建议值、全局 Code 唯一、父级存在/状态和非负保质期。 */
@@ -306,9 +354,9 @@ class MdmMasterDataPostgresqlIT {
     /** 覆盖正常层级创建、平台唯一 Code、同父级冲突、不同父级同 Code 和父级不存在。 */
     @Test
     void factoryAndWarehouseHierarchyMustEnforceParentScopedCodes() {
-        var plantA = factoryApplication.createPlant("P-A", "工厂甲", MdmMasterDataRules.ENABLED);
-        var plantB = factoryApplication.createPlant("P-B", "工厂乙", MdmMasterDataRules.ENABLED);
-        assertCodeConflict(() -> factoryApplication.createPlant("P-A", "重复工厂", MdmMasterDataRules.ENABLED));
+        var plantA = factoryApplication.createPlant("P-A", "工厂甲", "Asia/Shanghai", MdmMasterDataRules.ENABLED);
+        var plantB = factoryApplication.createPlant("P-B", "工厂乙", "Asia/Shanghai", MdmMasterDataRules.ENABLED);
+        assertCodeConflict(() -> factoryApplication.createPlant("P-A", "重复工厂", "Asia/Shanghai", MdmMasterDataRules.ENABLED));
 
         var workshopA = factoryApplication.createWorkshop(plantA.id(), "WS-01", "一车间", MdmMasterDataRules.ENABLED);
         assertCodeConflict(() -> factoryApplication.createWorkshop(plantA.id(), "WS-01", "重复车间", MdmMasterDataRules.ENABLED));
@@ -330,8 +378,8 @@ class MdmMasterDataPostgresqlIT {
     /** 覆盖 Location 无仓储区域、合法区域、跨 Plant 非法区域以及动态 LocationType 引用。 */
     @Test
     void locationMustAllowOptionalAreaAndValidateCompleteWarehousePlantChain() {
-        var plantA = factoryApplication.createPlant("P-A", "工厂甲", MdmMasterDataRules.ENABLED);
-        var plantB = factoryApplication.createPlant("P-B", "工厂乙", MdmMasterDataRules.ENABLED);
+        var plantA = factoryApplication.createPlant("P-A", "工厂甲", "Asia/Shanghai", MdmMasterDataRules.ENABLED);
+        var plantB = factoryApplication.createPlant("P-B", "工厂乙", "Asia/Shanghai", MdmMasterDataRules.ENABLED);
         var type = locationApplication.createLocationType("BUFFER", "缓存位置", MdmMasterDataRules.ENABLED);
         var warehouse = warehouseApplication.createWarehouse(plantA.id(), "WH-1", "一号仓", MdmMasterDataRules.ENABLED);
         var area = warehouseApplication.createWarehouseArea(warehouse.id(), "AREA-1", "一区", MdmMasterDataRules.ENABLED);
@@ -359,7 +407,7 @@ class MdmMasterDataPostgresqlIT {
     /** 覆盖所有层级在父级停用时禁止创建或启用直接子级，且不引入隐式级联状态变更。 */
     @Test
     void disabledParentMustBlockCreatingAndEnablingDirectChildren() {
-        var plantCreated = factoryApplication.createPlant("P-A", "工厂甲", MdmMasterDataRules.ENABLED);
+        var plantCreated = factoryApplication.createPlant("P-A", "工厂甲", "Asia/Shanghai", MdmMasterDataRules.ENABLED);
         var workshopCreated = factoryApplication.createWorkshop(
                 plantCreated.id(), "WS-1", "一车间", MdmMasterDataRules.ENABLED);
 
@@ -454,7 +502,7 @@ class MdmMasterDataPostgresqlIT {
      */
     @Test
     void parentDisableAndChildCreateMustSerializeOnPostgresqlRowLock() throws Exception {
-        var plant = factoryApplication.createPlant("P-LOCK", "并发锁工厂", MdmMasterDataRules.ENABLED);
+        var plant = factoryApplication.createPlant("P-LOCK", "并发锁工厂", "Asia/Shanghai", MdmMasterDataRules.ENABLED);
         CountDownLatch parentLocked = new CountDownLatch(1);
         CountDownLatch allowParentCommit = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -496,8 +544,8 @@ class MdmMasterDataPostgresqlIT {
     /** 覆盖显式启停、更新不改变 Code、乐观锁冲突以及 PageResult 统一转换。 */
     @Test
     void lifecycleUpdateAndPagingMustRemainExplicitAndStable() {
-        var plant = factoryApplication.createPlant("P-A", "旧名称", MdmMasterDataRules.ENABLED);
-        var updated = factoryApplication.updatePlant(plant.id(), "新名称", plant.version());
+        var plant = factoryApplication.createPlant("P-A", "旧名称", "Asia/Shanghai", MdmMasterDataRules.ENABLED);
+        var updated = factoryApplication.updatePlant(plant.id(), "新名称", null, plant.version());
         assertThat(updated.code()).isEqualTo("P-A");
         assertThat(updated.name()).isEqualTo("新名称");
         assertThat(updated.version()).isEqualTo(1L);
@@ -506,11 +554,11 @@ class MdmMasterDataPostgresqlIT {
         assertThat(disabled.status()).isEqualTo(MdmMasterDataRules.DISABLED);
         var enabled = factoryApplication.enablePlant(plant.id(), disabled.version());
         assertThat(enabled.status()).isEqualTo(MdmMasterDataRules.ENABLED);
-        assertThatThrownBy(() -> factoryApplication.updatePlant(plant.id(), "过期更新", plant.version()))
+        assertThatThrownBy(() -> factoryApplication.updatePlant(plant.id(), "过期更新", null, plant.version()))
                 .isInstanceOfSatisfying(MdmException.class,
                         exception -> assertThat(exception.code()).isEqualTo("mdm.version_conflict"));
 
-        factoryApplication.createPlant("P-B", "工厂乙", MdmMasterDataRules.ENABLED);
+        factoryApplication.createPlant("P-B", "工厂乙", "Asia/Shanghai", MdmMasterDataRules.ENABLED);
         var page = factoryApplication.pagePlants(new PageQuery<>(new PlantPageParams(), 1, 1));
         assertThat(page.records()).hasSize(1);
         assertThat(page.pageNo()).isEqualTo(1);
@@ -544,6 +592,7 @@ class MdmMasterDataPostgresqlIT {
 
         var created = materialApplication.createMaterial(
                 "MAT-001", "测试物料", leaf.id(), uomCategory.referenceUomId(),
+                MaterialType.RAW_MATERIAL, BatchTrackingSource.EXPLICIT, BatchTrackingPolicy.REQUIRED,
                 ShelfLifeSource.CATEGORY_DEFAULT, null, MdmMasterDataRules.ENABLED);
         assertThat(created.shelfLifeDays()).isEqualTo(90);
         assertThat(created.categoryId()).isEqualTo(leaf.id());
@@ -551,36 +600,43 @@ class MdmMasterDataPostgresqlIT {
         assertThat(created.createdBy()).isEqualTo("mdm-it-actor");
         assertCodeConflict(() -> materialApplication.createMaterial(
                 "MAT-001", "重复物料", leaf.id(), uomCategory.referenceUomId(),
+                MaterialType.RAW_MATERIAL, BatchTrackingSource.EXPLICIT, BatchTrackingPolicy.REQUIRED,
                 ShelfLifeSource.EXPLICIT, null, MdmMasterDataRules.ENABLED));
         assertThatThrownBy(() -> materialApplication.createMaterial(
                 "MAT-ROOT-INVALID", "不能挂根分类", root.id(), uomCategory.referenceUomId(),
+                MaterialType.RAW_MATERIAL, BatchTrackingSource.EXPLICIT, BatchTrackingPolicy.REQUIRED,
                 ShelfLifeSource.EXPLICIT, 10, MdmMasterDataRules.ENABLED))
                 .isInstanceOfSatisfying(MdmException.class,
                         exception -> assertThat(exception.code()).isEqualTo("mdm.material_category_not_leaf"));
         assertNotFound(() -> materialApplication.createMaterial(
                 "MAT-MISSING", "缺失分类", "missing", uomCategory.referenceUomId(),
+                MaterialType.RAW_MATERIAL, BatchTrackingSource.EXPLICIT, BatchTrackingPolicy.REQUIRED,
                 ShelfLifeSource.EXPLICIT, null, MdmMasterDataRules.ENABLED));
         assertParentDisabled(() -> materialApplication.createMaterial(
                 "MAT-DISABLED-CATEGORY", "停用分类物料", disabledLeaf.id(), uomCategory.referenceUomId(),
+                MaterialType.RAW_MATERIAL, BatchTrackingSource.EXPLICIT, BatchTrackingPolicy.REQUIRED,
                 ShelfLifeSource.EXPLICIT, null, MdmMasterDataRules.ENABLED));
         assertParentDisabled(() -> materialApplication.createMaterial(
                 "MAT-DISABLED-UOM", "停用单位物料", leaf.id(), disabledUom.id(),
+                MaterialType.RAW_MATERIAL, BatchTrackingSource.EXPLICIT, BatchTrackingPolicy.REQUIRED,
                 ShelfLifeSource.EXPLICIT, null, MdmMasterDataRules.ENABLED));
         assertValidationFailed(() -> materialApplication.createMaterial(
                 "MAT-AMBIGUOUS-SHELF", "歧义保质期物料", leaf.id(), uomCategory.referenceUomId(),
+                MaterialType.RAW_MATERIAL, BatchTrackingSource.EXPLICIT, BatchTrackingPolicy.REQUIRED,
                 ShelfLifeSource.CATEGORY_DEFAULT, 30, MdmMasterDataRules.ENABLED));
 
         var updated = materialApplication.updateMaterial(
-                created.id(), "测试物料已修正", anotherLeaf.id(), alternateUom.id(), null, created.version());
+                created.id(), "测试物料已修正", anotherLeaf.id(), BatchTrackingPolicy.NONE, null, created.version());
         assertThat(updated.code()).isEqualTo("MAT-001");
         assertThat(updated.categoryId()).isEqualTo(anotherLeaf.id());
-        assertThat(updated.baseUomId()).isEqualTo(alternateUom.id());
+        assertThat(updated.baseUomId()).isEqualTo(uomCategory.referenceUomId());
+        assertThat(updated.revisionNo()).isEqualTo(2);
         assertThat(updated.shelfLifeDays()).isNull();
         assertVersionConflict(() -> materialApplication.updateMaterial(
-                created.id(), "陈旧修改", leaf.id(), alternateUom.id(), 1, created.version()));
+                created.id(), "陈旧修改", leaf.id(), BatchTrackingPolicy.REQUIRED, 1, created.version()));
 
         var page = materialApplication.pageMaterials(new PageQuery<>(new MaterialPageParams(
-                null, "已修正", anotherLeaf.id(), alternateUom.id(), MdmMasterDataRules.ENABLED), 1, 20));
+                null, "已修正", anotherLeaf.id(), uomCategory.referenceUomId(), MdmMasterDataRules.ENABLED), 1, 20));
         assertThat(page.records()).extracting(record -> record.id()).containsExactly(created.id());
         assertThat(page.pageNo()).isEqualTo(1);
         assertThat(page.pageSize()).isEqualTo(20);
@@ -592,6 +648,51 @@ class MdmMasterDataPostgresqlIT {
         var enabled = materialApplication.enableMaterial(disabled.id(), disabled.version());
         assertThat(enabled.status()).isEqualTo(MdmMasterDataRules.ENABLED);
     }
+
+    /** 分类批次建议只在创建时复制，业务修订只随治理字段变化，技术版本始终防止陈旧写入。 */
+    @Test
+    void materialBatchPolicyMustBeIndependentAndRevisionMustTrackBusinessChanges() {
+        var category = materialCategoryApplication.createMaterialCategory(
+                "DMC-RAW", "电解液原料", null, 1, null,
+                BatchTrackingPolicy.REQUIRED, MdmMasterDataRules.ENABLED);
+        var noDefault = materialCategoryApplication.createMaterialCategory(
+                "DMC-NO-DEFAULT", "无建议分类", null, 2, null, MdmMasterDataRules.ENABLED);
+        String baseUomId = "800000000000000210"; // Flyway 种子的 kg 单位。
+
+        assertValidationFailed(() -> materialApplication.createMaterial(
+                "DMC-INVALID-TYPE", "非法用途", category.id(), baseUomId,
+                MaterialType.UNSPECIFIED, BatchTrackingSource.CATEGORY_DEFAULT, null,
+                ShelfLifeSource.EXPLICIT, null, MdmMasterDataRules.ENABLED));
+        assertValidationFailed(() -> materialApplication.createMaterial(
+                "DMC-NO-POLICY", "未指定批次", noDefault.id(), baseUomId,
+                MaterialType.RAW_MATERIAL, BatchTrackingSource.CATEGORY_DEFAULT, null,
+                ShelfLifeSource.EXPLICIT, null, MdmMasterDataRules.ENABLED));
+
+        var dmc = materialApplication.createMaterial(
+                "DMC", "碳酸二甲酯", category.id(), baseUomId,
+                MaterialType.RAW_MATERIAL, BatchTrackingSource.CATEGORY_DEFAULT, null,
+                ShelfLifeSource.EXPLICIT, 365, MdmMasterDataRules.ENABLED);
+        assertThat(dmc.batchTrackingPolicy()).isEqualTo("REQUIRED");
+        assertThat(dmc.materialType()).isEqualTo("RAW_MATERIAL");
+        assertThat(dmc.revisionNo()).isEqualTo(1);
+        assertThat(dmc.version()).isZero();
+
+        materialCategoryApplication.updateMaterialCategory(category.id(), category.name(), null, 1,
+                null, BatchTrackingPolicy.NONE, category.version());
+        assertThat(materialApplication.getMaterial(dmc.id()).batchTrackingPolicy()).isEqualTo("REQUIRED");
+
+        var renamed = materialApplication.updateMaterial(dmc.id(), "DMC 原料", category.id(),
+                BatchTrackingPolicy.REQUIRED, 365, dmc.version());
+        assertThat(renamed.revisionNo()).isEqualTo(1);
+        assertThat(renamed.version()).isEqualTo(1);
+        var changed = materialApplication.updateMaterial(dmc.id(), "DMC 原料", category.id(),
+                BatchTrackingPolicy.NONE, 365, renamed.version());
+        assertThat(changed.revisionNo()).isEqualTo(2);
+        assertThat(changed.baseUomId()).isEqualTo(baseUomId);
+        assertVersionConflict(() -> materialApplication.updateMaterial(dmc.id(), "陈旧更新", category.id(),
+                BatchTrackingPolicy.REQUIRED, 365, renamed.version()));
+    }
+
 
     /** 覆盖非删除 Material 对分类子树和完整单位链的引用保护，以及失败时无部分级联。 */
     @Test
@@ -610,6 +711,7 @@ class MdmMasterDataPostgresqlIT {
                 MdmMasterDataRules.ENABLED, BigDecimal.TWO, BigDecimal.ZERO, 34, "HALF_EVEN");
         var material = materialApplication.createMaterial(
                 "PROTECTED-MAT", "受保护物料", leaf.id(), ordinaryUom.id(),
+                MaterialType.RAW_MATERIAL, BatchTrackingSource.EXPLICIT, BatchTrackingPolicy.REQUIRED,
                 ShelfLifeSource.EXPLICIT, null, MdmMasterDataRules.DISABLED);
         assertThat(material.status()).isEqualTo(MdmMasterDataRules.DISABLED);
 

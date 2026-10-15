@@ -72,4 +72,13 @@ public final class MdmPageParams {
 
     /** @param uomId 必填 UOM ID */
     public record UomConversionRulePageParams(String uomId) { }
+
+    /** @param plantId 可选工厂过滤；@param outputMaterialId 可选产出物料过滤 */
+    public record FormulaPageParams(String plantId, String outputMaterialId) { }
+
+    /** @param plantId 可选工厂过滤。 */
+    public record RoutingPageParams(String plantId) { }
+
+    /** @param plantId 可选工厂；@param outputMaterialId 可选产出物料；@param status 可选生命周期。 */
+    public record ProductionVersionPageParams(String plantId, String outputMaterialId, String status) { }
 }

@@ -114,7 +114,7 @@ class SystemV1PostgresqlIT {
     /** 历史 Migration 保持存在，V11～V15 Web 文案种子已生效。 */
     @Test
     void migrationMustPreserveHistoryAndCreateOnlyCurrentV1Tables() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("17");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("24");
         assertThat(jdbc.queryForList("""
                 SELECT table_name FROM information_schema.tables
                  WHERE table_schema=? AND table_name IN (
@@ -141,13 +141,42 @@ class SystemV1PostgresqlIT {
             SELECT count(*) FROM system_i18n_message_definition
             WHERE message_key LIKE 'navigation.mdm%'
               AND enabled = true AND deleted = false
-            """, Long.class)).isEqualTo(12L);
+            """, Long.class)).isEqualTo(25L);
         assertThat(jdbc.queryForObject("""
             SELECT count(*) FROM system_i18n_translation t
             JOIN system_i18n_message_definition m ON m.id = t.message_id
             WHERE m.message_key LIKE 'navigation.mdm%'
               AND t.locale_code IN ('zh-CN', 'en-US') AND t.deleted = false
-            """, Long.class)).isEqualTo(24L);
+            """, Long.class)).isEqualTo(50L);
+        assertThat(jdbc.queryForObject("""
+            SELECT t.message_text FROM system_i18n_translation t
+            JOIN system_i18n_message_definition m ON m.id = t.message_id
+            WHERE m.message_key = 'navigation.mdm' AND t.locale_code = 'zh-CN'
+            """, String.class)).isEqualTo("主数据中心");
+        assertThat(jdbc.queryForObject("""
+            SELECT t.message_text FROM system_i18n_translation t
+            JOIN system_i18n_message_definition m ON m.id = t.message_id
+            WHERE m.message_key = 'navigation.mdmlocations' AND t.locale_code = 'zh-CN'
+            """, String.class)).isEqualTo("位置");
+        assertThat(jdbc.queryForObject("""
+            SELECT t.message_text FROM system_i18n_translation t
+            JOIN system_i18n_message_definition m ON m.id = t.message_id
+            WHERE m.message_key = 'navigation.mdmformulas' AND t.locale_code = 'zh-CN'
+            """, String.class)).isEqualTo("配方");
+        assertThat(jdbc.queryForObject("""
+            SELECT t.message_text FROM system_i18n_translation t
+            JOIN system_i18n_message_definition m ON m.id = t.message_id
+            WHERE m.message_key = 'navigation.mdmroutings' AND t.locale_code = 'en-US'
+            """, String.class)).isEqualTo("Routings");
+        assertThat(jdbc.queryForList("""
+            SELECT m.message_key FROM system_i18n_message_definition m
+            WHERE m.message_key IN (
+              'navigation.mdmorganizationresources', 'navigation.mdmmaterialuom',
+              'navigation.mdmmanufacturingdefinition', 'navigation.mdmwarehouselogistics',
+              'navigation.mdmqualitydefinition', 'navigation.mdmgovernance')
+              AND m.enabled = true AND m.deleted = false
+            ORDER BY m.message_key
+            """, String.class)).hasSize(6);
         assertThat(jdbc.queryForObject("""
             SELECT count(*) FROM system_application WHERE application_code = 'mdm'
             """, Long.class)).isZero();

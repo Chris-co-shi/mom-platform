@@ -132,7 +132,7 @@ class AuthManagementPostgresqlIT {
 
     @Test
     void flywayAndDatabaseConstraintsMustMatchMiniAuthModel() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("14");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("16");
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("show timezone", String.class)).isEqualTo("UTC");
         assertThat(jdbcTemplate.queryForObject("""
@@ -201,7 +201,7 @@ class AuthManagementPostgresqlIT {
             .locations("classpath:db/migration/auth")
             .load();
         seeded.migrate();
-        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("14");
+        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("16");
         assertThat(jdbcTemplate.queryForList("""
             SELECT permission.code
               FROM mom_auth_system_seed.auth_permission permission
@@ -228,7 +228,7 @@ class AuthManagementPostgresqlIT {
             .locations("classpath:db/migration/auth")
             .load();
         seeded.migrate();
-        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("14");
+        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("16");
 
         assertThat(jdbcTemplate.queryForObject("""
             SELECT COUNT(*) FROM mom_auth_mdm_seed.auth_permission_resource
@@ -263,6 +263,24 @@ class AuthManagementPostgresqlIT {
               AND permission.code LIKE 'mdm:%' AND permission.enabled = true AND permission.deleted = false
               AND resource.resource_code IN ('FACTORY', 'WAREHOUSE', 'LOCATION', 'UOM', 'MATERIAL')
             """, Long.class)).isEqualTo(10L);
+
+        assertThat(jdbcTemplate.queryForList("""
+            SELECT permission.code FROM mom_auth_mdm_seed.auth_permission permission
+            JOIN mom_auth_mdm_seed.auth_permission_resource resource ON resource.id=permission.resource_id
+            WHERE resource.domain_code='MDM' AND resource.resource_code='MANUFACTURING_DEFINITION'
+              AND permission.enabled=true AND permission.deleted=false
+            ORDER BY permission.code
+            """, String.class)).containsExactly(
+            "mdm:manufacturing-definition:read", "mdm:manufacturing-definition:write");
+
+        assertThat(jdbcTemplate.queryForList("""
+            SELECT code FROM mom_auth_mdm_seed.auth_permission
+             WHERE code IN ('qms:quality-definition:read','qms:quality-definition:write',
+                            'qms:i18n:read','qms:i18n:write','mdm:governance:read')
+               AND enabled=true AND deleted=false ORDER BY code
+            """, String.class)).containsExactly(
+            "mdm:governance:read", "qms:i18n:read", "qms:i18n:write",
+            "qms:quality-definition:read", "qms:quality-definition:write");
 
         assertThat(jdbcTemplate.queryForObject("""
             SELECT COUNT(*) FROM mom_auth_mdm_seed.auth_user user_account

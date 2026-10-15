@@ -4,6 +4,7 @@ import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.MaterialCategoryPageParams;
 import io.github.chrisshi.mom.mdm.application.MaterialCategoryApplication;
+import io.github.chrisshi.mom.mdm.application.MaterialApplication.BatchTrackingPolicy;
 import io.github.chrisshi.mom.mdm.application.model.MaterialCategoryView;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import jakarta.validation.Valid;
@@ -61,7 +62,7 @@ public class MaterialCategoryController {
             @Valid @RequestBody CreateMaterialCategoryRequest request) {
         return Result.success(application.createMaterialCategory(
                 request.code(), request.name(), request.parentId(), request.sort(),
-                request.defaultShelfLifeDays(), request.status()));
+                request.defaultShelfLifeDays(), request.defaultBatchTrackingPolicy(), request.status()));
     }
 
     /**
@@ -80,7 +81,7 @@ public class MaterialCategoryController {
             @PathVariable String id, @Valid @RequestBody UpdateMaterialCategoryRequest request) {
         return Result.success(application.updateMaterialCategory(
                 id, request.name(), request.parentId(), request.sort(),
-                request.defaultShelfLifeDays(), request.version()));
+                request.defaultShelfLifeDays(), request.defaultBatchTrackingPolicy(), request.version()));
     }
 
     /**
@@ -167,6 +168,7 @@ public class MaterialCategoryController {
             @Size(max = 19) String parentId,
             @NotNull Integer sort,
             @PositiveOrZero Integer defaultShelfLifeDays,
+            BatchTrackingPolicy defaultBatchTrackingPolicy,
             @NotBlank String status) {
     }
 
@@ -187,6 +189,7 @@ public class MaterialCategoryController {
             @Size(max = 19) String parentId,
             @NotNull Integer sort,
             @PositiveOrZero Integer defaultShelfLifeDays,
+            BatchTrackingPolicy defaultBatchTrackingPolicy,
             @NotNull Long version) {
     }
 

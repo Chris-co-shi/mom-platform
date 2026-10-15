@@ -14,8 +14,8 @@ class GatewayModuleRouteContractTest {
         String yaml = new ClassPathResource("application.yml").getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(yaml).contains("Path=/auth/sessions/login", "Path=/auth/**", "Path=/system/**",
-                "Path=/mdm/**", "Path=/integration/**");
-        assertThat(yaml.split("StripPrefix=1", -1)).hasSizeGreaterThanOrEqualTo(5);
+                "Path=/mdm/**", "Path=/qms/**", "Path=/integration/**");
+        assertThat(yaml.split("StripPrefix=1", -1)).hasSizeGreaterThanOrEqualTo(6);
         assertThat(yaml).doesNotContain("Path=/auth/login", "Path=/api/integration/**", "PrefixPath=/api");
     }
 }
