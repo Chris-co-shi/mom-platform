@@ -9,7 +9,9 @@ import io.github.chrisshi.mom.mdm.application.FactoryStructureApplication;
 import io.github.chrisshi.mom.mdm.application.LocationMasterDataApplication;
 import io.github.chrisshi.mom.mdm.application.MaterialApplication;
 import io.github.chrisshi.mom.mdm.application.MasterDataGovernanceApplication;
+import io.github.chrisshi.mom.mdm.application.QualityDefinitionApplication;
 import io.github.chrisshi.mom.mdm.application.model.GovernanceModels.Scope;
+import io.github.chrisshi.mom.mdm.application.model.QualityModels.ItemInput;
 import io.github.chrisshi.mom.mdm.application.MaterialApplication.ShelfLifeSource;
 import io.github.chrisshi.mom.mdm.application.MaterialApplication.MaterialType;
 import io.github.chrisshi.mom.mdm.application.MaterialApplication.BatchTrackingSource;
@@ -98,6 +100,7 @@ class MdmMasterDataPostgresqlIT {
     @Autowired private UomMasterDataApplication uomMasterDataApplication;
     @Autowired private UomConversionApplication uomConversionApplication;
     @Autowired private MasterDataGovernanceApplication governanceApplication;
+    @Autowired private QualityDefinitionApplication qualityDefinitionApplication;
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private PlatformTransactionManager transactionManager;
 
@@ -117,7 +120,9 @@ class MdmMasterDataPostgresqlIT {
     @BeforeEach
     void cleanTables() {
         jdbcTemplate.update("""
-                TRUNCATE TABLE mdm_production_version,
+                TRUNCATE TABLE mdm_specification_item, mdm_specification_revision,
+                               mdm_quality_specification, mdm_inspection_method, mdm_inspection_characteristic,
+                               mdm_production_version,
                                mdm_routing_step, mdm_routing_revision, mdm_routing,
                                mdm_formula_item, mdm_formula_revision, mdm_formula
                 """);
@@ -133,13 +138,13 @@ class MdmMasterDataPostgresqlIT {
                 """);
     }
 
-    /** 验证截至 V124 的表、命名约束、查询索引和无物理外键策略。 */
+    /** 验证包含质量基础定义在内的 MDM 表、命名约束和无物理外键策略。 */
     @Test
     void migrationMustCreateMasterTablesAndDatabaseConstraints() {
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT version FROM flyway_schema_history
                  WHERE success = true ORDER BY installed_rank DESC LIMIT 1
-                """, String.class)).isEqualTo("125");
+                """, String.class)).isEqualTo("127");
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT count(*) FROM information_schema.tables
@@ -150,8 +155,10 @@ class MdmMasterDataPostgresqlIT {
                    'mdm_uom_conversion_rule', 'mdm_material',
                    'mdm_formula', 'mdm_formula_revision', 'mdm_formula_item',
                    'mdm_routing', 'mdm_routing_revision', 'mdm_routing_step',
-                   'mdm_production_version')
-                """, Long.class, SCHEMA)).isEqualTo(21L);
+                   'mdm_production_version',
+                   'mdm_inspection_characteristic', 'mdm_inspection_method',
+                   'mdm_quality_specification', 'mdm_specification_revision', 'mdm_specification_item')
+                """, Long.class, SCHEMA)).isEqualTo(26L);
         assertThat(jdbcTemplate.queryForList("""
                 SELECT constraint_name FROM information_schema.table_constraints
                  WHERE table_schema = ? AND constraint_type = 'UNIQUE'
@@ -168,6 +175,9 @@ class MdmMasterDataPostgresqlIT {
                 "uk_mdm_formula_item_sequence", "uk_mdm_routing_code",
                 "uk_mdm_routing_revision_no", "uk_mdm_routing_step_sequence",
                 "uk_mdm_production_version_code", "uk_mdm_production_version_business",
+                "uk_mdm_inspection_characteristic_code", "uk_mdm_inspection_method_code",
+                "uk_mdm_quality_specification_code", "uk_mdm_quality_specification_scope",
+                "uk_mdm_specification_revision_no", "uk_mdm_specification_item_sequence",
                 "uk_mdm_i18n_message_definition_key",
                 "uk_mdm_i18n_translation_message_locale");
         assertThat(jdbcTemplate.queryForList("""
@@ -235,6 +245,112 @@ class MdmMasterDataPostgresqlIT {
         assertThat(report.truncated()).isFalse();
         assertThat(jdbcTemplate.queryForObject("SELECT plant_id FROM mdm_location WHERE id=?",String.class,location.id()))
                 .isEqualTo(plantB.id());
+    }
+
+    /** 质量定义在 MDM 本地事务内固化 DMC 来料标准，已发布修订不可修改。 */
+    @Test
+    void dmcQualitySpecificationMustBeOwnedAndReleasedByMdm() {
+        var plant = factoryApplication.createPlant("Q-PLANT", "质量工厂", "Asia/Shanghai", MdmMasterDataRules.ENABLED);
+        var materialCategory = materialCategoryApplication.createMaterialCategory(
+                "Q-MAT", "质量原料", null, 1, null, MdmMasterDataRules.ENABLED);
+        String kilogramId = jdbcTemplate.queryForObject("SELECT id FROM mdm_uom WHERE code='kg'", String.class);
+        String percentId = jdbcTemplate.queryForObject("SELECT id FROM mdm_uom WHERE code='%'", String.class);
+        var material = materialApplication.createMaterial(
+                "Q-DMC", "DMC 原料", materialCategory.id(), kilogramId,
+                MaterialType.RAW_MATERIAL, BatchTrackingSource.EXPLICIT, BatchTrackingPolicy.REQUIRED,
+                ShelfLifeSource.EXPLICIT, 365, MdmMasterDataRules.ENABLED);
+        var characteristic = qualityDefinitionApplication.createCharacteristic(
+                "PURITY", "纯度", percentId);
+        var method = qualityDefinitionApplication.createMethod("GC", "气相色谱", "DMC 来料纯度检测");
+
+        var draft = qualityDefinitionApplication.createSpecification(
+                "DMC-IN", "DMC 来料标准", plant.id(), material.id(),
+                java.util.List.of(qualityItem(characteristic.id(), method.id(), percentId,
+                        "99.90", "99.95", "100.00")));
+        var released = qualityDefinitionApplication.release(draft.revisionId(), draft.lockVersion());
+
+        assertThat(released.status()).isEqualTo("RELEASED");
+        assertThat(released.materialRevisionNo()).isEqualTo(material.revisionNo());
+        assertThat(released.items().getFirst().lowerLimit()).isEqualTo("99.900000000");
+        var reference = qualityDefinitionApplication.reference(draft.id());
+        assertThat(reference.availableForNewUse()).isTrue();
+        assertThat(reference.revisionId()).isEqualTo(released.revisionId());
+        assertThat(reference.items()).singleElement()
+                .extracting(item -> item.targetValue()).isEqualTo("99.950000000");
+
+        qualityDefinitionApplication.updateCharacteristic(characteristic.id(), characteristic.name(),
+                characteristic.defaultUomId(), false, characteristic.version());
+        assertThat(qualityDefinitionApplication.reference(draft.id()).invalidReason())
+                .isEqualTo("CHARACTERISTIC_DISABLED");
+        assertThatThrownBy(() -> qualityDefinitionApplication.updateDraft(
+                released.revisionId(), released.lockVersion(),
+                java.util.List.of(qualityItem(characteristic.id(), method.id(), percentId,
+                        "99", "99.5", "100"))))
+                .isInstanceOf(MdmException.class)
+                .extracting("code").isEqualTo("mdm.immutable_master_data");
+    }
+
+    /** 非法范围或停用物料必须在质量标准写入前失败且不留局部数据。 */
+    @Test
+    void invalidQualityRangeOrDisabledMaterialMustRollbackMdmWrite() {
+        var plant = factoryApplication.createPlant("QB-PLANT", "失败路径工厂", "Asia/Shanghai", MdmMasterDataRules.ENABLED);
+        var materialCategory = materialCategoryApplication.createMaterialCategory(
+                "QB-MAT", "失败路径原料", null, 1, null, MdmMasterDataRules.ENABLED);
+        String kilogramId = jdbcTemplate.queryForObject("SELECT id FROM mdm_uom WHERE code='kg'", String.class);
+        String percentId = jdbcTemplate.queryForObject("SELECT id FROM mdm_uom WHERE code='%'", String.class);
+        var material = materialApplication.createMaterial(
+                "QB-DMC", "DMC 失败路径", materialCategory.id(), kilogramId,
+                MaterialType.RAW_MATERIAL, BatchTrackingSource.EXPLICIT, BatchTrackingPolicy.REQUIRED,
+                ShelfLifeSource.EXPLICIT, 365, MdmMasterDataRules.ENABLED);
+        var characteristic = qualityDefinitionApplication.createCharacteristic(
+                "WATER", "水分", percentId);
+        var method = qualityDefinitionApplication.createMethod("KF", "卡尔费休", null);
+
+        assertThatThrownBy(() -> qualityDefinitionApplication.createSpecification(
+                "BAD-RANGE", "非法范围", plant.id(), material.id(),
+                java.util.List.of(qualityItem(characteristic.id(), method.id(), percentId,
+                        "10", "5", "1"))))
+                .isInstanceOf(MdmException.class)
+                .extracting("code").isEqualTo("mdm.quality_invalid_range");
+
+        var disabled = materialApplication.disableMaterial(material.id(), material.version());
+        assertThat(disabled.status()).isEqualTo(MdmMasterDataRules.DISABLED);
+        assertThatThrownBy(() -> qualityDefinitionApplication.createSpecification(
+                "BLOCKED", "停用物料", plant.id(), material.id(),
+                java.util.List.of(qualityItem(characteristic.id(), method.id(), percentId,
+                        "1", "2", "3"))))
+                .isInstanceOf(MdmException.class)
+                .extracting("code").isEqualTo("mdm.parent_disabled");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM mdm_quality_specification", Long.class)).isZero();
+    }
+
+    /** 质量定义进入 MDM 后，治理扫描必须发现其权威引用断链。 */
+    @Test
+    void qualityDefinitionGovernanceMustReportMissingMaterialReference() {
+        var plant = factoryApplication.createPlant("QG-PLANT", "治理质量工厂", "Asia/Shanghai", MdmMasterDataRules.ENABLED);
+        var category = materialCategoryApplication.createMaterialCategory(
+                "QG-MAT", "治理质量原料", null, 1, null, MdmMasterDataRules.ENABLED);
+        String kilogramId = jdbcTemplate.queryForObject("SELECT id FROM mdm_uom WHERE code='kg'", String.class);
+        String percentId = jdbcTemplate.queryForObject("SELECT id FROM mdm_uom WHERE code='%'", String.class);
+        var material = materialApplication.createMaterial(
+                "QG-DMC", "治理 DMC", category.id(), kilogramId,
+                MaterialType.RAW_MATERIAL, BatchTrackingSource.EXPLICIT, BatchTrackingPolicy.REQUIRED,
+                ShelfLifeSource.EXPLICIT, 365, MdmMasterDataRules.ENABLED);
+        var characteristic = qualityDefinitionApplication.createCharacteristic("QG-PURITY", "治理纯度", percentId);
+        var method = qualityDefinitionApplication.createMethod("QG-GC", "治理色谱", null);
+        var specification = qualityDefinitionApplication.createSpecification(
+                "QG-DMC-IN", "治理 DMC 标准", plant.id(), material.id(),
+                java.util.List.of(qualityItem(characteristic.id(), method.id(), percentId, "99", "99.5", "100")));
+        jdbcTemplate.update("UPDATE mdm_quality_specification SET material_id='9999999999999999999' WHERE id=?",
+                specification.id());
+
+        var report = governanceApplication.check(Scope.valueOf("QUALITY_DEFINITION"));
+        assertThat(report.issues()).extracting(issue -> issue.reasonCode()).contains("MATERIAL_MISSING");
+    }
+
+    private static ItemInput qualityItem(String characteristicId, String methodId, String uomId,
+                                         String lower, String target, String upper) {
+        return new ItemInput(10, characteristicId, methodId, uomId, lower, target, upper, true);
     }
 
     /** 覆盖根/子分类创建、默认建议值、全局 Code 唯一、父级存在/状态和非负保质期。 */

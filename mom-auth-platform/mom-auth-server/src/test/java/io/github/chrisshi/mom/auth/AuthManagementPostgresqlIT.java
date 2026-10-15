@@ -132,7 +132,7 @@ class AuthManagementPostgresqlIT {
 
     @Test
     void flywayAndDatabaseConstraintsMustMatchMiniAuthModel() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("16");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("17");
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("show timezone", String.class)).isEqualTo("UTC");
         assertThat(jdbcTemplate.queryForObject("""
@@ -201,7 +201,7 @@ class AuthManagementPostgresqlIT {
             .locations("classpath:db/migration/auth")
             .load();
         seeded.migrate();
-        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("16");
+        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("17");
         assertThat(jdbcTemplate.queryForList("""
             SELECT permission.code
               FROM mom_auth_system_seed.auth_permission permission
@@ -228,7 +228,7 @@ class AuthManagementPostgresqlIT {
             .locations("classpath:db/migration/auth")
             .load();
         seeded.migrate();
-        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("16");
+        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("17");
 
         assertThat(jdbcTemplate.queryForObject("""
             SELECT COUNT(*) FROM mom_auth_mdm_seed.auth_permission_resource
@@ -275,11 +275,19 @@ class AuthManagementPostgresqlIT {
 
         assertThat(jdbcTemplate.queryForList("""
             SELECT code FROM mom_auth_mdm_seed.auth_permission
-             WHERE code IN ('qms:quality-definition:read','qms:quality-definition:write',
-                            'qms:i18n:read','qms:i18n:write','mdm:governance:read')
+            WHERE code IN ('qms:quality-definition:read','qms:quality-definition:write',
+                            'qms:i18n:read','qms:i18n:write','mdm:governance:read',
+                            'mdm:quality-definition:read','mdm:quality-definition:write')
                AND enabled=true AND deleted=false ORDER BY code
             """, String.class)).containsExactly(
-            "mdm:governance:read", "qms:i18n:read", "qms:i18n:write",
+            "mdm:governance:read", "mdm:quality-definition:read", "mdm:quality-definition:write",
+            "qms:i18n:read", "qms:i18n:write");
+
+        assertThat(jdbcTemplate.queryForList("""
+            SELECT code FROM mom_auth_mdm_seed.auth_permission
+             WHERE code IN ('qms:quality-definition:read','qms:quality-definition:write')
+               AND enabled=false AND deleted=false ORDER BY code
+            """, String.class)).containsExactly(
             "qms:quality-definition:read", "qms:quality-definition:write");
 
         assertThat(jdbcTemplate.queryForObject("""

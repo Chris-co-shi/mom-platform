@@ -2,7 +2,7 @@
 
 - 状态：**Current / Implemented**
 - 生效日期：2026-09-03
-- 权威基线：[P1.5 认证与授权设计基线](../security/P1.5-认证与授权设计基线.md)
+- 当前认证基线：[ADR-040](../adr/ADR-040-Mini-Auth与Redis-Opaque-Token认证基线.md)
 - 安全架构：[安全架构](安全架构.md)
 
 ## 1. 当前责任链

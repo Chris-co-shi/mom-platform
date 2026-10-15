@@ -1,13 +1,13 @@
 # ADR-024：PC JSON 与 Mobile PKCE/OIDC 双通道
 
-- 状态：Accepted
+- 状态：Superseded by ADR-040 for V1 runtime
 - 提出日期：2026-07-29
 - 接受日期：2026-07-29
 - 决策人：Chris
 - 批准来源：Chris 在 P1.6 S07-B 当前对话中的明确输入
 - Slice：P1.6 S07
 - 替代：[ADR-019：P1.5 认证与授权闭环](ADR-019-P1.5认证与授权闭环.md)
-- 关联文档：[P1.6 S06 IAM 端点、调用方与职责审计](../engineering/P1.6-S06-IAM端点调用方与职责审计.md)、[IAM、安全协议、Gateway 与 Resource Server 运行规范](../engineering/standards/security-protocol-runtime-standard.md)、[P1.6 IAM 与 System 平台治理计划](../plans/P1.6-IAM与System平台治理计划.md)
+- 当前关联：[ADR-040](ADR-040-Mini-Auth与Redis-Opaque-Token认证基线.md)、[安全协议运行规范](../engineering/standards/security-protocol-runtime-standard.md)
 
 > Chris 已明确接受本 ADR 的双通道长期方向、IAM 密码认证权威边界、IAM 授权上下文权威边界，
 > 以及共享 Session、Refresh、JWT Claims、Token 签发和撤销核心的职责边界。
@@ -776,14 +776,10 @@ S10 必须覆盖：
 
 ## 28. 参考资料
 
-仓库权威资料：
+仓库保留资料：
 
-- [P1.6 S06 IAM 端点、调用方与职责审计](../engineering/P1.6-S06-IAM端点调用方与职责审计.md)
-- [P1.6 工程规范覆盖与缺口清单](../engineering/P1.6-工程规范覆盖与缺口清单.md)
-- [P1.6 IAM 与 System 平台治理计划](../plans/P1.6-IAM与System平台治理计划.md)
-- [P1.6 实施进度](../plans/P1.6-实施进度.md)
-- [P1.5 认证与授权设计基线](../security/P1.5-认证与授权设计基线.md)
 - [ADR-019：P1.5 认证与授权闭环](ADR-019-P1.5认证与授权闭环.md)
+- [ADR-040：Mini Auth 与 Redis Opaque Token](ADR-040-Mini-Auth与Redis-Opaque-Token认证基线.md)
 - [IAM、安全协议、Gateway 与 Resource Server 运行规范](../engineering/standards/security-protocol-runtime-standard.md)
 
 协议依据：

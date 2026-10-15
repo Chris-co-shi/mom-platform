@@ -1,5 +1,7 @@
 # MOM 事务与跨服务一致性规范
 
+> 适用于事务、MQ、Outbox/Inbox、Seata 或外部副作用；单纯只读查询无需读取本文。
+
 ## 1. 默认选择树
 
 1. 单服务数据库写入：单权威 DataSource + Spring 本地事务。

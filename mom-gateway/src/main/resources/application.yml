@@ -112,7 +112,7 @@ spring:
                     redis-rate-limiter.burstCapacity: ${GATEWAY_MDM_RATE_LIMIT_BURST_CAPACITY:20}
                     redis-rate-limiter.requestedTokens: ${GATEWAY_MDM_RATE_LIMIT_REQUESTED_TOKENS:1}
 
-            # QMS 质量定义 API 与自有 I18n；服务端仍独立鉴权。
+            # QMS 执行域预留路由与历史 I18n；质量基础定义已由 MDM 持有。
             - id: qms-api
               order: 0
               uri: lb://mom-qms-server

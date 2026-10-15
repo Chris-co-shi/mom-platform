@@ -7,7 +7,7 @@
 - 适用范围：`mom-platform` V1 认证与授权运行时
 - 替代：ADR-024 在 V1 认证运行时上的结论；ADR-019 保持历史记录
 - 关联文档：
-  - [P1.5 认证与授权设计基线](../security/P1.5-认证与授权设计基线.md)
+  - P1.5 认证与授权设计基线（历史阶段文档已清理）
   - [安全架构](../architecture/安全架构.md)
   - [CurrentActor 与数据审计基础](../architecture/CurrentActor与数据审计.md)
 

@@ -6,6 +6,7 @@ import io.github.chrisshi.mom.mdm.api.UomReference;
 import io.github.chrisshi.mom.mdm.api.LocationReference;
 import io.github.chrisshi.mom.mdm.api.WarehouseResourceReference;
 import io.github.chrisshi.mom.mdm.api.ProductionVersionReference;
+import io.github.chrisshi.mom.mdm.api.QualitySpecificationReference;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -48,4 +49,8 @@ public interface MdmReferenceClient {
     /** 查询已发布制造定义组合当前是否可供新工单引用。 */
     @GetMapping("/production-version-references/{id}")
     Result<ProductionVersionReference> getProductionVersionReference(@PathVariable("id") String id);
+
+    /** 查询来料质量标准当前已发布修订及其新业务可用性。 */
+    @GetMapping("/quality-specification-references/{id}")
+    Result<QualitySpecificationReference> getQualitySpecificationReference(@PathVariable("id") String id);
 }

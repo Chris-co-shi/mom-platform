@@ -85,26 +85,26 @@ defaultMessage
 
 具体错误枚举归各模块所有，例如 `GatewayErrorCode implements ErrorCode`；禁止建立包含所有领域错误的巨大 `GlobalErrorCode`。
 
-## 6. Mini Auth 精确例外
+## 6. Mini Auth 当前结构
 
-正式复杂 bounded context 默认仍可按 Web / Application / Domain / Infrastructure 边界组织；Mini Auth V1 根据 ADR-041 精确采用：
+Mini Auth 与其他 Level 1 模块一致，采用：
 
 ```text
 io.github.chrisshi.mom.auth
 ├── controller
-├── service
+├── application
 └── infrastructure
 ```
 
 ```text
-controller → service → infrastructure
+controller → application → infrastructure
 ```
 
 不默认创建 Repository Port、一对一 Adapter 或其他形式化抽象。
 
 ## 7. System Platform 当前边界
 
-`mom-system-platform` 继续拥有平台参数、字典、国际化资源与用户偏好等平台配置能力，但旧 IAM/JWT/revoked-sid 描述不再作为当前安全协议。
+`mom-system-platform` 当前只拥有受限字典、支持 Locale 与 `system.*` 国际化资源。不提供 Parameter、用户偏好、应用目录、导航、发布快照、缓存或 MQ 运行时。
 
 System 不拥有 User/Role/Permission、Token、Authentication 或 Authorization 权威数据；这些由 Mini Auth / `mom-security` 负责。
 

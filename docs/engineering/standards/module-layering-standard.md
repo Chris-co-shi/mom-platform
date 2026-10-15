@@ -1,5 +1,7 @@
 # MOM 模块分层与 Server 包结构规范
 
+> 适用于新增模块、跨模块依赖或 Package 分层调整；普通类内修改无需读取本文。
+
 - 状态：Accepted
 - 生效范围：`mom-platform` 根 Reactor 及后续新增领域模块
 - 首次冻结：P1.6 S01

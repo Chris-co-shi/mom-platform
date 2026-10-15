@@ -29,7 +29,7 @@
 - `timezone-date-time-standard.md`：UTC、用户/Factory/设备时区、业务日期、DST 与 API 时间契约；
 - `number-money-rounding-standard.md`：Decimal String、BigDecimal、金额、比例和舍入边界；
 - `measurement-unit-standard.md`：MDM 单位所有权、UCUM、量纲、换算与历史快照；
-- `user-preference-standard.md`：System 偏好所有权、覆盖层级、授权隔离和 S16 进入条件。
+- `user-preference-standard.md`：未来重新引入用户偏好时的准入边界；当前 System V1 未实现该能力。
 
 本索引只负责导航，强制规则以根目录 `AGENTS.md` 和对应规范正文为准。
 

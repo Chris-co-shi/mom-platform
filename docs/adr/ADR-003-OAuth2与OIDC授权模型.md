@@ -5,7 +5,7 @@
 - 被替代日期：2026-07-19
 - 替代决策：[ADR-019：P1.5 认证与授权闭环](ADR-019-P1.5认证与授权闭环.md)
 
-> 本 ADR 保留历史背景，不再作为当前实现依据。OAuth Client、user_type、Token、Session、RBAC、Factory/Party Scope、Gateway/Resource Server、Web/Mobile Runtime 的当前结论以 ADR-019 和 [P1.5 认证与授权设计基线](../security/P1.5-认证与授权设计基线.md) 为准。
+> 本 ADR 保留历史背景，不再作为当前实现依据。当前认证运行时以 [ADR-040](ADR-040-Mini-Auth与Redis-Opaque-Token认证基线.md) 为准。
 
 ## 1. 背景
 

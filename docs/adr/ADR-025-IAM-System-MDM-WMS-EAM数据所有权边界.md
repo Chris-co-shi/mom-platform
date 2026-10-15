@@ -5,7 +5,7 @@
 - 接受日期：2026-07-29
 - 决策 Slice：P1.6 S11-A（草案）/ S11-B（接受）
 - 决策人：Chris
-- 关联：[ADR-023](ADR-023-Locale时区与用户偏好边界.md)、[ADR-024](ADR-024-PC-JSON与Mobile-PKCE-OIDC双通道.md)、[S11 现状与迁移边界报告](../engineering/P1.6-S11-数据所有权现状与迁移边界报告.md)
+- 关联：[ADR-023](ADR-023-Locale时区与用户偏好边界.md)、[ADR-024](ADR-024-PC-JSON与Mobile-PKCE-OIDC双通道.md)
 
 > **Accepted Decision（局部被取代）。** Chris 于 2026-07-29 接受方案 C 与本 ADR 第 23 节七项决策。2026-10-14 接受的 [ADR-044](ADR-044-MDM静态主数据与WMS-MES运行时所有权边界.md) 仅取代本 ADR 关于仓库/库位静态主数据以及产线/工位静态主数据的所有权结论；其余决策继续有效。读取本 ADR 的相关对象时必须以 ADR-044 为准。
 

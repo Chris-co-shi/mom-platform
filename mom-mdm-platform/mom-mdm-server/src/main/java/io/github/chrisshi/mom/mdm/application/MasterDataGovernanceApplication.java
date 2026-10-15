@@ -30,18 +30,27 @@ public class MasterDataGovernanceApplication {
     private final FormulaMapper formulas; private final FormulaRevisionMapper formulaRevisions; private final FormulaItemMapper formulaItems;
     private final RoutingMapper routings; private final RoutingRevisionMapper routingRevisions; private final RoutingStepMapper routingSteps;
     private final ProductionVersionMapper productionVersions;
+    private final InspectionCharacteristicMapper inspectionCharacteristics; private final InspectionMethodMapper inspectionMethods;
+    private final QualitySpecificationMapper qualitySpecifications; private final SpecificationRevisionMapper specificationRevisions;
+    private final SpecificationItemMapper specificationItems;
 
     public MasterDataGovernanceApplication(PlantMapper plants, WorkshopMapper workshops, ProductionLineMapper lines,
             WorkstationMapper stations, WarehouseMapper warehouses, WarehouseAreaMapper areas, LocationMapper locations,
             LocationTypeMapper locationTypes, MaterialCategoryMapper categories, MaterialMapper materials,
             DimensionMapper dimensions, UomCategoryMapper uomCategories, UomMapper uoms, FormulaMapper formulas,
             FormulaRevisionMapper formulaRevisions, FormulaItemMapper formulaItems, RoutingMapper routings,
-            RoutingRevisionMapper routingRevisions, RoutingStepMapper routingSteps, ProductionVersionMapper productionVersions) {
+            RoutingRevisionMapper routingRevisions, RoutingStepMapper routingSteps, ProductionVersionMapper productionVersions,
+            InspectionCharacteristicMapper inspectionCharacteristics, InspectionMethodMapper inspectionMethods,
+            QualitySpecificationMapper qualitySpecifications, SpecificationRevisionMapper specificationRevisions,
+            SpecificationItemMapper specificationItems) {
         this.plants=plants;this.workshops=workshops;this.lines=lines;this.stations=stations;this.warehouses=warehouses;
         this.areas=areas;this.locations=locations;this.locationTypes=locationTypes;this.categories=categories;this.materials=materials;
         this.dimensions=dimensions;this.uomCategories=uomCategories;this.uoms=uoms;this.formulas=formulas;
         this.formulaRevisions=formulaRevisions;this.formulaItems=formulaItems;this.routings=routings;
         this.routingRevisions=routingRevisions;this.routingSteps=routingSteps;this.productionVersions=productionVersions;
+        this.inspectionCharacteristics=inspectionCharacteristics;this.inspectionMethods=inspectionMethods;
+        this.qualitySpecifications=qualitySpecifications;this.specificationRevisions=specificationRevisions;
+        this.specificationItems=specificationItems;
     }
 
     /** 执行所选范围的一致性扫描；ALL 按稳定板块顺序合并。 */
@@ -53,6 +62,7 @@ public class MasterDataGovernanceApplication {
         if (selected == Scope.ALL || selected == Scope.WAREHOUSE) warehouse(collector);
         if (selected == Scope.ALL || selected == Scope.MATERIAL_UOM) materialUom(collector);
         if (selected == Scope.ALL || selected == Scope.MANUFACTURING_DEFINITION) manufacturing(collector);
+        if (selected == Scope.ALL || selected == Scope.QUALITY_DEFINITION) quality(collector);
         return new Report(selected, Instant.now(), collector.issues.size(), collector.truncated, collector.issues);
     }
 
@@ -120,6 +130,30 @@ public class MasterDataGovernanceApplication {
             if(routing==null||!"RELEASED".equals(routing.getStatus()))out.add("MANUFACTURING_REFERENCE","PRODUCTION_VERSION",row,"ERROR","ROUTING_REVISION_NOT_RELEASED",row.getRoutingRevisionId());});
     }
 
+    private void quality(Collector out) {
+        Map<String,PlantEntity> plantMap=map(plants.selectList(null));
+        Map<String,MaterialEntity> materialMap=map(materials.selectList(null));
+        Map<String,UomEntity> uomMap=map(uoms.selectList(null));
+        Map<String,InspectionCharacteristicEntity> characteristicMap=map(inspectionCharacteristics.selectList(null));
+        Map<String,InspectionMethodEntity> methodMap=map(inspectionMethods.selectList(null));
+        Map<String,QualitySpecificationEntity> specificationMap=map(qualitySpecifications.selectList(null));
+        Map<String,SpecificationRevisionEntity> revisionMap=map(specificationRevisions.selectList(null));
+        characteristicMap.values().forEach(row->required(out,"INSPECTION_CHARACTERISTIC",row,
+                row.getDefaultUomId(),uomMap,"DEFAULT_UOM_MISSING"));
+        specificationMap.values().forEach(row->{
+            required(out,"QUALITY_SPECIFICATION",row,row.getPlantId(),plantMap,"PLANT_MISSING");
+            required(out,"QUALITY_SPECIFICATION",row,row.getMaterialId(),materialMap,"MATERIAL_MISSING");
+        });
+        revisionMap.values().forEach(row->required(out,"SPECIFICATION_REVISION",row,
+                row.getSpecificationId(),specificationMap,"SPECIFICATION_MISSING"));
+        specificationItems.selectList(null).forEach(row->{
+            required(out,"SPECIFICATION_ITEM",row,row.getRevisionId(),revisionMap,"REVISION_MISSING");
+            required(out,"SPECIFICATION_ITEM",row,row.getCharacteristicId(),characteristicMap,"CHARACTERISTIC_MISSING");
+            required(out,"SPECIFICATION_ITEM",row,row.getMethodId(),methodMap,"METHOD_MISSING");
+            required(out,"SPECIFICATION_ITEM",row,row.getUomId(),uomMap,"UOM_MISSING");
+        });
+    }
+
     private void parent(Collector out,String type,BaseIdEntity row,String parentId,Map<String,? extends BaseIdEntity> parents,String parentType){BaseIdEntity parent=parents.get(parentId);if(parent==null)out.add("PARENT_CHAIN",type,row,"ERROR",parentType+"_MISSING",parentId);else if(!enabled(parent))out.add("PARENT_CHAIN",type,row,"ERROR",parentType+"_DISABLED",parentId);}
     private void required(Collector out,String type,BaseIdEntity row,String id,Map<String,? extends BaseIdEntity> values,String reason){if(!values.containsKey(id))out.add("REFERENCE",type,row,"ERROR",reason,id);}
     private boolean enabled(Object row){
@@ -139,7 +173,9 @@ public class MasterDataGovernanceApplication {
         case PlantEntity e->e.getCode();case WorkshopEntity e->e.getCode();case ProductionLineEntity e->e.getCode();case WorkstationEntity e->e.getCode();
         case WarehouseEntity e->e.getCode();case WarehouseAreaEntity e->e.getCode();case LocationEntity e->e.getCode();case LocationTypeEntity e->e.getCode();
         case MaterialCategoryEntity e->e.getCode();case MaterialEntity e->e.getCode();case DimensionEntity e->e.getCode();case UomCategoryEntity e->e.getCode();case UomEntity e->e.getCode();
-        case FormulaEntity e->e.getCode();case RoutingEntity e->e.getCode();case ProductionVersionEntity e->e.getCode();default->null;};}
+        case FormulaEntity e->e.getCode();case RoutingEntity e->e.getCode();case ProductionVersionEntity e->e.getCode();
+        case InspectionCharacteristicEntity e->e.getCode();case InspectionMethodEntity e->e.getCode();
+        case QualitySpecificationEntity e->e.getCode();default->null;};}
     private static final class Collector {private final List<Issue> issues=new ArrayList<>();private boolean truncated;
         private void add(String issueType,String resourceType,BaseIdEntity row,String severity,String reason,String related){if(issues.size()>=ISSUE_LIMIT){truncated=true;return;}issues.add(new Issue(issueType,resourceType,row.getId(),code(row),severity,reason,related));}}
 }

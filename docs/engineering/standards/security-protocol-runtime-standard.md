@@ -1,5 +1,7 @@
 # Mini Auth、安全协议、Gateway 与 Resource Server 运行规范
 
+> 适用于认证、授权、Token、Gateway、Resource Server 或安全配置；普通业务 CRUD 无需读取全文。
+
 - 状态：Current
 - 当前基线：Mini Auth V1
 - 决策权威：[ADR-040：Mini Auth 与 Redis Opaque Token 认证基线](../../adr/ADR-040-Mini-Auth与Redis-Opaque-Token认证基线.md)

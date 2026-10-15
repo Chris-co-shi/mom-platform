@@ -1,5 +1,7 @@
 # MOM 持久化与数据建模规范
 
+> 适用于 Entity、Mapper、Repository、SQL 或 Flyway 修改；纯 Controller/前端任务无需读取本文。
+
 ## 1. 适用范围与事实层次
 
 本规范冻结 MOM 新增和实质修改数据访问代码的工程边界。当前事实基线是 PostgreSQL 17、Flyway
@@ -10,7 +12,7 @@
 已经进入 Level 2/3、确实需要 Domain Repository Port / MyBatis Repository Adapter 的复杂场景参考，
 不再解释为所有 bounded context 第一版的默认强制结构。
 
-历史实现差异见 [S02 历史例外清单](../P1.6-S02-持久化历史例外清单.md)。历史差异只用于识别债务，
+历史差异只用于识别债务，
 不得无判断复制为新代码模式。
 
 ## 2. 数据所有权与物理命名
@@ -246,7 +248,7 @@ insertOrUpdate(entities [, batchSize])
 
 ### 7.3 System Platform 零 XML 门禁
 
-`mom-system-server/src/main/resources/mapper` 必须为空。Parameter、Dictionary、Dynamic I18n 和 Preference 的既有正式持久化路径统一使用 MyBatis-Plus。PostgreSQL advisory lock 允许保留受控固定参数化语句；JSONB 使用 Framework TypeHandler；历史聚合按已有 Accepted 决策执行。
+`mom-system-server/src/main/resources/mapper` 必须为空。当前 Dictionary、Supported Locale 和 Dynamic I18n 持久化统一使用 MyBatis-Plus。PostgreSQL advisory lock 允许保留受控固定参数化语句；JSONB 使用 Framework TypeHandler。
 
 ### 7.4 自定义数据库能力
 

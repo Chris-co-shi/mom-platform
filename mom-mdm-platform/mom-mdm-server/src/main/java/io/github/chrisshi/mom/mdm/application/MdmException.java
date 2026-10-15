@@ -117,4 +117,10 @@ public final class MdmException extends RuntimeException {
     public static MdmException conversionInexact() {
         return new MdmException(Kind.BAD_REQUEST, "mdm.conversion_inexact", "mdm.error.conversion_inexact");
     }
+
+    /** 创建质量标准数值范围无法解析或次序非法的输入异常。 */
+    public static MdmException qualityInvalidRange() {
+        return new MdmException(Kind.BAD_REQUEST, "mdm.quality_invalid_range",
+                "mdm.error.quality_invalid_range");
+    }
 }

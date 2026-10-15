@@ -1,5 +1,7 @@
 # 国际化与 Locale 工程规范
 
+> 适用于 Locale 解析、跨服务语言契约和动态文案所有权；不涉及国际化时无需读取本文。
+
 ## 1. 事实与项目决策
 
 BCP 47 定义语言 Tag；HTTP `Accept-Language` 表达客户端语言偏好；OIDC `ui_locales` 只提示授权服务器 UI。MOM 决定初始支持 `zh-CN`、`en-US`，默认回退 `zh-CN`。Java 内部可使用 `Locale`，跨服务契约只使用标准 Tag，不使用 `zh_CN`、`en_US` 或数字枚举。

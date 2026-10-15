@@ -1,5 +1,7 @@
 # MOM 数据库表结构设计规范
 
+> 适用于新增或修改表、约束、索引和 Migration；不涉及 Schema 时无需读取本文。
+
 - 状态：Accepted
 - 数据库基线：PostgreSQL 17 / Flyway 12
 - 决策关联：[ADR-026](../../adr/ADR-026-MOM业务表禁止物理外键与关联完整性策略.md)
