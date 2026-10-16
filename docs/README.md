@@ -18,6 +18,7 @@
 | CRUD/分页/持久化 | [CRUD 规范](engineering/standards/crud-application-standard.md) | [持久化规范](engineering/standards/persistence-data-modeling-standard.md) |
 | 表、索引、Flyway | [数据库表设计规范](engineering/standards/database-schema-design-standard.md) | 对应 Migration |
 | 事务、消息、幂等 | [事务一致性规范](engineering/standards/transaction-consistency-standard.md) | 对应 Accepted ADR |
+| 国际化文案/Key/Owner/翻译种子/去重 | [国际化与 Locale 规范](engineering/standards/localization-locale-standard.md) | [Key 与 Owner 边界](architecture/I18n-Key维度与Owner边界设计.md) |
 | Locale/时间/数量/UOM | [工程规范索引](engineering/standards/README.md) | 只读命中的单项规范 |
 | 测试/CI | [测试策略](engineering/standards/testing-strategy-standard.md) | Maven 或 CI 专项规范 |
 | 质量定义所有权 | [ADR-045](adr/ADR-045-MDM质量基础定义与QMS运行时边界.md) | MDM/QMS 当前源码 |

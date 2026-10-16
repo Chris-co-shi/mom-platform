@@ -57,7 +57,7 @@ class FrameworkGovernanceArchitectureTest {
         assertThat(violations).as("业务生产源码基础设施依赖越界").isEmpty();
     }
 
-    /** StreamBridge 与 Outbox JDBC 只能由各自 Framework Adapter 持有。 */
+    /** StreamBridge 与 JDBC 只能由各自 Framework Adapter 持有；I18n 仅开放单个 Store 文件。 */
     @Test
     void frameworkTechnologyDependenciesMustRemainInOwningAdapters() throws Exception {
         List<String> violations = new ArrayList<>();
@@ -69,8 +69,9 @@ class FrameworkGovernanceArchitectureTest {
             }
             if (source.path().startsWith("mom-framework/")
                     && imports.stream().anyMatch(FrameworkGovernanceArchitectureTest::isJdbcTemplate)
-                    && !source.path().startsWith("mom-framework/mom-outbox/")) {
-                violations.add(source.path() + " Framework JDBC Template 只能存在于 mom-outbox 精确 Adapter");
+                    && !source.path().startsWith("mom-framework/mom-outbox/")
+                    && !source.path().equals("mom-framework/mom-i18n-jdbc/src/main/java/io/github/chrisshi/mom/i18n/jdbc/JdbcI18nStore.java")) {
+                violations.add(source.path() + " Framework JDBC Template 只能存在于已登记的持久化 Adapter");
             }
         }
         assertThat(violations).as("Framework Adapter 技术所有权越界").isEmpty();

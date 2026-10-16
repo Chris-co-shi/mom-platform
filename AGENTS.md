@@ -21,6 +21,7 @@
 | CRUD、分页、关联、Flyway | `docs/engineering/standards/crud-application-standard.md`；按需再读持久化或表设计规范 |
 | 事务、消息、幂等、并发 | `docs/engineering/standards/transaction-consistency-standard.md`；按需再读审计并发规范 |
 | 认证、授权、Gateway、Redis、外部 HTTP | `docs/engineering/standards/security-protocol-runtime-standard.md`；按需再读对应专项规范 |
+| 国际化文案、I18n Key/Owner、翻译种子或去重 | [国际化与 Locale 工程规范](docs/engineering/standards/localization-locale-standard.md)；新增或生成国际化内容前必须按其中的新增流程检查复用 |
 | Locale、时间、数量、单位 | 只读 `docs/engineering/standards/` 中命中的单项规范 |
 | 测试、构建、CI | `docs/engineering/standards/testing-strategy-standard.md`；按需再读 Maven 或 CI 规范 |
 
