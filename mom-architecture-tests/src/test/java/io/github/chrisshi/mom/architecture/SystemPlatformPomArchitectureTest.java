@@ -23,7 +23,7 @@ class SystemPlatformPomArchitectureTest {
             MOM_GROUP + ":mom-system-api",
             MOM_GROUP + ":mom-webmvc", MOM_GROUP + ":mom-security",
             MOM_GROUP + ":mom-data", MOM_GROUP + ":mom-tracing",
-            MOM_GROUP + ":mom-metrics",
+            MOM_GROUP + ":mom-metrics", MOM_GROUP + ":mom-i18n-jdbc",
             "org.springframework.boot:spring-boot-starter-flyway",
             "org.flywaydb:flyway-database-postgresql", "org.postgresql:postgresql",
             "com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery",
