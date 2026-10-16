@@ -7,6 +7,7 @@ import io.github.chrisshi.mom.i18n.runtime.I18nLocalePolicy;
 import io.github.chrisshi.mom.i18n.store.I18nStore;
 import io.github.chrisshi.mom.i18n.validation.I18nRules;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -38,7 +39,7 @@ public class I18nManagementService {
             I18nMessage created = store.createMessage(key, I18nRules.description(description), enabled == null || enabled);
             changes.bundleChanged("*");
             return created;
-        } catch (DataIntegrityViolationException exception) {
+        } catch (DuplicateKeyException exception) {
             throw new I18nFailure(I18nFailure.Kind.CONFLICT, "i18n.message_key_conflict");
         }
     }

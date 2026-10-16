@@ -8,6 +8,7 @@ import io.github.chrisshi.mom.i18n.store.I18nStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.time.Instant;
 import java.util.List;
@@ -61,10 +62,19 @@ class I18nManagementServiceTest {
     @Test
     void uniqueConflictMustUseStableFailureCode() {
         when(store.createMessage("mdm.material.title", null, true))
-                .thenThrow(new DataIntegrityViolationException("unique constraint"));
+                .thenThrow(new DuplicateKeyException("unique constraint"));
 
         assertFailure(() -> service.createMessage("MDM.Material.Title", null, true),
                 "i18n.message_key_conflict");
+        verifyNoInteractions(changes);
+    }
+
+    @Test
+    void nonUniqueConstraintFailureMustNotBecomeKeyConflict() {
+        var failure = new DataIntegrityViolationException("check or not-null constraint");
+        when(store.createMessage("title", null, true)).thenThrow(failure);
+
+        assertThatThrownBy(() -> service.createMessage("title", null, true)).isSameAs(failure);
         verifyNoInteractions(changes);
     }
 

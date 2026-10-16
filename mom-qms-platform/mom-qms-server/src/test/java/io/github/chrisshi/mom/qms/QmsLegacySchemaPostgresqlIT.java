@@ -25,6 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         webEnvironment = SpringBootTest.WebEnvironment.NONE,
         properties = {
                 "spring.main.banner-mode=off",
+                // 本测试验证 V4 退役行为；V5 对原始历史 Key 的显式拒绝由独立迁移测试覆盖。
+                "spring.flyway.target=4",
                 "spring.cloud.nacos.discovery.enabled=false",
                 "mom.security.resource-server.enabled=false",
                 "spring.autoconfigure.exclude="
