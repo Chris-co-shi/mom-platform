@@ -58,17 +58,11 @@ mybatis-plus:
 
 mom:
   i18n:
-    runtime:
-      base-path: /i18n/runtime
-    management:
-      base-path: /i18n/messages
-      read-authority: system:i18n:read
-      write-authority: system:i18n:write
+    owner: mdm
   security:
     resource-server:
       enabled: ${MOM_RESOURCE_SERVER_ENABLED:true}
       public-paths:
-        - /i18n/runtime/**
 
 management:
   endpoints:

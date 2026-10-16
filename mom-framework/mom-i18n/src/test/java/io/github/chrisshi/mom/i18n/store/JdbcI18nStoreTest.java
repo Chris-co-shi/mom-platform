@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.i18n.jdbc;
+package io.github.chrisshi.mom.i18n.store;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;

@@ -82,7 +82,7 @@ class AuthI18nStorePostgresqlIT {
     @Test
     void crudAuditCasAndLogicalDeletion() {
         assertThat(context.getBeansOfType(I18nStore.class)).hasSize(1);
-        assertThat(store.getClass().getName()).isEqualTo("io.github.chrisshi.mom.i18n.jdbc.JdbcI18nStore");
+        assertThat(store.getClass().getName()).isEqualTo("io.github.chrisshi.mom.i18n.store.JdbcI18nStore");
         Instant before = Instant.now().minusSeconds(1);
         var message = store.createMessage("jdbc.test.audit", "说明", true);
         assertThat(message.id()).matches("[0-9]{1,19}");
@@ -227,16 +227,27 @@ class AuthI18nStorePostgresqlIT {
                 .addFilters(context.getBean("springSecurityFilterChain", jakarta.servlet.Filter.class)).build();
         var tokens = context.getBean(io.github.chrisshi.mom.security.token.MomTokenStore.class);
         tokens.store("jdbc-http-token", new io.github.chrisshi.mom.security.token.MomTokenPrincipal(
-                "jdbc-http-actor", List.of("auth:i18n:read", "auth:i18n:write"), Instant.now().plusSeconds(300)));
+                "jdbc-http-actor", List.of("system:i18n:write"), Instant.now().plusSeconds(300)));
         tokens.store("jdbc-read-token", new io.github.chrisshi.mom.security.token.MomTokenPrincipal(
                 "jdbc-http-actor", List.of("auth:i18n:read"), Instant.now().plusSeconds(300)));
         tokens.store("jdbc-no-permission", new io.github.chrisshi.mom.security.token.MomTokenPrincipal(
                 "jdbc-http-actor", List.of(), Instant.now().plusSeconds(300)));
-        mvc.perform(get("/i18n/messages")).andExpect(status().isUnauthorized());
+        tokens.store("jdbc-legacy-write", new io.github.chrisshi.mom.security.token.MomTokenPrincipal(
+                "jdbc-http-actor", List.of("auth:i18n:write"), Instant.now().plusSeconds(300)));
+        mvc.perform(get("/i18n/messages")).andExpect(status().isOk());
         mvc.perform(get("/i18n/messages").header("Authorization", "Bearer jdbc-no-permission"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
+        mvc.perform(post("/i18n/messages").contentType("application/json")
+                        .content("{\"messageKey\":\"jdbc.test.anon-denied\"}"))
+                .andExpect(status().isUnauthorized());
         mvc.perform(post("/i18n/messages").header("Authorization", "Bearer jdbc-read-token")
                         .contentType("application/json").content("{\"messageKey\":\"jdbc.test.denied\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/i18n/messages").header("Authorization", "Bearer jdbc-no-permission")
+                        .contentType("application/json").content("{\"messageKey\":\"jdbc.test.no-permission\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/i18n/messages").header("Authorization", "Bearer jdbc-legacy-write")
+                        .contentType("application/json").content("{\"messageKey\":\"jdbc.test.legacy-denied\"}"))
                 .andExpect(status().isForbidden());
         var events = mvc.perform(get("/i18n/runtime/events"))
                 .andExpect(request().asyncStarted())
@@ -315,7 +326,7 @@ class AuthI18nStorePostgresqlIT {
     @Test
     void explicitSchemaFixedClockAndDatabaseErrorClassification() {
         var now = Instant.parse("2026-10-16T03:00:00.123456Z");
-        var qualified = new io.github.chrisshi.mom.i18n.jdbc.JdbcI18nStore(
+        var qualified = new io.github.chrisshi.mom.i18n.store.JdbcI18nStore(
                 context.getBean(javax.sql.DataSource.class), "mom_auth.auth_i18n_message_definition",
                 "mom_auth.auth_i18n_translation", () -> "1234567890123456789",
                 context.getBean(io.github.chrisshi.mom.core.security.CurrentActorProvider.class),
@@ -323,7 +334,7 @@ class AuthI18nStorePostgresqlIT {
         var message = qualified.createMessage("jdbc.test.fixed", null, true);
         assertThat(message.id()).isEqualTo("1234567890123456789");
         assertThat(qualified.message(message.id(), false).updatedAt()).isEqualTo(now);
-        var missing = new io.github.chrisshi.mom.i18n.jdbc.JdbcI18nStore(
+        var missing = new io.github.chrisshi.mom.i18n.store.JdbcI18nStore(
                 context.getBean(javax.sql.DataSource.class), "missing_message_table", "missing_translation_table",
                 () -> "1", java.util.Optional::empty, java.time.Clock.systemUTC());
         assertThatThrownBy(missing::messages).isInstanceOf(org.springframework.jdbc.BadSqlGrammarException.class);
@@ -346,7 +357,7 @@ class AuthI18nStorePostgresqlIT {
         var tokens = context.getBean(io.github.chrisshi.mom.security.token.MomTokenStore.class);
         assertThat(tokens.find(token)).get().satisfies(principal -> assertThat(principal.userId()).isEqualTo(user.id()));
         mvc.perform(get("/i18n/messages").header("Authorization", "Bearer " + token))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
         mvc.perform(get("/i18n/messages").header("Authorization", "Bearer unknown-jdbc-token"))
                 .andExpect(status().isUnauthorized());
         // 仅在测试内用过去时钟写入尚有 Redis TTL、但业务有效期已过的快照，验证实际内省器拒绝它。

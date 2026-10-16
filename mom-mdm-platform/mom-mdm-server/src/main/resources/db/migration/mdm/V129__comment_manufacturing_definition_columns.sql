@@ -1,0 +1,26 @@
+-- 只补齐已发布制造定义表的元数据，不改变列、数据、约束或国际化行为。
+COMMENT ON COLUMN mdm_formula.id IS '配方身份的稳定技术 ID';
+COMMENT ON COLUMN mdm_formula.plant_id IS '配方所属工厂的 MDM ID';
+COMMENT ON COLUMN mdm_formula.output_material_id IS '配方产出物料的 MDM ID';
+COMMENT ON COLUMN mdm_formula.base_uom_id IS '基准批量对应的 MDM 计量单位 ID';
+COMMENT ON COLUMN mdm_formula_revision.id IS '配方业务修订的稳定技术 ID';
+COMMENT ON COLUMN mdm_formula_revision.formula_id IS '所属配方身份 ID';
+COMMENT ON COLUMN mdm_formula_revision.status IS '配方修订状态：DRAFT、RELEASED 或 OBSOLETE';
+COMMENT ON COLUMN mdm_formula_item.id IS '配方组成条目的稳定技术 ID';
+COMMENT ON COLUMN mdm_formula_item.revision_id IS '所属配方业务修订 ID';
+COMMENT ON COLUMN mdm_formula_item.material_id IS '组成物料的 MDM ID';
+COMMENT ON COLUMN mdm_formula_item.uom_id IS '组成数量对应的 MDM 计量单位 ID';
+COMMENT ON COLUMN mdm_routing.id IS '工艺路线身份的稳定技术 ID';
+COMMENT ON COLUMN mdm_routing.plant_id IS '工艺路线所属工厂的 MDM ID';
+COMMENT ON COLUMN mdm_routing_revision.id IS '工艺路线业务修订的稳定技术 ID';
+COMMENT ON COLUMN mdm_routing_revision.routing_id IS '所属工艺路线身份 ID';
+COMMENT ON COLUMN mdm_routing_revision.status IS '路线修订状态：DRAFT、RELEASED 或 OBSOLETE';
+COMMENT ON COLUMN mdm_routing_step.id IS '路线工序条目的稳定技术 ID';
+COMMENT ON COLUMN mdm_routing_step.revision_id IS '所属工艺路线业务修订 ID';
+COMMENT ON COLUMN mdm_routing_step.resource_id IS '工序引用的 MDM 产线或工作站 ID，由 resource_type 区分';
+COMMENT ON COLUMN mdm_production_version.id IS '生产版本的稳定技术 ID';
+COMMENT ON COLUMN mdm_production_version.plant_id IS '生产版本适用的 MDM 工厂 ID';
+COMMENT ON COLUMN mdm_production_version.output_material_id IS '生产版本产出物料的 MDM ID';
+COMMENT ON COLUMN mdm_production_version.formula_revision_id IS '生产版本固定引用的配方业务修订 ID';
+COMMENT ON COLUMN mdm_production_version.routing_revision_id IS '生产版本固定引用的工艺路线业务修订 ID';
+COMMENT ON COLUMN mdm_production_version.status IS '生产版本状态：DRAFT、RELEASED 或 OBSOLETE';

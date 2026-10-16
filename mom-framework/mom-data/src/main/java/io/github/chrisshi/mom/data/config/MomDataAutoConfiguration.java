@@ -6,8 +6,11 @@ import com.baomidou.mybatisplus.extension.plugins.inner.BlockAttackInnerIntercep
 import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import io.github.chrisshi.mom.core.security.CurrentActorProvider;
+import io.github.chrisshi.mom.core.id.IdGenerator;
 import io.github.chrisshi.mom.data.audit.MomMetaObjectHandler;
 import io.github.chrisshi.mom.data.page.PageAdapter;
+import com.baomidou.mybatisplus.core.toolkit.GlobalConfigUtils;
+import org.apache.ibatis.session.SqlSessionFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -74,5 +77,14 @@ public class MomDataAutoConfiguration {
     @ConditionalOnMissingBean(PageAdapter.class)
     PageAdapter momPageAdapter(MomDataPaginationProperties paginationProperties) {
         return new PageAdapter(paginationProperties.getMaxPageSize());
+    }
+
+    /** 复用 MyBatis-Plus 全局 ASSIGN_ID 生成规则，供共享技术组件使用。 */
+    @Bean
+    @ConditionalOnMissingBean(IdGenerator.class)
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnBean(SqlSessionFactory.class)
+    IdGenerator momIdGenerator(SqlSessionFactory sessions) {
+        var delegate = GlobalConfigUtils.getGlobalConfig(sessions.getConfiguration()).getIdentifierGenerator();
+        return () -> delegate.nextId(null).toString();
     }
 }

@@ -12,12 +12,12 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 可由任意 Servlet 业务服务复用的薄 I18n Runtime HTTP Controller。
  *
- * <p>路径前缀由 {@code mom.i18n.runtime.base-path} 配置，Framework 不硬编码 System、MDM、MES 等 Owner。
+ * <p>路径固定为 {@code /i18n/runtime}，Framework 不硬编码 System、MDM、MES 等 Owner。
  * Controller 只适配 Locale 并调用公共 Runtime Service，不访问数据库或决定 Owner。认证与授权由
  * 宿主服务的 SecurityFilterChain 负责。</p>
  */
 @RestController
-@RequestMapping("${mom.i18n.runtime.base-path:/i18n/runtime}")
+@RequestMapping("/i18n/runtime")
 public final class I18nRuntimeController {
     private final I18nRuntimeService runtime;
 

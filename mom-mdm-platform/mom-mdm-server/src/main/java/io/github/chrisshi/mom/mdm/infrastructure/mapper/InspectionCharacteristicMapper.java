@@ -9,6 +9,10 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface InspectionCharacteristicMapper extends MomBaseMapper<InspectionCharacteristicEntity> {
     /** 按主键锁定特性，保证质量标准写入与特性停用串行。 */
-    @Select("SELECT * FROM mdm_inspection_characteristic WHERE id = #{id} FOR UPDATE")
+    @Select("""
+            SELECT id, code, name, default_uom_id, default_uom_version, enabled, version,
+                   created_at, created_by, updated_at, updated_by
+              FROM mdm_inspection_characteristic WHERE id = #{id} FOR UPDATE
+            """)
     InspectionCharacteristicEntity selectByIdForUpdate(@Param("id") String id);
 }

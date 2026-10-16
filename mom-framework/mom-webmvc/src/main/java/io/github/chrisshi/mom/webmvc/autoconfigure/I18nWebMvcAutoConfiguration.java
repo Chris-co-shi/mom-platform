@@ -92,13 +92,14 @@ public class I18nWebMvcAutoConfiguration {
         return new I18nManagementService(store, locales, notifier);
     }
 
-    /** @return 宿主明确配置的管理权限；未配置时不会意外授予权限 */
+    /** 为未迁移 Owner 保留旧权限兼容；Auth、MDM、System 使用统一 system:i18n:write。 */
     @Bean("i18nManagementAccess")
     @ConditionalOnBean(I18nStore.class)
     I18nManagementAccess i18nManagementAccess(
-            @Value("${mom.i18n.management.read-authority:__I18N_UNCONFIGURED_READ__}") String read,
-            @Value("${mom.i18n.management.write-authority:__I18N_UNCONFIGURED_WRITE__}") String write) {
-        return new I18nManagementAccess(read, write);
+            @Value("${mom.i18n.owner:}") String owner,
+            @Value("${mom.i18n.management.read-authority:}") String read,
+            @Value("${mom.i18n.management.write-authority:}") String write) {
+        return new I18nManagementAccess(owner, read, write);
     }
 
     /** @return 公共匿名 Runtime Controller */

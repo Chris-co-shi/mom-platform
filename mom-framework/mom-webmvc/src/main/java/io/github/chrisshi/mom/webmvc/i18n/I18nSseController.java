@@ -13,7 +13,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * Bundle，重连后应主动重新加载当前 Owner Bundle；V1 不提供 Last-Event-ID、历史重放或跨实例广播。</p>
  */
 @RestController
-@RequestMapping("${mom.i18n.runtime.base-path:/i18n/runtime}")
+@RequestMapping("/i18n/runtime")
 public final class I18nSseController {
     private final I18nChangeNotifier notifier;
 

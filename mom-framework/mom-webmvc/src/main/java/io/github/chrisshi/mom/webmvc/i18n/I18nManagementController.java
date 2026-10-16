@@ -6,6 +6,7 @@ import io.github.chrisshi.mom.i18n.model.I18nTranslation;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,11 +21,11 @@ import java.util.List;
 /**
  * 各 Servlet Owner 共享的 I18n 管理 HTTP 边界。
  *
- * <p>路径和权限由宿主配置，所有写操作都要求真实 Permission；业务所有权、占位符和事务
+ * <p>管理路径固定，所有写操作都要求统一的真实 Permission；读取 API 公开。业务所有权、占位符和事务
  * 由 Framework 用例统一执行。Controller 不依赖 System/Auth/MDM 实体或 Mapper。</p>
  */
 @RestController
-@RequestMapping("${mom.i18n.management.base-path:/i18n/admin/messages}")
+@RequestMapping("/i18n/messages")
 public class I18nManagementController {
     private final I18nManagementService management;
 

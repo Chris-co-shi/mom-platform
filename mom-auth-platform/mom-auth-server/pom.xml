@@ -37,7 +37,7 @@
 
     <dependency>
       <groupId>io.github.chrisshi.mom</groupId>
-      <artifactId>mom-i18n-jdbc</artifactId>
+      <artifactId>mom-i18n</artifactId>
       <version>${project.version}</version>
     </dependency>
 

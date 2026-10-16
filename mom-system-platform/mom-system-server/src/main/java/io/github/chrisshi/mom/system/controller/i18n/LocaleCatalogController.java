@@ -18,7 +18,7 @@ public class LocaleCatalogController {
     private final SupportedLocaleApplication application;
     public LocaleCatalogController(SupportedLocaleApplication application) { this.application = application; }
 
-    @GetMapping @PreAuthorize("hasAuthority('system:i18n:read')")
+    @GetMapping
     public Result<List<LocaleView>> list() { return Result.success(application.list()); }
     @PostMapping @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('system:i18n:write')")
     public Result<LocaleView> create(@RequestBody CreateLocaleRequest request) {

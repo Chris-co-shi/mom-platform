@@ -39,7 +39,7 @@ class QmsI18nSchemaPostgresqlIT {
         assertThat(jdbc.queryForList("""
                 SELECT version FROM flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank
                 """, String.class))
-                .containsExactly("1", "2", "3", "4", "4.1", "5");
+                .containsExactly("1", "2", "3", "4", "4.1", "5", "6");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM qms_i18n_message_definition", Integer.class))
                 .isEqualTo(36);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM qms_i18n_translation", Integer.class))
@@ -66,7 +66,7 @@ class QmsI18nSchemaPostgresqlIT {
         flyway(schema, null).migrate();
         assertThat(snapshot(jdbc)).isEqualTo(expected);
         assertThat(translationSnapshot(jdbc)).isEqualTo(translations);
-        assertThat(flyway(schema, null).info().current().getVersion().getVersion()).isEqualTo("5");
+        assertThat(flyway(schema, null).info().current().getVersion().getVersion()).isEqualTo("6");
     }
 
     @Test
@@ -76,7 +76,7 @@ class QmsI18nSchemaPostgresqlIT {
         List<String> before = snapshot(jdbc);
         flyway(schema, null).migrate();
 
-        assertThat(flyway(schema, null).info().current().getVersion().getVersion()).isEqualTo("5");
+        assertThat(flyway(schema, null).info().current().getVersion().getVersion()).isEqualTo("6");
         assertThat(snapshot(jdbc)).isEqualTo(before);
         int id = 100;
         for (String key : List.of("title", "inspection.result", "a1_b2-c3.d4", "qms.existing", "a".repeat(160))) {
@@ -176,6 +176,71 @@ class QmsI18nSchemaPostgresqlIT {
                 .isInstanceOf(FlywayException.class)
                 .hasMessageContaining("Detected resolved migration not applied to database: 4.1");
         assertThat(snapshot(jdbc(schema))).isEqualTo(before);
+    }
+
+    /** V6 只能改变名称和注释，不能重建约束、改写数据或改变既有约束定义。 */
+    @Test
+    void metadataRepairMustPreserveRowsConstraintIdentityAndDefinitions() {
+        String schema = schema();
+        flyway(schema, "5").migrate();
+        JdbcTemplate jdbc = jdbc(schema);
+        var definitions = snapshot(jdbc);
+        var translations = translationSnapshot(jdbc);
+        var constraints = constraintSnapshot(jdbc, schema);
+        var history = jdbc.queryForList("SELECT version, checksum FROM flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank");
+        flyway(schema, null).migrate();
+        assertThat(snapshot(jdbc)).isEqualTo(definitions);
+        assertThat(translationSnapshot(jdbc)).isEqualTo(translations);
+        assertThat(constraintSnapshot(jdbc, schema)).isEqualTo(constraints);
+        assertThat(jdbc.queryForList("SELECT version, checksum FROM flyway_schema_history WHERE version <> '6' ORDER BY installed_rank"))
+                .isEqualTo(history);
+        assertThat(jdbc.queryForList("""
+                SELECT conname FROM pg_constraint WHERE connamespace = ?::regnamespace
+                  AND conname IN ('uk_qms_specification_revision_no', 'pk_qms_i18n_message_definition',
+                    'uk_qms_i18n_message_definition_key', 'ck_qms_i18n_message_definition_key',
+                    'ck_qms_i18n_message_definition_version')
+                """, String.class, schema)).hasSize(5);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid
+                WHERE c.relnamespace = ?::regnamespace AND c.relname LIKE 'qms_%'
+                  AND (a.attname = 'id' OR a.attname LIKE '%\\_id' ESCAPE '\\'
+                       OR a.attname IN ('status', 'version'))
+                  AND col_description(c.oid, a.attnum) IS NULL
+                """, Integer.class, schema)).isZero();
+        assertThat(jdbc.queryForObject("SELECT obj_description('qms_quality_specification'::regclass)", String.class))
+                .startsWith("LEGACY READ-ONLY DATA:");
+        assertThatThrownBy(() -> insert(jdbc, "201", "BAD KEY"))
+                .isInstanceOf(DataIntegrityViolationException.class).isNotInstanceOf(DuplicateKeyException.class);
+        assertThatThrownBy(() -> insert(jdbc, "202", "qms.invalid_reference"))
+                .isInstanceOf(DuplicateKeyException.class);
+    }
+
+    private List<String> constraintSnapshot(JdbcTemplate jdbc, String schema) {
+        return jdbc.queryForList("""
+                SELECT oid::text || ':' || conrelid::text || ':' || contype::text || ':' || convalidated::text
+                       || ':' || pg_get_constraintdef(oid)
+                FROM pg_constraint WHERE connamespace = ?::regnamespace ORDER BY oid
+                """, String.class, schema);
+    }
+
+    /** 后段改名失败时，前面已经执行的改名也必须随 Flyway 事务回滚。 */
+    @Test
+    void failedMetadataRepairMustRollbackEarlierRenames() {
+        String schema = schema();
+        flyway(schema, "5").migrate();
+        JdbcTemplate jdbc = jdbc(schema);
+        jdbc.execute("ALTER TABLE qms_i18n_message_definition DROP CONSTRAINT ck_qms_i18n_message_version");
+        var constraints = constraintSnapshot(jdbc, schema);
+        String namesSql = "SELECT oid, conname FROM pg_constraint WHERE connamespace = ?::regnamespace ORDER BY oid";
+        var names = jdbc.queryForList(namesSql, schema);
+        var definitions = snapshot(jdbc);
+        var translations = translationSnapshot(jdbc);
+        assertThatThrownBy(() -> flyway(schema, null).migrate()).isInstanceOf(FlywayException.class);
+        assertThat(constraintSnapshot(jdbc, schema)).isEqualTo(constraints);
+        assertThat(jdbc.queryForList(namesSql, schema)).isEqualTo(names);
+        assertThat(snapshot(jdbc)).isEqualTo(definitions);
+        assertThat(translationSnapshot(jdbc)).isEqualTo(translations);
+        assertThat(flyway(schema, null).info().current().getVersion().getVersion()).isEqualTo("5");
     }
 
     private void assertNormalizationFailsWithoutChanges(String schema, String reason) {

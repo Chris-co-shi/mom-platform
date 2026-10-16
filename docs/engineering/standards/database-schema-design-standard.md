@@ -53,3 +53,5 @@ Flyway 只管理本服务 Schema；已发布 Versioned Migration 不修改/删�
 ## 8. 自动证明与人工 Review
 
 门禁可证明命名、显式 PK/UK/CK/索引、技术 ID、时间/精度类型、version Check、注释、跨 Schema、版本不可变和无业务 FK。字段长度合理性、索引有效性、真实基数、生命周期和业务完整性只能输出精确 Review Candidate，并由设计记录、PostgreSQL IT、孤儿查询和 EXPLAIN 证据关闭。
+
+已发布脚本的命名缺陷通过新 Migration 修复；经明确批准后，门禁可按来源文件、表、旧/新约束名及修复文件精确识别后续 `RENAME CONSTRAINT`。修复缺失或不匹配必须失败，不豁免类型、注释或其他规则；注释缺失沿用同上下文后续 Migration 补齐机制。

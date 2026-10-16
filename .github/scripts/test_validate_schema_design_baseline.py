@@ -7,6 +7,8 @@ import importlib.util
 import pathlib
 import sys
 import unittest
+import tempfile
+from unittest.mock import patch
 
 PATH = pathlib.Path(__file__).with_name("validate_schema_design_baseline.py")
 SPEC = importlib.util.spec_from_file_location("schema", PATH)
@@ -83,6 +85,50 @@ class SchemaDesignBaselineTest(unittest.TestCase):
         wrong = module.Report()
         module.check_sql(self.path, "CREATE TABLE old_table (id bigint);", wrong, {(self.path, "other")})
         self.assertTrue(wrong.errors)
+
+    def repaired_revision_report(self, *, repair=True, source=None, table=None, bad_id=False, rename=None):
+        source = source or "mom-qms-platform/mom-qms-server/src/main/resources/db/migration/qms/V1__create_quality_definition.sql"
+        table = table or "qms_specification_revision"
+        repair_path = "mom-qms-platform/mom-qms-server/src/main/resources/db/migration/qms/V6__repair_schema_metadata.sql"
+        sql = self.valid.replace("system_item", table).replace(
+            "uk_" + table + "_owner", "uk_qms_specification_revision")
+        if bad_id:
+            sql = sql.replace("id varchar(19)", "id bigint", 1)
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            files = {source: sql}
+            if repair:
+                files[repair_path] = rename or """ALTER TABLE qms_specification_revision
+                    RENAME CONSTRAINT uk_qms_specification_revision TO uk_qms_specification_revision_no;"""
+            for name, value in files.items():
+                target = root / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(value)
+            report = module.Report()
+            with patch.object(module, "git_files", return_value=list(files)):
+                module.run(root, report)
+            return report
+
+    def test_exact_later_constraint_rename_repairs_historical_name(self):
+        self.assertEqual([], self.repaired_revision_report().errors)
+
+    def test_missing_repair_must_fail(self):
+        self.assertTrue(self.repaired_revision_report(repair=False).errors)
+
+    def test_commented_wrong_or_partial_rename_must_fail(self):
+        for sql in (
+            "-- ALTER TABLE qms_specification_revision RENAME CONSTRAINT uk_qms_specification_revision TO uk_qms_specification_revision_no;",
+            "ALTER TABLE qms_other RENAME CONSTRAINT uk_qms_specification_revision TO uk_qms_specification_revision_no;",
+            "ALTER TABLE qms_specification_revision RENAME CONSTRAINT uk_qms_other TO uk_qms_specification_revision_no;",
+            "ALTER TABLE qms_specification_revision RENAME CONSTRAINT uk_qms_specification_revision TO uk_qms_specification_revision_wrong;",
+        ):
+            with self.subTest(sql=sql):
+                self.assertTrue(self.repaired_revision_report(rename=sql).errors)
+
+    def test_rename_does_not_exempt_types_other_files_or_tables(self):
+        self.assertTrue(self.repaired_revision_report(bad_id=True).errors)
+        self.assertTrue(self.repaired_revision_report(source=self.path.replace("system/", "qms/")).errors)
+        self.assertTrue(self.repaired_revision_report(table="qms_other").errors)
 
 
 if __name__ == "__main__":

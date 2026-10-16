@@ -82,7 +82,7 @@ class SystemI18nStorePostgresqlIT {
     @Test
     void hostMustExposeOneJdbcStoreAndOneLocalTransaction() {
         assertThat(context.getBeansOfType(I18nStore.class)).hasSize(1);
-        assertThat(store.getClass().getName()).isEqualTo("io.github.chrisshi.mom.i18n.jdbc.JdbcI18nStore");
+        assertThat(store.getClass().getName()).isEqualTo("io.github.chrisshi.mom.i18n.store.JdbcI18nStore");
         assertThat(context.getBeansOfType(javax.sql.DataSource.class)).hasSize(1);
         assertThat(context.getBeansOfType(PlatformTransactionManager.class)).hasSize(1);
         var source = context.getBean(javax.sql.DataSource.class);
@@ -236,10 +236,9 @@ class SystemI18nStorePostgresqlIT {
                 .apply(springSecurity()).build();
         var identity = opaqueToken()
                 .attributes(a -> a.put("sub", "jdbc-http-actor"))
-                .authorities(new SimpleGrantedAuthority("system:i18n:read"),
-                        new SimpleGrantedAuthority("system:i18n:write"));
+                .authorities(new SimpleGrantedAuthority("system:i18n:write"));
         mvc.perform(get("/i18n/messages").with(anonymous()))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk());
         var events = mvc.perform(get("/i18n/runtime/events").with(anonymous()))
                 .andExpect(request().asyncStarted())
                 .andReturn();
@@ -319,10 +318,16 @@ class SystemI18nStorePostgresqlIT {
                 .andExpect(jsonPath("$.data[0].defaultLocale").value(true))
                 .andExpect(jsonPath("$.data[1].localeCode").value("en-US"));
         mvc.perform(get("/i18n/locale-catalog").with(anonymous()))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk());
         mvc.perform(post("/i18n/messages").with(opaqueToken()
                         .authorities(new SimpleGrantedAuthority("system:i18n:read")))
                         .contentType("application/json").content("{\"messageKey\":\"jdbc.test.forbidden\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/i18n/messages").with(anonymous()).contentType("application/json")
+                        .content("{\"messageKey\":\"jdbc.test.anonymous-denied\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/i18n/messages").with(opaqueToken()).contentType("application/json")
+                        .content("{\"messageKey\":\"jdbc.test.no-permission\"}"))
                 .andExpect(status().isForbidden());
         actor("jdbc-locale");
         var locales = context.getBean(io.github.chrisshi.mom.system.application.i18n.SupportedLocaleApplication.class);

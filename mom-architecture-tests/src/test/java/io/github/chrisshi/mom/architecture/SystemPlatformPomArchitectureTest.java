@@ -23,7 +23,7 @@ class SystemPlatformPomArchitectureTest {
             MOM_GROUP + ":mom-system-api",
             MOM_GROUP + ":mom-webmvc", MOM_GROUP + ":mom-security",
             MOM_GROUP + ":mom-data", MOM_GROUP + ":mom-tracing",
-            MOM_GROUP + ":mom-metrics", MOM_GROUP + ":mom-i18n-jdbc",
+            MOM_GROUP + ":mom-metrics", MOM_GROUP + ":mom-i18n",
             "org.springframework.boot:spring-boot-starter-flyway",
             "org.flywaydb:flyway-database-postgresql", "org.postgresql:postgresql",
             "com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery",
@@ -113,7 +113,14 @@ class SystemPlatformPomArchitectureTest {
                             migration(server, "V14__seed_uom_navigation.sql"),
                             migration(server, "V15__seed_material_navigation.sql"),
                             migration(server, "V16__b2_responsive_web_copy.sql"),
-                            migration(server, "V17__remove_system_i18n_namespace.sql"));
+                            migration(server, "V17__remove_system_i18n_namespace.sql"),
+                            migration(server, "V18__rename_mdm_and_seed_section_navigation.sql"),
+                            migration(server, "V19__clarify_mdm_location_navigation.sql"),
+                            migration(server, "V20__seed_formula_navigation.sql"),
+                            migration(server, "V21__seed_routing_navigation.sql"),
+                            migration(server, "V22__seed_production_version_navigation.sql"),
+                            migration(server, "V23__seed_quality_definition_navigation.sql"),
+                            migration(server, "V24__seed_governance_navigation.sql"));
             assertThat(files)
                     .filteredOn(path -> normalized(path).contains("/src/main/resources/mapper/"))
                     .isEmpty();

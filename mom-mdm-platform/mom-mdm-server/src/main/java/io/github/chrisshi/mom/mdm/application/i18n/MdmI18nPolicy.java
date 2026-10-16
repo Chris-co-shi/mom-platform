@@ -2,7 +2,6 @@ package io.github.chrisshi.mom.mdm.application.i18n;
 
 import io.github.chrisshi.mom.i18n.runtime.I18nLocalePolicy;
 import io.github.chrisshi.mom.i18n.runtime.LocalBaseLocalePolicy;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -15,9 +14,9 @@ import org.springframework.stereotype.Component;
 public final class MdmI18nPolicy implements I18nLocalePolicy {
     private final LocalBaseLocalePolicy locales;
 
-    /** @param baseLocale MDM 独立部署的基础语言 */
-    public MdmI18nPolicy(@Value("${mom.i18n.base-locale:zh-CN}") String baseLocale) {
-        this.locales = new LocalBaseLocalePolicy(baseLocale);
+    /** 使用 zh-CN 作为服务端缺失译文的固定技术兜底，不代表 System 动态平台默认语言。 */
+    public MdmI18nPolicy() {
+        this.locales = new LocalBaseLocalePolicy("zh-CN");
     }
 
     /** {@inheritDoc} */

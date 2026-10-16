@@ -60,13 +60,7 @@ logging:
 
 mom:
   i18n:
-    base-locale: ${MOM_I18N_BASE_LOCALE:zh-CN}
-    runtime:
-      base-path: /i18n/runtime
-    management:
-      base-path: /i18n/messages
-      read-authority: auth:i18n:read
-      write-authority: auth:i18n:write
+    owner: auth
   auth:
     access-token-ttl: ${MOM_AUTH_ACCESS_TOKEN_TTL:8h}
   security:
@@ -74,4 +68,3 @@ mom:
       enabled: true
       public-paths:
         - /sessions/login
-        - /i18n/runtime/**

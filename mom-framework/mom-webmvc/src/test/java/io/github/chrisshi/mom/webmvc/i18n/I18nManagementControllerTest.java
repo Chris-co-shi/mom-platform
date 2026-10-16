@@ -19,8 +19,7 @@ class I18nManagementControllerTest {
     void ownerWideQueryDoesNotExposeNamespaceFilter() throws Exception {
         var service = mock(I18nManagementService.class);
         when(service.messages()).thenReturn(List.of());
-        var mvc = MockMvcBuilders.standaloneSetup(new I18nManagementController(service))
-                .addPlaceholderValue("mom.i18n.management.base-path", "/i18n/messages").build();
+        var mvc = MockMvcBuilders.standaloneSetup(new I18nManagementController(service)).build();
         mvc.perform(get("/i18n/messages")).andExpect(status().isOk());
         verify(service, times(1)).messages();
     }

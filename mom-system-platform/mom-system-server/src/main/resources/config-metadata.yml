@@ -3,13 +3,13 @@ version: 1.0
 owner: mom-system-platform
 
 configs:
-  - key: mom.i18n.runtime.base-path
-    environmentVariable: MOM_I18N_RUNTIME_BASE_PATH
+  - key: mom.i18n.owner
+    environmentVariable: MOM_I18N_OWNER
     type: string
-    default: /api/system/i18n/runtime
+    default: system
     required: true
     sensitive: false
-    owner: mom-framework/mom-webmvc
-    failureMode: fail-fast-on-invalid-controller-mapping
+    owner: mom-i18n
+    failureMode: fail-fast-on-unsupported-owner
     restartRequired: true
-    changeImpact: [runtime-api-routing]
+    changeImpact: [i18n-store-table-ownership]

@@ -13,6 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplicat
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -72,7 +73,8 @@ public class MomServletResourceServerAutoConfiguration {
         OpaqueTokenIntrospector introspector,
         MomResourceServerProperties properties,
         ObjectProvider<I18nMessageResolver> messageResolverProvider,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        Environment environment
     ) {
 
         MomLocalizedSecurityErrorHandler errorHandler = new MomLocalizedSecurityErrorHandler(
@@ -85,6 +87,16 @@ public class MomServletResourceServerAutoConfiguration {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
             .authorizeHttpRequests(authorize -> {
+                String i18nOwner = environment.getProperty("mom.i18n.owner", "");
+                if ("auth".equals(i18nOwner) || "mdm".equals(i18nOwner) || "system".equals(i18nOwner)) {
+                    authorize.requestMatchers(org.springframework.http.HttpMethod.GET,
+                                    "/i18n/messages", "/i18n/messages/**", "/i18n/locale-catalog",
+                                    "/i18n/locales", "/i18n/runtime/bundles", "/i18n/runtime/events")
+                            .permitAll();
+                    authorize.requestMatchers(org.springframework.http.HttpMethod.POST,
+                                    "/i18n/messages/duplicate-check/*/*")
+                            .permitAll();
+                }
                 if (!properties.getPublicPaths().isEmpty()) {
                     authorize
                         .requestMatchers(properties.getPublicPaths().toArray(String[]::new))

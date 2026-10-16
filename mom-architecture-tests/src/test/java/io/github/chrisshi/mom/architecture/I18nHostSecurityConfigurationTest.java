@@ -33,46 +33,45 @@ class I18nHostSecurityConfigurationTest {
     private static final String MDM = "mom-mdm-platform/mom-mdm-server/src/main/resources/application.yml";
 
     @Test
-    void systemHostMustExposeOnlyAnonymousRuntimeAndLocaleCatalog() throws Exception {
-        assertHost(SYSTEM, List.of("/i18n/locales", "/i18n/runtime/**"),
-                "/i18n/messages");
+    void systemHostHasExplicitOwnerAndNoBroadI18nPermit() throws Exception {
+        assertHost(SYSTEM, List.of(), "system");
     }
 
     @Test
-    void authHostMustExposeOnlyLoginAndAnonymousRuntime() throws Exception {
-        assertHost(AUTH, List.of("/sessions/login", "/i18n/runtime/**"), "/i18n/messages");
+    void authHostHasExplicitOwnerAndOnlyLoginConfiguredPublic() throws Exception {
+        assertHost(AUTH, List.of("/sessions/login"), "auth");
     }
 
     @Test
-    void mdmHostMustExposeOnlyAnonymousRuntime() throws Exception {
-        assertHost(MDM, List.of("/i18n/runtime/**"), "/i18n/messages");
+    void mdmHostHasExplicitOwnerAndNoBroadI18nPermit() throws Exception {
+        assertHost(MDM, List.of(), "mdm");
     }
 
-    private void assertHost(String relative, List<String> expectedPublic, String managementPath) throws Exception {
+    private void assertHost(String relative, List<String> expectedPublic, String owner) throws Exception {
         Path yaml = reactorRoot().resolve(relative);
         PropertySource<?> source = new YamlPropertySourceLoader()
                 .load(relative, new FileSystemResource(yaml)).getFirst();
         String enabled = String.valueOf(source.getProperty("mom.security.resource-server.enabled"));
         // System/MDM 允许环境显式覆盖，但正常启动默认必须启用；Auth 必须始终启用。
         assertThat(enabled).as(relative).isIn("true", "${MOM_RESOURCE_SERVER_ENABLED:true}");
-        String runtimePath = String.valueOf(source.getProperty("mom.i18n.runtime.base-path"));
-        assertThat(runtimePath).as(relative).isNotBlank();
-        assertThat(source.getProperty("mom.i18n.management.base-path")).isEqualTo(managementPath);
+        assertThat(source.getProperty("mom.i18n.owner")).isEqualTo(owner);
+        assertThat(source.getProperty("mom.i18n.base-locale")).isNull();
+        assertThat(source.getProperty("mom.i18n.runtime.base-path")).isNull();
+        assertThat(source.getProperty("mom.i18n.management.base-path")).isNull();
+        assertThat(source.getProperty("mom.i18n.management.read-authority")).isNull();
+        assertThat(source.getProperty("mom.i18n.management.write-authority")).isNull();
 
         List<String> publicPaths = java.util.stream.IntStream.range(0, 20)
                 .mapToObj(index -> source.getProperty("mom.security.resource-server.public-paths[" + index + "]"))
                 .filter(java.util.Objects::nonNull).map(String::valueOf).toList();
         assertThat(publicPaths).as(relative).containsAll(expectedPublic)
-                .doesNotContain(managementPath, "/api/mdm/**", "/api/system/**", "/admin/**");
-        assertThat(publicPaths.stream().filter(path -> path.contains("i18n") && !path.contains("runtime")))
-                .as(relative).allMatch("/i18n/locales"::equals);
+                .doesNotContain("/i18n/runtime/**", "/i18n/locales", "/i18n/messages", "/i18n/messages/**",
+                        "/api/mdm/**", "/api/system/**", "/admin/**");
 
         new WebApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(I18nWebMvcAutoConfiguration.class))
                 .withUserConfiguration(HostI18nBeans.class)
-                .withPropertyValues("mom.security.resource-server.enabled=true",
-                        "mom.i18n.runtime.base-path=" + runtimePath,
-                        "mom.i18n.management.base-path=" + managementPath)
+                .withPropertyValues("mom.security.resource-server.enabled=true", "mom.i18n.owner=" + owner)
                 .run(context -> {
                     assertThat(context).hasSingleBean(I18nRuntimeController.class);
                     assertThat(context).hasSingleBean(I18nSseController.class);

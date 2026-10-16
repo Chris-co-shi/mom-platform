@@ -75,6 +75,19 @@ class MdmI18nStorePostgresqlIT {
     void clearActor() { SecurityContextHolder.clearContext(); }
 
     @Test
+    void hostMustReuseOneJdbcStoreAndTheMybatisTransactionDataSource() {
+        assertThat(context.getBeansOfType(I18nStore.class)).hasSize(1);
+        assertThat(store).isInstanceOf(io.github.chrisshi.mom.i18n.store.JdbcI18nStore.class);
+        assertThat(context.getBeansOfType(javax.sql.DataSource.class)).hasSize(1);
+        assertThat(context.getBeansOfType(PlatformTransactionManager.class)).hasSize(1);
+        var source = context.getBean(javax.sql.DataSource.class);
+        assertThat(((org.springframework.jdbc.support.JdbcTransactionManager) transactions).getDataSource())
+                .isSameAs(source);
+        assertThat(context.getBean(org.apache.ibatis.session.SqlSessionFactory.class)
+                .getConfiguration().getEnvironment().getDataSource()).isSameAs(source);
+    }
+
+    @Test
     void crudAuditCasAndLogicalDeletion() {
         assertThat(context.getBeansOfType(I18nStore.class)).hasSize(1);
         Instant before = Instant.now().minusSeconds(1);
@@ -218,15 +231,24 @@ class MdmI18nStorePostgresqlIT {
                 .apply(springSecurity()).build();
         var identity = opaqueToken()
                 .attributes(a -> a.put("sub", "jdbc-http-actor"))
-                .authorities(new SimpleGrantedAuthority("system:i18n:read"),
-                        new SimpleGrantedAuthority("system:i18n:write"));
+                .authorities(new SimpleGrantedAuthority("system:i18n:write"));
         mvc.perform(get("/i18n/messages").with(anonymous()))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk());
         var events = mvc.perform(get("/i18n/runtime/events").with(anonymous()))
                 .andExpect(request().asyncStarted())
                 .andReturn();
         try {
             assertThat(new String(events.getResponse().getContentAsByteArray(), StandardCharsets.UTF_8)).contains("I18N_CONNECTED");
+            mvc.perform(post("/i18n/messages").with(anonymous()).contentType("application/json")
+                            .content("{\"messageKey\":\"jdbc.test.anon-denied\"}"))
+                    .andExpect(status().isUnauthorized());
+            mvc.perform(post("/i18n/messages").with(opaqueToken().authorities(
+                            new SimpleGrantedAuthority("mdm:i18n:write"))).contentType("application/json")
+                            .content("{\"messageKey\":\"jdbc.test.legacy-denied\"}"))
+                    .andExpect(status().isForbidden());
+            mvc.perform(post("/i18n/messages").with(opaqueToken()).contentType("application/json")
+                            .content("{\"messageKey\":\"jdbc.test.no-permission\"}"))
+                    .andExpect(status().isForbidden());
             var created = mvc.perform(post("/i18n/messages")
                             .with(identity).contentType("application/json")
                             .content("{\"messageKey\":\"jdbc.test.http\",\"enabled\":true}"))
@@ -238,6 +260,10 @@ class MdmI18nStorePostgresqlIT {
                     .andExpect(status().isOk());
             mvc.perform(get("/i18n/messages/{id}/translations", id).with(identity))
                     .andExpect(jsonPath("$.data[0].messageText").value("HTTP {0}"));
+            mvc.perform(post("/i18n/messages/duplicate-check/{id}/zh-CN", id)
+                            .with(anonymous()).contentType("application/json")
+                            .content("{\"messageText\":\"HTTP {0}\"}"))
+                    .andExpect(status().isOk());
             mvc.perform(get("/i18n/runtime/bundles").param("locale", "fr-FR"))
                     .andExpect(jsonPath("$.data.messages['jdbc.test.http']").value("HTTP {0}"));
             String committedEvents = new String(events.getResponse().getContentAsByteArray(), StandardCharsets.UTF_8);
@@ -287,7 +313,7 @@ class MdmI18nStorePostgresqlIT {
     @Test
     void explicitSchemaFixedClockAndDatabaseErrorClassification() {
         var now = Instant.parse("2026-10-16T03:00:00.123456Z");
-        var qualified = new io.github.chrisshi.mom.i18n.jdbc.JdbcI18nStore(
+        var qualified = new io.github.chrisshi.mom.i18n.store.JdbcI18nStore(
                 context.getBean(javax.sql.DataSource.class), "mom_mdm.mdm_i18n_message_definition",
                 "mom_mdm.mdm_i18n_translation", () -> "1234567890123456789",
                 context.getBean(io.github.chrisshi.mom.core.security.CurrentActorProvider.class),
@@ -295,7 +321,7 @@ class MdmI18nStorePostgresqlIT {
         var message = qualified.createMessage("jdbc.test.fixed", null, true);
         assertThat(message.id()).isEqualTo("1234567890123456789");
         assertThat(qualified.message(message.id(), false).updatedAt()).isEqualTo(now);
-        var missing = new io.github.chrisshi.mom.i18n.jdbc.JdbcI18nStore(
+        var missing = new io.github.chrisshi.mom.i18n.store.JdbcI18nStore(
                 context.getBean(javax.sql.DataSource.class), "missing_message_table", "missing_translation_table",
                 () -> "1", java.util.Optional::empty, java.time.Clock.systemUTC());
         assertThatThrownBy(missing::messages).isInstanceOf(org.springframework.jdbc.BadSqlGrammarException.class);

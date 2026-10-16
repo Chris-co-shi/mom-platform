@@ -59,6 +59,22 @@ LEGACY_TABLES = {
     ("mom-system-platform/mom-system-server/src/main/resources/db/migration/system/V3__create_system_i18n.sql", "system_i18n_release"),
 }
 
+# 经工程治理批准的历史约束改名：不豁免规则，必须由指定后续 Migration 实际修复。
+QMS_MIGRATIONS = "mom-qms-platform/mom-qms-server/src/main/resources/db/migration/qms/"
+CONSTRAINT_REPAIRS = (
+    ("V1__create_quality_definition.sql", "qms_specification_revision",
+     "uk_qms_specification_revision", "uk_qms_specification_revision_no"),
+    ("V2__create_qms_i18n.sql", "qms_i18n_message_definition",
+     "pk_qms_i18n_message", "pk_qms_i18n_message_definition"),
+    ("V2__create_qms_i18n.sql", "qms_i18n_message_definition",
+     "uk_qms_i18n_message_key", "uk_qms_i18n_message_definition_key"),
+    ("V2__create_qms_i18n.sql", "qms_i18n_message_definition",
+     "ck_qms_i18n_message_key", "ck_qms_i18n_message_definition_key"),
+    ("V2__create_qms_i18n.sql", "qms_i18n_message_definition",
+     "ck_qms_i18n_message_version", "ck_qms_i18n_message_definition_version"),
+)
+CONSTRAINT_REPAIR_PATH = QMS_MIGRATIONS + "V6__repair_schema_metadata.sql"
+
 
 @dataclass
 class Report:
@@ -89,7 +105,8 @@ def table_statements(sql: str) -> list[tuple[str, str]]:
 
 
 def check_table(path: str, table: str, statement: str, full_sql: str, report: Report,
-                legacy_tables: set[tuple[str, str]] | None = None) -> None:
+                legacy_tables: set[tuple[str, str]] | None = None,
+                repaired_names: dict[tuple[str, str, str], str] | None = None) -> None:
     """校验一张新表的命名、类型、约束和注释。"""
 
     legacy = LEGACY_TABLES if legacy_tables is None else legacy_tables
@@ -97,6 +114,10 @@ def check_table(path: str, table: str, statement: str, full_sql: str, report: Re
     if (path, table_lower) in legacy:
         report.reviews.append(f"已发布表结构历史基线，新增实现不得复制: {path}#{table_lower}")
         return
+    for (source, target, old), new in (repaired_names or {}).items():
+        if (source, target) == (path, table_lower):
+            statement = re.sub(rf"\b(CONSTRAINT\s+){re.escape(old)}\b",
+                               lambda match: match.group(1) + new, statement, flags=re.I)
     if table != table_lower or not SNAKE.fullmatch(table):
         report.errors.append(f"表名必须小写 snake_case: {path}#{table}")
 
@@ -139,7 +160,8 @@ def check_table(path: str, table: str, statement: str, full_sql: str, report: Re
 
 
 def check_sql(path: str, sql: str, report: Report, legacy_tables: set[tuple[str, str]] | None = None,
-              comment_sql: str | None = None) -> None:
+              comment_sql: str | None = None,
+              repaired_names: dict[tuple[str, str, str], str] | None = None) -> None:
     """检查单个 Migration；表注释允许由同 bounded context 的后续 Migration 补齐。"""
 
     match = MIGRATION.fullmatch(path)
@@ -155,7 +177,7 @@ def check_sql(path: str, sql: str, report: Report, legacy_tables: set[tuple[str,
             report.errors.append(f"Migration 禁止跨 Schema: {path} -> mom_{target}")
     comments = sql if comment_sql is None else comment_sql
     for table, statement in table_statements(sql):
-        check_table(path, table, statement, comments, report, legacy_tables)
+        check_table(path, table, statement, comments, report, legacy_tables, repaired_names)
     legacy = LEGACY_TABLES if legacy_tables is None else legacy_tables
     created_tables = {table.lower() for table, _ in table_statements(sql)}
     if any((path, table) in legacy for table in created_tables):
@@ -193,8 +215,27 @@ def run(root: pathlib.Path, report: Report) -> None:
         migrations.append((relative, context, sql))
         context_sql.setdefault(context, []).append(sql)
 
+    migration_sql = {relative: sql for relative, _, sql in migrations}
+    repaired_names: dict[tuple[str, str, str], str] = {}
+    repair_sql = clean(migration_sql.get(CONSTRAINT_REPAIR_PATH, ""))
+    for source, table, old, new in CONSTRAINT_REPAIRS:
+        source_path = QMS_MIGRATIONS + source
+        if source_path not in migration_sql:
+            continue
+        statements = dict(table_statements(migration_sql[source_path]))
+        source_constraint = re.search(rf"\bCONSTRAINT\s+{re.escape(old)}\b", statements.get(table, ""), re.I)
+        rename = re.search(
+            rf"(?:^|;)\s*ALTER\s+TABLE\s+{re.escape(table)}\s+RENAME\s+CONSTRAINT\s+"
+            rf"{re.escape(old)}\s+TO\s+{re.escape(new)}\s*;", repair_sql, re.I)
+        if not source_constraint or not rename:
+            report.errors.append(f"历史约束修复必须精确匹配来源及后续改名: {source_path}#{table}.{old} -> {CONSTRAINT_REPAIR_PATH}#{new}")
+            continue
+        repaired_names[(source_path, table, old)] = new
+        report.reviews.append(f"历史约束已由指定后续 Migration 改名，仍校验其余表规则: {source_path}#{table}.{old} -> {new}")
+
     for relative, context, sql in migrations:
-        check_sql(relative, sql, report, comment_sql="\n".join(context_sql[context]))
+        check_sql(relative, sql, report, comment_sql="\n".join(context_sql[context]),
+                  repaired_names=repaired_names)
 
 
 def main(argv: list[str] | None = None) -> int:

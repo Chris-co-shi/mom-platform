@@ -70,7 +70,7 @@ class FrameworkGovernanceArchitectureTest {
             if (source.path().startsWith("mom-framework/")
                     && imports.stream().anyMatch(FrameworkGovernanceArchitectureTest::isJdbcTemplate)
                     && !source.path().startsWith("mom-framework/mom-outbox/")
-                    && !source.path().equals("mom-framework/mom-i18n-jdbc/src/main/java/io/github/chrisshi/mom/i18n/jdbc/JdbcI18nStore.java")) {
+                    && !source.path().equals("mom-framework/mom-i18n/src/main/java/io/github/chrisshi/mom/i18n/store/JdbcI18nStore.java")) {
                 violations.add(source.path() + " Framework JDBC Template 只能存在于已登记的持久化 Adapter");
             }
         }

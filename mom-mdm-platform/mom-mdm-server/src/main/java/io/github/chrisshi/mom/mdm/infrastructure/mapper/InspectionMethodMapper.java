@@ -9,6 +9,10 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface InspectionMethodMapper extends MomBaseMapper<InspectionMethodEntity> {
     /** 按主键锁定方法，保证质量标准写入与方法停用串行。 */
-    @Select("SELECT * FROM mdm_inspection_method WHERE id = #{id} FOR UPDATE")
+    @Select("""
+            SELECT id, code, name, description, enabled, version,
+                   created_at, created_by, updated_at, updated_by
+              FROM mdm_inspection_method WHERE id = #{id} FOR UPDATE
+            """)
     InspectionMethodEntity selectByIdForUpdate(@Param("id") String id);
 }
