@@ -4,6 +4,7 @@ import io.github.chrisshi.mom.i18n.validation.I18nRules;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -15,6 +16,9 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.util.List;
 import java.util.UUID;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,26 +31,42 @@ class QmsI18nSchemaPostgresqlIT {
             DockerImageName.parse("postgres:17.7-alpine"));
 
     @Test
-    void originalV4DataMustFailExplicitlyWithoutChangingHistory() {
+    void emptyDatabaseMustMigrateThroughNormalizationToLatest() {
+        String schema = schema();
+        flyway(schema, null).migrate();
+        JdbcTemplate jdbc = jdbc(schema);
+        // Flyway 还会写一条无版本的 Schema 创建记录，此处核对所有版本迁移的实际顺序。
+        assertThat(jdbc.queryForList("""
+                SELECT version FROM flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank
+                """, String.class))
+                .containsExactly("1", "2", "3", "4", "4.1", "5");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM qms_i18n_message_definition", Integer.class))
+                .isEqualTo(36);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM qms_i18n_translation", Integer.class))
+                .isEqualTo(72);
+        assertThat(jdbc.queryForList("SELECT message_key FROM qms_i18n_message_definition", String.class))
+                .allSatisfy(key -> assertThat(I18nRules.messageKey(key)).isEqualTo(key));
+    }
+
+    @Test
+    void originalV4DataMustUpgradeWithoutChangingMetadataOrTranslations() {
         String schema = schema();
         flyway(schema, "4").migrate();
         JdbcTemplate jdbc = jdbc(schema);
-        List<String> before = snapshot(jdbc);
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM qms_i18n_message_definition
                 WHERE message_key <> lower(message_key) AND NOT enabled
-                """, Integer.class)).isPositive();
+                """, Integer.class)).isEqualTo(7);
+        // 覆盖历史种子被重新启用、逻辑删除的情况；规范化不能改变这些状态或版本。
+        jdbc.update("UPDATE qms_i18n_message_definition SET enabled = true WHERE message_key = 'qms.spec.addItem'");
+        jdbc.update("UPDATE qms_i18n_message_definition SET deleted = true WHERE message_key = 'qms.spec.removeItem'");
+        List<String> expected = normalizedSnapshot(jdbc);
+        List<String> translations = translationSnapshot(jdbc);
 
-        assertThatThrownBy(() -> flyway(schema, null).migrate())
-                .isInstanceOf(FlywayException.class)
-                .hasStackTraceContaining("QMS I18n message_key precheck failed");
-
-        assertThat(snapshot(jdbc)).isEqualTo(before);
-        assertThat(flyway(schema, null).info().current().getVersion().getVersion()).isEqualTo("4");
-        // 失败回滚后，旧约束仍禁止无前缀 Key，且仍允许旧格式。
-        assertThatThrownBy(() -> insert(jdbc, "101", "title"))
-                .isInstanceOf(DataIntegrityViolationException.class);
-        insert(jdbc, "102", "qms.Legacy");
+        flyway(schema, null).migrate();
+        assertThat(snapshot(jdbc)).isEqualTo(expected);
+        assertThat(translationSnapshot(jdbc)).isEqualTo(translations);
+        assertThat(flyway(schema, null).info().current().getVersion().getVersion()).isEqualTo("5");
     }
 
     @Test
@@ -91,16 +111,89 @@ class QmsI18nSchemaPostgresqlIT {
             assertThatThrownBy(() -> flyway(schema, null).migrate())
                     .as("预检覆盖 %s 数据", state)
                     .isInstanceOf(FlywayException.class)
-                    .hasStackTraceContaining("QMS I18n message_key precheck failed");
+                    .hasStackTraceContaining("QMS I18n normalization precheck failed");
             assertThat(snapshot(jdbc)).isEqualTo(before);
             assertThat(flyway(schema, null).info().current().getVersion().getVersion()).isEqualTo("4");
         }
     }
 
+    @Test
+    void caseCollisionMustRollbackIncludingDisabledAndDeletedRows() {
+        for (String state : List.of("enabled", "disabled", "deleted")) {
+            String schema = schema();
+            flyway(schema, "4").migrate();
+            JdbcTemplate jdbc = jdbc(schema);
+            insert(jdbc, "101", "qms.common.nodata");
+            jdbc.update("UPDATE qms_i18n_message_definition SET enabled = ?, deleted = ? WHERE id = '101'",
+                    state.equals("enabled"), state.equals("deleted"));
+            assertNormalizationFailsWithoutChanges(schema, "normalized key collision");
+        }
+    }
+
+    @Test
+    void malformedHistoricalKeyMustFailBeforeNormalization() {
+        String schema = schema();
+        flyway(schema, "4").migrate();
+        // 模拟历史约束曾被外部工具移除的脏数据，正式迁移必须仍主动预检。
+        JdbcTemplate jdbc = jdbc(schema);
+        jdbc.execute("ALTER TABLE qms_i18n_message_definition DROP CONSTRAINT ck_qms_i18n_message_key");
+        insert(jdbc, "101", "qms.bad..key");
+        assertNormalizationFailsWithoutChanges(schema, "invalid normalized key");
+    }
+
+    @Test
+    void keyBasedForeignReferenceMustFailWithoutCascadingChanges() {
+        String schema = schema();
+        flyway(schema, "4").migrate();
+        JdbcTemplate jdbc = jdbc(schema);
+        jdbc.execute("""
+                CREATE TABLE legacy_key_reference (
+                    message_key varchar(160) REFERENCES qms_i18n_message_definition(message_key) ON UPDATE CASCADE)
+                """);
+        jdbc.update("INSERT INTO legacy_key_reference VALUES ('qms.common.noData')");
+        assertNormalizationFailsWithoutChanges(schema, "incompatible message_key reference");
+        assertThat(jdbc.queryForObject("SELECT message_key FROM legacy_key_reference", String.class))
+                .isEqualTo("qms.common.noData");
+    }
+
+    @Test
+    void previouslyAppliedV5MustExposeEarlierMigrationValidationRisk(@TempDir Path migrations) throws IOException {
+        // 使用原样 V1～V5 文件重现上一版发布包，不通过 outOfOrder 或忽略验证伪造环境。
+        for (String file : List.of("V1__create_quality_definition.sql", "V2__create_qms_i18n.sql",
+                "V3__seed_quality_definition_web_copy.sql", "V4__deprecate_legacy_quality_definition_tables.sql",
+                "V5__align_i18n_message_key_constraint.sql")) {
+            try (var source = getClass().getResourceAsStream("/db/migration/qms/" + file)) {
+                assertThat(source).isNotNull();
+                Files.copy(source, migrations.resolve(file));
+            }
+        }
+        String schema = compliantV4Fixture();
+        Flyway.configure()
+                .dataSource(POSTGRESQL.getJdbcUrl(), POSTGRESQL.getUsername(), POSTGRESQL.getPassword())
+                .schemas(schema).defaultSchema(schema).locations("filesystem:" + migrations).load().migrate();
+        List<String> before = snapshot(jdbc(schema));
+        assertThatThrownBy(() -> flyway(schema, null).migrate())
+                .isInstanceOf(FlywayException.class)
+                .hasMessageContaining("Detected resolved migration not applied to database: 4.1");
+        assertThat(snapshot(jdbc(schema))).isEqualTo(before);
+    }
+
+    private void assertNormalizationFailsWithoutChanges(String schema, String reason) {
+        JdbcTemplate jdbc = jdbc(schema);
+        List<String> before = snapshot(jdbc);
+        List<String> translations = translationSnapshot(jdbc);
+        assertThatThrownBy(() -> flyway(schema, null).migrate())
+                .isInstanceOf(FlywayException.class)
+                .hasStackTraceContaining("QMS I18n normalization precheck failed: " + reason);
+        assertThat(snapshot(jdbc)).isEqualTo(before);
+        assertThat(translationSnapshot(jdbc)).isEqualTo(translations);
+        assertThat(flyway(schema, null).info().current().getVersion().getVersion()).isEqualTo("4");
+    }
+
     private String compliantV4Fixture() {
         String schema = schema();
         flyway(schema, "4").migrate();
-        // 仅构造全量合规的测试前置数据，不代表批准生产 Key 改名；实际迁移不得执行此操作。
+        // 模拟已经人工修复的 V4 数据，用于验证合规升级及上一版 V5 已应用环境。
         jdbc(schema).update("UPDATE qms_i18n_message_definition SET message_key = lower(message_key)");
         return schema;
     }
@@ -133,7 +226,18 @@ class QmsI18nSchemaPostgresqlIT {
 
     private List<String> snapshot(JdbcTemplate jdbc) {
         return jdbc.queryForList("""
-                SELECT row_to_json(m)::text FROM qms_i18n_message_definition m ORDER BY id
+                SELECT to_jsonb(m)::text FROM qms_i18n_message_definition m ORDER BY id
                 """, String.class);
+    }
+
+    private List<String> normalizedSnapshot(JdbcTemplate jdbc) {
+        return jdbc.queryForList("""
+                SELECT (to_jsonb(m) || jsonb_build_object('message_key', lower(message_key COLLATE "C")))::text
+                FROM qms_i18n_message_definition m ORDER BY id
+                """, String.class);
+    }
+
+    private List<String> translationSnapshot(JdbcTemplate jdbc) {
+        return jdbc.queryForList("SELECT to_jsonb(t)::text FROM qms_i18n_translation t ORDER BY id", String.class);
     }
 }
