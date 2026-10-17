@@ -10,8 +10,9 @@ import org.junit.jupiter.api.Test;
 
 class MdmCodeSegmentTest {
     private List<io.github.chrisshi.mom.core.codesegment.CodeSegmentHandler> handlers() {
-        var config = new MdmCodeSegmentHandlers();
-        return List.of(config.literalCodeSegment(), config.dateCodeSegment(), config.sequenceCodeSegment());
+        return List.of(new io.github.chrisshi.mom.data.coderule.handler.LiteralCodeSegmentHandler(),
+                new io.github.chrisshi.mom.data.coderule.handler.DateCodeSegmentHandler(),
+                new io.github.chrisshi.mom.data.coderule.handler.SequenceCodeSegmentHandler());
     }
 
     @Test void builtinsValidateRenderAndNeverFakeSequenceResult() {

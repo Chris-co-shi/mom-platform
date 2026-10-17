@@ -57,6 +57,9 @@ mybatis-plus:
     banner: false
 
 mom:
+  code-rule:
+    enabled: true
+    owner: mdm
   i18n:
     owner: mdm
   security:

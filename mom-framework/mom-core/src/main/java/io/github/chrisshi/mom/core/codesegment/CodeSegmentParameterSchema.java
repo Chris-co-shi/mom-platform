@@ -3,7 +3,9 @@ package io.github.chrisshi.mom.core.codesegment;
 import java.util.List;
 import java.util.Objects;
 
-/** 前端可解析的参数表单 Schema V1。 */
+/**
+ * 前端可解析的参数表单 Schema V1。
+ */
 public record CodeSegmentParameterSchema(int schemaVersion, List<Field> fields) {
     public CodeSegmentParameterSchema {
         fields = List.copyOf(Objects.requireNonNull(fields, "fields"));
@@ -22,8 +24,11 @@ public record CodeSegmentParameterSchema(int schemaVersion, List<Field> fields) 
     }
 
     public record Option(String label, String value) {
-        public Option { Objects.requireNonNull(label); Objects.requireNonNull(value); }
+        public Option {
+            Objects.requireNonNull(label);
+            Objects.requireNonNull(value);
+        }
     }
 
-    public enum Type { TEXT, SELECT, NUMBER }
+    public enum Type {TEXT, SELECT, NUMBER}
 }

@@ -1,2 +1,3 @@
 io.github.chrisshi.mom.webmvc.autoconfigure.CorrelationWebMvcAutoConfiguration
 io.github.chrisshi.mom.webmvc.autoconfigure.I18nWebMvcAutoConfiguration
+io.github.chrisshi.mom.webmvc.autoconfigure.CodeRuleWebMvcAutoConfiguration
