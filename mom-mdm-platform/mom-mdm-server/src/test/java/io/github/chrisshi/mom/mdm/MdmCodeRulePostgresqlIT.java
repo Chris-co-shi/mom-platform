@@ -1,7 +1,18 @@
 package io.github.chrisshi.mom.mdm;
 
-import io.github.chrisshi.mom.core.coderule.*;
-import io.github.chrisshi.mom.core.codesegment.*;
+import io.github.chrisshi.mom.coderule.CodeRuleDefinition;
+import io.github.chrisshi.mom.coderule.CodeRuleFailure;
+import io.github.chrisshi.mom.coderule.CodeRulePageParams;
+import io.github.chrisshi.mom.coderule.CodeRuleView;
+import io.github.chrisshi.mom.coderule.field.CodeFieldMetadata;
+import io.github.chrisshi.mom.coderule.field.CodeFieldRegistry;
+import io.github.chrisshi.mom.coderule.field.CodeGenerationContext;
+import io.github.chrisshi.mom.coderule.segment.CodeSegmentException;
+import io.github.chrisshi.mom.coderule.segment.CodeSegmentMetadata;
+import io.github.chrisshi.mom.coderule.segment.CodeSegmentRegistry;
+import io.github.chrisshi.mom.coderule.segment.CodeSegmentRenderContext;
+import io.github.chrisshi.mom.coderule.application.CodeRuleApplication;
+import io.github.chrisshi.mom.coderule.store.CodeRuleStore;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.security.token.MomTokenPrincipal;
 import io.github.chrisshi.mom.security.token.MomTokenStore;
@@ -94,6 +105,10 @@ class MdmCodeRulePostgresqlIT {
 
     @Test void discoveredBeansAndJsonbRoundTrip() {
         assertThat(context.getBeansOfType(CodeRuleStore.class)).hasSize(1);
+        assertThat(context.getBeansOfType(CodeRuleApplication.class)).hasSize(1);
+        assertThat(context.getBeansOfType(CodeSegmentRegistry.class)).hasSize(1);
+        assertThat(context.getBeansOfType(CodeFieldRegistry.class)).hasSize(1);
+        assertThat(context.getBeansOfType(io.github.chrisshi.mom.webmvc.coderule.CodeRuleController.class)).hasSize(1);
         assertThat(segments.catalog(1)).extracting(CodeSegmentMetadata::type)
                 .containsExactlyInAnyOrder("LITERAL", "DATE", "SEQUENCE", "BUSINESS_FIELD");
         assertThat(fields.catalog()).extracting(CodeFieldMetadata::fieldKey).contains("mdm.materialCategory.code");
@@ -186,7 +201,7 @@ class MdmCodeRulePostgresqlIT {
 
     @Test void removedProviderLeavesHistoryReadableButPreventsEnable() {
         var initial = rules.create("it.code.removed", definition());
-        var withoutProvider = new io.github.chrisshi.mom.data.coderule.DefaultCodeRuleApplication(
+        var withoutProvider = new io.github.chrisshi.mom.coderule.application.DefaultCodeRuleApplication(
                 store, segments, new CodeFieldRegistry(List.of()), context.getBean(io.github.chrisshi.mom.core.id.IdGenerator.class));
         assertThat(withoutProvider.detail(initial.id()).definition()).isEqualTo(definition());
         assertThatThrownBy(() -> withoutProvider.enable(initial.id(), 0)).isInstanceOf(CodeRuleFailure.class);

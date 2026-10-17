@@ -1,7 +1,13 @@
 package io.github.chrisshi.mom.webmvc.coderule;
 
-import io.github.chrisshi.mom.core.coderule.*;
-import io.github.chrisshi.mom.core.codesegment.*;
+import io.github.chrisshi.mom.coderule.CodeRuleDefinition;
+import io.github.chrisshi.mom.coderule.CodeRuleFailure;
+import io.github.chrisshi.mom.coderule.CodeRulePageParams;
+import io.github.chrisshi.mom.coderule.CodeRuleView;
+import io.github.chrisshi.mom.coderule.segment.CodeSegmentMetadata;
+import io.github.chrisshi.mom.coderule.segment.CodeSegmentParameterSchema;
+import io.github.chrisshi.mom.coderule.segment.CodeSegmentRegistry;
+import io.github.chrisshi.mom.coderule.application.CodeRuleApplication;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.webmvc.response.Result;

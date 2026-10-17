@@ -1,6 +1,9 @@
 package io.github.chrisshi.mom.mdm.codesegment;
 
-import io.github.chrisshi.mom.core.codesegment.*;
+import io.github.chrisshi.mom.coderule.field.CodeFieldMetadata;
+import io.github.chrisshi.mom.coderule.field.CodeFieldProvider;
+import io.github.chrisshi.mom.coderule.field.CodeGenerationContext;
+import io.github.chrisshi.mom.coderule.segment.CodeSegmentException;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.MaterialCategoryEntity;
 import io.github.chrisshi.mom.mdm.infrastructure.mapper.MaterialCategoryMapper;
 import org.springframework.stereotype.Component;

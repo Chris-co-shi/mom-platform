@@ -103,6 +103,28 @@ class MavenModuleDependencyArchitectureTest {
                 + String.join("\n", violations));
     }
 
+    /** 编码规则独立于数据、Web 与领域服务，防止迁移后重新形成反向依赖。 */
+    @Test
+    void codeRuleModuleMustKeepIndependentFrameworkBoundary() throws Exception {
+        List<Module> modules = reactorModules();
+        Module rules = modules.stream().filter(module -> "mom-code-rule".equals(module.artifactId()))
+                .findFirst().orElseThrow();
+        List<String> violations = new ArrayList<>();
+        for (Dependency dependency : rules.dependencies()) {
+            if (MOM_GROUP.equals(dependency.groupId()) && !List.of("mom-core", "mom-test").contains(dependency.artifactId())
+                    || containsAny(dependency.artifactId(), "mybatis", "spring-web", "servlet")) {
+                violations.add("mom-code-rule -> " + dependency.coordinates());
+            }
+        }
+        for (Module module : modules) {
+            if (List.of("mom-core", "mom-data").contains(module.artifactId())) {
+                module.dependencies().stream().filter(dependency -> "mom-code-rule".equals(dependency.artifactId()))
+                        .map(dependency -> module.artifactId() + " -> " + dependency.coordinates()).forEach(violations::add);
+            }
+        }
+        assertTrue(violations.isEmpty(), "编码规则模块依赖方向错误：\n" + String.join("\n", violations));
+    }
+
     private static boolean containsAny(String value, String... fragments) {
         for (String fragment : fragments) {
             if (value.contains(fragment)) {

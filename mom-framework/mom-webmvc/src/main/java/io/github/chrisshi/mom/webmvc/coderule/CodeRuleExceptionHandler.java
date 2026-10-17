@@ -1,7 +1,7 @@
 package io.github.chrisshi.mom.webmvc.coderule;
 
-import io.github.chrisshi.mom.core.coderule.CodeRuleFailure;
-import io.github.chrisshi.mom.core.codesegment.CodeSegmentException;
+import io.github.chrisshi.mom.coderule.CodeRuleFailure;
+import io.github.chrisshi.mom.coderule.segment.CodeSegmentException;
 import io.github.chrisshi.mom.core.page.PageQueryValidationException;
 import io.github.chrisshi.mom.core.i18n.I18nMessageResolver;
 import io.github.chrisshi.mom.webmvc.response.Result;
