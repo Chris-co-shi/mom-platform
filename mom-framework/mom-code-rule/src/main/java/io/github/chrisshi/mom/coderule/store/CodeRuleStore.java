@@ -12,7 +12,8 @@ import java.util.List;
  * Owner 本地规则与修订的持久化契约。
  */
 public interface CodeRuleStore {
-    record Rule(String id, String ruleCode, long version) {
+    /** 规则身份、规则级共享说明和并发版本；旧规则的说明可为空。 */
+    record Rule(String id, String ruleCode, String usageScenario, String description, long version) {
     }
 
     record Revision(String id, String ruleId, int revisionNo, String status,
@@ -30,7 +31,11 @@ public interface CodeRuleStore {
 
     List<Revision> revisions(String ruleId);
 
-    void insertRule(String id, String ruleCode);
+    /** 创建规则身份及规则级使用场景和说明。 */
+    void insertRule(String id, String ruleCode, String usageScenario, String description);
+
+    /** 在调用者已锁定规则行的事务中更新说明，版本与审计由 advanceVersion 同时推进。 */
+    boolean updateMetadata(String ruleId, String usageScenario, String description);
 
     void insertRevision(String id, String ruleId, int revisionNo, String status, CodeRuleDefinition definition);
 

@@ -4,7 +4,7 @@ import io.github.chrisshi.mom.coderule.CodeRuleFailure;
 import io.github.chrisshi.mom.coderule.CodeRulePageParams;
 import io.github.chrisshi.mom.coderule.CodeRuleView;
 import io.github.chrisshi.mom.coderule.CodeRuleDefinition;
-import io.github.chrisshi.mom.coderule.store.CodeRuleStore;
+import io.github.chrisshi.mom.coderule.CodeRuleOwner;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.core.security.CurrentActorProvider;
@@ -34,8 +34,8 @@ public final class JdbcCodeRuleStore implements CodeRuleStore {
 
     /** 创建 Owner 本地 Store；分页上限沿用 mom.data.pagination.max-page-size。 */
     public JdbcCodeRuleStore(DataSource source, JsonMapper json, long maxPageSize,
-                             CurrentActorProvider actors, Clock clock, String prefix) {
-        if (!"mdm".equals(prefix)) throw new IllegalArgumentException("不支持的编码规则 Owner");
+                             CurrentActorProvider actors, Clock clock, String owner) {
+        String prefix = new CodeRuleOwner(owner).value();
         this.jdbc = new JdbcTemplate(source);
         this.json = json;
         if (maxPageSize <= 0) throw new IllegalArgumentException("最大单页条数必须大于 0");
@@ -47,13 +47,13 @@ public final class JdbcCodeRuleStore implements CodeRuleStore {
     }
 
     public Rule lockRule(String id) {
-        return one(jdbc.query("SELECT id, rule_code, version FROM " + ruleTable + " WHERE id=? FOR UPDATE",
-            (r, n) -> new Rule(r.getString(1), r.getString(2), r.getLong(3)), id));
+        return one(jdbc.query("SELECT id, rule_code, usage_scenario, description, version FROM " + ruleTable + " WHERE id=? FOR UPDATE",
+            (r, n) -> new Rule(r.getString(1), r.getString(2), r.getString(3), r.getString(4), r.getLong(5)), id));
     }
 
     public Rule rule(String id) {
-        return one(jdbc.query("SELECT id, rule_code, version FROM " + ruleTable + " WHERE id=?",
-            (r, n) -> new Rule(r.getString(1), r.getString(2), r.getLong(3)), id));
+        return one(jdbc.query("SELECT id, rule_code, usage_scenario, description, version FROM " + ruleTable + " WHERE id=?",
+            (r, n) -> new Rule(r.getString(1), r.getString(2), r.getString(3), r.getString(4), r.getLong(5)), id));
     }
 
     public Revision revision(String id) {
@@ -64,11 +64,17 @@ public final class JdbcCodeRuleStore implements CodeRuleStore {
         return jdbc.query(revisionSelect() + " WHERE rule_id=? ORDER BY revision_no", this::mapRevision, ruleId);
     }
 
-    public void insertRule(String id, String ruleCode) {
+    /** 持久化规则身份和说明，并沿用当前操作者与时钟填充审计。 */
+    public void insertRule(String id, String ruleCode, String usageScenario, String description) {
         String actor = actors.requireCurrentActor().actorId();
         Timestamp now = Timestamp.from(clock.instant());
-        requireOne(jdbc.update("INSERT INTO " + ruleTable + " (id,rule_code,version,created_at,created_by,updated_at,updated_by) VALUES (?,?,0,?,?,?,?)",
-            id, ruleCode, now, actor, now, actor));
+        requireOne(jdbc.update("INSERT INTO " + ruleTable + " (id,rule_code,usage_scenario,description,version,created_at,created_by,updated_at,updated_by) VALUES (?,?,?,?,0,?,?,?,?)",
+            id, ruleCode, usageScenario, description, now, actor, now, actor));
+    }
+
+    /** 仅更新规则说明；调用者在同一本地事务中持有规则行锁并推进规则版本。 */
+    public boolean updateMetadata(String id, String usageScenario, String description) {
+        return jdbc.update("UPDATE " + ruleTable + " SET usage_scenario=?,description=? WHERE id=?", usageScenario, description, id) == 1;
     }
 
     public void insertRevision(String id, String ruleId, int revisionNo, String status, CodeRuleDefinition definition) {
@@ -124,10 +130,10 @@ public final class JdbcCodeRuleStore implements CodeRuleStore {
         List<Object> paged = new ArrayList<>(args);
         paged.add(query.pageSize());
         paged.add(offset);
-        List<CodeRuleView> records = jdbc.query("SELECT v.id,v.rule_id,r.rule_code,v.revision_no,v.status,v.definition,r.version AS rule_version,"
+        List<CodeRuleView> records = jdbc.query("SELECT v.id,v.rule_id,r.rule_code,r.usage_scenario,r.description,v.revision_no,v.status,v.definition,r.version AS rule_version,"
                 + "v.created_at,v.updated_at" + from + where
                 + " ORDER BY r.rule_code ASC,v.revision_no DESC,v.id ASC LIMIT ? OFFSET ?",
-            (r, n) -> new CodeRuleView(r.getString("id"), r.getString("rule_id"), r.getString("rule_code"),
+            (r, n) -> new CodeRuleView(r.getString("id"), r.getString("rule_id"), r.getString("rule_code"), r.getString("usage_scenario"), r.getString("description"),
                 r.getInt("revision_no"), r.getString("status"), decode(r.getString("definition")),
                 r.getLong("rule_version"), r.getTimestamp("created_at").toInstant(),
                 r.getTimestamp("updated_at").toInstant()), paged.toArray());

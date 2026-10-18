@@ -80,6 +80,74 @@ class SystemI18nStorePostgresqlIT {
     void clearActor() { SecurityContextHolder.clearContext(); }
 
     @Test
+    void codeRuleMessagesUpgradeFromV24PreservesExistingAndCustomTranslations() {
+        verifyCodeRuleMessagesUpgrade("24");
+    }
+
+    @Test
+    void readableCodeRuleMessagesUpgradeFromV25PreservesExistingAndCustomTranslations() {
+        verifyCodeRuleMessagesUpgrade("25");
+    }
+
+    @Test
+    void usageMetadataMessagesUpgradeFromV26PreservesExistingAndCustomTranslations() {
+        verifyCodeRuleMessagesUpgrade("26");
+    }
+
+    private void verifyCodeRuleMessagesUpgrade(String fromVersion) {
+        String schema = "code_rule_messages_upgrade";
+        String originalDefinitions = fromVersion.equals("24") ? "message_key NOT LIKE 'system.coderules.%'"
+                : fromVersion.equals("25") ? "id NOT LIKE '9672%' AND id NOT LIKE '9673%'" : "id NOT LIKE '9673%'";
+        String originalTranslations = fromVersion.equals("24") ? "d.message_key NOT LIKE 'system.coderules.%'"
+                : fromVersion.equals("25") ? "t.id NOT LIKE '9672%' AND t.id NOT LIKE '9673%'" : "t.id NOT LIKE '9673%'";
+        var source = new org.springframework.jdbc.datasource.DriverManagerDataSource(
+                POSTGRES.getJdbcUrl() + "&currentSchema=" + schema, POSTGRES.getUsername(), POSTGRES.getPassword());
+        var isolated = new JdbcTemplate(source);
+        try {
+            org.flywaydb.core.Flyway.configure().dataSource(source).schemas(schema).defaultSchema(schema)
+                    .locations("classpath:db/migration/system").target(fromVersion).load().migrate();
+            isolated.update("""
+                    INSERT INTO system_i18n_message_definition
+                    (id,message_key,description,enabled,version,deleted,created_by,created_at,updated_by,updated_at)
+                    VALUES ('9991000000000000001','system.custom.label','自定义文案',true,7,false,'admin',CURRENT_TIMESTAMP,'admin',CURRENT_TIMESTAMP)
+                    """);
+            isolated.update("""
+                    INSERT INTO system_i18n_translation
+                    (id,message_id,locale_code,message_text,version,deleted,created_by,created_at,updated_by,updated_at)
+                    VALUES ('9991000000000000002','9991000000000000001','zh-CN','保留自定义译文',9,false,'admin',CURRENT_TIMESTAMP,'admin',CURRENT_TIMESTAMP)
+                    """);
+            var definitions = isolated.queryForList("SELECT * FROM system_i18n_message_definition ORDER BY id");
+            var translations = isolated.queryForList("SELECT * FROM system_i18n_translation ORDER BY id");
+            org.flywaydb.core.Flyway.configure().dataSource(source).schemas(schema).defaultSchema(schema)
+                    .locations("classpath:db/migration/system").load().migrate();
+            assertThat(isolated.queryForList("SELECT * FROM system_i18n_message_definition WHERE " + originalDefinitions + " ORDER BY id"))
+                    .isEqualTo(definitions);
+            assertThat(isolated.queryForList("SELECT t.* FROM system_i18n_translation t JOIN system_i18n_message_definition d ON t.message_id=d.id WHERE " + originalTranslations + " ORDER BY t.id"))
+                    .isEqualTo(translations);
+            assertThat(isolated.queryForObject("SELECT COUNT(*) FROM system_i18n_message_definition WHERE message_key LIKE 'system.coderules.%'", Long.class)).isEqualTo(41);
+        } finally { jdbc.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE"); }
+    }
+
+    @Test
+    void codeRuleManagementMessagesAreLoadedFromSystemDatabaseInBothLocales() {
+        var chinese = runtime.load("zh-CN").messages();
+        var english = runtime.load("en-US").messages();
+        assertThat(chinese).containsEntry("system.coderules.title", "编码规则")
+                .containsEntry("system.coderules.search", "查询规则")
+                .containsEntry("system.coderules.composition", "编码组成")
+                .containsEntry("system.coderules.usagescenario", "使用场景");
+        assertThat(english).containsEntry("system.coderules.title", "Code Rules")
+                .containsEntry("system.coderules.search", "Search Rules")
+                .containsEntry("system.coderules.composition", "Code Composition")
+                .containsEntry("system.coderules.usagescenario", "Usage Scenario");
+        var keys = jdbc.queryForList("SELECT message_key FROM system_i18n_message_definition WHERE message_key LIKE 'system.coderules.%'", String.class);
+        assertThat(keys).hasSize(41);
+        assertThat(chinese.keySet()).containsAll(keys);
+        assertThat(english.keySet()).containsAll(keys);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM system_i18n_translation t JOIN system_i18n_message_definition d ON t.message_id=d.id WHERE d.message_key LIKE 'system.coderules.%'", Long.class)).isEqualTo(82);
+    }
+
+    @Test
     void hostMustExposeOneJdbcStoreAndOneLocalTransaction() {
         assertThat(context.getBeansOfType(I18nStore.class)).hasSize(1);
         assertThat(store.getClass().getName()).isEqualTo("io.github.chrisshi.mom.i18n.store.JdbcI18nStore");

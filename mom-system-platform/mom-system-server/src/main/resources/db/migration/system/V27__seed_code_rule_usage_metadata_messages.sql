@@ -1,0 +1,17 @@
+-- 仅增加规则级用途界面文案；说明字段复用 system.common.description。用户填写的内容归规则 Owner 保存。
+INSERT INTO system_i18n_message_definition
+ (id,message_key,description,enabled,version,deleted,created_by,created_at,updated_by,updated_at)
+VALUES
+('9673000000000000000','system.coderules.usagescenario',NULL,true,0,false,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP),
+('9673000000000000001','system.coderules.missingscenario',NULL,true,0,false,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP),
+('9673000000000000002','system.coderules.invalidmetadata',NULL,true,0,false,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP);
+
+INSERT INTO system_i18n_translation
+ (id,message_id,locale_code,message_text,version,deleted,created_by,created_at,updated_by,updated_at)
+VALUES
+('9673000000000001000','9673000000000000000','zh-CN','使用场景',0,false,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP),
+('9673000000000001001','9673000000000000000','en-US','Usage Scenario',0,false,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP),
+('9673000000000001002','9673000000000000001','zh-CN','未填写使用场景',0,false,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP),
+('9673000000000001003','9673000000000000001','en-US','Usage scenario not provided',0,false,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP),
+('9673000000000001004','9673000000000000002','zh-CN','使用场景必填且不超过 120 个字符；说明不超过 1000 个字符。',0,false,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP),
+('9673000000000001005','9673000000000000002','en-US','Usage scenario is required and must not exceed 120 characters. Description must not exceed 1000 characters.',0,false,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP,'SYSTEM_MIGRATION',CURRENT_TIMESTAMP);

@@ -25,6 +25,7 @@ import java.util.Map;
 public class CodeRuleController {
     private final CodeRuleApplication application;
     private final CodeSegmentRegistry handlers;
+    /** 使用当前服务装配的 Application 与片段目录，不接受请求指定 Owner。 */
     public CodeRuleController(CodeRuleApplication application, CodeSegmentRegistry handlers) {
         this.application = application; this.handlers = handlers;
     }
@@ -34,39 +35,46 @@ public class CodeRuleController {
     public Result<List<Map<String, Object>>> segments(@RequestParam(defaultValue = "1") int catalogVersion) {
         return Result.success(handlers.catalog(catalogVersion).stream().map(CodeRuleController::entry).toList());
     }
+    /** 创建当前 Owner 的规则身份及首个草稿。 */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAuthority('mdm:code-rule:write')")
+    @PreAuthorize("@codeRuleManagementAccess.canWrite(authentication)")
     public Result<CodeRuleView> create(@RequestBody CreateRequest request) {
-        return Result.success(application.create(request.ruleCode(), request.definition()));
+        return Result.success(application.create(request.ruleCode(), request.usageScenario(), request.description(), request.definition()));
     }
+    /** 按规则编码和修订状态查询当前 Owner 的分页数据。 */
     @PostMapping("/search")
-    @PreAuthorize("hasAuthority('mdm:code-rule:read')")
+    @PreAuthorize("@codeRuleManagementAccess.canRead(authentication)")
     public Result<PageResult<CodeRuleView>> search(@RequestBody PageQuery<CodeRulePageParams> query) {
         return Result.success(application.search(query));
     }
+    /** 通过修订 ID 读取完整历史定义和规则级版本。 */
     @GetMapping("/{revisionId}")
-    @PreAuthorize("hasAuthority('mdm:code-rule:read')")
+    @PreAuthorize("@codeRuleManagementAccess.canRead(authentication)")
     public Result<CodeRuleView> detail(@PathVariable String revisionId) {
         return Result.success(application.detail(revisionId));
     }
+    /** 以规则级版本保护规则说明和当前草稿完整定义的原子更新。 */
     @PutMapping("/{revisionId}")
-    @PreAuthorize("hasAuthority('mdm:code-rule:write')")
+    @PreAuthorize("@codeRuleManagementAccess.canWrite(authentication)")
     public Result<CodeRuleView> update(@PathVariable String revisionId, @RequestBody UpdateRequest request) {
-        return Result.success(application.updateDraft(revisionId, request.definition(), required(request.ruleVersion())));
+        return Result.success(application.updateDraft(revisionId, request.usageScenario(), request.description(), request.definition(), required(request.ruleVersion())));
     }
+    /** 从历史修订复制新草稿。 */
     @PostMapping("/{revisionId}/revisions")
-    @PreAuthorize("hasAuthority('mdm:code-rule:write')")
+    @PreAuthorize("@codeRuleManagementAccess.canWrite(authentication)")
     public Result<CodeRuleView> revise(@PathVariable String revisionId, @RequestBody VersionRequest request) {
         return Result.success(application.revise(revisionId, required(request.ruleVersion())));
     }
+    /** 发布目标修订，由 Application 重新校验当前片段与字段能力。 */
     @PostMapping("/{revisionId}/enable")
-    @PreAuthorize("hasAuthority('mdm:code-rule:write')")
+    @PreAuthorize("@codeRuleManagementAccess.canWrite(authentication)")
     public Result<CodeRuleView> enable(@PathVariable String revisionId, @RequestBody VersionRequest request) {
         return Result.success(application.enable(revisionId, required(request.ruleVersion())));
     }
+    /** 停用已发布修订并保留历史定义。 */
     @PostMapping("/{revisionId}/disable")
-    @PreAuthorize("hasAuthority('mdm:code-rule:write')")
+    @PreAuthorize("@codeRuleManagementAccess.canWrite(authentication)")
     public Result<CodeRuleView> disable(@PathVariable String revisionId, @RequestBody VersionRequest request) {
         return Result.success(application.disable(revisionId, required(request.ruleVersion())));
     }
@@ -94,7 +102,10 @@ public class CodeRuleController {
         result.put("parameterSchema", Map.of("schemaVersion", 1, "fields", fields));
         return result;
     }
-    public record CreateRequest(String ruleCode, CodeRuleDefinition definition) { }
-    public record UpdateRequest(CodeRuleDefinition definition, Long ruleVersion) { }
+    /** 创建请求包含稳定编码、规则级使用场景、说明与定义。 */
+    public record CreateRequest(String ruleCode, String usageScenario, String description, CodeRuleDefinition definition) { }
+    /** 草稿更新携带规则级说明、完整定义和并发版本。 */
+    public record UpdateRequest(String usageScenario, String description, CodeRuleDefinition definition, Long ruleVersion) { }
+    /** 修订与启停动作共用的规则级并发版本。 */
     public record VersionRequest(Long ruleVersion) { }
 }

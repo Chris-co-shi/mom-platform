@@ -62,11 +62,24 @@ class CodeRuleAutoConfigurationTest {
         new ApplicationContextRunner().withConfiguration(AutoConfigurations.of(CodeRuleAutoConfiguration.class))
                 .withPropertyValues("mom.code-rule.enabled=true", "mom.code-rule.owner=mdm")
                 .run(context -> assertThat(context).hasFailed());
-        runner().withPropertyValues("mom.code-rule.owner=system")
+        runner().withPropertyValues("mom.code-rule.owner=mdm.other")
                 .run(context -> assertThat(context).hasFailed());
         runner(mock(DataSource.class), new DataSourceTransactionManager(mock(DataSource.class)))
                 .run(context -> assertThat(context).hasFailed()
                         .getFailure().hasStackTraceContaining("编码规则 Store 与本地事务必须使用同一 DataSource"));
+    }
+    @Test void secondOwnerUsesIndependentCatalogAndStore() {
+        runner().withPropertyValues("mom.code-rule.owner=test_owner").run(second -> {
+            assertThat(second).hasNotFailed().hasSingleBean(CodeRuleStore.class);
+            assertThat(second.getBean(CodeSegmentRegistry.class).catalog(1))
+                    .extracting(CodeSegmentMetadata::type).doesNotContain("BUSINESS_FIELD", "CUSTOM");
+        });
+    }
+    @Test void unsafeOwnerFailsBeforeAccessingDataSource() {
+        for (String owner : new String[]{"", "MDM", "mdm.other", "mdm;drop table x", "mdm--", "a".repeat(45)}) {
+            runner().withPropertyValues("mom.code-rule.owner=" + owner)
+                    .run(context -> assertThat(context).hasFailed());
+        }
     }
     @Test void paginationUsesExistingPropertyAndRejectsInvalidConfiguration() {
         runner().run(context -> assertThatThrownBy(() -> context.getBean(CodeRuleStore.class)

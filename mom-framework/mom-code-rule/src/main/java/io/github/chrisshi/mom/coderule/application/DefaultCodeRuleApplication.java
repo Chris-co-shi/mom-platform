@@ -33,13 +33,14 @@ public class DefaultCodeRuleApplication implements CodeRuleApplication {
 
     /** 同一事务创建规则身份和首个草稿。 */
     @Transactional
-    public CodeRuleView create(String ruleCode, CodeRuleDefinition definition) {
+    public CodeRuleView create(String ruleCode, String usageScenario, String description, CodeRuleDefinition definition) {
         if (ruleCode == null || !ruleCode.matches("[A-Za-z][A-Za-z0-9_.-]{0,63}")) bad("rule_code_invalid");
+        usageScenario = scenario(usageScenario); description = description(description);
         validate(definition, false);
         String ruleId = ids.nextId();
         String revisionId = ids.nextId();
         try {
-            store.insertRule(ruleId, ruleCode);
+            store.insertRule(ruleId, ruleCode, usageScenario, description);
             store.insertRevision(revisionId, ruleId, 1, "DRAFT", definition);
         } catch (DuplicateKeyException ex) { conflict("rule_code_conflict"); }
         return detail(revisionId);
@@ -56,15 +57,16 @@ public class DefaultCodeRuleApplication implements CodeRuleApplication {
     @Transactional(readOnly = true)
     public PageResult<CodeRuleView> search(PageQuery<CodeRulePageParams> query) { return store.search(query); }
 
-    /** 只有草稿定义可改，规则级版本阻止跨修订覆盖。 */
+    /** 只有草稿可保存规则级说明及定义，规则级版本阻止跨修订覆盖。 */
     @Transactional
-    public CodeRuleView updateDraft(String revisionId, CodeRuleDefinition definition, long ruleVersion) {
+    public CodeRuleView updateDraft(String revisionId, String usageScenario, String description, CodeRuleDefinition definition, long ruleVersion) {
         CodeRuleStore.Revision current = requireRevision(revisionId);
         CodeRuleStore.Rule rule = lock(current.ruleId(), ruleVersion);
         current = requireRevision(revisionId);
         if (!"DRAFT".equals(current.status())) conflict("immutable_revision");
+        usageScenario = scenario(usageScenario); description = description(description);
         validate(definition, false);
-        if (!store.updateDraft(revisionId, definition) || !store.advanceVersion(rule.id(), ruleVersion)) conflict("stale_version");
+        if (!store.updateMetadata(rule.id(), usageScenario, description) || !store.updateDraft(revisionId, definition) || !store.advanceVersion(rule.id(), ruleVersion)) conflict("stale_version");
         return detail(revisionId);
     }
 
@@ -110,6 +112,19 @@ public class DefaultCodeRuleApplication implements CodeRuleApplication {
         if (!store.changeStatus(revisionId, "ENABLED", "DISABLED")
                 || !store.advanceVersion(rule.id(), ruleVersion)) conflict("stale_version");
         return detail(revisionId);
+    }
+
+    private static String scenario(String value) {
+        if (value == null || value.isBlank()) bad("usage_scenario_invalid");
+        String text = value.strip();
+        if (text.codePointCount(0, text.length()) > 120 || text.indexOf(0) >= 0) bad("usage_scenario_invalid");
+        return text;
+    }
+    private static String description(String value) {
+        if (value == null || value.isBlank()) return null;
+        String text = value.strip();
+        if (text.codePointCount(0, text.length()) > 1000 || text.indexOf(0) >= 0) bad("description_invalid");
+        return text;
     }
 
     private void validate(CodeRuleDefinition definition, boolean complete) {
@@ -181,7 +196,7 @@ public class DefaultCodeRuleApplication implements CodeRuleApplication {
         return revision;
     }
     private static CodeRuleView view(CodeRuleStore.Rule rule, CodeRuleStore.Revision revision) {
-        return new CodeRuleView(revision.id(), rule.id(), rule.ruleCode(), revision.revisionNo(),
+        return new CodeRuleView(revision.id(), rule.id(), rule.ruleCode(), rule.usageScenario(), rule.description(), revision.revisionNo(),
                 revision.status(), revision.definition(), rule.version(), revision.createdAt(), revision.updatedAt());
     }
     private static void bad(String code) { throw new CodeRuleFailure(CodeRuleFailure.Kind.BAD_REQUEST, code); }

@@ -37,7 +37,6 @@ public class CodeRuleAutoConfiguration {
                                       JsonMapper json, CurrentActorProvider actors, Clock clock,
                                       org.springframework.core.env.Environment environment) {
         String owner = environment.getProperty("mom.code-rule.owner", "");
-        if (!"mdm".equals(owner)) throw new IllegalStateException("mom.code-rule.owner 仅支持 mdm");
         if (!(transactions instanceof DataSourceTransactionManager manager) || manager.getDataSource() != source)
             throw new IllegalStateException("编码规则 Store 与本地事务必须使用同一 DataSource");
         long maxPageSize = environment.getProperty("mom.data.pagination.max-page-size", Long.class, 200L);

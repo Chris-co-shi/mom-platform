@@ -60,6 +60,9 @@ mom:
   code-rule:
     enabled: true
     owner: mdm
+    management:
+      read-authority: mdm:code-rule:read
+      write-authority: mdm:code-rule:write
   i18n:
     owner: mdm
   security:

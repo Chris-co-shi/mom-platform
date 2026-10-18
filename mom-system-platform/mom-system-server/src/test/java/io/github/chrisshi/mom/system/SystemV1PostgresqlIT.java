@@ -48,6 +48,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         classes = MomSystemApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.MOCK,
         properties = {
+                "spring.config.additional-location=file:src/main/resources/application.yml",
                 "spring.main.banner-mode=off",
                 "spring.cloud.nacos.discovery.enabled=false",
                 "mom.security.resource-server.enabled=false"
@@ -92,8 +93,8 @@ class SystemV1PostgresqlIT {
     /** 每例保留 Migration 种子并删除测试创建的数据。 */
     @BeforeEach
     void resetCurrentV1Data() {
-        jdbc.update("DELETE FROM system_i18n_translation WHERE id NOT LIKE '93000000000000000%' AND id NOT LIKE '964%' AND id NOT LIKE '966%'");
-        jdbc.update("DELETE FROM system_i18n_message_definition WHERE id NOT LIKE '92000000000000000%' AND id NOT LIKE '963%' AND id NOT LIKE '965%'");
+        jdbc.update("DELETE FROM system_i18n_translation WHERE id NOT LIKE '93000000000000000%' AND id NOT LIKE '964%' AND id NOT LIKE '966%' AND id NOT LIKE '9671%' AND id NOT LIKE '9672%' AND id NOT LIKE '9673%'");
+        jdbc.update("DELETE FROM system_i18n_message_definition WHERE id NOT LIKE '92000000000000000%' AND id NOT LIKE '963%' AND id NOT LIKE '965%' AND id NOT LIKE '9671%' AND id NOT LIKE '9672%' AND id NOT LIKE '9673%'");
         jdbc.update("DELETE FROM system_supported_locale WHERE id NOT LIKE '910000000000000000%'");
         jdbc.update("UPDATE system_supported_locale SET is_default=false, enabled=true WHERE is_default=true");
         jdbc.update("UPDATE system_supported_locale SET is_default=true WHERE locale_code='zh-CN'");
@@ -111,10 +112,10 @@ class SystemV1PostgresqlIT {
                 .isInstanceOf(I18nFailure.class);
     }
 
-    /** 历史 Migration 保持存在，V11～V15 Web 文案种子已生效。 */
+    /** 历史 Migration 保持存在，现行 Web 文案种子（含 V27 编码规则使用场景）已生效。 */
     @Test
     void migrationMustPreserveHistoryAndCreateOnlyCurrentV1Tables() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("24");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("27");
         assertThat(jdbc.queryForList("""
                 SELECT table_name FROM information_schema.tables
                  WHERE table_schema=? AND table_name IN (
