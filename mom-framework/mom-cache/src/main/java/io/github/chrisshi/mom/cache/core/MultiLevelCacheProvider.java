@@ -44,7 +44,16 @@ public class MultiLevelCacheProvider {
         this.metrics = metrics;
     }
 
-    /** @deprecated 仅供旧 Core 兼容，新 CacheService 使用 typed 方法 */
+    /**
+     * 读取旧缓存 API 的兼容入口。
+     *
+     * <p>该入口不参与新的 typed {@link CacheEntryKey} 调用链，只用于存量调用迁移期间的兼容。</p>
+     *
+     * @param key 旧缓存 Key
+     * @param policy 旧缓存策略
+     * @return 命中的缓存值；未命中时返回 {@code null}
+     * @deprecated 迁移到带类型和 Scope 的新 API
+     */
     @Deprecated(since = "P1.6", forRemoval = false)
     public Object get(CacheKey key, CachePolicy policy) {
         for (CacheProvider provider : providers) {
@@ -59,7 +68,14 @@ public class MultiLevelCacheProvider {
         return null;
     }
 
-    /** @deprecated 仅供旧 Core 兼容，新 CacheService 使用 typed 方法 */
+    /**
+     * 写入旧缓存 API 的兼容入口。
+     *
+     * @param key 旧缓存 Key
+     * @param value 待写入的缓存值
+     * @param policy 旧缓存策略
+     * @deprecated 迁移到带类型和 Scope 的新 API
+     */
     @Deprecated(since = "P1.6", forRemoval = false)
     public void put(CacheKey key, Object value, CachePolicy policy) {
         providers.stream()
@@ -67,7 +83,15 @@ public class MultiLevelCacheProvider {
                 .forEach(provider -> provider.put(key, value, policy.ttl()));
     }
 
-    /** @deprecated 仅供旧 Core 兼容，新 CacheService 使用 typed 方法 */
+    /**
+     * 删除旧缓存 API 的兼容入口。
+     *
+     * <p>该方法不改变新 API 的精确 Key 失效语义。</p>
+     *
+     * @param key 旧缓存 Key
+     * @param policy 旧缓存策略
+     * @deprecated 迁移到带类型和 Scope 的新 API
+     */
     @Deprecated(since = "P1.6", forRemoval = false)
     public void evict(CacheKey key, CachePolicy policy) {
         providers.stream()

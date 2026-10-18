@@ -19,7 +19,12 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-/** 公共规则生命周期；每个写用例只操作当前 Owner 的本地数据库。 */
+/**
+ * 公共编码规则生命周期用例。
+ *
+ * <p>每个写用例只操作当前 Owner 的本地数据库，并通过规则级版本控制并发更新。
+ * 本类负责规则定义校验和状态流转，不负责 HTTP 协议包装或跨 Owner 数据访问。</p>
+ */
 public class DefaultCodeRuleApplication implements CodeRuleApplication {
     private final CodeRuleStore store;
     private final CodeSegmentRegistry handlers;
@@ -31,7 +36,16 @@ public class DefaultCodeRuleApplication implements CodeRuleApplication {
         this.store = store; this.handlers = handlers; this.fields = fields; this.ids = ids;
     }
 
-    /** 同一事务创建规则身份和首个草稿。 */
+    /**
+     * 在同一事务中创建规则身份和首个草稿修订。
+     *
+     * @param ruleCode 规则稳定编码
+     * @param usageScenario 规则使用场景
+     * @param description 规则说明，可为空
+     * @param definition 编码段定义
+     * @return 新建规则的草稿修订视图
+     * @throws CodeRuleFailure 编码、定义或唯一约束不满足时抛出
+     */
     @Transactional
     public CodeRuleView create(String ruleCode, String usageScenario, String description, CodeRuleDefinition definition) {
         if (ruleCode == null || !ruleCode.matches("[A-Za-z][A-Za-z0-9_.-]{0,63}")) bad("rule_code_invalid");
@@ -46,6 +60,13 @@ public class DefaultCodeRuleApplication implements CodeRuleApplication {
         return detail(revisionId);
     }
 
+    /**
+     * 按修订 ID 查询规则详情；修订 ID 是读写目标，不能用 ruleId 代替。
+     *
+     * @param revisionId 规则修订 ID
+     * @return 规则及修订视图
+     * @throws CodeRuleFailure 修订不存在时抛出 NOT_FOUND
+     */
     @Transactional(readOnly = true)
     public CodeRuleView detail(String revisionId) {
         CodeRuleStore.Revision revision = requireRevision(revisionId);
@@ -54,10 +75,28 @@ public class DefaultCodeRuleApplication implements CodeRuleApplication {
         return view(rule, revision);
     }
 
+    /**
+     * 分页查询当前 Owner 的规则修订。
+     *
+     * @param query 已校验的分页和筛选条件
+     * @return 平台统一分页结果
+     */
     @Transactional(readOnly = true)
     public PageResult<CodeRuleView> search(PageQuery<CodeRulePageParams> query) { return store.search(query); }
 
-    /** 只有草稿可保存规则级说明及定义，规则级版本阻止跨修订覆盖。 */
+    /**
+     * 更新草稿修订的说明和定义。
+     *
+     * <p>只有草稿允许修改；规则级版本用于阻止不同修订或并发请求互相覆盖。</p>
+     *
+     * @param revisionId 待更新修订 ID
+     * @param usageScenario 规则使用场景
+     * @param description 规则说明，可为空
+     * @param definition 新的编码段定义
+     * @param ruleVersion 客户端读取到的规则级版本
+     * @return 更新后的草稿视图
+     * @throws CodeRuleFailure 修订状态、定义或版本不满足时抛出
+     */
     @Transactional
     public CodeRuleView updateDraft(String revisionId, String usageScenario, String description, CodeRuleDefinition definition, long ruleVersion) {
         CodeRuleStore.Revision current = requireRevision(revisionId);
@@ -70,7 +109,14 @@ public class DefaultCodeRuleApplication implements CodeRuleApplication {
         return detail(revisionId);
     }
 
-    /** 从已发布或停用版本复制定义，新草稿保留原始 JSON 内容。 */
+    /**
+     * 从已发布或停用修订复制定义，创建下一份草稿。
+     *
+     * @param revisionId 源修订 ID
+     * @param ruleVersion 客户端读取到的规则级版本
+     * @return 新建草稿视图
+     * @throws CodeRuleFailure 源修订不可复制、已有草稿或版本冲突时抛出
+     */
     @Transactional
     public CodeRuleView revise(String revisionId, long ruleVersion) {
         CodeRuleStore.Revision source = requireRevision(revisionId);
@@ -86,7 +132,14 @@ public class DefaultCodeRuleApplication implements CodeRuleApplication {
         return detail(id);
     }
 
-    /** 重验当前能力，并在同一事务中替换 ENABLED 版本。 */
+    /**
+     * 重新校验当前能力并发布指定草稿，同时停用同一规则的旧发布版本。
+     *
+     * @param revisionId 待发布修订 ID
+     * @param ruleVersion 客户端读取到的规则级版本
+     * @return 发布后的规则视图
+     * @throws CodeRuleFailure 定义无效、状态非法或版本冲突时抛出
+     */
     @Transactional
     public CodeRuleView enable(String revisionId, long ruleVersion) {
         CodeRuleStore.Revision target = requireRevision(revisionId);
@@ -103,6 +156,14 @@ public class DefaultCodeRuleApplication implements CodeRuleApplication {
         return detail(revisionId);
     }
 
+    /**
+     * 停用当前已发布修订，并使用规则级版本防止并发覆盖。
+     *
+     * @param revisionId 待停用修订 ID
+     * @param ruleVersion 客户端读取到的规则级版本
+     * @return 停用后的规则视图
+     * @throws CodeRuleFailure 修订状态非法或版本冲突时抛出
+     */
     @Transactional
     public CodeRuleView disable(String revisionId, long ruleVersion) {
         CodeRuleStore.Revision target = requireRevision(revisionId);

@@ -77,7 +77,21 @@ public class QualityDefinitionApplication {
     public QualityModels.DetailView obsolete(String revisionId, Long lockVersion) {
         return writer.obsolete(revisionId, lockVersion);
     }
+
+    /**
+     * 按质量标准身份读取其最新修订详情。
+     *
+     * @param specificationId 质量标准身份 ID
+     * @return 质量标准详情及当前修订条目
+     */
     public QualityModels.DetailView detail(String specificationId) { return writer.detailBySpecification(specificationId); }
+
+    /**
+     * 按修订 ID 读取质量标准详情。
+     *
+     * @param revisionId 质量标准修订 ID
+     * @return 指定修订详情及条目
+     */
     public QualityModels.DetailView revision(String revisionId) { return writer.detailByRevision(revisionId); }
 
     /** 返回当前已发布质量标准的稳定跨域只读快照。 */
