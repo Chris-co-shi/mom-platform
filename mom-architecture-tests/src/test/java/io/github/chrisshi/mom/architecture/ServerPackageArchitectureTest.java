@@ -14,7 +14,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  *
  * <p>测试分析聚合测试模块依赖中的已编译生产字节码，不使用源码正则。Domain、Controller、公开 API
  * 与 Gateway 规则全量生效；Application 的严格 Port/Domain 规则只约束已经进入 Level 2/3 的模块，
- * Mini Auth、System 与 MDM 简单主数据按 ADR-042 允许直接依赖本服务 Mapper/Entity。</p>
+ * Mini Auth、System、MDM 简单主数据与 WMS 按 ADR-042 允许直接依赖本服务 Mapper/Entity。</p>
  */
 class ServerPackageArchitectureTest {
 
@@ -46,7 +46,6 @@ class ServerPackageArchitectureTest {
                         "io.github.chrisshi.mom.iam.application..",
                         "io.github.chrisshi.mom.integration.application..",
                         "io.github.chrisshi.mom.mes.application..",
-                        "io.github.chrisshi.mom.wms.application..",
                         "io.github.chrisshi.mom.qms.application..",
                         "io.github.chrisshi.mom.ems.application..",
                         "io.github.chrisshi.mom.eam.application..",
@@ -82,6 +81,40 @@ class ServerPackageArchitectureTest {
                 .because("System Controller 只能通过 Application 进入用例")
                 .allowEmptyShould(true)
                 .check(productionClasses);
+    }
+
+    /** WMS Level 1 的 Controller 不得直接调用 Infrastructure 方法。 */
+    @Test
+    void wmsControllersMustNotCallInfrastructure() {
+        var violations = productionClasses.stream()
+                .filter(type -> type.getPackageName().startsWith("io.github.chrisshi.mom.wms."))
+                .filter(type -> type.getSimpleName().endsWith("Controller"))
+                .flatMap(type -> type.getMethodCallsFromSelf().stream())
+                .filter(call -> call.getTargetOwner().getPackageName()
+                        .startsWith("io.github.chrisshi.mom.wms.infrastructure."))
+                .map(Object::toString).distinct().toList();
+        org.assertj.core.api.Assertions.assertThat(violations)
+                .as("WMS Controller 不得直接调用 Infrastructure")
+                .isEmpty();
+    }
+
+    /** WMS 不得越过其他业务模块 Application 访问其 Mapper。 */
+    @Test
+    void wmsMustNotAccessOtherBoundedContextMappers() {
+        var violations = productionClasses.stream()
+                .filter(type -> type.getPackageName().startsWith("io.github.chrisshi.mom.wms."))
+                .flatMap(type -> type.getDirectDependenciesFromSelf().stream())
+                .filter(dependency -> dependency.getTargetClass().getSimpleName().endsWith("Mapper"))
+                .filter(dependency -> dependency.getTargetClass().getPackageName()
+                        .startsWith("io.github.chrisshi.mom."))
+                .filter(dependency -> !dependency.getTargetClass().getPackageName()
+                        .startsWith("io.github.chrisshi.mom.wms."))
+                .filter(dependency -> !dependency.getTargetClass().getPackageName()
+                        .startsWith("io.github.chrisshi.mom.data."))
+                .map(Object::toString).distinct().toList();
+        org.assertj.core.api.Assertions.assertThat(violations)
+                .as("WMS 不得直接访问其他业务模块 Mapper")
+                .isEmpty();
     }
 
     /** System 只拥有平台字典、支持 Locale 与 system.* 文案，不得形成第二 IAM 或主数据权威。 */

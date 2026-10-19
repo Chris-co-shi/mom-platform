@@ -86,7 +86,7 @@ class SystemPlatformPomArchitectureTest {
     }
 
     @Test
-    void v1MustPreserveHistoricalMigrationsThroughV17WithoutMapperXml() throws Exception {
+    void systemMustPreserveAllHistoricalMigrationsWithoutMapperXml() throws Exception {
         Path server = systemRoot().resolve("mom-system-server");
         try (var paths = Files.walk(systemRoot())) {
             List<Path> files = paths.filter(Files::isRegularFile).toList();
@@ -120,7 +120,10 @@ class SystemPlatformPomArchitectureTest {
                             migration(server, "V21__seed_routing_navigation.sql"),
                             migration(server, "V22__seed_production_version_navigation.sql"),
                             migration(server, "V23__seed_quality_definition_navigation.sql"),
-                            migration(server, "V24__seed_governance_navigation.sql"));
+                            migration(server, "V24__seed_governance_navigation.sql"),
+                            migration(server, "V25__seed_code_rule_management_messages.sql"),
+                            migration(server, "V26__seed_readable_code_rule_views.sql"),
+                            migration(server, "V27__seed_code_rule_usage_metadata_messages.sql"));
             assertThat(files)
                     .filteredOn(path -> normalized(path).contains("/src/main/resources/mapper/"))
                     .isEmpty();

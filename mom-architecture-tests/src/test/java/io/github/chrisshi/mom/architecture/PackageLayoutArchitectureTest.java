@@ -6,6 +6,8 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import io.github.chrisshi.mom.data.mapper.MomBaseMapper;
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
@@ -20,6 +22,18 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  * 当前工程规范，必须调整实现或提供精确 Accepted Exception。</p>
  */
 class PackageLayoutArchitectureTest {
+
+    private static final Set<String> WMS_PERSISTENCE_DATA_TYPES = Set.of(
+            "io.github.chrisshi.mom.wms.application.QualityStatus",
+            "io.github.chrisshi.mom.wms.application.WarehouseStatus",
+            "io.github.chrisshi.mom.wms.application.InventoryAccountingService$Dimension",
+            "io.github.chrisshi.mom.wms.application.InventoryQueryService$OverviewFilter",
+            "io.github.chrisshi.mom.wms.application.InventoryQueryService$DetailFilter",
+            "io.github.chrisshi.mom.wms.application.InventoryQueryService$OverviewRow",
+            "io.github.chrisshi.mom.wms.application.InventoryQueryService$DetailRow",
+            "io.github.chrisshi.mom.wms.application.InventoryHistoryApplication$Filter",
+            "io.github.chrisshi.mom.wms.application.InventoryHistoryApplication$EntryView",
+            "io.github.chrisshi.mom.wms.application.InventoryHistoryApplication$TransactionView");
 
     private final JavaClasses productionClasses = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
@@ -103,6 +117,7 @@ class PackageLayoutArchitectureTest {
                         "..infrastructure.mapper..",
                         "..infrastructure.persistence.entity..",
                         "..infrastructure.persistence.mapper..")
+                .and().resideOutsideOfPackage("io.github.chrisshi.mom.wms.infrastructure..")
                 .and().doNotHaveFullyQualifiedName(
                         "io.github.chrisshi.mom.iam.infrastructure.persistence.mapper.IamOauthClientPolicyMapper")
                 .and().doNotHaveFullyQualifiedName(
@@ -120,6 +135,23 @@ class PackageLayoutArchitectureTest {
                 .because("数据库写模型不能反向依赖入站协议或用例实现")
                 .allowEmptyShould(true)
                 .check(productionClasses);
+    }
+
+    /** WMS 持久化只可引用已登记的纯数据类型，不得反向引用入站层或 Application 编排实现。 */
+    @Test
+    void wmsPersistenceMustNotDependOnApplicationServices() {
+        var violations = productionClasses.stream()
+                .filter(type -> type.getPackageName().startsWith("io.github.chrisshi.mom.wms.infrastructure."))
+                .flatMap(type -> type.getDirectDependenciesFromSelf().stream())
+                .filter(dependency -> dependency.getTargetClass().getPackageName()
+                        .startsWith("io.github.chrisshi.mom.wms.application")
+                        || dependency.getTargetClass().getPackageName()
+                        .startsWith("io.github.chrisshi.mom.wms.controller"))
+                .filter(dependency -> !WMS_PERSISTENCE_DATA_TYPES.contains(dependency.getTargetClass().getName()))
+                .map(Object::toString).distinct().toList();
+        org.assertj.core.api.Assertions.assertThat(violations)
+                .as("WMS Infrastructure 不得反向依赖 Application 编排实现")
+                .isEmpty();
     }
 
     /** Repository 与 Query Adapter 不得依赖 Controller/Web。 */
@@ -161,7 +193,6 @@ class PackageLayoutArchitectureTest {
                         "io.github.chrisshi.mom.iam.application..",
                         "io.github.chrisshi.mom.integration.application..",
                         "io.github.chrisshi.mom.mes.application..",
-                        "io.github.chrisshi.mom.wms.application..",
                         "io.github.chrisshi.mom.qms.application..",
                         "io.github.chrisshi.mom.ems.application..",
                         "io.github.chrisshi.mom.eam.application..",
