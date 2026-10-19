@@ -82,8 +82,8 @@ public class InventoryAccountingService {
         int line = 0;
         for (Entry entry : posting.entries()) {
             BalanceChange change = entry.delta().signum() > 0
-                    ? mapper.increase(ids.nextId(), entry.dimension(), entry.delta())
-                    : mapper.decrease(entry.dimension(), entry.delta());
+                ? mapper.increase(ids.nextId(), entry.dimension(), entry.delta())
+                : mapper.decrease(entry.dimension(), entry.delta());
             if (change == null) throw new IllegalStateException("库存不足或库位所属仓库冲突");
             if (mapper.insertEntry(ids.nextId(), claimed, ++line, change.id(), entry.dimension(), entry.delta(),
                     change.beforeQuantity(), change.afterQuantity()) != 1)
@@ -109,7 +109,7 @@ public class InventoryAccountingService {
             if (!present(d.materialId()) || !present(d.materialCode()) || !present(d.materialName())
                     || !present(d.uomCode()) || !present(d.warehouseId()) || !present(d.warehouseCode())
                     || !present(d.locationId()) || !present(d.locationCode())
-                    || d.qualityStatus() == null || d.warehouseStatus() == null
+                || d.qualityStatus() == null || d.warehouseStatus() == null
                     || "".equals(d.batchCode()) || "".equals(d.snCode()))
                 throw new IllegalArgumentException("库存维度非法");
         }
