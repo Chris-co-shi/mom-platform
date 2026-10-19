@@ -21,6 +21,19 @@ public class InventoryAccountingOperations {
         this.mapper = mapper;
     }
 
+    /** 在调用方本地事务内按键取得 PostgreSQL 事务级锁；多个键由调用方排序。 */
+    public void lockAccountingKey(String key) { mapper.lockAccountingKey(key); }
+
+    /** 查询同一 SN 的全局正余额行数；调用前必须取得该 SN 的记账锁。 */
+    public int positiveBalanceCountForSn(String snCode) { return mapper.positiveBalanceCountForSn(snCode); }
+
+    /** 查询交易及不可变分录，用于按原始命令重放移动。 */
+    public TransferReplay findTransferReplay(String requestKey) { return mapper.findTransferReplay(requestKey); }
+
+    /** 已提交移动的不可变输入事实；非移动交易也返回类型以拒绝跨业务复用请求键。 */
+    public record TransferReplay(String transactionId, String transactionType, String sourceType, String sourceId,
+                                 String operatorId, String balanceId, String targetLocationId, BigDecimal quantity) { }
+
     /**
      * 领取幂等请求并保存交易来源与责任主体。
      * @param id 新交易技术标识

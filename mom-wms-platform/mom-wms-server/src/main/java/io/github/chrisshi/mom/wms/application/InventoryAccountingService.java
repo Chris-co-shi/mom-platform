@@ -71,6 +71,9 @@ public class InventoryAccountingService {
     @Transactional
     public String post(Posting posting) {
         validate(posting);
+        // 所有携带 SN 的记账统一串行化，库位移动据此检查不可拆标签的唯一正余额。
+        posting.entries().stream().map(entry -> entry.dimension().snCode()).filter(value -> value != null)
+                .distinct().sorted().forEach(sn -> mapper.lockAccountingKey("WMS:SN:" + sn));
         String digest = digest(posting);
         String id = ids.nextId();
         String claimed = mapper.claim(id, posting.requestKey(), digest, posting.transactionType(),

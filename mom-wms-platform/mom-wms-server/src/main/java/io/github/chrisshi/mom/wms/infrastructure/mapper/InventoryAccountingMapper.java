@@ -25,6 +25,31 @@ import java.util.List;
  */
 @Mapper
 interface InventoryAccountingMapper extends MomBaseMapper<InventoryBalanceEntity> {
+    /** 同一事务按稳定键锁定库位或 SN；所有 SN 记账方共用此锁以阻止位置校验期间出现幻影余额。 */
+    @Select("SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(#{key}, 0))")
+    int lockAccountingKey(@Param("key") String key);
+
+    /** 仅允许全局一条正余额的 SN 作为不可拆载体整体移动。 */
+    @Select("SELECT count(*) FROM wms_inventory_balance WHERE sn_code=#{snCode} AND quantity>0")
+    int positiveBalanceCountForSn(@Param("snCode") String snCode);
+
+    /** 读取不可变交易和两条分录，以原始输入而非当前余额决定重放。 */
+    @Select("""
+        SELECT t.id AS transactionId, t.transaction_type AS transactionType,
+               t.source_type AS sourceType, t.source_id AS sourceId, t.operator_id AS operatorId,
+               e1.balance_id AS balanceId, e2.location_id AS targetLocationId,
+               e2.delta_quantity AS quantity
+          FROM wms_inventory_transaction t
+          LEFT JOIN wms_inventory_transaction_entry e1 ON e1.transaction_id=t.id AND e1.line_no=1
+          LEFT JOIN wms_inventory_transaction_entry e2 ON e2.transaction_id=t.id AND e2.line_no=2
+         WHERE t.request_key=#{requestKey}
+        """)
+    @ConstructorArgs({@Arg(column="transactionId", javaType=String.class),
+        @Arg(column="transactionType", javaType=String.class), @Arg(column="sourceType", javaType=String.class),
+        @Arg(column="sourceId", javaType=String.class), @Arg(column="operatorId", javaType=String.class),
+        @Arg(column="balanceId", javaType=String.class), @Arg(column="targetLocationId", javaType=String.class),
+        @Arg(column="quantity", javaType=BigDecimal.class)})
+    InventoryAccountingOperations.TransferReplay findTransferReplay(@Param("requestKey") String requestKey);
     /** 读取冻结命令指向的余额快照；余额扣减必须由统一记账 SQL 完成。 */
     @Select("""
         SELECT id, material_id AS materialId, material_code AS materialCode, material_name AS materialName,

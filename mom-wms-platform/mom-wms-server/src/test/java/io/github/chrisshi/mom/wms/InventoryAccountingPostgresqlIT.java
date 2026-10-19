@@ -193,7 +193,7 @@ class InventoryAccountingPostgresqlIT {
                 "claim", "hashOf", "idOf", "increase", "decrease", "insertEntry",
                 "warehouseInventoryState", "findInventoryBalance", "findFreezeByTransaction", "lockFreeze",
                 "insertFreeze", "activeFreezesByDimension", "decreaseFreezeRemaining", "findUnfreeze",
-                "insertUnfreeze");
+                "insertUnfreeze", "lockAccountingKey", "positiveBalanceCountForSn", "findTransferReplay");
     }
 
     @Test

@@ -14,6 +14,9 @@ import io.github.chrisshi.mom.wms.application.InventoryFreezeApplication.FreezeR
 import io.github.chrisshi.mom.wms.application.InventoryFreezeApplication.FreezeView;
 import io.github.chrisshi.mom.wms.application.InventoryFreezeApplication.UnfreezeCommand;
 import io.github.chrisshi.mom.wms.application.InventoryFreezeApplication.UnfreezeResult;
+import io.github.chrisshi.mom.wms.application.InventoryTransferApplication;
+import io.github.chrisshi.mom.wms.application.InventoryTransferApplication.TransferCommand;
+import io.github.chrisshi.mom.wms.application.InventoryTransferApplication.TransferResult;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,17 +28,20 @@ import org.springframework.web.bind.annotation.RestController;
 import java.math.BigDecimal;
 import java.util.List;
 
-/** WMS 实时库存与仓储冻结 HTTP 边界；没有任意库存增减或质量状态修改 API。 */
+/** WMS 实时库存、仓储冻结和同仓库库位移动 HTTP 边界；没有任意增减或质量状态修改 API。 */
 @RestController
 @RequestMapping("/inventory")
 public class InventoryController {
     private final InventoryQueryService query;
     private final InventoryFreezeApplication freezes;
+    private final InventoryTransferApplication transfers;
 
-    /** @param query 库存实时查询用例 @param freezes 仓储冻结与解冻用例 */
-    public InventoryController(InventoryQueryService query, InventoryFreezeApplication freezes) {
+    /** @param query 库存实时查询用例 @param freezes 仓储冻结与解冻用例 @param transfers 同仓库库位移动用例 */
+    public InventoryController(InventoryQueryService query, InventoryFreezeApplication freezes,
+                               InventoryTransferApplication transfers) {
         this.query = query;
         this.freezes = freezes;
+        this.transfers = transfers;
     }
 
     /** 按 Material 返回实时汇总；必须持有 WMS 库存读权限。 */
@@ -77,6 +83,14 @@ public class InventoryController {
                 request.quantity(), request.note(), "MANUAL", request.requestKey(), authentication.getName())));
     }
 
+    /** 从选中的具体余额移动至同仓库 MDM 库位；操作人取自 Resource Server 认证主体。 */
+    @PostMapping("/transfers")
+    @PreAuthorize("hasAuthority('wms:inventory:transfer')")
+    public Result<TransferResult> transfer(@RequestBody TransferRequest request, Authentication authentication) {
+        return Result.success(transfers.transfer(new TransferCommand(request.requestKey(), request.balanceId(),
+                request.targetLocationId(), request.quantity(), authentication.getName())));
+    }
+
     /** 冻结限制查询请求。 */
     public record FreezeLookup(String balanceId) { }
 
@@ -86,4 +100,7 @@ public class InventoryController {
 
     /** 人工解冻 HTTP 请求，不接受客户端传入冻结目标或操作人。 */
     public record UnfreezeRequest(String requestKey, BigDecimal quantity, String note) { }
+
+    /** 库位移动请求只包含来源余额、MDM 目标库位和数量，状态及其他库存维度由服务器确定。 */
+    public record TransferRequest(String requestKey, String balanceId, String targetLocationId, BigDecimal quantity) { }
 }
