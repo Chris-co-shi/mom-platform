@@ -3,6 +3,10 @@ package io.github.chrisshi.mom.wms;
 import io.github.chrisshi.mom.core.id.IdGenerator;
 import io.github.chrisshi.mom.mdm.api.WarehouseResourceReference;
 import io.github.chrisshi.mom.wms.application.InventoryQueryService;
+import io.github.chrisshi.mom.wms.application.InventoryAccountingService;
+import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Dimension;
+import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Entry;
+import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Posting;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryApplication.LineInput;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryCommitService;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.LocationSnapshot;
@@ -41,6 +45,7 @@ class OpeningInventoryPostgresqlIT {
     }
 
     @Autowired OpeningInventoryCommitService commits;
+    @Autowired InventoryAccountingService accounting;
     @Autowired OpeningInventoryMapper mapper;
     @Autowired InventoryQueryService queries;
     @Autowired IdGenerator ids;
@@ -56,9 +61,21 @@ class OpeningInventoryPostgresqlIT {
         add(documentId, "SN-A", "3001", "4.25");
         add(documentId, "SN-B", "3002", "2.75");
         var document = mapper.find(documentId);
+        var replayEntries = mapper.lines(documentId).stream().map(line -> new Entry(new Dimension(
+                line.materialId(), line.materialCode(), line.materialName(), line.uomCode(), line.batchCode(),
+                line.snCode(), line.warehouseId(), line.warehouseCode(), line.locationId(), line.locationCode(),
+                line.qualityStatus(), line.warehouseStatus()), line.quantity())).toList();
         assertThat(document.warehouseState()).isEqualTo("INITIALIZING");
         String transactionId = commits.post(documentId, document.version(), "operator-1");
         assertThat(commits.post(documentId, document.version(), "operator-1")).isEqualTo(transactionId);
+        assertThat(accounting.post(new Posting("OPENING:" + documentId, "OPENING", "OPENING_DOCUMENT",
+                documentId, "operator-1", replayEntries))).isEqualTo(transactionId);
+        var alteredEntries = replayEntries.stream().map(entry -> new Entry(entry.dimension(),
+                entry.delta().add(BigDecimal.ONE))).toList();
+        assertThatThrownBy(() -> accounting.post(new Posting("OPENING:" + documentId, "OPENING",
+                "OPENING_DOCUMENT", documentId, "operator-1", alteredEntries)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("库存请求键已用于不同内容");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_transaction WHERE id=? AND transaction_type='OPENING' AND source_type='OPENING_DOCUMENT' AND source_id=? AND operator_id='operator-1'", Integer.class, transactionId, documentId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_transaction_entry WHERE transaction_id=?", Integer.class, transactionId)).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_balance", Integer.class)).isEqualTo(2);

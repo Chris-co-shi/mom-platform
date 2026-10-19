@@ -71,11 +71,6 @@ public class InventoryAccountingService {
     @Transactional
     public String post(Posting posting) {
         validate(posting);
-        String requiredWarehouseState = "OPENING".equals(posting.transactionType()) ? "INITIALIZING" : "ACTIVE";
-        for (String warehouseId : posting.entries().stream().map(entry -> entry.dimension().warehouseId()).distinct().toList()) {
-            if (!requiredWarehouseState.equals(mapper.warehouseInventoryState(warehouseId)))
-                throw new IllegalStateException("仓库库存尚未进入允许当前交易类型的 WMS 生命周期状态");
-        }
         String digest = digest(posting);
         String id = ids.nextId();
         String claimed = mapper.claim(id, posting.requestKey(), digest, posting.transactionType(),
@@ -83,6 +78,11 @@ public class InventoryAccountingService {
         if (claimed == null) {
             if (digest.equals(mapper.hashOf(posting.requestKey()))) return mapper.idOf(posting.requestKey());
             throw new IllegalArgumentException("库存请求键已用于不同内容");
+        }
+        String requiredWarehouseState = "OPENING".equals(posting.transactionType()) ? "INITIALIZING" : "ACTIVE";
+        for (String warehouseId : posting.entries().stream().map(entry -> entry.dimension().warehouseId()).distinct().toList()) {
+            if (!requiredWarehouseState.equals(mapper.warehouseInventoryState(warehouseId)))
+                throw new IllegalStateException("仓库库存尚未进入允许当前交易类型的 WMS 生命周期状态");
         }
         int line = 0;
         for (Entry entry : posting.entries()) {
