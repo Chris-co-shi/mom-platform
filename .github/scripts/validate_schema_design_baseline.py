@@ -8,6 +8,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import zlib
 from dataclasses import dataclass, field
 
 MIGRATION = re.compile(
@@ -78,6 +79,20 @@ CONSTRAINT_REPAIRS = (
      "ck_qms_i18n_message_version", "ck_qms_i18n_message_definition_version"),
 )
 CONSTRAINT_REPAIR_PATH = QMS_MIGRATIONS + "V6__repair_schema_metadata.sql"
+
+# 这些已提交历史建表迁移的注释由后续同 Owner 迁移补齐；新建表必须在本文件写全注释。
+HISTORICAL_COMMENT_SOURCES = {
+    "mom-auth-platform/mom-auth-server/src/main/resources/db/migration/auth/V7__create_auth_i18n.sql",
+    "mom-mdm-platform/mom-mdm-server/src/main/resources/db/migration/mdm/V6__create_mdm_i18n.sql",
+    "mom-mdm-platform/mom-mdm-server/src/main/resources/db/migration/mdm/V119__create_formula_revision_master_data.sql",
+    "mom-mdm-platform/mom-mdm-server/src/main/resources/db/migration/mdm/V121__create_routing_revision_master_data.sql",
+    "mom-mdm-platform/mom-mdm-server/src/main/resources/db/migration/mdm/V123__create_production_version_master_data.sql",
+    QMS_MIGRATIONS + "V1__create_quality_definition.sql",
+    QMS_MIGRATIONS + "V2__create_qms_i18n.sql",
+}
+WMS_V8_PATH = "mom-wms-platform/mom-wms-server/src/main/resources/db/migration/wms/V8__opening_document_code_rule.sql"
+WMS_V11_PATH = "mom-wms-platform/mom-wms-server/src/main/resources/db/migration/wms/V11__repair_code_rule_column_comments.sql"
+WMS_V8_PUBLISHED_CHECKSUM = 114386239
 
 
 @dataclass
@@ -238,8 +253,19 @@ def run(root: pathlib.Path, report: Report) -> None:
         report.reviews.append(f"历史约束已由指定后续 Migration 改名，仍校验其余表规则: {source_path}#{table}.{old} -> {new}")
 
     for relative, context, sql in migrations:
-        check_sql(relative, sql, report, comment_sql="\n".join(context_sql[context]),
-                  repaired_names=repaired_names)
+        comments = sql
+        if relative in HISTORICAL_COMMENT_SOURCES:
+            comments = "\n".join(context_sql[context])
+        elif relative == WMS_V8_PATH:
+            checksum = zlib.crc32("".join(sql.splitlines()).encode("utf-8"))
+            if checksum != WMS_V8_PUBLISHED_CHECKSUM:
+                report.errors.append(f"已发布 WMS V8 checksum 不匹配: {relative}")
+            repair = migration_sql.get(WMS_V11_PATH)
+            if repair is None:
+                report.errors.append(f"已发布 WMS V8 缺少后续注释修复 Migration: {WMS_V11_PATH}")
+            else:
+                comments = sql + "\n" + repair
+        check_sql(relative, sql, report, comment_sql=comments, repaired_names=repaired_names)
 
 
 def main(argv: list[str] | None = None) -> int:

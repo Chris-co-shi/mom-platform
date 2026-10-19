@@ -73,6 +73,40 @@ class SchemaDesignBaselineTest(unittest.TestCase):
         module.check_sql(self.path, create_sql, report, set(), comment_sql=later_comments)
         self.assertEqual([], report.errors)
 
+    def test_new_migration_cannot_borrow_later_comments(self):
+        source = self.path
+        later = source.replace("V9__create_item.sql", "V10__repair_item_comments.sql")
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            for path, sql in ((source, self.valid.split("COMMENT ON TABLE")[0]),
+                              (later, self.valid[self.valid.index("COMMENT ON TABLE"):])):
+                file = root / path
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_text(sql)
+            with patch.object(module, "git_files", return_value=[source, later]):
+                report = module.Report()
+                module.run(root, report)
+            self.assertTrue(any("必须有表注释" in error for error in report.errors))
+
+    def test_published_v8_requires_exact_v11_repair(self):
+        root_repo = PATH.parents[2]
+        source = "mom-wms-platform/mom-wms-server/src/main/resources/db/migration/wms/V8__opening_document_code_rule.sql"
+        repair = source.replace("V8__opening_document_code_rule.sql", "V11__repair_code_rule_column_comments.sql")
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            for path in (source, repair):
+                file = root / path
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_text((root_repo / path).read_text())
+            with patch.object(module, "git_files", return_value=[source, repair]):
+                report = module.Report()
+                module.run(root, report)
+                self.assertEqual([], report.errors)
+                (root / repair).write_text("-- 修复文件缺少必要 COMMENT\n")
+                missing = module.Report()
+                module.run(root, missing)
+            self.assertTrue(any("关键列必须有注释" in error for error in missing.errors))
+
     def test_cross_schema_is_rejected(self):
         report = module.Report()
         module.check_sql(self.path, "SELECT id FROM mom_iam.iam_user;", report, set())
