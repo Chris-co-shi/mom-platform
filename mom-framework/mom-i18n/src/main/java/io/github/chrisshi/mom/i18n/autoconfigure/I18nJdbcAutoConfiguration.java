@@ -24,7 +24,7 @@ import java.util.Map;
 @ConditionalOnProperty(prefix = "mom.i18n", name = "owner")
 public class I18nJdbcAutoConfiguration {
     private static final Map<String, String> TABLE_PREFIXES = Map.of(
-            "auth", "auth", "mdm", "mdm", "system", "system");
+            "auth", "auth", "mdm", "mdm", "system", "system", "wms", "wms");
 
     /** 只在显式 Owner 且宿主未提供 Store 时创建本地 JDBC 适配器。 */
     @Bean
@@ -35,7 +35,7 @@ public class I18nJdbcAutoConfiguration {
         String owner = environment.getProperty("mom.i18n.owner", "").toLowerCase(Locale.ROOT);
         String prefix = TABLE_PREFIXES.get(owner);
         if (prefix == null) {
-            throw new IllegalStateException("mom.i18n.owner 仅支持 auth、mdm 或 system");
+            throw new IllegalStateException("mom.i18n.owner 仅支持 auth、mdm、system 或 wms");
         }
         if (!(transactionManager instanceof DataSourceTransactionManager manager)) {
             throw new IllegalStateException("I18n JDBC Store 要求宿主提供 DataSourceTransactionManager");

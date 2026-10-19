@@ -3,17 +3,45 @@ server:
 spring:
   application:
     name: mom-wms-server
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_wms}&tcpKeepAlive=true&ApplicationName=mom-wms-server}
+    username: ${POSTGRES_USERNAME:postgres}
+    password: ${POSTGRES_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${POSTGRES_MAXIMUM_POOL_SIZE:5}
+      connection-init-sql: SET TIME ZONE 'UTC'
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    create-schemas: true
+    default-schema: ${POSTGRES_SCHEMA:mom_wms}
+    schemas: ${POSTGRES_SCHEMA:mom_wms}
+    locations: classpath:db/migration/wms
+    validate-migration-naming: true
+    clean-disabled: true
   cloud:
     nacos:
       discovery:
-        enabled: ${NACOS_DISCOVERY_ENABLED:false}
+        enabled: ${NACOS_DISCOVERY_ENABLED:true}
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+mom:
+  i18n:
+    owner: wms
+  security:
+    resource-server:
+      enabled: ${MOM_RESOURCE_SERVER_ENABLED:true}
 management:
   endpoints:
     web:
       exposure:
         include: health,info,prometheus
-  endpoint:
-    health:
-      probes:
-        enabled: true

@@ -88,7 +88,8 @@ public class MomServletResourceServerAutoConfiguration {
             )
             .authorizeHttpRequests(authorize -> {
                 String i18nOwner = environment.getProperty("mom.i18n.owner", "");
-                if ("auth".equals(i18nOwner) || "mdm".equals(i18nOwner) || "system".equals(i18nOwner)) {
+                if ("auth".equals(i18nOwner) || "mdm".equals(i18nOwner)
+                        || "system".equals(i18nOwner) || "wms".equals(i18nOwner)) {
                     authorize.requestMatchers(org.springframework.http.HttpMethod.GET,
                                     "/i18n/messages", "/i18n/messages/**", "/i18n/locale-catalog",
                                     "/i18n/locales", "/i18n/runtime/bundles", "/i18n/runtime/events")

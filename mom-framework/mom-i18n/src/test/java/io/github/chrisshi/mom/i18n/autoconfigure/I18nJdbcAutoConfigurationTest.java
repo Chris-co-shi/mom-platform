@@ -36,6 +36,15 @@ class I18nJdbcAutoConfigurationTest {
     }
 
     @Test
+    void wmsOwnerCreatesItsLocalStore() {
+        runner.withUserConfiguration(TechnicalBeans.class).withPropertyValues("mom.i18n.owner=wms")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(I18nStore.class);
+                    assertThat(context.getBean(I18nStore.class)).isInstanceOf(JdbcI18nStore.class);
+                });
+    }
+
+    @Test
     void customStoreTakesPrecedenceWithoutTechnicalDependencies() {
         runner.withUserConfiguration(CustomStore.class).withPropertyValues("mom.i18n.owner=auth")
                 .run(context -> {

@@ -112,6 +112,22 @@ spring:
                     redis-rate-limiter.burstCapacity: ${GATEWAY_MDM_RATE_LIMIT_BURST_CAPACITY:20}
                     redis-rate-limiter.requestedTokens: ${GATEWAY_MDM_RATE_LIMIT_REQUESTED_TOKENS:1}
 
+            # WMS 库存查询入口；认证与权限由 WMS Resource Server 最终校验。
+            - id: wms-api
+              order: 0
+              uri: lb://mom-wms-server
+              predicates:
+                - Path=/wms/**
+              filters:
+                - StripPrefix=1
+                - name: RequestRateLimiter
+                  args:
+                    rate-limiter: "#{@momFailClosedRedisRateLimiter}"
+                    key-resolver: "#{@requestIdentityKeyResolver}"
+                    redis-rate-limiter.replenishRate: ${GATEWAY_WMS_RATE_LIMIT_REPLENISH_RATE:10}
+                    redis-rate-limiter.burstCapacity: ${GATEWAY_WMS_RATE_LIMIT_BURST_CAPACITY:20}
+                    redis-rate-limiter.requestedTokens: ${GATEWAY_WMS_RATE_LIMIT_REQUESTED_TOKENS:1}
+
             # QMS 执行域预留路由与历史 I18n；质量基础定义已由 MDM 持有。
             - id: qms-api
               order: 0

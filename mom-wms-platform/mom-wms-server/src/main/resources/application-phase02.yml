@@ -3,14 +3,8 @@ spring:
     activate:
       on-profile: phase02
 
+# 沿用 Base 的 Redis Opaque Token Resource Server；不恢复历史 JWT/JWK 配置。
 mom:
   security:
     resource-server:
       enabled: true
-      issuer-uri: ${IAM_ISSUER}
-      jwk-set-uri: ${IAM_JWK_SET_URI}
-      accepted-audiences:
-        - mom-admin-web
-        - mom-supplier-web
-        - mom-mobile-pda
-
