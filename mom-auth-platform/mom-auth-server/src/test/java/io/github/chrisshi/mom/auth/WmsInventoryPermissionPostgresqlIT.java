@@ -42,5 +42,12 @@ class WmsInventoryPermissionPostgresqlIT {
                    AND r.domain_code='WMS' AND r.resource_code='OPENING_INVENTORY'
                    AND rp.role_id='1000000000000000002' AND p.enabled AND NOT p.deleted
                 """, Integer.class)).isEqualTo(4);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM auth_permission p JOIN auth_permission_resource r ON r.id=p.resource_id
+                 JOIN auth_role_permission rp ON rp.permission_id=p.id
+                 WHERE p.code IN ('wms:inventory:freeze','wms:inventory:unfreeze')
+                   AND r.domain_code='WMS' AND r.resource_code='INVENTORY_FREEZE'
+                   AND rp.role_id='1000000000000000002' AND p.enabled AND NOT p.deleted
+                """, Integer.class)).isEqualTo(2);
     }
 }

@@ -1,11 +1,15 @@
 package io.github.chrisshi.mom.wms.infrastructure.mapper;
 
 import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Dimension;
+import io.github.chrisshi.mom.wms.application.QualityStatus;
+import io.github.chrisshi.mom.wms.application.WarehouseStatus;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
 
-/** 库存记账的受限持久化入口，只暴露记账所需原子操作，不暴露余额 Entity 的通用 CRUD。 */
+/** WMS 库存记账与仓储冻结的受限持久化入口；不暴露余额 Entity 的通用 CRUD。 */
 @Component
 public class InventoryAccountingOperations {
     private final InventoryAccountingMapper mapper;
@@ -100,4 +104,88 @@ public class InventoryAccountingOperations {
 
     /** 原子余额操作返回的余额标识及前后数量。 */
     public record BalanceChange(String id, BigDecimal beforeQuantity, BigDecimal afterQuantity) { }
+
+    /** 冻结操作选择的实时余额快照。 */
+    public record Balance(String id, String materialId, String materialCode, String materialName, String uomCode,
+                          String batchCode, String snCode, String warehouseId, String warehouseCode,
+                          String locationId, String locationCode, QualityStatus qualityStatus,
+                          WarehouseStatus warehouseStatus, BigDecimal quantity) { }
+
+    /** 冻结限制完整快照；remainingQuantity 仅可通过锁定与条件更新修改。 */
+    public record FreezeRecord(String id, String transactionId, String originalBalanceId, String materialId,
+                               String materialCode, String materialName, String uomCode, String batchCode,
+                               String snCode, String warehouseId, String warehouseCode, String locationId,
+                               String locationCode, QualityStatus qualityStatus,
+                               String reasonCode, String note, BigDecimal originalQuantity, BigDecimal remainingQuantity,
+                               String sourceType, String sourceId, String operatorId, Instant frozenAt) { }
+
+    /** 解冻请求幂等记录。 */
+    public record UnfreezeRecord(String requestHash, String transactionId) { }
+
+    /**
+     * 按 ID 读取余额快照用于冻结选择；真正增减仍交由唯一库存记账入口完成。
+     * @param id 实时库存余额 ID
+     * @return 当前余额快照，不存在时为空
+     */
+    public Balance findInventoryBalance(String id) { return mapper.findInventoryBalance(id); }
+
+    /**
+     * 查询冻结交易对应限制，处理库存交易幂等重放。
+     * @param transactionId 库存交易 ID
+     * @return 冻结限制，不存在时为空
+     */
+    public FreezeRecord findFreezeByTransaction(String transactionId) { return mapper.findFreezeByTransaction(transactionId); }
+
+    /**
+     * 锁定指定限制行，串行化同一限制的解冻操作。
+     * @param id 冻结限制 ID
+     * @return 当前限制；不存在时为空
+     */
+    public FreezeRecord lockFreeze(String id) { return mapper.lockFreeze(id); }
+
+    /**
+     * 同一事务中保存冻结原因与库存维度快照。
+     * @param id 冻结限制技术 ID @param transactionId 冻结库存交易 ID @param balance 原始 NORMAL 余额快照
+     * @param reasonCode 受控仓储冻结原因 @param note 冻结说明 @param quantity 冻结数量
+     * @param sourceType 业务来源类型 @param sourceId 来源业务标识 @param operatorId 实际操作人
+     * @return 插入行数；同一交易已记录时为零
+     */
+    public int insertFreeze(String id, String transactionId, Balance balance, String reasonCode, String note,
+                            BigDecimal quantity, String sourceType, String sourceId, String operatorId) {
+        return mapper.insertFreeze(id, transactionId, balance, reasonCode, note, quantity, sourceType, sourceId, operatorId);
+    }
+
+    /**
+     * 查询给定库存维度仍有效的所有冻结限制。
+     * @param balance 实时库存维度快照
+     * @return 尚有剩余冻结数量的限制，按时间和 ID 排序
+     */
+    public List<FreezeRecord> activeFreezesByDimension(Balance balance) { return mapper.activeFreezesByDimension(balance); }
+
+    /**
+     * 通过数据库剩余量条件更新保护并发解冻不超额。
+     * @param id 冻结限制 ID @param quantity 本次解冻数量
+     * @return 更新行数；剩余量不足时为零
+     */
+    public int decreaseFreezeRemaining(String id, BigDecimal quantity) { return mapper.decreaseFreezeRemaining(id, quantity); }
+
+    /**
+     * 查询已提交解冻幂等事实。
+     * @param requestKey 原样请求幂等键
+     * @return 解冻请求摘要与原交易标识，不存在时为空
+     */
+    public UnfreezeRecord findUnfreeze(String requestKey) { return mapper.findUnfreeze(requestKey); }
+
+    /**
+     * 追加不可变解冻历史。
+     * @param id 解冻历史 ID @param requestKey 原样幂等键 @param requestHash 解冻请求摘要
+     * @param freezeId 被解除的限制 ID @param transactionId 解冻库存交易 ID @param quantity 解冻数量
+     * @param note 必填处理说明 @param sourceType 业务来源类型 @param sourceId 来源标识 @param operatorId 操作人
+     * @return 插入行数
+     */
+    public int insertUnfreeze(String id, String requestKey, String requestHash, String freezeId, String transactionId,
+                              BigDecimal quantity, String note, String sourceType, String sourceId, String operatorId) {
+        return mapper.insertUnfreeze(id, requestKey, requestHash, freezeId, transactionId, quantity, note,
+                sourceType, sourceId, operatorId);
+    }
 }

@@ -56,7 +56,7 @@ class InventoryHttpPostgresqlIT {
         mvc = webAppContextSetup(context).apply(springSecurity()).build();
         jdbc.update("INSERT INTO wms_warehouse_inventory_state(id,warehouse_id,warehouse_code,state) VALUES(?,?,?,'ACTIVE') ON CONFLICT(warehouse_id) DO NOTHING",
                 "9000000000000000001", "2001", "WH-1");
-        jdbc.execute("TRUNCATE wms_inventory_transaction_entry, wms_inventory_transaction, wms_inventory_balance");
+        jdbc.execute("TRUNCATE wms_inventory_unfreeze, wms_inventory_freeze, wms_inventory_transaction_entry, wms_inventory_transaction, wms_inventory_balance");
         var dimension = new Dimension("1001", "MAT-1", "材料一", "kg", null, "SN-1",
                 "2001", "WH-1", "3001", "LOC-1", QualityStatus.QUALIFIED, WarehouseStatus.NORMAL);
         accounting.post(new Posting("http-seed", "RECEIPT", "TEST", "http-seed", "operator-1",
@@ -91,7 +91,8 @@ class InventoryHttpPostgresqlIT {
     void wmsOwnerPublishesInventoryText() throws Exception {
         mvc.perform(get("/i18n/runtime/bundles").param("locale", "zh-CN"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.messages['wms.inventory.overview']").value("实时库存总览"));
+                .andExpect(jsonPath("$.data.messages['wms.inventory.overview']").value("实时库存总览"))
+                .andExpect(jsonPath("$.data.messages['wms.inventory.reason.package_damage']").value("包装破损"));
     }
 
     @Test
@@ -105,5 +106,32 @@ class InventoryHttpPostgresqlIT {
                         .with(opaqueToken().authorities(new SimpleGrantedAuthority("wms:opening:read"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.records").isArray());
+    }
+
+    @Test
+    void freezeAndUnfreezeRequireTheirWmsWriteAuthorities() throws Exception {
+        String balanceId = jdbc.queryForObject("SELECT id FROM wms_inventory_balance WHERE warehouse_status='NORMAL'", String.class);
+        String freeze = "{\"requestKey\":\"http-freeze\",\"balanceId\":\"" + balanceId +
+                "\",\"quantity\":\"2\",\"reason\":\"PACKAGE_DAMAGE\"}";
+        mvc.perform(post("/inventory/freezes").contentType(MediaType.APPLICATION_JSON).content(freeze)
+                        .with(opaqueToken().authorities(new SimpleGrantedAuthority("wms:inventory:read"))))
+                .andExpect(status().isForbidden());
+        var response = mvc.perform(post("/inventory/freezes").contentType(MediaType.APPLICATION_JSON).content(freeze)
+                        .with(opaqueToken().authorities(new SimpleGrantedAuthority("wms:inventory:freeze"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.reasonCode").value("PACKAGE_DAMAGE"))
+                .andReturn();
+        String freezeId = com.fasterxml.jackson.databind.json.JsonMapper.builder().build()
+                .readTree(response.getResponse().getContentAsString()).at("/data/id").asText();
+        String unfreeze = "{\"requestKey\":\"http-release\",\"quantity\":\"1\",\"note\":\"核实完成\"}";
+        mvc.perform(post("/inventory/freezes/" + freezeId + "/unfreeze").contentType(MediaType.APPLICATION_JSON).content(unfreeze)
+                        .with(opaqueToken().authorities(new SimpleGrantedAuthority("wms:inventory:freeze"))))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/inventory/freezes/" + freezeId + "/unfreeze").contentType(MediaType.APPLICATION_JSON).content(unfreeze)
+                        .with(opaqueToken().authorities(new SimpleGrantedAuthority("wms:inventory:unfreeze"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.freezeId").value(freezeId));
+        mvc.perform(post("/inventory/freezes/query").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"balanceId\":\"" + balanceId + "\"}")
+                        .with(opaqueToken().authorities(new SimpleGrantedAuthority("wms:inventory:read"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].reasonCode").value("PACKAGE_DAMAGE"));
     }
 }

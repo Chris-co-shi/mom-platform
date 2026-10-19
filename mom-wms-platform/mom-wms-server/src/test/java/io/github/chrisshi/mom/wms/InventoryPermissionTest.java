@@ -3,6 +3,7 @@ package io.github.chrisshi.mom.wms;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.wms.application.InventoryQueryService;
+import io.github.chrisshi.mom.wms.application.InventoryFreezeApplication;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -27,6 +28,7 @@ class InventoryPermissionTest {
     @EnableMethodSecurity
     static class SecurityConfig {
         @Bean InventoryQueryService query() { return mock(InventoryQueryService.class); }
+        @Bean InventoryFreezeApplication freezes() { return mock(InventoryFreezeApplication.class); }
     }
 
     @Autowired InventoryController controller;
