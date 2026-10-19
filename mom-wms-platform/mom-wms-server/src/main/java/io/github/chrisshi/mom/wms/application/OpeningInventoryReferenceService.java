@@ -28,7 +28,8 @@ public class OpeningInventoryReferenceService {
     @Transactional(propagation = Propagation.NEVER)
     public WarehouseResourceReference warehouse(String id) {
         WarehouseResourceReference value = data(mdm.getWarehouseReference(id));
-        require(value != null && value.availableForNewUse() && "WAREHOUSE".equals(value.resourceType()));
+        if (value == null || !"WAREHOUSE".equals(value.resourceType()) || !value.availableForNewUse())
+            throw new OpeningInventoryReferenceException(value == null ? null : value.invalidReason());
         return value;
     }
 

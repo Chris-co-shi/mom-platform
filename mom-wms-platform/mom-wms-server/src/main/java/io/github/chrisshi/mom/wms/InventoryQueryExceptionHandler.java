@@ -3,6 +3,7 @@ package io.github.chrisshi.mom.wms;
 import io.github.chrisshi.mom.core.i18n.I18nMessageResolver;
 import io.github.chrisshi.mom.core.page.PageQueryValidationException;
 import io.github.chrisshi.mom.webmvc.response.Result;
+import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceException;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -29,6 +30,16 @@ public class InventoryQueryExceptionHandler {
     public ResponseEntity<Result<Void>> invalid(Locale locale) {
         return ResponseEntity.badRequest().body(Result.failure("request.invalid_body",
                 messages.resolve("framework.web.invalid_request", locale)));
+    }
+
+    /** 返回可操作的 MDM 引用校验原因，不把缺失的父级主数据误报成通用保存失败。 */
+    @ExceptionHandler(OpeningInventoryReferenceException.class)
+    public ResponseEntity<Result<Void>> invalidReference(OpeningInventoryReferenceException exception, Locale locale) {
+        String messageKey = "PLANT_TIME_ZONE_MISSING".equals(exception.invalidReason())
+                ? "wms.error.opening_plant_timezone_missing"
+                : "wms.error.opening_warehouse_unavailable";
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(Result.failure(
+                "wms.opening.reference_invalid", messages.resolve(messageKey, locale)));
     }
 
     /** 数据库不可用不返回空库存或伪造成功。 */

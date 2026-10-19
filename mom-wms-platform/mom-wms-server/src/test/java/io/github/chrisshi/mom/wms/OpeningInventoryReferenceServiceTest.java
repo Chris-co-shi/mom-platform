@@ -7,6 +7,7 @@ import io.github.chrisshi.mom.mdm.api.WarehouseResourceReference;
 import io.github.chrisshi.mom.mdm.client.MdmReferenceClient;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService;
+import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceException;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,7 +23,10 @@ class OpeningInventoryReferenceServiceTest {
         when(mdm.getWarehouseReference("warehouse")).thenReturn(Result.success(new WarehouseResourceReference(
                 "WAREHOUSE", "warehouse", "WH-1", "主仓", "plant", "plant", "Asia/Shanghai", null, 0L,
                 false, "WAREHOUSE_DISABLED")));
-        assertThatThrownBy(() -> references.warehouse("warehouse")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> references.warehouse("warehouse"))
+                .isInstanceOf(OpeningInventoryReferenceException.class)
+                .extracting(error -> ((OpeningInventoryReferenceException) error).invalidReason())
+                .isEqualTo("WAREHOUSE_DISABLED");
 
         when(mdm.getMaterialReference("material")).thenReturn(Result.success(new MaterialReference("material",
                 "MAT-1", "物料", "category", "uom", "RAW_MATERIAL", "REQUIRED", null, 1, 0L,
@@ -36,6 +40,17 @@ class OpeningInventoryReferenceServiceTest {
                 null, 0L, true, null)));
         assertThatThrownBy(() -> references.location("location", "warehouse"))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void reportsMissingPlantTimeZoneAsTheWarehouseInvalidReason() {
+        when(mdm.getWarehouseReference("warehouse")).thenReturn(Result.success(new WarehouseResourceReference(
+                "WAREHOUSE", "warehouse", "WH-1", "主仓", "plant", "plant", null, null, 0L,
+                false, "PLANT_TIME_ZONE_MISSING")));
+
+        assertThatThrownBy(() -> references.warehouse("warehouse"))
+                .isInstanceOf(OpeningInventoryReferenceException.class)
+                .extracting(error -> ((OpeningInventoryReferenceException) error).invalidReason())
+                .isEqualTo("PLANT_TIME_ZONE_MISSING");
     }
 
     @Test void resolvesMaterialInventoryUomFromMdmAndKeepsBatchPolicy() {
