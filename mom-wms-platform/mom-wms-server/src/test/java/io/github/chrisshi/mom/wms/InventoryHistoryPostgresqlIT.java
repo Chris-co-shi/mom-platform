@@ -135,6 +135,7 @@ class InventoryHistoryPostgresqlIT {
         assertThat(frozenHistory.getNote()).isEqualTo("外箱破损");
         assertThat(frozenHistory.getEntries()).extracting(e -> e.getDeltaQuantity().signum()).containsExactly(-1, 1);
         var releasedHistory = history.transaction(release.transactionId());
+        assertThat(releasedHistory.getReasonCode()).isEqualTo("PACKAGE_DAMAGE");
         assertThat(releasedHistory.getNote()).isEqualTo("现场复核完成");
         assertThat(releasedHistory.getEntries()).extracting(e -> e.getDeltaQuantity().signum()).containsExactly(1, -1);
         assertThat(history.search(new PageQuery<>(filter("1001", "B1", null, "2001", "3001",
@@ -148,6 +149,30 @@ class InventoryHistoryPostgresqlIT {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> history.search(new PageQuery<>(filter(null,null,null,null,null,null,null,null,null), 1, 100000)))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void partialUnfreezesKeepTheirOwnNotesAndOriginalReasonWithoutDuplicateEntries() {
+        jdbc.update("UPDATE wms_warehouse_inventory_state SET state='ACTIVE' WHERE warehouse_id='2001'");
+        accounting.post(new Posting("history-multiple-seed", "RECEIPT", "TEST", "receipt-multiple", "operator-1",
+                List.of(new Entry(dimension("1001", "B1", null, "3001"), new BigDecimal("10")))));
+        String balanceId = jdbc.queryForObject("SELECT id FROM wms_inventory_balance WHERE warehouse_status='NORMAL'", String.class);
+        var damaged = freezes.freezeInventory(new FreezeCommand("history-damaged", balanceId, new BigDecimal("4"),
+                FreezeReason.PACKAGE_DAMAGE, "破损", "MANUAL", "freeze-damaged", "operator-2"));
+        var checking = freezes.freezeInventory(new FreezeCommand("history-checking", balanceId, new BigDecimal("3"),
+                FreezeReason.WAREHOUSE_CHECK, "盘点", "MANUAL", "freeze-checking", "operator-3"));
+        var first = freezes.unfreezeInventory(new UnfreezeCommand("history-release-first", damaged.id(), new BigDecimal("1"),
+                "首批复核", "MANUAL", "release-first", "operator-4"));
+        var second = freezes.unfreezeInventory(new UnfreezeCommand("history-release-second", damaged.id(), new BigDecimal("3"),
+                "后续复核", "MANUAL", "release-second", "operator-5"));
+        assertThat(history.transaction(first.transactionId()).getReasonCode()).isEqualTo("PACKAGE_DAMAGE");
+        assertThat(history.transaction(first.transactionId()).getNote()).isEqualTo("首批复核");
+        assertThat(history.transaction(second.transactionId()).getReasonCode()).isEqualTo("PACKAGE_DAMAGE");
+        assertThat(history.transaction(second.transactionId()).getNote()).isEqualTo("后续复核");
+        assertThat(history.transaction(checking.transactionId()).getReasonCode()).isEqualTo("WAREHOUSE_CHECK");
+        var page = history.search(new PageQuery<>(filter("1001", "B1", null, "2001", "3001",
+                null, null, null, null), 1, 20));
+        assertThat(page.total()).isEqualTo(9);
+        assertThat(page.records()).extracting(e -> e.getId()).doesNotHaveDuplicates();
     }
 
     @Test void bothHistoryEndpointsRequireReadAuthority() throws Exception {

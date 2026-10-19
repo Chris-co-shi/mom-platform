@@ -50,17 +50,19 @@ public interface InventoryHistoryQueryMapper {
     IPage<EntryView> search(IPage<EntryView> page, @Param("filter") Filter filter);
 
     /**
-     * 查询交易头及冻结/解冻当时留下的原因与说明；两张来源表各有交易 ID 唯一约束。
+     * 查询交易头及冻结/解冻原因；解冻沿 freeze_id 定位原限制，保留本次解冻说明。
      * @param transactionId 交易标识
      * @return 交易头，不存在时为空
      */
     @Select("""
             SELECT t.id, t.transaction_type AS transactionType, t.source_type AS sourceType,
                    t.source_id AS sourceId, t.operator_id AS operatorId, t.occurred_at AS occurredAt,
-                   f.reason_code AS reasonCode, COALESCE(f.note, u.note) AS note
+                   COALESCE(f.reason_code, original_f.reason_code) AS reasonCode,
+                   COALESCE(u.note, f.note) AS note
               FROM wms_inventory_transaction t
               LEFT JOIN wms_inventory_freeze f ON f.transaction_id = t.id
               LEFT JOIN wms_inventory_unfreeze u ON u.transaction_id = t.id
+              LEFT JOIN wms_inventory_freeze original_f ON original_f.id = u.freeze_id
              WHERE t.id = #{transactionId}
             """)
     TransactionView transaction(@Param("transactionId") String transactionId);
