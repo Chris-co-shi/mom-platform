@@ -83,6 +83,8 @@ class InventoryFreezePostgresqlIT {
                 InventoryFreezeApplication.FreezeReason.PACKAGE_DAMAGE)).id()).isEqualTo(first.id());
         assertThatThrownBy(() -> freezes.freezeInventory(freezeCommand("freeze-1", balance, "201",
                 InventoryFreezeApplication.FreezeReason.PACKAGE_DAMAGE))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> freezes.freezeInventory(freezeCommand("freeze-1", balance, "200",
+                InventoryFreezeApplication.FreezeReason.SAFETY_HOLD))).isInstanceOf(IllegalArgumentException.class);
         assertThat(freezes.queryActiveFreezes(balance)).hasSize(2);
 
         freezes.unfreezeInventory(unfreezeCommand("release-1", first.id(), "50"));
@@ -124,6 +126,10 @@ class InventoryFreezePostgresqlIT {
         assertThat(jdbc.queryForObject("SELECT quality_status FROM wms_inventory_balance WHERE warehouse_status='NORMAL'", String.class))
                 .isEqualTo("REJECTED");
         jdbc.update("UPDATE wms_warehouse_inventory_state SET state='PENDING_ACTIVATION' WHERE warehouse_id='2001'");
+        assertThat(freezes.freezeInventory(freezeCommand("all-freeze", balance, "4.5",
+                InventoryFreezeApplication.FreezeReason.STOCK_DISCREPANCY)).id()).isEqualTo(frozen.id());
+        assertThat(freezes.unfreezeInventory(unfreezeCommand("all-release", frozen.id(), "4.5")).transactionId())
+                .isEqualTo(jdbc.queryForObject("SELECT transaction_id FROM wms_inventory_unfreeze WHERE request_key='all-release'", String.class));
         assertThatThrownBy(() -> freezes.freezeInventory(freezeCommand("closed-freeze", balance, "1",
                 InventoryFreezeApplication.FreezeReason.WAREHOUSE_CHECK))).isInstanceOf(IllegalStateException.class);
     }

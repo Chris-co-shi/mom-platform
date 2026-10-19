@@ -86,6 +86,18 @@ class SchemaDesignBaselineTest(unittest.TestCase):
         module.check_sql(self.path, "CREATE TABLE old_table (id bigint);", wrong, {(self.path, "other")})
         self.assertTrue(wrong.errors)
 
+    def test_published_wms_opening_tables_are_exact_legacy_baseline(self):
+        path = "mom-wms-platform/mom-wms-server/src/main/resources/db/migration/wms/V3__opening_inventory.sql"
+        for table in ("wms_warehouse_inventory_state", "wms_opening_document", "wms_opening_document_line"):
+            with self.subTest(table=table):
+                report = module.Report()
+                module.check_sql(path, f"CREATE TABLE {table} (id bigint);", report)
+                self.assertEqual([], report.errors)
+        changed_path = path.replace("V3__opening_inventory.sql", "V4__opening_inventory.sql")
+        report = module.Report()
+        module.check_sql(changed_path, "CREATE TABLE wms_opening_document (id bigint);", report)
+        self.assertTrue(report.errors)
+
     def repaired_revision_report(self, *, repair=True, source=None, table=None, bad_id=False, rename=None):
         source = source or "mom-qms-platform/mom-qms-server/src/main/resources/db/migration/qms/V1__create_quality_definition.sql"
         table = table or "qms_specification_revision"

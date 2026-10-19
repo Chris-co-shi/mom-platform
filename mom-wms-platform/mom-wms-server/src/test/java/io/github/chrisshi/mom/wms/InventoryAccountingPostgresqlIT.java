@@ -191,7 +191,9 @@ class InventoryAccountingPostgresqlIT {
                 .map(java.lang.reflect.Method::getName).toList();
         assertThat(operationNames).containsExactlyInAnyOrder(
                 "claim", "hashOf", "idOf", "increase", "decrease", "insertEntry",
-                "warehouseInventoryState");
+                "warehouseInventoryState", "findInventoryBalance", "findFreezeByTransaction", "lockFreeze",
+                "insertFreeze", "activeFreezesByDimension", "decreaseFreezeRemaining", "findUnfreeze",
+                "insertUnfreeze");
     }
 
     @Test

@@ -64,10 +64,23 @@ CREATE INDEX ix_wms_inventory_freeze_active_dimension
     WHERE remaining_quantity > 0;
 
 COMMENT ON TABLE wms_inventory_freeze IS '独立追踪每次仓储冻结来源、原因、库存快照及剩余受限数量';
+COMMENT ON COLUMN wms_inventory_freeze.id IS '冻结限制技术主键';
+COMMENT ON COLUMN wms_inventory_freeze.transaction_id IS '创建该限制的唯一冻结库存交易';
+COMMENT ON COLUMN wms_inventory_freeze.original_balance_id IS '冻结前 NORMAL 权威余额行标识';
+COMMENT ON COLUMN wms_inventory_freeze.material_id IS '冻结时 MDM 物料稳定标识快照';
+COMMENT ON COLUMN wms_inventory_freeze.warehouse_id IS '冻结时 MDM 仓库稳定标识快照';
+COMMENT ON COLUMN wms_inventory_freeze.location_id IS '冻结时 MDM 库位稳定标识快照';
 COMMENT ON COLUMN wms_inventory_freeze.reason_code IS 'WMS 受控冻结原因编码，不表示 QMS 质量结论';
 COMMENT ON COLUMN wms_inventory_freeze.remaining_quantity IS '该冻结限制尚未解除的数量，由行锁与条件更新保护';
+COMMENT ON COLUMN wms_inventory_freeze.source_id IS '发起冻结的业务来源对象标识快照';
+COMMENT ON COLUMN wms_inventory_freeze.operator_id IS '执行冻结的责任主体标识快照';
 COMMENT ON TABLE wms_inventory_unfreeze IS '每次解冻的不可变处理历史；重复请求键返回原交易';
+COMMENT ON COLUMN wms_inventory_unfreeze.id IS '解冻历史技术主键';
+COMMENT ON COLUMN wms_inventory_unfreeze.freeze_id IS '被部分或全部解除的冻结限制';
+COMMENT ON COLUMN wms_inventory_unfreeze.transaction_id IS '本次解冻对应的唯一库存交易';
 COMMENT ON COLUMN wms_inventory_unfreeze.note IS '解冻处理说明快照';
+COMMENT ON COLUMN wms_inventory_unfreeze.source_id IS '发起解冻的业务来源对象标识快照';
+COMMENT ON COLUMN wms_inventory_unfreeze.operator_id IS '执行解冻的责任主体标识快照';
 
 CREATE FUNCTION wms_reject_unfreeze_history_change() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN

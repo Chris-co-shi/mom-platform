@@ -95,12 +95,12 @@ public class InventoryFreezeApplication {
                 new InventoryAccountingService.Entry(dimension(balance, WarehouseStatus.NORMAL), command.quantity().negate()),
                 new InventoryAccountingService.Entry(dimension(balance, WarehouseStatus.FROZEN), command.quantity()))));
         FreezeRecord existing = operations.findFreezeByTransaction(transactionId);
-        if (existing != null) return view(existing);
+        if (existing != null) return replayFreeze(existing, balance, command);
         String id = ids.nextId();
         if (operations.insertFreeze(id, transactionId, balance, command.reason().name(), clean(command.note()),
                 command.quantity(), command.sourceType(), command.sourceId(), command.operatorId()) != 1) {
             existing = operations.findFreezeByTransaction(transactionId);
-            if (existing != null) return view(existing);
+            if (existing != null) return replayFreeze(existing, balance, command);
             throw new IllegalStateException("冻结限制写入失败");
         }
         return view(operations.findFreezeByTransaction(transactionId));
@@ -170,6 +170,18 @@ public class InventoryFreezeApplication {
         FreezeRecord freeze = operations.lockFreeze(freezeId);
         if (freeze == null) throw new IllegalStateException("冻结限制不存在");
         return new UnfreezeResult(replay.transactionId(), freezeId, freeze.remainingQuantity());
+    }
+
+    private static FreezeView replayFreeze(FreezeRecord existing, Balance balance, FreezeCommand command) {
+        if (!existing.originalBalanceId().equals(balance.id())
+                || existing.originalQuantity().compareTo(command.quantity()) != 0
+                || !existing.reasonCode().equals(command.reason().name())
+                || !java.util.Objects.equals(existing.note(), clean(command.note()))
+                || !existing.sourceType().equals(command.sourceType())
+                || !existing.sourceId().equals(command.sourceId())
+                || !existing.operatorId().equals(command.operatorId()))
+            throw new IllegalArgumentException("冻结请求键已用于不同内容");
+        return view(existing);
     }
 
     private static InventoryAccountingService.Dimension dimension(Balance balance, WarehouseStatus status) {

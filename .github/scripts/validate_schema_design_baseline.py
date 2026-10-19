@@ -57,6 +57,10 @@ LEGACY_TABLES = {
     ("mom-system-platform/mom-system-server/src/main/resources/db/migration/system/V3__create_system_i18n.sql", "system_i18n_resource"),
     ("mom-system-platform/mom-system-server/src/main/resources/db/migration/system/V3__create_system_i18n.sql", "system_i18n_message"),
     ("mom-system-platform/mom-system-server/src/main/resources/db/migration/system/V3__create_system_i18n.sql", "system_i18n_release"),
+    # 已发布的 WMS Phase 2 开账表；历史约束命名不可通过改写 V3 修正。
+    ("mom-wms-platform/mom-wms-server/src/main/resources/db/migration/wms/V3__opening_inventory.sql", "wms_warehouse_inventory_state"),
+    ("mom-wms-platform/mom-wms-server/src/main/resources/db/migration/wms/V3__opening_inventory.sql", "wms_opening_document"),
+    ("mom-wms-platform/mom-wms-server/src/main/resources/db/migration/wms/V3__opening_inventory.sql", "wms_opening_document_line"),
 }
 
 # 经工程治理批准的历史约束改名：不豁免规则，必须由指定后续 Migration 实际修复。

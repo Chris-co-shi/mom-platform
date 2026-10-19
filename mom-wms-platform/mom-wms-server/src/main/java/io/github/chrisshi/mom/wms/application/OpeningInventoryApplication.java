@@ -8,9 +8,9 @@ import io.github.chrisshi.mom.core.security.CurrentActorProvider;
 import io.github.chrisshi.mom.mdm.api.WarehouseResourceReference;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.LocationSnapshot;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.MaterialSnapshot;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryMapper;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryMapper.Document;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryMapper.Line;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryPersistence;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryPersistence.Document;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryPersistence.Line;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -28,7 +28,7 @@ import jakarta.validation.constraints.Size;
  */
 @Service
 public class OpeningInventoryApplication {
-    private final OpeningInventoryMapper mapper;
+    private final OpeningInventoryPersistence mapper;
     private final OpeningInventoryReferenceService references;
     private final OpeningInventoryCommitService commits;
     private final IdGenerator ids;
@@ -36,7 +36,7 @@ public class OpeningInventoryApplication {
     private final PageAdapter pages;
 
     /** @param mapper WMS 期初持久化入口 @param references 事务外 MDM 权威引用 @param commits WMS 本地事务入口 @param ids 字符串技术 ID @param actors 当前责任主体 */
-    public OpeningInventoryApplication(OpeningInventoryMapper mapper, OpeningInventoryReferenceService references,
+    public OpeningInventoryApplication(OpeningInventoryPersistence mapper, OpeningInventoryReferenceService references,
                                        OpeningInventoryCommitService commits, IdGenerator ids,
                                        CurrentActorProvider actors, PageAdapter pages) {
         this.mapper = mapper; this.references = references; this.commits = commits; this.ids = ids; this.actors = actors;

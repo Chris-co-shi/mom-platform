@@ -17,8 +17,7 @@ import java.util.List;
  * <p>仅供 WMS Application 在本地事务中使用；不访问或修改 MDM Schema。</p>
  */
 @Mapper
-public interface OpeningInventoryMapper {
-    /** 期初单持久化读取视图，名称和编码为保存时 MDM 快照。 */
+public interface OpeningInventoryPersistence {
     /**
      * 期初单持久化读取视图；仓库状态来自 WMS 生命周期表。
      * @param id 技术主键 @param documentNo 期初单业务编号 @param warehouseId MDM 仓库稳定 ID

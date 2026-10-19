@@ -13,7 +13,7 @@ import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.L
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.MaterialSnapshot;
 import io.github.chrisshi.mom.wms.application.QualityStatus;
 import io.github.chrisshi.mom.wms.application.WarehouseStatus;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryPersistence;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +46,7 @@ class OpeningInventoryPostgresqlIT {
 
     @Autowired OpeningInventoryCommitService commits;
     @Autowired InventoryAccountingService accounting;
-    @Autowired OpeningInventoryMapper mapper;
+    @Autowired OpeningInventoryPersistence mapper;
     @Autowired InventoryQueryService queries;
     @Autowired IdGenerator ids;
     @Autowired JdbcTemplate jdbc;

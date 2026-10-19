@@ -8,9 +8,9 @@ import io.github.chrisshi.mom.wms.application.OpeningInventoryApplication.LineIn
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.LocationSnapshot;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.MaterialSnapshot;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryMapper;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryMapper.Document;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryMapper.Line;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryPersistence;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryPersistence.Document;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryPersistence.Line;
 import io.github.chrisshi.mom.mdm.api.WarehouseResourceReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,12 +23,12 @@ import java.util.List;
  */
 @Service
 public class OpeningInventoryCommitService {
-    private final OpeningInventoryMapper mapper;
+    private final OpeningInventoryPersistence mapper;
     private final InventoryAccountingService accounting;
     private final IdGenerator ids;
 
     /** @param mapper 期初单持久化入口 @param accounting 唯一库存记账服务 @param ids 技术主键生成器 */
-    public OpeningInventoryCommitService(OpeningInventoryMapper mapper, InventoryAccountingService accounting,
+    public OpeningInventoryCommitService(OpeningInventoryPersistence mapper, InventoryAccountingService accounting,
                                          IdGenerator ids) {
         this.mapper = mapper; this.accounting = accounting; this.ids = ids;
     }
