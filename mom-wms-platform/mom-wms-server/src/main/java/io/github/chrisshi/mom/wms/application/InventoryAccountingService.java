@@ -16,7 +16,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 
-/** WMS 唯一余额写入口；调用方需提供已核验的 MDM 快照及真实责任主体。 */
+/** WMS 唯一余额写入口；调用方需提供已核验的 MDM 快照、真实责任主体及允许过账的 WMS 仓库状态。 */
 @Service
 public class InventoryAccountingService {
     private final InventoryAccountingOperations mapper;
@@ -71,6 +71,11 @@ public class InventoryAccountingService {
     @Transactional
     public String post(Posting posting) {
         validate(posting);
+        String requiredWarehouseState = "OPENING".equals(posting.transactionType()) ? "INITIALIZING" : "ACTIVE";
+        for (String warehouseId : posting.entries().stream().map(entry -> entry.dimension().warehouseId()).distinct().toList()) {
+            if (!requiredWarehouseState.equals(mapper.warehouseInventoryState(warehouseId)))
+                throw new IllegalStateException("仓库库存尚未进入允许当前交易类型的 WMS 生命周期状态");
+        }
         String digest = digest(posting);
         String id = ids.nextId();
         String claimed = mapper.claim(id, posting.requestKey(), digest, posting.transactionType(),

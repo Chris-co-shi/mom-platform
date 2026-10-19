@@ -5,6 +5,7 @@ import io.github.chrisshi.mom.core.page.PageQueryValidationException;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -14,7 +15,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.Locale;
 
 /** 库存只读 HTTP 输入和数据库失败适配，不把 SQL 或异常明细暴露给浏览器。 */
-@RestControllerAdvice(assignableTypes = InventoryController.class)
+@RestControllerAdvice(assignableTypes = {InventoryController.class, OpeningInventoryController.class})
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class InventoryQueryExceptionHandler {
     private final I18nMessageResolver messages;
@@ -35,5 +36,19 @@ public class InventoryQueryExceptionHandler {
     public ResponseEntity<Result<Void>> unavailable(Locale locale) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Result.failure("wms.inventory_unavailable",
                 messages.resolve("wms.error.inventory_unavailable", locale)));
+    }
+
+    /** 业务状态冲突以 409 返回，不泄露 SQL 或数据库约束细节。 */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Result<Void>> conflict(Locale locale) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Result.failure("wms.opening.conflict",
+                messages.resolve("wms.error.opening_conflict", locale)));
+    }
+
+    /** 数据库唯一约束冲突以稳定业务冲突返回，不暴露具体约束名。 */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Result<Void>> duplicate(Locale locale) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Result.failure("wms.opening.conflict",
+                messages.resolve("wms.error.opening_conflict", locale)));
     }
 }

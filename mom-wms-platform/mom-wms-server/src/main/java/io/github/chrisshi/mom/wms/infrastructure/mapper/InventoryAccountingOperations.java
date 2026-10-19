@@ -52,6 +52,14 @@ public class InventoryAccountingOperations {
     }
 
     /**
+     * 查询 WMS 仓库库存生命周期状态；MDM 仓库静态状态不由此操作。
+     * @param warehouseId MDM 仓库稳定 ID @return WMS 状态，不存在时为空
+     */
+    public String warehouseInventoryState(String warehouseId) {
+        return mapper.warehouseInventoryState(warehouseId);
+    }
+
+    /**
      * 原子增加余额并返回执行前后的数量。
      * @param id 新余额技术标识
      * @param dimension 库存唯一维度与展示快照

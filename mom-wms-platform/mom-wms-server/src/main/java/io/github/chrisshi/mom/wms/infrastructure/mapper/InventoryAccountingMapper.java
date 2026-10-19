@@ -18,6 +18,13 @@ import java.math.BigDecimal;
 @Mapper
 interface InventoryAccountingMapper extends MomBaseMapper<InventoryBalanceEntity> {
     /**
+     * 读取 WMS 仓库库存生命周期状态供唯一记账入口 fail closed 校验。
+     * @param warehouseId WMS 仓库稳定 ID @return 当前状态，不存在时为空
+     */
+    @Select("SELECT state FROM wms_warehouse_inventory_state WHERE warehouse_id=#{warehouseId}")
+    String warehouseInventoryState(@Param("warehouseId") String warehouseId);
+
+    /**
      * 数据库唯一键领取幂等请求，并在同一本地事务记录来源与责任主体。
      * @param id 新交易技术标识
      * @param requestKey 幂等请求标识

@@ -54,7 +54,9 @@ class InventoryAccountingPostgresqlIT {
 
     @BeforeEach
     void clean() {
-        jdbc.execute("TRUNCATE wms_inventory_transaction_entry, wms_inventory_transaction, wms_inventory_balance");
+        jdbc.execute("TRUNCATE wms_inventory_transaction_entry, wms_inventory_transaction, wms_inventory_balance, wms_warehouse_inventory_state");
+        jdbc.update("INSERT INTO wms_warehouse_inventory_state(id,warehouse_id,warehouse_code,state) VALUES(?,?,?,?)",
+                "9000000000000000001", "2001", "WH-1", "ACTIVE");
     }
 
     private Dimension dimension(String sn, QualityStatus quality, WarehouseStatus warehouse) {
@@ -71,9 +73,19 @@ class InventoryAccountingPostgresqlIT {
     }
 
     @Test
-    void writesBalanceTransactionAndEntriesOnceAndAllowsOneSnInDifferentStatuses() {
+    void normalInventoryTransactionRequiresActiveWarehouse() {
+        Dimension unopened = new Dimension("1001", "MAT-1", "材料一", "kg", null, null,
+                "2999", "WH-2", "3001", "LOC-1", QualityStatus.QUALIFIED, WarehouseStatus.NORMAL);
+        assertThatThrownBy(() -> accounting.post(posting("unopened-warehouse", entry(unopened, "1"))))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_transaction", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_balance", Integer.class)).isZero();
+    }
+
+    @Test
+    void writesBalanceTransactionAndEntriesOnceAndRejectsRepeatedSnTags() {
         var qualified = dimension("SN-1", QualityStatus.QUALIFIED, WarehouseStatus.NORMAL);
-        var frozen = dimension("SN-1", QualityStatus.QUALIFIED, WarehouseStatus.FROZEN);
+        var frozen = dimension("SN-2", QualityStatus.QUALIFIED, WarehouseStatus.FROZEN);
         var request = posting("initial-1", entry(qualified, "10.500000"), entry(frozen, "2"));
         String id = accounting.post(request);
         assertThat(accounting.post(request)).isEqualTo(id);
@@ -113,11 +125,15 @@ class InventoryAccountingPostgresqlIT {
         assertThat(overview.records().getFirst().getFrozenQuantity()).isEqualByComparingTo("2");
         var details = queries.details(new PageQuery<>(new InventoryQueryService.DetailFilter("1001", null, null,
                 null, "SN-1", null, null), 1, 10));
-        assertThat(details.records()).hasSize(2);
+        assertThat(details.records()).hasSize(1);
         var secondPage = queries.details(new PageQuery<>(new InventoryQueryService.DetailFilter("1001", null, null,
                 null, "SN-1", null, null), 2, 1));
-        assertThat(secondPage.records()).hasSize(1);
-        assertThat(secondPage.total()).isEqualTo(2);
+        assertThat(secondPage.records()).isEmpty();
+        assertThat(secondPage.total()).isEqualTo(1);
+        assertThatThrownBy(() -> accounting.post(posting("duplicate-sn", entry(
+                dimension("SN-1", QualityStatus.REJECTED, WarehouseStatus.NORMAL), "1"))))
+                .isInstanceOf(RuntimeException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_transaction WHERE request_key='duplicate-sn'", Integer.class)).isZero();
     }
 
     @Test
@@ -174,7 +190,8 @@ class InventoryAccountingPostgresqlIT {
         var operationNames = java.util.Arrays.stream(InventoryAccountingOperations.class.getDeclaredMethods())
                 .map(java.lang.reflect.Method::getName).toList();
         assertThat(operationNames).containsExactlyInAnyOrder(
-                "claim", "hashOf", "idOf", "increase", "decrease", "insertEntry");
+                "claim", "hashOf", "idOf", "increase", "decrease", "insertEntry",
+                "warehouseInventoryState");
     }
 
     @Test

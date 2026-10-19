@@ -54,6 +54,8 @@ class InventoryHttpPostgresqlIT {
     @BeforeEach
     void setUp() {
         mvc = webAppContextSetup(context).apply(springSecurity()).build();
+        jdbc.update("INSERT INTO wms_warehouse_inventory_state(id,warehouse_id,warehouse_code,state) VALUES(?,?,?,'ACTIVE') ON CONFLICT(warehouse_id) DO NOTHING",
+                "9000000000000000001", "2001", "WH-1");
         jdbc.execute("TRUNCATE wms_inventory_transaction_entry, wms_inventory_transaction, wms_inventory_balance");
         var dimension = new Dimension("1001", "MAT-1", "材料一", "kg", null, "SN-1",
                 "2001", "WH-1", "3001", "LOC-1", QualityStatus.QUALIFIED, WarehouseStatus.NORMAL);
@@ -90,5 +92,18 @@ class InventoryHttpPostgresqlIT {
         mvc.perform(get("/i18n/runtime/bundles").param("locale", "zh-CN"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.messages['wms.inventory.overview']").value("实时库存总览"));
+    }
+
+    @Test
+    void openingDocumentReadUsesSeparateWmsPermission() throws Exception {
+        String request = "{\"params\":{},\"pageNo\":1,\"pageSize\":10}";
+        mvc.perform(post("/opening-documents/search").contentType(MediaType.APPLICATION_JSON).content(request)).andExpect(status().isUnauthorized());
+        mvc.perform(post("/opening-documents/search").contentType(MediaType.APPLICATION_JSON).content(request)
+                        .with(opaqueToken().authorities(new SimpleGrantedAuthority("wms:inventory:read"))))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/opening-documents/search").contentType(MediaType.APPLICATION_JSON).content(request)
+                        .with(opaqueToken().authorities(new SimpleGrantedAuthority("wms:opening:read"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records").isArray());
     }
 }
