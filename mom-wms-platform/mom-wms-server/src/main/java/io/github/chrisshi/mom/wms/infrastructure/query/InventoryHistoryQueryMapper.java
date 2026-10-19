@@ -36,10 +36,13 @@ public interface InventoryHistoryQueryMapper {
               JOIN wms_inventory_transaction_entry e ON e.transaction_id = t.id
              WHERE t.occurred_at &gt;= #{filter.startTime} AND t.occurred_at &lt; #{filter.endTime}
                <if test="filter.materialId != null">AND e.material_id = #{filter.materialId}</if>
+               <if test="filter.materialKeyword != null">AND (e.material_code ILIKE '%' || #{filter.materialKeyword} || '%' OR e.material_name ILIKE '%' || #{filter.materialKeyword} || '%')</if>
                <if test="filter.batchCode != null">AND e.batch_code = #{filter.batchCode}</if>
                <if test="filter.snCode != null">AND e.sn_code = #{filter.snCode}</if>
                <if test="filter.warehouseId != null">AND e.warehouse_id = #{filter.warehouseId}</if>
+               <if test="filter.warehouseCode != null">AND e.warehouse_code ILIKE '%' || #{filter.warehouseCode} || '%'</if>
                <if test="filter.locationId != null">AND e.location_id = #{filter.locationId}</if>
+               <if test="filter.locationCode != null">AND e.location_code ILIKE '%' || #{filter.locationCode} || '%'</if>
                <if test="filter.transactionType != null">AND t.transaction_type = #{filter.transactionType}</if>
                <if test="filter.sourceType != null">AND t.source_type = #{filter.sourceType}</if>
                <if test="filter.sourceId != null">AND t.source_id = #{filter.sourceId}</if>

@@ -117,7 +117,7 @@ class InventoryAccountingPostgresqlIT {
         assertThatThrownBy(() -> accounting.post(new Posting("initial-1", "RECEIPT", "TEST",
                 "source-initial-1", "operator-2", request.entries())))
                 .isInstanceOf(IllegalArgumentException.class);
-        var overview = queries.overview(new PageQuery<>(new InventoryQueryService.OverviewFilter("1001", null, null), 1, 10));
+        var overview = queries.overview(new PageQuery<>(new InventoryQueryService.OverviewFilter("1001", null, null, null), 1, 10));
         assertThat(overview.records()).hasSize(1);
         assertThat(overview.records().getFirst().getTotalQuantity()).isEqualByComparingTo("12.5");
         assertThat(overview.records().getFirst().getAvailableQuantity()).isEqualByComparingTo("10.5");
@@ -155,7 +155,7 @@ class InventoryAccountingPostgresqlIT {
                 entry(dimension(null, QualityStatus.RESTRICTED, WarehouseStatus.NORMAL), "3"),
                 entry(dimension(null, QualityStatus.REJECTED, WarehouseStatus.NORMAL), "4"),
                 entry(dimension(null, QualityStatus.PENDING, WarehouseStatus.FROZEN), "6")));
-        var row = queries.overview(new PageQuery<>(new InventoryQueryService.OverviewFilter("1001", null, null), 1, 10))
+        var row = queries.overview(new PageQuery<>(new InventoryQueryService.OverviewFilter("1001", null, null, null), 1, 10))
                 .records().getFirst();
         assertThat(row.getTotalQuantity()).isEqualByComparingTo("20");
         assertThat(row.getAvailableQuantity()).isEqualByComparingTo("5");

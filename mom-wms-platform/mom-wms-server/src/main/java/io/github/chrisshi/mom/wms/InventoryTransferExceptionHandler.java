@@ -3,6 +3,7 @@ package io.github.chrisshi.mom.wms;
 import io.github.chrisshi.mom.core.i18n.I18nMessageResolver;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import io.github.chrisshi.mom.wms.application.InventoryTransferConflictException;
+import io.github.chrisshi.mom.wms.controller.InventoryController;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

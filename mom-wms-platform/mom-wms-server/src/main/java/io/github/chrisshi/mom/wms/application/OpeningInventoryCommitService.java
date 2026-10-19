@@ -26,25 +26,27 @@ public class OpeningInventoryCommitService {
     private final OpeningInventoryPersistence mapper;
     private final InventoryAccountingService accounting;
     private final IdGenerator ids;
+    private final OpeningDocumentNumberService numbers;
 
-    /** @param mapper 期初单持久化入口 @param accounting 唯一库存记账服务 @param ids 技术主键生成器 */
+    /** @param mapper 期初单持久化入口 @param accounting 唯一库存记账服务 @param ids 技术主键生成器 @param numbers WMS 正式单据发号入口 */
     public OpeningInventoryCommitService(OpeningInventoryPersistence mapper, InventoryAccountingService accounting,
-                                         IdGenerator ids) {
-        this.mapper = mapper; this.accounting = accounting; this.ids = ids;
+                                         IdGenerator ids, OpeningDocumentNumberService numbers) {
+        this.mapper = mapper; this.accounting = accounting; this.ids = ids; this.numbers = numbers;
     }
 
     /**
      * 创建唯一仓库期初单并原子进入 INITIALIZING。
-     * @param id 期初单技术 ID @param documentNo 期初单业务编号 @param warehouse 经 MDM 验证的仓库快照
+     * @param id 期初单技术 ID @param warehouse 经 MDM 验证的仓库快照
      * @param actor 当前责任主体 @throws IllegalStateException 仓库已开始建账或已启用时整体回滚
      */
     @Transactional
-    public void create(String id, String documentNo, WarehouseResourceReference warehouse, String actor) {
+    public void create(String id, WarehouseResourceReference warehouse, String actor) {
         mapper.initialize(ids.nextId(), warehouse.id(), warehouse.code());
         String state = mapper.lockWarehouse(warehouse.id());
         if (!"INITIALIZING".equals(state)) throw new IllegalStateException("仓库已过账待启用或已启用，不可再次进行期初建账");
         if (mapper.hasWarehouseBalance(warehouse.id()))
             throw new IllegalStateException("该仓库已存在实时余额，不能通过期初单重复增加初始库存");
+        String documentNo = numbers.allocate();
         if (mapper.createDocument(id, documentNo, warehouse.id(), warehouse.code(), actor) != 1)
             throw new IllegalStateException("期初草稿写入失败");
     }

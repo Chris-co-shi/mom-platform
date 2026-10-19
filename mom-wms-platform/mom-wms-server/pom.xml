@@ -12,6 +12,11 @@
   <dependencies>
     <dependency>
       <groupId>io.github.chrisshi.mom</groupId>
+      <artifactId>mom-code-rule</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.chrisshi.mom</groupId>
       <artifactId>mom-wms-api</artifactId>
       <version>${project.version}</version>
     </dependency>

@@ -71,8 +71,8 @@ public interface OpeningInventoryPersistence {
      * 查询期初建账单列表，最近创建的单据优先。
      * @return 期初单视图列表
      */
-    @Select("SELECT d.id,d.document_no AS documentNo,d.warehouse_id AS warehouseId,d.warehouse_code AS warehouseCode,d.status,d.transaction_id AS transactionId,d.created_by AS createdBy,d.version,s.state AS warehouseState FROM wms_opening_document d JOIN wms_warehouse_inventory_state s ON s.warehouse_id=d.warehouse_id ORDER BY d.created_at DESC,d.id DESC")
-    IPage<Document> list(IPage<Document> page);
+    @Select("<script>SELECT d.id,d.document_no AS documentNo,d.warehouse_id AS warehouseId,d.warehouse_code AS warehouseCode,d.status,d.transaction_id AS transactionId,d.created_by AS createdBy,d.version,s.state AS warehouseState FROM wms_opening_document d JOIN wms_warehouse_inventory_state s ON s.warehouse_id=d.warehouse_id <if test='warehouseId != null'>WHERE d.warehouse_id=#{warehouseId}</if> ORDER BY d.created_at DESC,d.id DESC</script>")
+    IPage<Document> list(IPage<Document> page, @Param("warehouseId") String warehouseId);
     /**
      * 锁定期初单主行以串行化草稿变更和过账。
      * @param id 期初单 ID @return 锁定的单据视图，不存在时为空

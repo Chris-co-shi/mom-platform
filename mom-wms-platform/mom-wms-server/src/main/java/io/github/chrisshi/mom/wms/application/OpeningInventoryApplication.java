@@ -58,7 +58,7 @@ public class OpeningInventoryApplication {
      */
     public PageResult<Document> list(PageQuery<ListFilter> query) {
         Page<Document> page = pages.toPage(query);
-        mapper.list(page);
+        mapper.list(page, query.params().warehouseId());
         return pages.toResult(page);
     }
 
@@ -69,7 +69,7 @@ public class OpeningInventoryApplication {
     public Detail create(String warehouseId) {
         WarehouseResourceReference warehouse = references.warehouse(warehouseId);
         String documentId = ids.nextId();
-        commits.create(documentId, "OB-" + documentId, warehouse, actors.requireCurrentActor().actorId());
+        commits.create(documentId, warehouse, actors.requireCurrentActor().actorId());
         return get(documentId);
     }
 
@@ -184,8 +184,8 @@ public class OpeningInventoryApplication {
                             BigDecimal quantity) { }
     /** 单据及其库存明细查询结果。 @param document 建账单快照 @param lines 建账明细 */
     public record Detail(Document document, List<LineView> lines) { }
-    /** 建账单列表无额外筛选字段，保持 PageQuery 统一分页协议。 */
-    public record ListFilter() { }
+    /** 建账单列表可按仓库身份精确筛选，用于创建结果未知时核对。 */
+    public record ListFilter(String warehouseId) { }
     /**
      * 期初明细 HTTP 展示视图；数量使用十进制字符串避免浏览器浮点精度损失。
      * @param id 明细 ID @param lineNo 单据内顺序号 @param materialId 物料 ID @param materialCode 物料编码快照

@@ -5,6 +5,7 @@ import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.wms.application.InventoryQueryService;
 import io.github.chrisshi.mom.wms.application.InventoryFreezeApplication;
 import io.github.chrisshi.mom.wms.application.InventoryTransferApplication;
+import io.github.chrisshi.mom.wms.controller.InventoryController;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -39,7 +40,7 @@ class InventoryPermissionTest {
     @Autowired InventoryTransferApplication transfers;
 
     private PageQuery<InventoryQueryService.OverviewFilter> request() {
-        return new PageQuery<>(new InventoryQueryService.OverviewFilter(null, null, null), 1, 10);
+        return new PageQuery<>(new InventoryQueryService.OverviewFilter(null, null, null, null), 1, 10);
     }
 
     @Test

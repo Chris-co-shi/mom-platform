@@ -12,7 +12,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 在真实 Auth Flyway Schema 上验证 MDM 编码规则权限种子。 */
+/** 在真实 Auth Flyway Schema 上验证各 Owner 编码规则权限种子。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = AuthApplication.class, properties = {
         "spring.main.banner-mode=off", "spring.cloud.nacos.discovery.enabled=false",
@@ -35,5 +35,14 @@ class AuthCodeRulePermissionsPostgresqlIT {
                   AND p.enabled=true AND p.deleted=false ORDER BY p.code
                 """, String.class);
         assertThat(codes).containsExactly("mdm:code-rule:read", "mdm:code-rule:write");
+    }
+    @Test void wmsOwnsReadAndWriteAuthorities() {
+        List<String> codes = jdbc.queryForList("""
+                SELECT p.code FROM auth_permission p
+                JOIN auth_permission_resource r ON p.resource_id=r.id
+                WHERE r.domain_code='WMS' AND r.resource_code='CODE_RULE'
+                  AND p.enabled=true AND p.deleted=false ORDER BY p.code
+                """, String.class);
+        assertThat(codes).containsExactly("wms:code-rule:read", "wms:code-rule:write");
     }
 }

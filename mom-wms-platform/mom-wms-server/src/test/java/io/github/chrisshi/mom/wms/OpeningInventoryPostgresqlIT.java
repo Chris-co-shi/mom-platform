@@ -8,6 +8,7 @@ import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Dimensi
 import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Entry;
 import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Posting;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryApplication.LineInput;
+import io.github.chrisshi.mom.wms.application.OpeningInventoryApplication;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryCommitService;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.LocationSnapshot;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.MaterialSnapshot;
@@ -45,6 +46,7 @@ class OpeningInventoryPostgresqlIT {
     }
 
     @Autowired OpeningInventoryCommitService commits;
+    @Autowired OpeningInventoryApplication opening;
     @Autowired InventoryAccountingService accounting;
     @Autowired OpeningInventoryPersistence mapper;
     @Autowired InventoryQueryService queries;
@@ -53,7 +55,55 @@ class OpeningInventoryPostgresqlIT {
 
     @BeforeEach void clean() {
         jdbc.execute("TRUNCATE wms_opening_document_line,wms_opening_document,wms_warehouse_inventory_state," +
-                "wms_inventory_transaction_entry,wms_inventory_transaction,wms_inventory_balance CASCADE");
+                "wms_inventory_transaction_entry,wms_inventory_transaction,wms_inventory_balance,wms_code_rule_sequence CASCADE");
+        jdbc.update("UPDATE wms_code_rule_revision SET status='ENABLED' WHERE rule_id='8300000000000000001' AND revision_no=1");
+    }
+
+    @Test void openingNumbersFollowPublishedRuleAndRollbackWithDocument() {
+        String first = createDraft("2000000000000000101");
+        assertThat(mapper.find(first).documentNo()).isEqualTo("OB-00000001");
+        assertThatThrownBy(() -> createDraft("2000000000000000101"))
+                .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+        assertThat(jdbc.queryForObject("SELECT last_value FROM wms_code_rule_sequence WHERE rule_id='8300000000000000001'", Long.class)).isEqualTo(1L);
+        String second = createDraft("2000000000000000102");
+        assertThat(mapper.find(second).documentNo()).isEqualTo("OB-00000002");
+        assertThatThrownBy(() -> commits.create(first, new WarehouseResourceReference("WAREHOUSE",
+                "2000000000000000103", "WH-3", "仓库三", "1000000000000000001",
+                "1000000000000000001", "Asia/Shanghai", null, 0L, true, null), "operator-1"))
+                .isInstanceOf(RuntimeException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_warehouse_inventory_state WHERE warehouse_id='2000000000000000103'", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT last_value FROM wms_code_rule_sequence WHERE rule_id='8300000000000000001'", Long.class)).isEqualTo(2L);
+    }
+
+    @Test void disabledRuleLeavesNoOpeningDraftOrWarehouseState() {
+        jdbc.update("UPDATE wms_code_rule_revision SET status='DISABLED' WHERE rule_id='8300000000000000001'");
+        assertThatThrownBy(() -> createDraft("2000000000000000104"))
+                .isInstanceOf(IllegalStateException.class).hasMessage("期初单编码规则未发布");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_opening_document", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_warehouse_inventory_state", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_code_rule_sequence", Integer.class)).isZero();
+    }
+
+    @Test void concurrentOpeningCreatesDistinctNumbers() throws Exception {
+        CountDownLatch start = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var one = pool.submit(() -> { start.await(); return createDraft("2000000000000000105"); });
+            var two = pool.submit(() -> { start.await(); return createDraft("2000000000000000106"); });
+            start.countDown();
+            assertThat(mapper.find(one.get()).documentNo()).isIn("OB-00000001", "OB-00000002");
+            assertThat(mapper.find(two.get()).documentNo()).isIn("OB-00000001", "OB-00000002");
+        }
+        assertThat(jdbc.queryForList("SELECT document_no FROM wms_opening_document ORDER BY document_no", String.class))
+                .containsExactly("OB-00000001", "OB-00000002");
+    }
+
+    @Test void openingListCanReconcileByWarehouseAfterUnknownCreateResult() {
+        String first = createDraft("2000000000000000107");
+        createDraft("2000000000000000108");
+        var filtered = opening.list(new io.github.chrisshi.mom.core.page.PageQuery<>(
+                new OpeningInventoryApplication.ListFilter("2000000000000000107"), 1, 20));
+        assertThat(filtered.total()).isEqualTo(1);
+        assertThat(filtered.records()).extracting(OpeningInventoryPersistence.Document::id).containsExactly(first);
     }
 
     @Test void postsMultipleLinesOnceAndActivationIsSeparate() {
@@ -123,7 +173,7 @@ class OpeningInventoryPostgresqlIT {
 
     private String createDraft(String warehouseId) {
         String id = ids.nextId();
-        commits.create(id, "OB-" + id, new WarehouseResourceReference("WAREHOUSE", warehouseId, "WH-1", "主仓",
+        commits.create(id, new WarehouseResourceReference("WAREHOUSE", warehouseId, "WH-1", "主仓",
                 "1000000000000000001", "1000000000000000001", "Asia/Shanghai", null, 0L, true, null), "operator-1");
         return id;
     }

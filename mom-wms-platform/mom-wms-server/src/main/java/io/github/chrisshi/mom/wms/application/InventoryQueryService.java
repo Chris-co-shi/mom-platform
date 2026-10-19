@@ -33,8 +33,9 @@ public class InventoryQueryService {
      * @param materialId 物料稳定标识
      * @param keyword 物料编码或名称模糊查询词
      * @param warehouseId 仓库稳定标识
+     * @param warehouseCode 仓库编码模糊查询词
      */
-    public record OverviewFilter(String materialId, String keyword, String warehouseId) {}
+    public record OverviewFilter(String materialId, String keyword, String warehouseId, String warehouseCode) {}
     /**
      * 明细组合条件，批次和 SN 为精确筛选，状态以业务枚举承载。
      * @param materialId 物料稳定标识
@@ -116,7 +117,7 @@ public class InventoryQueryService {
     @Transactional(readOnly = true)
     public PageResult<OverviewRow> overview(PageQuery<OverviewFilter> query) {
         OverviewFilter f = query.params();
-        var filter = new OverviewFilter(clean(f.materialId()), clean(f.keyword()), clean(f.warehouseId()));
+        var filter = new OverviewFilter(clean(f.materialId()), clean(f.keyword()), clean(f.warehouseId()), clean(f.warehouseCode()));
         Page<OverviewRow> page = pages.toPage(query);
         mapper.overview(page, filter, QualityStatus.QUALIFIED, WarehouseStatus.NORMAL);
         return pages.toResult(page);

@@ -28,10 +28,11 @@ public class InventoryHistoryApplication {
         this.pages = pages;
     }
 
-    /** 交易时间采用左闭右开区间，最长 366 天。 */
+    /** 交易时间采用左闭右开区间，最长 366 天；可按分录中的历史名称和编码筛选。 */
     public record Filter(String materialId, String batchCode, String snCode, String warehouseId,
                          String locationId, String transactionType, String sourceType, String sourceId,
-                         String actor, Instant startTime, Instant endTime) { }
+                         String actor, String materialKeyword, String warehouseCode, String locationCode,
+                         Instant startTime, Instant endTime) { }
 
     /** 单条分录及其所属交易事实；数量只代表本分录对应的完整库存维度。 */
     @Getter @Setter
@@ -90,7 +91,8 @@ public class InventoryHistoryApplication {
         }
         Filter filter = new Filter(clean(f.materialId()), clean(f.batchCode()), clean(f.snCode()),
                 clean(f.warehouseId()), clean(f.locationId()), clean(f.transactionType()),
-                clean(f.sourceType()), clean(f.sourceId()), clean(f.actor()), f.startTime(), f.endTime());
+                clean(f.sourceType()), clean(f.sourceId()), clean(f.actor()), clean(f.materialKeyword()),
+                clean(f.warehouseCode()), clean(f.locationCode()), f.startTime(), f.endTime());
         Page<EntryView> page = pages.toPage(query);
         mapper.search(page, filter);
         return pages.toResult(page);

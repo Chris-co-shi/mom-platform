@@ -36,6 +36,7 @@ public interface InventoryQueryMapper {
              WHERE quantity &gt; 0
                <if test="filter.materialId != null">AND material_id = #{filter.materialId}</if>
                <if test="filter.warehouseId != null">AND warehouse_id = #{filter.warehouseId}</if>
+               <if test="filter.warehouseCode != null">AND warehouse_code ILIKE '%' || #{filter.warehouseCode} || '%'</if>
                <if test="filter.keyword != null">AND (material_code ILIKE '%' || #{filter.keyword} || '%'
                     OR material_name ILIKE '%' || #{filter.keyword} || '%')</if>
              GROUP BY material_id ORDER BY material_id

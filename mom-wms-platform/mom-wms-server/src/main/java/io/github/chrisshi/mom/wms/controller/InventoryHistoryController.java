@@ -1,4 +1,4 @@
-package io.github.chrisshi.mom.wms;
+package io.github.chrisshi.mom.wms.controller;
 
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;

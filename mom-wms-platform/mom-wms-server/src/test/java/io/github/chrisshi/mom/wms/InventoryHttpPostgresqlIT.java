@@ -88,11 +88,39 @@ class InventoryHttpPostgresqlIT {
     }
 
     @Test
+    void overviewFiltersWarehouseByVisibleCodeWithoutRequiringTechnicalId() throws Exception {
+        mvc.perform(post("/inventory/overview/search").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"params\":{\"keyword\":\"材料\",\"warehouseCode\":\"WH-1\"},\"pageNo\":1,\"pageSize\":10}")
+                        .with(opaqueToken().authorities(new SimpleGrantedAuthority("wms:inventory:read"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].materialCode").value("MAT-1"));
+        mvc.perform(post("/inventory/overview/search").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"params\":{\"warehouseCode\":\"OTHER\"},\"pageNo\":1,\"pageSize\":10}")
+                        .with(opaqueToken().authorities(new SimpleGrantedAuthority("wms:inventory:read"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(0));
+    }
+
+    @Test
     void wmsOwnerPublishesInventoryText() throws Exception {
         mvc.perform(get("/i18n/runtime/bundles").param("locale", "zh-CN"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.messages['wms.inventory.overview']").value("实时库存总览"))
+                .andExpect(jsonPath("$.data.messages['wms.inventory.warehousecodesearch']").value("输入仓库编码"))
                 .andExpect(jsonPath("$.data.messages['wms.inventory.reason.package_damage']").value("包装破损"));
+    }
+
+    @Test
+    void codeRulesUseWmsOwnerAndWmsManagementPermission() throws Exception {
+        String request = "{\"params\":{\"ruleCode\":\"wms.opening.document\",\"status\":\"ENABLED\"},\"pageNo\":1,\"pageSize\":10}";
+        mvc.perform(post("/code-rules/search").contentType(MediaType.APPLICATION_JSON).content(request)
+                        .with(opaqueToken().authorities(new SimpleGrantedAuthority("mdm:code-rule:read"))))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/code-rules/search").contentType(MediaType.APPLICATION_JSON).content(request)
+                        .with(opaqueToken().authorities(new SimpleGrantedAuthority("wms:code-rule:read"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].ruleCode").value("wms.opening.document"))
+                .andExpect(jsonPath("$.data.records[0].status").value("ENABLED"));
     }
 
     @Test

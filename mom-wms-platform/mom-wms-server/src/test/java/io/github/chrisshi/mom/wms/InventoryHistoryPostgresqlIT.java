@@ -78,6 +78,7 @@ class InventoryHistoryPostgresqlIT {
     private Filter filter(String material, String batch, String sn, String warehouse, String location,
                           String type, String source, String sourceId, String actor) {
         return new Filter(material, batch, sn, warehouse, location, type, source, sourceId, actor,
+                null, null, null,
                 Instant.now().minus(1, ChronoUnit.DAYS), Instant.now().plus(1, ChronoUnit.DAYS));
     }
 
@@ -119,6 +120,22 @@ class InventoryHistoryPostgresqlIT {
         assertThat(history.transaction("9000000000000000011").getEntries()).hasSize(1);
     }
 
+    @Test void searchesHistoricalMaterialNameAndCodesWithoutTechnicalIds() {
+        accounting.post(new Posting("history-readable-search", "OPENING", "OPENING_DOCUMENT", "document-search",
+                "operator-1", List.of(new Entry(dimension("1001", "B1", null, "3001"), new BigDecimal("5")),
+                        new Entry(dimension("1002", "B2", null, "3002"), new BigDecimal("2")))));
+        Instant start = Instant.now().minus(1, ChronoUnit.DAYS);
+        Instant end = Instant.now().plus(1, ChronoUnit.DAYS);
+        Filter byName = new Filter(null, null, null, null, null, null, null, null, null,
+                "历史物料", "WH-1", "LOC-3001", start, end);
+        assertThat(history.search(new PageQuery<>(byName, 1, 10)).records())
+                .extracting(e -> e.getMaterialCode()).containsExactly("MAT-1001");
+        Filter byCode = new Filter(null, null, null, null, null, null, null, null, null,
+                "1002", "WH-1", "LOC-3002", start, end);
+        assertThat(history.search(new PageQuery<>(byCode, 1, 10)).records())
+                .extracting(e -> e.getMaterialCode()).containsExactly("MAT-1002");
+    }
+
     @Test void freezeAndClosedRestrictionRemainInHistoryWithOriginalReason() {
         jdbc.update("UPDATE wms_warehouse_inventory_state SET state='ACTIVE' WHERE warehouse_id='2001'");
         accounting.post(new Posting("history-seed", "RECEIPT", "TEST", "receipt-1", "operator-1",
@@ -143,7 +160,7 @@ class InventoryHistoryPostgresqlIT {
     }
 
     @Test void timeAndPageBoundariesRejectInvalidRequests() {
-        Filter tooLong = new Filter(null,null,null,null,null,null,null,null,null,
+        Filter tooLong = new Filter(null,null,null,null,null,null,null,null,null,null,null,null,
                 Instant.now().minus(367, ChronoUnit.DAYS), Instant.now());
         assertThatThrownBy(() -> history.search(new PageQuery<>(tooLong, 1, 10)))
                 .isInstanceOf(IllegalArgumentException.class);

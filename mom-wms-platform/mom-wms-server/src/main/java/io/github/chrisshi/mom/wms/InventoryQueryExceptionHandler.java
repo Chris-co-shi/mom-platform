@@ -4,6 +4,9 @@ import io.github.chrisshi.mom.core.i18n.I18nMessageResolver;
 import io.github.chrisshi.mom.core.page.PageQueryValidationException;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceException;
+import io.github.chrisshi.mom.wms.controller.InventoryController;
+import io.github.chrisshi.mom.wms.controller.InventoryHistoryController;
+import io.github.chrisshi.mom.wms.controller.OpeningInventoryController;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -15,52 +18,68 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.Locale;
 
-/** 库存与冻结 HTTP 输入、业务冲突和数据库失败适配，不把 SQL 或异常明细暴露给浏览器。 */
+/**
+ * 库存与冻结 HTTP 输入、业务冲突和数据库失败适配，不把 SQL 或异常明细暴露给浏览器。
+ */
 @RestControllerAdvice(assignableTypes = {InventoryController.class, OpeningInventoryController.class,
-        InventoryHistoryController.class})
+    InventoryHistoryController.class})
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class InventoryQueryExceptionHandler {
     private final I18nMessageResolver messages;
 
-    /** @param messages 框架固定错误文案解析器 */
-    public InventoryQueryExceptionHandler(I18nMessageResolver messages) { this.messages = messages; }
-
-    /** 非法筛选、分页与 JSON 均返回稳定 400。 */
-    @ExceptionHandler({IllegalArgumentException.class, PageQueryValidationException.class,
-            HttpMessageNotReadableException.class})
-    public ResponseEntity<Result<Void>> invalid(Locale locale) {
-        return ResponseEntity.badRequest().body(Result.failure("request.invalid_body",
-                messages.resolve("framework.web.invalid_request", locale)));
+    /**
+     * @param messages 框架固定错误文案解析器
+     */
+    public InventoryQueryExceptionHandler(I18nMessageResolver messages) {
+        this.messages = messages;
     }
 
-    /** 返回可操作的 MDM 引用校验原因，不把缺失的父级主数据误报成通用保存失败。 */
+    /**
+     * 非法筛选、分页与 JSON 均返回稳定 400。
+     */
+    @ExceptionHandler({IllegalArgumentException.class, PageQueryValidationException.class,
+        HttpMessageNotReadableException.class})
+    public ResponseEntity<Result<Void>> invalid(Locale locale) {
+        return ResponseEntity.badRequest().body(Result.failure("request.invalid_body",
+            messages.resolve("framework.web.invalid_request", locale)));
+    }
+
+    /**
+     * 返回可操作的 MDM 引用校验原因，不把缺失的父级主数据误报成通用保存失败。
+     */
     @ExceptionHandler(OpeningInventoryReferenceException.class)
     public ResponseEntity<Result<Void>> invalidReference(OpeningInventoryReferenceException exception, Locale locale) {
         String messageKey = "PLANT_TIME_ZONE_MISSING".equals(exception.invalidReason())
-                ? "wms.error.opening_plant_timezone_missing"
-                : "wms.error.opening_warehouse_unavailable";
+            ? "wms.error.opening_plant_timezone_missing"
+            : "wms.error.opening_warehouse_unavailable";
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(Result.failure(
-                "wms.opening.reference_invalid", messages.resolve(messageKey, locale)));
+            "wms.opening.reference_invalid", messages.resolve(messageKey, locale)));
     }
 
-    /** 数据库不可用不返回空库存或伪造成功。 */
+    /**
+     * 数据库不可用不返回空库存或伪造成功。
+     */
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<Result<Void>> unavailable(Locale locale) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Result.failure("wms.inventory_unavailable",
-                messages.resolve("wms.error.inventory_unavailable", locale)));
+            messages.resolve("wms.error.inventory_unavailable", locale)));
     }
 
-    /** 业务状态冲突以 409 返回，不泄露 SQL 或数据库约束细节。 */
+    /**
+     * 业务状态冲突以 409 返回，不泄露 SQL 或数据库约束细节。
+     */
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Result<Void>> conflict(Locale locale) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Result.failure("wms.opening.conflict",
-                messages.resolve("wms.error.opening_conflict", locale)));
+            messages.resolve("wms.error.opening_conflict", locale)));
     }
 
-    /** 数据库唯一约束冲突以稳定业务冲突返回，不暴露具体约束名。 */
+    /**
+     * 数据库唯一约束冲突以稳定业务冲突返回，不暴露具体约束名。
+     */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Result<Void>> duplicate(Locale locale) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Result.failure("wms.opening.conflict",
-                messages.resolve("wms.error.opening_conflict", locale)));
+            messages.resolve("wms.error.opening_conflict", locale)));
     }
 }
