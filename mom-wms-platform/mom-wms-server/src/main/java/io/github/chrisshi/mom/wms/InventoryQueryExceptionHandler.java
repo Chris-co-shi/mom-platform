@@ -16,7 +16,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.Locale;
 
 /** 库存与冻结 HTTP 输入、业务冲突和数据库失败适配，不把 SQL 或异常明细暴露给浏览器。 */
-@RestControllerAdvice(assignableTypes = {InventoryController.class, OpeningInventoryController.class})
+@RestControllerAdvice(assignableTypes = {InventoryController.class, OpeningInventoryController.class,
+        InventoryHistoryController.class})
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class InventoryQueryExceptionHandler {
     private final I18nMessageResolver messages;
