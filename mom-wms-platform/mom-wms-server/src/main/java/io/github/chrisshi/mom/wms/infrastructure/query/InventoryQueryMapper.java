@@ -1,6 +1,8 @@
 package io.github.chrisshi.mom.wms.infrastructure.query;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import io.github.chrisshi.mom.wms.application.QualityStatus;
+import io.github.chrisshi.mom.wms.application.WarehouseStatus;
 import io.github.chrisshi.mom.wms.application.InventoryQueryService.DetailFilter;
 import io.github.chrisshi.mom.wms.application.InventoryQueryService.DetailRow;
 import io.github.chrisshi.mom.wms.application.InventoryQueryService.OverviewFilter;
@@ -12,15 +14,22 @@ import org.apache.ibatis.annotations.Select;
 /** 查询使用数据库 SUM 和 MyBatis-Plus 分页，不读取历史流水或跨 MDM Schema JOIN。 */
 @Mapper
 public interface InventoryQueryMapper {
-    /** Material 汇总：可用仅 QUALIFIED+NORMAL；冻结属于不可用子集。 */
+    /**
+     * Material 汇总：可用仅合格且正常；冻结属于不可用子集。
+     * @param page MyBatis-Plus 分页条件
+     * @param filter 汇总筛选条件
+     * @param qualifiedStatus 可用库存要求的质量状态
+     * @param normalStatus 可用库存要求的仓储状态
+     * @return 数据库分页结果
+     */
     @Select("""
             <script>
             SELECT material_id AS materialId, MIN(material_code) AS materialCode,
                    MIN(material_name) AS materialName, MIN(uom_code) AS uomCode,
                    SUM(quantity) AS totalQuantity,
-                   SUM(CASE WHEN quality_status = 'QUALIFIED' AND warehouse_status = 'NORMAL'
+                   SUM(CASE WHEN quality_status = #{qualifiedStatus} AND warehouse_status = #{normalStatus}
                             THEN quantity ELSE 0 END) AS availableQuantity,
-                   SUM(CASE WHEN quality_status = 'QUALIFIED' AND warehouse_status = 'NORMAL'
+                   SUM(CASE WHEN quality_status = #{qualifiedStatus} AND warehouse_status = #{normalStatus}
                             THEN 0 ELSE quantity END) AS unavailableQuantity,
                    SUM(CASE WHEN warehouse_status = 'FROZEN' THEN quantity ELSE 0 END) AS frozenQuantity
               FROM wms_inventory_balance
@@ -32,9 +41,16 @@ public interface InventoryQueryMapper {
              GROUP BY material_id ORDER BY material_id
             </script>
             """)
-    IPage<OverviewRow> overview(IPage<OverviewRow> page, @Param("filter") OverviewFilter filter);
+    IPage<OverviewRow> overview(IPage<OverviewRow> page, @Param("filter") OverviewFilter filter,
+                                @Param("qualifiedStatus") QualityStatus qualifiedStatus,
+                                @Param("normalStatus") WarehouseStatus normalStatus);
 
-    /** 组合过滤仅访问非零余额；主键提供稳定分页次序。 */
+    /**
+     * 组合过滤仅访问非零余额；主键提供稳定分页次序。
+     * @param page MyBatis-Plus 分页条件
+     * @param filter 明细筛选条件
+     * @return 数据库分页结果
+     */
     @Select("""
             <script>
             SELECT id, material_id AS materialId, material_code AS materialCode,

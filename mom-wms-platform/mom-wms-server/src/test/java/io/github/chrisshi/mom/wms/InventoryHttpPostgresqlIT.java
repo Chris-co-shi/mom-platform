@@ -4,6 +4,8 @@ import io.github.chrisshi.mom.wms.application.InventoryAccountingService;
 import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Dimension;
 import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Entry;
 import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Posting;
+import io.github.chrisshi.mom.wms.application.QualityStatus;
+import io.github.chrisshi.mom.wms.application.WarehouseStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,8 +56,9 @@ class InventoryHttpPostgresqlIT {
         mvc = webAppContextSetup(context).apply(springSecurity()).build();
         jdbc.execute("TRUNCATE wms_inventory_transaction_entry, wms_inventory_transaction, wms_inventory_balance");
         var dimension = new Dimension("1001", "MAT-1", "材料一", "kg", null, "SN-1",
-                "2001", "WH-1", "3001", "LOC-1", "QUALIFIED", "NORMAL");
-        accounting.post(new Posting("http-seed", List.of(new Entry(dimension, new BigDecimal("12.500000")))));
+                "2001", "WH-1", "3001", "LOC-1", QualityStatus.QUALIFIED, WarehouseStatus.NORMAL);
+        accounting.post(new Posting("http-seed", "RECEIPT", "TEST", "http-seed", "operator-1",
+                List.of(new Entry(dimension, new BigDecimal("12.500000")))));
     }
 
     @Test
@@ -77,6 +80,8 @@ class InventoryHttpPostgresqlIT {
                         .with(opaqueToken().authorities(new SimpleGrantedAuthority("wms:inventory:read"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.records[0].snCode").value("SN-1"))
+                .andExpect(jsonPath("$.data.records[0].qualityStatus").value("QUALIFIED"))
+                .andExpect(jsonPath("$.data.records[0].warehouseStatus").value("NORMAL"))
                 .andExpect(jsonPath("$.data.records[0].quantity").value("12.500000"));
     }
 
