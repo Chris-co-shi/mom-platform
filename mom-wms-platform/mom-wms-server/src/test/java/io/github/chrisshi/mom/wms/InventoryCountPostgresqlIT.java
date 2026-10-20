@@ -10,6 +10,7 @@ import io.github.chrisshi.mom.wms.application.InventoryCountApplication;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.wms.application.InventoryCountLimitException;
 import io.github.chrisshi.mom.wms.application.InventoryCountFrozenDifferenceException;
+import io.github.chrisshi.mom.wms.application.InventoryCountWarehouseInactiveException;
 import io.github.chrisshi.mom.wms.application.InventoryFreezeApplication;
 import io.github.chrisshi.mom.wms.application.InventoryTransferCommitService;
 import io.github.chrisshi.mom.wms.application.InventoryTransferApplication.TransferCommand;
@@ -87,6 +88,12 @@ class InventoryCountPostgresqlIT {
         assertThat(page.records()).extracting(row->row.id()).containsExactly(id);
         assertThat(page.total()).isEqualTo(1);
         assertThat(application.list(new PageQuery<>(new InventoryCountApplication.Filter("9999"),1,10)).records()).isEmpty();
+    }
+    @Test void createRejectsWarehouseBeforeInventoryActivation() {
+        jdbc.update("UPDATE wms_warehouse_inventory_state SET state='INITIALIZING' WHERE warehouse_id='2001'");
+        assertThatThrownBy(()->counts.create("inactive-warehouse",warehouse(),List.of(),List.of()))
+            .isInstanceOf(InventoryCountWarehouseInactiveException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_count_task",Integer.class)).isZero();
     }
     @Test void draftScopeCanChangeButCannotChangeAfterStart() {
         String id=counts.create("scope-draft",warehouse(),List.of(),List.of());

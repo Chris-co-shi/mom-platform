@@ -27,7 +27,9 @@ class WmsFlywayReleasePostgresqlIT {
         flyway.validate();
         try (Connection connection = connection("mom_wms_fresh")) {
             assertThat(number(connection, "SELECT count(*) FROM flyway_schema_history "
-                    + "WHERE success AND version IS NOT NULL")).isEqualTo(21);
+                    + "WHERE success AND version IS NOT NULL")).isEqualTo(22);
+            assertThat(number(connection, "SELECT count(*) FROM wms_i18n_message_definition "
+                    + "WHERE message_key='wms.error.count_warehouse_inactive'")).isEqualTo(1);
             assertThat(value(connection, "SELECT col_description('wms_code_rule'::regclass, "
                     + "(SELECT attnum FROM pg_attribute WHERE attrelid='wms_code_rule'::regclass "
                     + "AND attname='version'))")).isNotBlank();

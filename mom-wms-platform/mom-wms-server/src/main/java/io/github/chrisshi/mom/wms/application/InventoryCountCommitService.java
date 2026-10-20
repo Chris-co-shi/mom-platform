@@ -53,7 +53,8 @@ public class InventoryCountCommitService {
                 throw new IllegalArgumentException("盘点创建请求键已用于不同内容");
             return existing.id();
         }
-        if(!"ACTIVE".equals(store.warehouseState(warehouse.id()))) throw new IllegalStateException("仓库库存未启用");
+        if(!"ACTIVE".equals(store.warehouseState(warehouse.id())))
+            throw new InventoryCountWarehouseInactiveException();
         String id=ids.nextId();
         store.create(id,numbers.allocate("wms.inventory.count"),requestKey,warehouse.id(),warehouse.code(),locations,materials,actor());
         return id;
@@ -70,7 +71,8 @@ public class InventoryCountCommitService {
         Task task=require(id,"DRAFT");
         if(task.version()!=expectedVersion) throw new IllegalStateException("盘点范围已变化，请刷新");
         store.lockWarehouse(task.warehouseId());
-        if(!"ACTIVE".equals(store.warehouseState(task.warehouseId()))) throw new IllegalStateException("仓库库存未启用");
+        if(!"ACTIVE".equals(store.warehouseState(task.warehouseId())))
+            throw new InventoryCountWarehouseInactiveException();
         if(store.acquire(task.warehouseId(),id)!=1) throw new IllegalStateException("仓库已有进行中的盘点任务");
         String actor=actor();
         for(var book:store.books(task)) {

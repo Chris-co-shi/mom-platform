@@ -4,6 +4,7 @@ import io.github.chrisshi.mom.core.i18n.I18nMessageResolver;
 import io.github.chrisshi.mom.webmvc.response.Result;
 import io.github.chrisshi.mom.wms.application.InventoryCountLimitException;
 import io.github.chrisshi.mom.wms.application.InventoryCountFrozenDifferenceException;
+import io.github.chrisshi.mom.wms.application.InventoryCountWarehouseInactiveException;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceException;
 import io.github.chrisshi.mom.wms.controller.InventoryCountController;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -36,6 +37,12 @@ public class InventoryCountExceptionHandler {
     public ResponseEntity<Result<Void>> frozenDifference(Locale locale) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(Result.failure("wms.inventory.count_frozen_difference",
             messages.resolve("wms.error.count_frozen_difference",locale)));
+    }
+    /** 创建或开始盘点前，仓库库存须完成期初建账并启用。 */
+    @ExceptionHandler(InventoryCountWarehouseInactiveException.class)
+    public ResponseEntity<Result<Void>> warehouseInactive(Locale locale) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Result.failure("wms.inventory.count_warehouse_inactive",
+            messages.resolve("wms.error.count_warehouse_inactive",locale)));
     }
     /** 请求参数、数量或 JSON 非法。 */
     @ExceptionHandler({IllegalArgumentException.class,HttpMessageNotReadableException.class,
