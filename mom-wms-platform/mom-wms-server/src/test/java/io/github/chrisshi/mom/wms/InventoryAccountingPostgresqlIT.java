@@ -137,6 +137,19 @@ class InventoryAccountingPostgresqlIT {
     }
 
     @Test
+    void committedPostingReplaysAfterWarehouseStateChanges() {
+        var request = posting("replay-after-lifecycle", entry(
+                dimension(null, QualityStatus.QUALIFIED, WarehouseStatus.NORMAL), "2"));
+        String transactionId = accounting.post(request);
+        jdbc.update("UPDATE wms_warehouse_inventory_state SET state='PENDING_ACTIVATION' WHERE warehouse_id='2001'");
+        assertThat(accounting.post(request)).isEqualTo(transactionId);
+        assertThatThrownBy(() -> accounting.post(posting("replay-after-lifecycle", entry(
+                dimension(null, QualityStatus.QUALIFIED, WarehouseStatus.NORMAL), "3"))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_transaction", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
     void failedSecondEntryRollsBackFirstEntryAndTransaction() {
         var first = dimension(null, QualityStatus.QUALIFIED, WarehouseStatus.NORMAL);
         var second = dimension("SN-2", QualityStatus.REJECTED, WarehouseStatus.NORMAL);
