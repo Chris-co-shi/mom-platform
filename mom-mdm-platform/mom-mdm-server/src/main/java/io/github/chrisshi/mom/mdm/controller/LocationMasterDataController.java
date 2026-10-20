@@ -122,7 +122,7 @@ public class LocationMasterDataController {
     }
 
     /**
-     * 可按 plantId、warehouseAreaId 组合分页查询 Location。
+     * 可按 Plant、WarehouseArea、Warehouse 及编码或名称关键字组合分页查询 Location。
      *
      * @param pageQuery 包含可选 Plant、WarehouseArea ID 和分页信息的唯一请求体
      * @return 统一 Location 分页结果

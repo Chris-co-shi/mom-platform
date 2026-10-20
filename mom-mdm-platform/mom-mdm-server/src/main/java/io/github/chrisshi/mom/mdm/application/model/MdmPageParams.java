@@ -23,11 +23,11 @@ public final class MdmPageParams {
     /** @param productionLineId 可选 ProductionLine ID */
     public record WorkstationPageParams(String productionLineId) { }
 
-    /** @param plantId 可选 Plant ID */
-    public record WarehousePageParams(String plantId) { }
+    /** @param plantId 可选 Plant ID；@param keyword 可选编码或名称关键字；@param status 可选状态 */
+    public record WarehousePageParams(String plantId, String keyword, String status) { }
 
-    /** @param warehouseId 可选 Warehouse ID */
-    public record WarehouseAreaPageParams(String warehouseId) { }
+    /** @param warehouseId 可选 Warehouse ID；@param keyword 可选编码或名称关键字；@param status 可选状态 */
+    public record WarehouseAreaPageParams(String warehouseId, String keyword, String status) { }
 
     /** LocationType 当前没有可选过滤条件。 */
     public record LocationTypePageParams() { }
@@ -35,8 +35,15 @@ public final class MdmPageParams {
     /**
      * @param plantId 可选 Plant ID
      * @param warehouseAreaId 可选 WarehouseArea ID
+     * @param warehouseId 可选 Warehouse ID，仅查询其下区域中的库位
+     * @param keyword 可选编码或名称关键字
+     * @param status 可选状态
      */
-    public record LocationPageParams(String plantId, String warehouseAreaId) { }
+    public record LocationPageParams(String plantId, String warehouseAreaId, String warehouseId, String keyword, String status) {
+        public LocationPageParams(String plantId, String warehouseAreaId) {
+            this(plantId, warehouseAreaId, null, null, null);
+        }
+    }
 
     /**
      * @param parentId 可选父分类 ID，仅查询直接子级

@@ -127,9 +127,9 @@ public class WarehouseStructureApplication {
     }
 
     /**
-     * 可按 Plant 过滤并稳定排序分页 Warehouse。
+     * 可按 Plant、关键字与状态过滤并稳定排序分页 Warehouse。
      *
-     * @param pageQuery 包含可选 Plant ID 和分页信息的唯一业务入参
+     * @param pageQuery 包含可选 Plant ID、关键字、状态与分页信息的业务入参
      * @return 统一分页结果；只读、幂等且无持久化副作用
      * @throws MdmException Plant ID 格式非法时抛出
      */
@@ -140,6 +140,12 @@ public class WarehouseStructureApplication {
         LambdaQueryWrapper<WarehouseEntity> query = new LambdaQueryWrapper<>();
         String plantId = params.plantId();
         if (plantId != null && !plantId.isBlank()) query.eq(WarehouseEntity::getPlantId, MdmMasterDataRules.id(plantId, "plantId"));
+        if (params.keyword() != null && !params.keyword().isBlank()) {
+            String keyword = params.keyword().strip();
+            query.and(filter -> filter.like(WarehouseEntity::getCode, keyword).or().like(WarehouseEntity::getName, keyword));
+        }
+        if (params.status() != null && !params.status().isBlank())
+            query.eq(WarehouseEntity::getStatus, MdmMasterDataRules.status(params.status()));
         query.orderByAsc(WarehouseEntity::getCode).orderByAsc(WarehouseEntity::getId);
         warehouseMapper.selectPage(page, query);
         return pageAdapter.toResult(page, WarehouseStructureApplication::toView);
@@ -184,9 +190,9 @@ public class WarehouseStructureApplication {
     public WarehouseAreaView getWarehouseArea(String id) { return toView(requireWarehouseArea(id)); }
 
     /**
-     * 可按 Warehouse 过滤并稳定排序分页 WarehouseArea。
+     * 可按 Warehouse、关键字与状态过滤并稳定排序分页 WarehouseArea。
      *
-     * @param pageQuery 包含可选 Warehouse ID 和分页信息的唯一业务入参
+     * @param pageQuery 包含可选 Warehouse ID、关键字、状态与分页信息的业务入参
      * @return 统一分页结果；只读、幂等且无持久化副作用
      * @throws MdmException Warehouse ID 格式非法时抛出
      */
@@ -198,6 +204,12 @@ public class WarehouseStructureApplication {
         String warehouseId = params.warehouseId();
         if (warehouseId != null && !warehouseId.isBlank()) query.eq(WarehouseAreaEntity::getWarehouseId,
                 MdmMasterDataRules.id(warehouseId, "warehouseId"));
+        if (params.keyword() != null && !params.keyword().isBlank()) {
+            String keyword = params.keyword().strip();
+            query.and(filter -> filter.like(WarehouseAreaEntity::getCode, keyword).or().like(WarehouseAreaEntity::getName, keyword));
+        }
+        if (params.status() != null && !params.status().isBlank())
+            query.eq(WarehouseAreaEntity::getStatus, MdmMasterDataRules.status(params.status()));
         query.orderByAsc(WarehouseAreaEntity::getCode).orderByAsc(WarehouseAreaEntity::getId);
         warehouseAreaMapper.selectPage(page, query);
         return pageAdapter.toResult(page, WarehouseStructureApplication::toView);

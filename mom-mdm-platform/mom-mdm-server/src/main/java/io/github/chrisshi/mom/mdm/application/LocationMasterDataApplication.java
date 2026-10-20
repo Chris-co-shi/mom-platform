@@ -181,7 +181,7 @@ public class LocationMasterDataApplication {
     /**
      * 可按 Plant、WarehouseArea 组合过滤并稳定排序分页查询 Location。
      *
-     * @param pageQuery 包含可选 Plant、WarehouseArea ID 和分页信息的唯一业务入参
+     * @param pageQuery 包含可选 Plant、WarehouseArea、Warehouse、关键字、状态与分页信息的业务入参
      * @return 统一分页结果；只读、幂等且无持久化副作用
      * @throws MdmException 任一过滤 ID 格式非法时抛出
      */
@@ -196,6 +196,18 @@ public class LocationMasterDataApplication {
                 MdmMasterDataRules.id(plantId, "plantId"));
         if (warehouseAreaId != null && !warehouseAreaId.isBlank()) query.eq(LocationEntity::getWarehouseAreaId,
                 MdmMasterDataRules.id(warehouseAreaId, "warehouseAreaId"));
+        if (params.warehouseId() != null && !params.warehouseId().isBlank()) {
+            String warehouseId = MdmMasterDataRules.id(params.warehouseId(), "warehouseId");
+            if (!warehouseId.matches("[0-9]{1,19}")) throw MdmException.invalidReference();
+            query.inSql(LocationEntity::getWarehouseAreaId,
+                    "SELECT id FROM mdm_warehouse_area WHERE warehouse_id = '" + warehouseId + "'");
+        }
+        if (params.keyword() != null && !params.keyword().isBlank()) {
+            String keyword = params.keyword().strip();
+            query.and(filter -> filter.like(LocationEntity::getCode, keyword).or().like(LocationEntity::getName, keyword));
+        }
+        if (params.status() != null && !params.status().isBlank())
+            query.eq(LocationEntity::getStatus, MdmMasterDataRules.status(params.status()));
         query.orderByAsc(LocationEntity::getCode).orderByAsc(LocationEntity::getId);
         locationMapper.selectPage(page, query);
         return pageAdapter.toResult(page, LocationMasterDataApplication::toView);

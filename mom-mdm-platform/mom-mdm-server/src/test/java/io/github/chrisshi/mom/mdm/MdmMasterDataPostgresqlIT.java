@@ -20,6 +20,8 @@ import io.github.chrisshi.mom.mdm.application.MaterialCategoryApplication;
 import io.github.chrisshi.mom.mdm.application.MdmException;
 import io.github.chrisshi.mom.mdm.application.MdmMasterDataRules;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.LocationPageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.WarehouseAreaPageParams;
+import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.WarehousePageParams;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.MaterialCategoryPageParams;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.MaterialPageParams;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.PlantPageParams;
@@ -487,6 +489,12 @@ class MdmMasterDataPostgresqlIT {
 
         assertThat(station.productionLineId()).isEqualTo(line.id());
         assertThat(area.warehouseId()).isEqualTo(warehouse.id());
+        assertThat(warehouseApplication.pageWarehouses(new PageQuery<>(
+                new WarehousePageParams(plantA.id(), "一号仓", MdmMasterDataRules.ENABLED), 1, 20)).records())
+                .extracting(record -> record.id()).containsExactly(warehouse.id());
+        assertThat(warehouseApplication.pageWarehouseAreas(new PageQuery<>(
+                new WarehouseAreaPageParams(warehouse.id(), "AREA-1", MdmMasterDataRules.ENABLED), 1, 20)).records())
+                .extracting(record -> record.id()).containsExactly(area.id());
         assertNotFound(() -> factoryApplication.createProductionLine("missing", "LINE-X", "无父级", MdmMasterDataRules.ENABLED));
         assertNotFound(() -> warehouseApplication.createWarehouse("missing", "WH-X", "无父级", MdmMasterDataRules.ENABLED));
     }
@@ -512,6 +520,13 @@ class MdmMasterDataPostgresqlIT {
                 new PageQuery<>(new LocationPageParams(plantA.id(), area.id()), 1, 20));
         assertThat(areaPage.records()).extracting(record -> record.id()).containsExactly(storage.id());
         assertThat(areaPage.total()).isEqualTo(1);
+        var warehousePage = locationApplication.pageLocations(new PageQuery<>(
+                new LocationPageParams(null, null, warehouse.id(), "仓储", MdmMasterDataRules.ENABLED), 1, 20));
+        assertThat(warehousePage.records()).extracting(record -> record.id()).containsExactly(storage.id());
+        assertThatThrownBy(() -> locationApplication.pageLocations(new PageQuery<>(
+                new LocationPageParams(null, null, "1' OR '1'='1", null, null), 1, 20)))
+                .isInstanceOfSatisfying(MdmException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("mdm.invalid_reference"));
         assertThatThrownBy(() -> locationApplication.createLocation(plantB.id(), area.id(), type.id(), "LOC-X",
                 "跨工厂错误位置", MdmMasterDataRules.ENABLED))
                 .isInstanceOfSatisfying(MdmException.class,
