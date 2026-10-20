@@ -293,23 +293,18 @@ public class UserApplication {
      *
      * @param userId 用户主键
      * @param requestedRoleIds 目标角色主键集合
-     * @param expectedVersion 打开关系编辑时读取的用户聚合版本；并发变化时拒绝替换
      * @return 替换后的角色列表
      * @throws AuthException 用户/角色不存在、角色已停用或目标数量超限时抛出
      */
     @Transactional
-    public List<RoleView> replaceRoles(String userId, List<String> requestedRoleIds, long expectedVersion) {
-        UserEntity owner = requireUser(userId);
-        requireVersion(owner.getVersion(), expectedVersion);
+    public List<RoleView> replaceRoles(String userId, List<String> requestedRoleIds) {
+        requireUser(userId);
         if (requestedRoleIds.size() > MAX_ROLE_SELECTION) {
             throw new AuthException(AuthErrorCode.RELATION_SELECTION_TOO_LARGE);
         }
         Set<String> roleIds = new LinkedHashSet<>(requestedRoleIds);
         validateRoles(roleIds);
 
-        // 用户聚合 version 同时保护角色关系：CAS 成功才允许删除并重建关系。
-        // 与其他用户资料修改共用版本，任何并发写入均不会被静默覆盖。
-        requireUpdateSucceeded(userId, userMapper.updateById(owner));
         userRoleMapper.delete(
             new LambdaQueryWrapper<UserRoleEntity>().eq(UserRoleEntity::getUserId, userId)
         );
