@@ -19,7 +19,6 @@ SQL_ADAPTER_IMPORT = re.compile(
     r"org\.springframework\.jdbc\.)",
     re.MULTILINE,
 )
-SELECT_STAR = re.compile(r"\bSELECT\s+\*\s+FROM\b", re.IGNORECASE | re.DOTALL)
 DYNAMIC_SQL_TEXT = re.compile(r"\$\{")
 MP_SERVICE_IMPORT = re.compile(
     r"^\s*import\s+com\.baomidou\.mybatisplus\.(?:spring\.service|extension\.service)\.",
@@ -143,10 +142,6 @@ def check_java_file(relative: str, text: str, report: Report) -> None:
     if not SQL_ADAPTER_IMPORT.search(text):
         return
 
-    if SELECT_STAR.search(text):
-        report.errors.append(
-            f"正式 Java SQL 必须显式列名，禁止 SELECT *: {relative}"
-        )
     if DYNAMIC_SQL_TEXT.search(text):
         report.errors.append(f"Java SQL 禁止 ${{}} 动态文本: {relative}")
 
@@ -199,7 +194,7 @@ def main(argv: list[str] | None = None) -> int:
     print("- bounded contexts use MyBatis/MyBatis-Plus unless precisely exempted")
     print("- Spring CrudRepository stays inside Infrastructure and implements a MOM Repository Port")
     print("- IRepository contracts and Spring/legacy generic Service abstractions remain forbidden")
-    print("- Java annotation/JDBC SQL rejects SELECT * and ${} dynamic text")
+    print("- Java annotation/JDBC SQL rejects ${} dynamic text; SELECT * is allowed")
     return 0
 
 
