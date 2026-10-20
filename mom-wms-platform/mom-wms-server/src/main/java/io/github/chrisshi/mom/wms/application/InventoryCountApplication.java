@@ -63,6 +63,19 @@ public class InventoryCountApplication {
     }
     /** 创建单仓盘点草稿，验证仓库及可选范围引用。 */
     public Detail create(CreateRequest request) {
+        if (request == null || request.requestKey() == null || request.requestKey().isBlank()
+                || request.requestKey().length() > 128) throw new IllegalArgumentException("盘点创建请求键非法");
+        // 已提交的同一操作可脱离当前 MDM 可用性重放；范围仍按首次创建时的规范化集合核对。
+        Task existing = store.findByRequestKey(request.requestKey());
+        if (existing != null) {
+            List<String> locations = normalizeScopeIds(request.locationIds());
+            List<String> materials = normalizeScopeIds(request.materialIds());
+            if (!existing.createdBy().equals(actors.requireCurrentActor().actorId())
+                    || !existing.warehouseId().equals(request.warehouseId())
+                    || !existing.locationIds().equals(locations) || !existing.materialIds().equals(materials))
+                throw new IllegalArgumentException("盘点创建请求键已用于不同内容");
+            return get(existing.id());
+        }
         var warehouse=references.warehouse(request.warehouseId());
         List<String> locations=validatedLocations(request.locationIds(),warehouse.id());
         List<String> materials=validatedMaterials(request.materialIds());
@@ -120,6 +133,12 @@ public class InventoryCountApplication {
         Task task=store.find(id);
         if(task==null) throw new IllegalArgumentException("盘点任务不存在");
         return task;
+    }
+    /** 与创建事务保持相同的去重与排序规则，但重放时不重新校验 MDM 实时状态。 */
+    private static List<String> normalizeScopeIds(List<String> ids) {
+        if (ids != null && ids.stream().anyMatch(value -> value == null || value.isBlank()))
+            throw new IllegalArgumentException("盘点范围 ID 非法");
+        return ids == null ? List.of() : ids.stream().distinct().sorted().toList();
     }
     private List<String> validatedLocations(List<String> ids,String warehouseId) {
         if(ids!=null && ids.stream().anyMatch(value->value==null || value.isBlank()))
