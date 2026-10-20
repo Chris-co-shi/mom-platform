@@ -13,6 +13,7 @@ import io.github.chrisshi.mom.wms.application.InventoryQueryService.OverviewRow;
 import io.github.chrisshi.mom.wms.application.InventoryTransferApplication;
 import io.github.chrisshi.mom.wms.application.InventoryTransferApplication.TransferCommand;
 import io.github.chrisshi.mom.wms.application.InventoryTransferApplication.TransferResult;
+import io.github.chrisshi.mom.wms.application.InventoryTransferApplication.TransferLookup;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -97,6 +98,12 @@ public class InventoryController {
     public Result<TransferResult> transfer(@RequestBody TransferRequest request, Authentication authentication) {
         return Result.success(transfers.transfer(new TransferCommand(request.requestKey(), request.balanceId(),
             request.targetLocationId(), request.quantity(), authentication.getName())));
+    }
+    /** 核对当前操作人按请求键提交的库存移动，不发起新的库存写入。 */
+    @GetMapping("/transfers/by-request-key/{requestKey}")
+    @PreAuthorize("hasAuthority('wms:inventory:transfer')")
+    public Result<TransferLookup> transferByRequestKey(@PathVariable String requestKey, Authentication authentication) {
+        return Result.success(transfers.findCommitted(requestKey, authentication.getName()));
     }
 
     /**

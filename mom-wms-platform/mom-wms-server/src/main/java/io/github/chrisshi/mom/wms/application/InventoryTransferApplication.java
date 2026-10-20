@@ -46,6 +46,19 @@ public class InventoryTransferApplication {
         LocationSnapshot target = references.location(command.targetLocationId(), source.warehouseId());
         return commits.transfer(command, source.warehouseId(), target);
     }
+    /** 只读原请求键的已提交移动事实；缺失时仍不能推断原请求未提交。 */
+    public TransferLookup findCommitted(String requestKey, String operatorId) {
+        if (!present(requestKey) || requestKey.length() > 128 || !present(operatorId))
+            throw new IllegalArgumentException("库存移动请求键非法");
+        TransferReplay previous = operations.findTransferReplay(requestKey);
+        if (previous == null || !"LOCATION_TRANSFER".equals(previous.transactionType())
+                || !"MANUAL".equals(previous.sourceType()) || !requestKey.equals(previous.sourceId())
+                || !operatorId.equals(previous.operatorId())) return null;
+        return new TransferLookup(previous.transactionId(), previous.balanceId(),
+                previous.targetLocationId(), previous.quantity().toPlainString());
+    }
+    /** 原移动的不可变输入与交易标识。 */
+    public record TransferLookup(String transactionId, String balanceId, String targetLocationId, String quantity) { }
 
     static TransferResult replay(TransferReplay previous, TransferCommand command) {
         if (!"LOCATION_TRANSFER".equals(previous.transactionType())

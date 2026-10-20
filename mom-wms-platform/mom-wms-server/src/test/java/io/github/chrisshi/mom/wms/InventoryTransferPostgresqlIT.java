@@ -107,6 +107,18 @@ class InventoryTransferPostgresqlIT {
                 Integer.class)).isEqualTo(1);
     }
 
+    @Test void committedMoveCanBeFoundOnlyByItsOperatorAndOriginalInput() {
+        String balance = seed(null, "10");
+        assertThat(transfers.findCommitted("move-lookup", "operator-1")).isNull();
+        String transactionId = transfers.transfer(command("move-lookup", balance, "2.5", "3002")).transactionId();
+        var found = transfers.findCommitted("move-lookup", "operator-1");
+        assertThat(found.transactionId()).isEqualTo(transactionId);
+        assertThat(found.balanceId()).isEqualTo(balance);
+        assertThat(found.targetLocationId()).isEqualTo("3002");
+        assertThat(new BigDecimal(found.quantity())).isEqualByComparingTo("2.5");
+        assertThat(transfers.findCommitted("move-lookup", "operator-2")).isNull();
+    }
+
     @Test void invalidTargetQuantityAndWarehouseStateLeaveNoMove() {
         String balance = seed(null, "10");
         assertThatThrownBy(() -> transfers.transfer(command("same", balance, "1", "3001")))

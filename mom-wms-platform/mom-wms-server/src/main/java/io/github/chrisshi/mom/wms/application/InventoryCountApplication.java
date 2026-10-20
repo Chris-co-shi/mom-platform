@@ -3,6 +3,7 @@ package io.github.chrisshi.mom.wms.application;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
+import io.github.chrisshi.mom.core.security.CurrentActorProvider;
 import io.github.chrisshi.mom.data.page.PageAdapter;
 import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Dimension;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.LocationSnapshot;
@@ -30,13 +31,14 @@ public class InventoryCountApplication {
     private final OpeningInventoryReferenceService references;
     private final InventoryCountCommitService commits;
     private final PageAdapter pages;
+    private final CurrentActorProvider actors;
 
     /** @param store 盘点持久化 @param queries 服务端分页 @param references 事务外 MDM 引用
-     * @param commits WMS 本地原子提交 @param pages 平台分页转换 */
+     * @param commits WMS 本地原子提交 @param pages 平台分页转换 @param actors 当前认证操作人 */
     public InventoryCountApplication(InventoryCountPersistence store,InventoryCountQueryMapper queries,
                                      OpeningInventoryReferenceService references,InventoryCountCommitService commits,
-                                     PageAdapter pages) {
-        this.store=store; this.queries=queries; this.references=references; this.commits=commits; this.pages=pages;
+                                     PageAdapter pages,CurrentActorProvider actors) {
+        this.store=store; this.queries=queries; this.references=references; this.commits=commits; this.pages=pages; this.actors=actors;
     }
     /** 按仓库筛选盘点任务；服务端分页是权威。 */
     public PageResult<Summary> list(PageQuery<Filter> query) {
@@ -52,6 +54,12 @@ public class InventoryCountApplication {
             line.bookQuantity().toPlainString(),line.countedQuantity()==null?null:line.countedQuantity().toPlainString(),
             line.countedQuantity()==null?null:line.difference().toPlainString(),line.snapshotBy(),line.snapshotAt(),
             line.countedBy(),line.countedAt())).toList());
+    }
+    /** 只返回当前操作人同键创建的已提交任务；缺失时不能证明原请求未提交。 */
+    public Detail findCreatedByRequestKey(String requestKey) {
+        if(requestKey==null || requestKey.isBlank() || requestKey.length()>128) throw new IllegalArgumentException("盘点创建请求键非法");
+        Task task=store.findByRequestKey(requestKey);
+        return task!=null && task.createdBy().equals(actors.requireCurrentActor().actorId()) ? get(task.id()) : null;
     }
     /** 创建单仓盘点草稿，验证仓库及可选范围引用。 */
     public Detail create(CreateRequest request) {

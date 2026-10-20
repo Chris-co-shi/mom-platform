@@ -27,6 +27,12 @@ public class InventoryCountController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('wms:inventory-count:read')")
     public Result<Detail> get(@PathVariable String id) { return Result.success(application.get(id)); }
+    /** 按创建请求键查询当前操作人的已提交结果，空结果仍需继续阻断重放。 */
+    @GetMapping("/by-request-key/{requestKey}")
+    @PreAuthorize("hasAuthority('wms:inventory-count:read')")
+    public Result<Detail> byRequestKey(@PathVariable String requestKey) {
+        return Result.success(application.findCreatedByRequestKey(requestKey));
+    }
     /** 创建任务并分配业务编号。 */
     @PostMapping
     @PreAuthorize("hasAuthority('wms:inventory-count:create')")

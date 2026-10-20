@@ -89,6 +89,14 @@ class InventoryCountPostgresqlIT {
         assertThat(page.total()).isEqualTo(1);
         assertThat(application.list(new PageQuery<>(new InventoryCountApplication.Filter("9999"),1,10)).records()).isEmpty();
     }
+    @Test void creationRequestKeyReturnsOnlyCurrentActorsCommittedTask() {
+        String id=counts.create("count-reconcile",warehouse(),List.of(),List.of());
+        assertThat(application.findCreatedByRequestKey("count-reconcile").task().id()).isEqualTo(id);
+        assertThat(application.findCreatedByRequestKey("missing-request")).isNull();
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken("operator-2","secret",List.of()));
+        assertThat(application.findCreatedByRequestKey("count-reconcile")).isNull();
+    }
     @Test void createRejectsWarehouseBeforeInventoryActivation() {
         jdbc.update("UPDATE wms_warehouse_inventory_state SET state='INITIALIZING' WHERE warehouse_id='2001'");
         assertThatThrownBy(()->counts.create("inactive-warehouse",warehouse(),List.of(),List.of()))
