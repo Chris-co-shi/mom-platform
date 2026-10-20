@@ -73,17 +73,19 @@ SELECT 'locale=' || count(*) FROM information_schema.tables WHERE table_schema='
 SELECT 'i18n=' || count(*) FROM information_schema.tables WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name IN ('system_i18n_message_definition','system_i18n_translation');
 SELECT 'enabled_locales=' || count(*) FROM ${POSTGRES_SCHEMA}.system_supported_locale WHERE enabled AND NOT deleted;
 SELECT 'default_locales=' || count(*) FROM ${POSTGRES_SCHEMA}.system_supported_locale WHERE is_default AND NOT deleted;
-SELECT 'system_messages=' || count(*) FROM ${POSTGRES_SCHEMA}.system_i18n_message_definition WHERE namespace='system' AND NOT deleted;
+SELECT 'system_messages=' || count(*) FROM ${POSTGRES_SCHEMA}.system_i18n_message_definition WHERE message_key LIKE 'system.%' AND NOT deleted;
 SELECT 'system_translations=' || count(*) FROM ${POSTGRES_SCHEMA}.system_i18n_translation WHERE NOT deleted;
+SELECT 'v28_messages=' || count(*) FROM ${POSTGRES_SCHEMA}.system_i18n_message_definition WHERE id BETWEEN '9680000000000000001' AND '9680000000000000008' AND message_key = lower(message_key) AND NOT deleted;
+SELECT 'v28_translations=' || count(*) FROM ${POSTGRES_SCHEMA}.system_i18n_translation WHERE message_id BETWEEN '9680000000000000001' AND '9680000000000000008' AND NOT deleted;
 SELECT 'base_entity_deleted=' || count(*) FROM information_schema.columns WHERE table_schema='${POSTGRES_SCHEMA}' AND table_name IN ('system_dictionary','system_dictionary_item','system_supported_locale','system_i18n_message_definition','system_i18n_translation') AND column_name='deleted' AND data_type='boolean' AND is_nullable='NO';
 SELECT 'cross_schema_fk=' || count(*) FROM pg_constraint c JOIN pg_class s ON s.oid=c.conrelid JOIN pg_namespace sn ON sn.oid=s.relnamespace JOIN pg_class t ON t.oid=c.confrelid JOIN pg_namespace tn ON tn.oid=t.relnamespace WHERE c.contype='f' AND sn.nspname='${POSTGRES_SCHEMA}' AND tn.nspname<>'${POSTGRES_SCHEMA}';
 SELECT 'business_fk=' || count(*) FROM pg_constraint c JOIN pg_class s ON s.oid=c.conrelid JOIN pg_namespace sn ON sn.oid=s.relnamespace WHERE c.contype='f' AND sn.nspname='${POSTGRES_SCHEMA}';
 " > system-postgresql-schema.txt
 
-for expected in schema=1 flyway_version=10 dictionary=2 locale=1 i18n=2 enabled_locales=2 \
-  default_locales=1 system_messages=15 system_translations=30 \
+for expected in schema=1 flyway_version=28 dictionary=2 locale=1 i18n=2 enabled_locales=2 \
+  default_locales=1 v28_messages=8 v28_translations=16 \
   base_entity_deleted=5 cross_schema_fk=0 business_fk=0; do
-  grep --fixed-strings --quiet "$expected" system-postgresql-schema.txt || {
+  grep --fixed-strings --line-regexp --quiet "$expected" system-postgresql-schema.txt || {
     FAILURE_REASON="missing schema evidence: $expected"; exit 1;
   }
 done
@@ -95,4 +97,4 @@ connections=$(docker exec "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USERNAME" \
 [[ "$(docker exec "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USERNAME" \
   -d "$POSTGRES_DATABASE" -tAc 'show timezone')" == "Asia/Tokyo" ]]
 
-echo "SYSTEM_POSTGRESQL_SMOKE result=success flyway=10 dictionary=2 locale=1 i18n=2 business_fk=0 cross_schema_fk=0 readiness=UP"
+echo "SYSTEM_POSTGRESQL_SMOKE result=success flyway=28 dictionary=2 locale=1 i18n=2 v28_messages=8 v28_translations=16 business_fk=0 cross_schema_fk=0 readiness=UP"

@@ -257,7 +257,7 @@ insertOrUpdate(entities [, batchSize])
 SQL 统一要求：
 
 1. 禁止 `${}` 和客户端原始 SQL；
-2. 自定义查询显式列名，禁止 `SELECT *`；
+2. 自定义查询优先显式列名；允许 `SELECT *`，但宽表、大结果集、敏感字段和跨版本 SQL 仍应评估返回列、性能及兼容性，不设置一刀切门禁；
 3. 大结果分页、Cursor、流式或分批处理，禁止无界加载和 N+1；
 4. 批量查询和写入定义上限；
 5. Update/Delete 必须有可证明的限定条件并检查 affected rows；

@@ -96,10 +96,6 @@ class SystemI18nStorePostgresqlIT {
 
     private void verifyCodeRuleMessagesUpgrade(String fromVersion) {
         String schema = "code_rule_messages_upgrade";
-        String originalDefinitions = fromVersion.equals("24") ? "message_key NOT LIKE 'system.coderules.%'"
-                : fromVersion.equals("25") ? "id NOT LIKE '9672%' AND id NOT LIKE '9673%'" : "id NOT LIKE '9673%'";
-        String originalTranslations = fromVersion.equals("24") ? "d.message_key NOT LIKE 'system.coderules.%'"
-                : fromVersion.equals("25") ? "t.id NOT LIKE '9672%' AND t.id NOT LIKE '9673%'" : "t.id NOT LIKE '9673%'";
         var source = new org.springframework.jdbc.datasource.DriverManagerDataSource(
                 POSTGRES.getJdbcUrl() + "&currentSchema=" + schema, POSTGRES.getUsername(), POSTGRES.getPassword());
         var isolated = new JdbcTemplate(source);
@@ -120,10 +116,12 @@ class SystemI18nStorePostgresqlIT {
             var translations = isolated.queryForList("SELECT * FROM system_i18n_translation ORDER BY id");
             org.flywaydb.core.Flyway.configure().dataSource(source).schemas(schema).defaultSchema(schema)
                     .locations("classpath:db/migration/system").load().migrate();
-            assertThat(isolated.queryForList("SELECT * FROM system_i18n_message_definition WHERE " + originalDefinitions + " ORDER BY id"))
-                    .isEqualTo(definitions);
-            assertThat(isolated.queryForList("SELECT t.* FROM system_i18n_translation t JOIN system_i18n_message_definition d ON t.message_id=d.id WHERE " + originalTranslations + " ORDER BY t.id"))
-                    .isEqualTo(translations);
+            // 后续 Migration 可以新增种子；这里应断言原有记录与自定义翻译逐行不变，
+            // 而不是假设升级后只可能新增 code-rule 系列 Key（V27/V28 已新增其他系列）。
+            assertThat(isolated.queryForList("SELECT * FROM system_i18n_message_definition ORDER BY id"))
+                    .containsAll(definitions);
+            assertThat(isolated.queryForList("SELECT * FROM system_i18n_translation ORDER BY id"))
+                    .containsAll(translations);
             assertThat(isolated.queryForObject("SELECT COUNT(*) FROM system_i18n_message_definition WHERE message_key LIKE 'system.coderules.%'", Long.class)).isEqualTo(41);
         } finally { jdbc.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE"); }
     }

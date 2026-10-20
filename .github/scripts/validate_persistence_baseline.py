@@ -23,6 +23,19 @@ KNOWN_CONTEXTS = {
 }
 XML_SQL_TAGS = {"select", "insert", "update", "delete"}
 
+# V28 于 2026-10-20 引入，但因五个驼峰消息键违反已发布小写约束而从未通过 main CI。
+# 只许可这一对确定的 Git Blob 作为一次性修复；其他已存在 Migration 仍严格不可修改。
+ONE_TIME_V28_FIX = (
+    "mom-system-platform/mom-system-server/src/main/resources/db/migration/system/"
+    "V28__reference_quantity_controls_i18n.sql",
+    "a7c4910683c925d15152f3255b7cdcc582a7c4d3",
+    "575e46ab538453578e9eb2782a9a24d945dbd338",
+)
+
+
+def is_approved_v28_fix(path: str, old_blob: str, new_blob: str) -> bool:
+    return (path, old_blob, new_blob) == ONE_TIME_V28_FIX
+
 
 @dataclass
 class Report:
@@ -202,7 +215,16 @@ def run(root: pathlib.Path, base: str | None, head: str, report: Report) -> None
     check_migration_paths(migration_files, migration_contents, report)
     if base:
         changes, base_files = collect_git_changes(root, base, head)
-        check_versioned_immutability(changes, base_files, report)
+        checked_changes: list[tuple[str, ...]] = []
+        for change in changes:
+            if change[0] == "M" and change[1] == ONE_TIME_V28_FIX[0]:
+                old_blob = git_lines(root, "rev-parse", f"{base}:{change[1]}")[0]
+                new_blob = git_lines(root, "rev-parse", f"{head}:{change[1]}")[0]
+                if is_approved_v28_fix(change[1], old_blob, new_blob):
+                    report.reviews.append("一次性修复了不可执行的 System V28 小写 i18n Key；仅此精确 Git Blob 对允许")
+                    continue
+            checked_changes.append(change)
+        check_versioned_immutability(checked_changes, base_files, report)
 
 
 def main(argv: list[str] | None = None) -> int:

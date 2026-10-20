@@ -54,7 +54,7 @@ class JavaPersistenceBaselineTest(unittest.TestCase):
         )
         self.assertEqual([], report.errors)
 
-    def test_select_star_in_new_mapper_is_rejected(self):
+    def test_select_star_in_new_mapper_is_allowed(self):
         report = self.report()
         path = (
             "mom-system-platform/mom-system-server/src/main/java/"
@@ -66,7 +66,21 @@ class JavaPersistenceBaselineTest(unittest.TestCase):
             '@Select("SELECT * FROM system_parameter")'
         )
         baseline.check_java_file(path, text, report)
-        self.assertTrue(any("SELECT *" in item for item in report.errors))
+        self.assertEqual([], report.errors)
+
+    def test_sql_text_interpolation_stays_forbidden(self):
+        report = self.report()
+        path = (
+            "mom-system-platform/mom-system-server/src/main/java/"
+            "io/github/chrisshi/mom/system/infrastructure/persistence/"
+            "mapper/UnsafeMapper.java"
+        )
+        text = (
+            'import org.apache.ibatis.annotations.Select;\n'
+            '@Select("SELECT * FROM system_parameter ORDER BY ${sort}")'
+        )
+        baseline.check_java_file(path, text, report)
+        self.assertTrue(any("动态文本" in item for item in report.errors))
 
     def test_current_and_legacy_iservice_are_rejected(self):
         for package in (

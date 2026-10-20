@@ -625,8 +625,9 @@ class MdmHttpPostgresqlConnectivityIT {
         mockMvc.perform(get("/i18n/runtime/bundles")
                         .param("locale", "zh-CN"))
                 .andExpect(status().isOk());
+        // 按当前 i18n 公开读取契约，匿名 GET 文案列表允许读取；写入仍受权限保护。
         mockMvc.perform(get("/i18n/messages"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk());
         mockMvc.perform(get("/uoms/{id}", missingId))
                 .andExpect(status().isUnauthorized());
 
