@@ -50,6 +50,13 @@ public class InventoryTransferCommitService {
                 || source.warehouseStatus() != WarehouseStatus.NORMAL || source.quantity().signum() <= 0)
             throw new InventoryTransferConflictException("来源库存或库位状态已变化");
 
+        // 与统一记账入口保持仓库 → 库位 → SN 的锁顺序，盘点开始时不会与移库形成反向等待。
+        if (operations.countLockOwner(warehouseId) != null)
+            throw new InventoryTransferConflictException("仓库正在盘点，不能移动库存");
+        operations.lockAccountingKey("WMS:WH:" + warehouseId);
+        if (operations.countLockOwner(warehouseId) != null)
+            throw new InventoryTransferConflictException("仓库正在盘点，不能移动库存");
+
         lockLocations(source.locationId(), target.id());
         source = verifySn(command, source);
         Dimension from = dimension(source, source.locationId(), source.locationCode());

@@ -41,7 +41,7 @@ public class OpeningInventoryCommitService {
      */
     @Transactional
     public void create(String id, WarehouseResourceReference warehouse, String actor) {
-        mapper.initialize(ids.nextId(), warehouse.id(), warehouse.code());
+        mapper.initialize(ids.nextId(), warehouse.id(), warehouse.code(), actor);
         String state = mapper.lockWarehouse(warehouse.id());
         if (!"INITIALIZING".equals(state)) throw new IllegalStateException("仓库已过账待启用或已启用，不可再次进行期初建账");
         if (mapper.hasWarehouseBalance(warehouse.id()))
@@ -58,11 +58,11 @@ public class OpeningInventoryCommitService {
      */
     @Transactional
     public void addLine(Document requested, MaterialSnapshot material, LocationSnapshot location,
-                        LineInput input, String lineId) {
+                        LineInput input, String lineId, String actor) {
         Document document = requireDraft(requested.id());
         if (!document.warehouseId().equals(requested.warehouseId())) throw new IllegalStateException("建账单仓库已变化");
         insert(document, material, location, input, lineId);
-        bumpVersion(document.id());
+        bumpVersion(document.id(), actor);
     }
 
     /**
@@ -72,13 +72,13 @@ public class OpeningInventoryCommitService {
      */
     @Transactional
     public void editLine(Document requested, String lineId, MaterialSnapshot material, LocationSnapshot location,
-                         LineInput input) {
+                         LineInput input, String actor) {
         Document document = requireDraft(requested.id());
         if (!document.warehouseId().equals(requested.warehouseId())) throw new IllegalStateException("建账单仓库已变化");
         if (mapper.updateLine(document.id(), lineId, material.id(), material.code(), material.name(), input.batchCode(),
                 input.snCode(), location.id(), location.code(), input.qualityStatus(), input.warehouseStatus(),
                 input.quantity(), material.uomCode()) != 1) throw new IllegalArgumentException("期初明细不存在");
-        bumpVersion(document.id());
+        bumpVersion(document.id(), actor);
     }
 
     /**
@@ -86,10 +86,10 @@ public class OpeningInventoryCommitService {
      * @param documentId 期初单 ID @param lineId 明细 ID @throws IllegalStateException 已过账时整体回滚
      */
     @Transactional
-    public void deleteLine(String documentId, String lineId) {
+    public void deleteLine(String documentId, String lineId, String actor) {
         requireDraft(documentId);
         if (mapper.deleteLine(documentId, lineId) != 1) throw new IllegalArgumentException("期初明细不存在");
-        bumpVersion(documentId);
+        bumpVersion(documentId, actor);
     }
 
     /**
@@ -126,8 +126,8 @@ public class OpeningInventoryCommitService {
                 line.warehouseStatus()), line.quantity())).toList();
         String transactionId = accounting.post(new Posting("OPENING:" + documentId, "OPENING", "OPENING_DOCUMENT",
                 documentId, actor, entries));
-        if (mapper.postDocument(documentId, transactionId, expectedVersion) != 1
-                || mapper.markPending(document.warehouseId(), documentId) != 1)
+        if (mapper.postDocument(documentId, transactionId, expectedVersion, actor) != 1
+                || mapper.markPending(document.warehouseId(), documentId, actor) != 1)
             throw new IllegalStateException("期初单或仓库状态发生并发冲突");
         return transactionId;
     }
@@ -151,8 +151,9 @@ public class OpeningInventoryCommitService {
                 material.uomCode()) != 1) throw new IllegalStateException("期初明细写入失败");
     }
 
-    private void bumpVersion(String documentId) {
-        if (mapper.bumpDocumentVersion(documentId) != 1) throw new IllegalStateException("期初单版本更新发生并发冲突");
+    private void bumpVersion(String documentId, String actor) {
+        if (mapper.bumpDocumentVersion(documentId, actor) != 1)
+            throw new IllegalStateException("期初单版本更新发生并发冲突");
     }
 
     private Document requireDraft(String id) {

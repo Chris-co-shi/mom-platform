@@ -24,6 +24,12 @@ public class InventoryAccountingOperations {
     /** 在调用方本地事务内按键取得 PostgreSQL 事务级锁；多个键由调用方排序。 */
     public void lockAccountingKey(String key) { mapper.lockAccountingKey(key); }
 
+    /** 返回指定仓库当前持有持久盘点锁的任务。 */
+    public String countLockOwner(String warehouseId) { return mapper.countLockOwner(warehouseId); }
+
+    /** 返回已确认且持锁的盘点任务，供唯一记账入口鉴别调整来源。 */
+    public String confirmedCountOwner(String warehouseId) { return mapper.confirmedCountOwner(warehouseId); }
+
     /** 查询同一 SN 的全局正余额行数；调用前必须取得该 SN 的记账锁。 */
     public int positiveBalanceCountForSn(String snCode) { return mapper.positiveBalanceCountForSn(snCode); }
 

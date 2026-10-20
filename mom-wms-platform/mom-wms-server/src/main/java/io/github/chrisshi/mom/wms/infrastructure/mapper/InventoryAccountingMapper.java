@@ -29,6 +29,14 @@ interface InventoryAccountingMapper extends MomBaseMapper<InventoryBalanceEntity
     @Select("SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(#{key}, 0))")
     int lockAccountingKey(@Param("key") String key);
 
+    /** 仓库事务级锁取得后读取已提交的持久盘点锁及任务状态。 */
+    @Select("SELECT l.task_id FROM wms_inventory_count_scope_lock l JOIN wms_inventory_count_task t ON t.id=l.task_id WHERE l.warehouse_id=#{warehouseId} AND t.status='CONFIRMED'")
+    String confirmedCountOwner(@Param("warehouseId") String warehouseId);
+
+    /** 仓库事务级锁取得后读取任意有效盘点锁。 */
+    @Select("SELECT task_id FROM wms_inventory_count_scope_lock WHERE warehouse_id=#{warehouseId}")
+    String countLockOwner(@Param("warehouseId") String warehouseId);
+
     /** 仅允许全局一条正余额的 SN 作为不可拆载体整体移动。 */
     @Select("SELECT count(*) FROM wms_inventory_balance WHERE sn_code=#{snCode} AND quantity>0")
     int positiveBalanceCountForSn(@Param("snCode") String snCode);

@@ -44,8 +44,8 @@ public interface OpeningInventoryPersistence {
      * 初始化仓库库存生命周期；唯一仓库约束使并发创建只有一条状态记录。
      * @param id 状态技术 ID @param warehouseId MDM 仓库 ID @param warehouseCode 仓库编码快照 @return 插入行数，已存在时为零
      */
-    @Insert("INSERT INTO wms_warehouse_inventory_state(id,warehouse_id,warehouse_code,state) VALUES(#{id},#{warehouseId},#{warehouseCode},'INITIALIZING') ON CONFLICT(warehouse_id) DO NOTHING")
-    int initialize(@Param("id") String id, @Param("warehouseId") String warehouseId, @Param("warehouseCode") String warehouseCode);
+    @Insert("INSERT INTO wms_warehouse_inventory_state(id,warehouse_id,warehouse_code,state,updated_by) VALUES(#{id},#{warehouseId},#{warehouseCode},'INITIALIZING',#{actor}) ON CONFLICT(warehouse_id) DO NOTHING")
+    int initialize(@Param("id") String id, @Param("warehouseId") String warehouseId, @Param("warehouseCode") String warehouseCode, @Param("actor") String actor);
     /**
      * 锁定仓库库存状态行以串行化建账、过账和启用。
      * @param warehouseId MDM 仓库 ID @return 当前 WMS 仓库库存状态
@@ -57,7 +57,7 @@ public interface OpeningInventoryPersistence {
      * @param id 技术 ID @param documentNo 业务编号 @param warehouseId MDM 仓库 ID
      * @param warehouseCode 仓库编码快照 @param actor 创建责任主体 @return 插入行数
      */
-    @Insert("INSERT INTO wms_opening_document(id,document_no,warehouse_id,warehouse_code,status,created_by) VALUES(#{id},#{documentNo},#{warehouseId},#{warehouseCode},'DRAFT',#{actor})")
+    @Insert("INSERT INTO wms_opening_document(id,document_no,warehouse_id,warehouse_code,status,created_by,updated_by) VALUES(#{id},#{documentNo},#{warehouseId},#{warehouseCode},'DRAFT',#{actor},#{actor})")
     int createDocument(@Param("id") String id, @Param("documentNo") String documentNo,
                        @Param("warehouseId") String warehouseId, @Param("warehouseCode") String warehouseCode,
                        @Param("actor") String actor);
@@ -133,14 +133,14 @@ public interface OpeningInventoryPersistence {
      * 明细成功变化后推进单据版本，使事务外远程校验可被 CAS 检查。
      * @param id 单据 ID @return 更新行数
      */
-    @Update("UPDATE wms_opening_document SET updated_at=now(),version=version+1 WHERE id=#{id} AND status='DRAFT'")
-    int bumpDocumentVersion(@Param("id") String id);
+    @Update("UPDATE wms_opening_document SET updated_at=now(),updated_by=#{actor},version=version+1 WHERE id=#{id} AND status='DRAFT'")
+    int bumpDocumentVersion(@Param("id") String id, @Param("actor") String actor);
     /**
      * 以版本条件将草稿变为已过账并关联唯一库存交易。
      * @param id 单据 ID @param transactionId 唯一库存交易 ID @param version 远程校验时的单据版本 @return 更新行数
      */
-    @Update("UPDATE wms_opening_document SET status='POSTED',transaction_id=#{transactionId},updated_at=now(),version=version+1 WHERE id=#{id} AND status='DRAFT' AND version=#{version}")
-    int postDocument(@Param("id") String id, @Param("transactionId") String transactionId, @Param("version") long version);
+    @Update("UPDATE wms_opening_document SET status='POSTED',transaction_id=#{transactionId},posted_by=#{actor},posted_at=now(),updated_at=now(),version=version+1 WHERE id=#{id} AND status='DRAFT' AND version=#{version}")
+    int postDocument(@Param("id") String id, @Param("transactionId") String transactionId, @Param("version") long version, @Param("actor") String actor);
     /**
      * 删除草稿明细；仅由已锁定的草稿删除事务调用。
      * @param id 单据 ID @return 删除行数
@@ -163,13 +163,13 @@ public interface OpeningInventoryPersistence {
      * 成功过账后将仓库置为待核对启用状态。
      * @param warehouseId 仓库 ID @param documentId 已过账单据 ID @return 更新行数
      */
-    @Update("UPDATE wms_warehouse_inventory_state SET state='PENDING_ACTIVATION',opening_document_id=#{documentId},updated_at=now() WHERE warehouse_id=#{warehouseId} AND state='INITIALIZING'")
-    int markPending(@Param("warehouseId") String warehouseId, @Param("documentId") String documentId);
+    @Update("UPDATE wms_warehouse_inventory_state SET state='PENDING_ACTIVATION',opening_document_id=#{documentId},updated_at=now(),updated_by=#{actor} WHERE warehouse_id=#{warehouseId} AND state='INITIALIZING'")
+    int markPending(@Param("warehouseId") String warehouseId, @Param("documentId") String documentId, @Param("actor") String actor);
     /**
      * 记录实际操作人并正式启用仓库库存。
      * @param warehouseId 仓库 ID @param actor 实际操作人 @return 更新行数
      */
-    @Update("UPDATE wms_warehouse_inventory_state SET state='ACTIVE',activated_by=#{actor},activated_at=now(),updated_at=now() WHERE warehouse_id=#{warehouseId} AND state='PENDING_ACTIVATION'")
+    @Update("UPDATE wms_warehouse_inventory_state SET state='ACTIVE',activated_by=#{actor},activated_at=now(),updated_at=now(),updated_by=#{actor} WHERE warehouse_id=#{warehouseId} AND state='PENDING_ACTIVATION'")
     int activate(@Param("warehouseId") String warehouseId, @Param("actor") String actor);
     /**
      * 读取仓库库存生命周期状态。

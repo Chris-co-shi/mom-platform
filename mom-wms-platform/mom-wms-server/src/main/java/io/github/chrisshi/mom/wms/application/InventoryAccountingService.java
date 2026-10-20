@@ -71,6 +71,22 @@ public class InventoryAccountingService {
     @Transactional
     public String post(Posting posting) {
         validate(posting);
+        // 仓库锁总是在 SN 锁之前，盘点快照与所有普通库存写入因此串行化。
+        List<String> warehouseIds = posting.entries().stream().map(entry -> entry.dimension().warehouseId())
+                .distinct().sorted().toList();
+        boolean adjustment = "INVENTORY_COUNT_ADJUSTMENT".equals(posting.transactionType());
+        if (!adjustment && warehouseIds.stream().anyMatch(warehouseId -> mapper.countLockOwner(warehouseId) != null))
+            throw new IllegalStateException("仓库正在盘点，普通库存记账已锁定");
+        warehouseIds.forEach(warehouseId -> mapper.lockAccountingKey("WMS:WH:" + warehouseId));
+        if (adjustment && (!"INVENTORY_COUNT".equals(posting.sourceType()) || warehouseIds.size() != 1))
+            throw new IllegalArgumentException("盘点调整来源非法");
+        for (String warehouseId : warehouseIds) {
+            String owner = mapper.countLockOwner(warehouseId);
+            if (adjustment) {
+                if (!posting.sourceId().equals(owner) || !owner.equals(mapper.confirmedCountOwner(warehouseId)))
+                    throw new IllegalStateException("盘点任务未确认或不持有仓库锁");
+            } else if (owner != null) throw new IllegalStateException("仓库正在盘点，普通库存记账已锁定");
+        }
         // 所有携带 SN 的记账统一串行化，库位移动据此检查不可拆标签的唯一正余额。
         posting.entries().stream().map(entry -> entry.dimension().snCode()).filter(value -> value != null)
                 .distinct().sorted().forEach(sn -> mapper.lockAccountingKey("WMS:SN:" + sn));

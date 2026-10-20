@@ -69,6 +69,8 @@ public class InventoryBalanceEntity extends BaseIdEntity {
      * 该唯一库存维度上的非负权威数量。
      */
     private BigDecimal quantity;
+    /** 该完整库存维度首次建立时间；迁移前余额可能未知。 */
+    private Instant createdAt;
     /**
      * 最近一次余额记账时间。
      */

@@ -83,7 +83,7 @@ public class OpeningInventoryApplication {
         LocationSnapshot location = references.location(input.locationId(), document.warehouseId());
         validateBatch(material.batchPolicy(), input.batchCode());
         validateInput(input);
-        commits.addLine(document, material, location, input, ids.nextId());
+        commits.addLine(document, material, location, input, ids.nextId(), actors.requireCurrentActor().actorId());
         return get(documentId);
     }
 
@@ -97,7 +97,7 @@ public class OpeningInventoryApplication {
         LocationSnapshot location = references.location(input.locationId(), document.warehouseId());
         validateBatch(material.batchPolicy(), input.batchCode());
         validateInput(input);
-        commits.editLine(document, lineId, material, location, input);
+        commits.editLine(document, lineId, material, location, input, actors.requireCurrentActor().actorId());
         return get(documentId);
     }
 
@@ -106,7 +106,7 @@ public class OpeningInventoryApplication {
      * @param documentId 目标期初单 ID @param lineId 目标明细 ID @return 更新后的单据与明细
      */
     public Detail deleteLine(String documentId, String lineId) {
-        commits.deleteLine(documentId, lineId);
+        commits.deleteLine(documentId, lineId, actors.requireCurrentActor().actorId());
         return get(documentId);
     }
 

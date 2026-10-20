@@ -28,10 +28,13 @@ public class OpeningDocumentNumberService {
     }
 
     /** 在期初单创建事务内取正式编号；规则缺失、停用或输出无效时抛错并回滚。 */
-    public String allocate() {
+    public String allocate() { return allocate(RULE_CODE); }
+
+    /** 在当前 WMS 本地事务中按已发布规则分配正式业务编号。 */
+    public String allocate(String ruleCode) {
         if (!TransactionSynchronizationManager.isActualTransactionActive())
             throw new IllegalStateException("期初单发号必须处于 WMS 本地事务中");
-        String ruleId = numbers.lockRuleId(RULE_CODE);
+        String ruleId = numbers.lockRuleId(ruleCode);
         if (ruleId == null) throw new IllegalStateException("期初单编码规则不存在");
         CodeRuleDefinition definition = rules.revisions(ruleId).stream()
                 .filter(revision -> "ENABLED".equals(revision.status()))

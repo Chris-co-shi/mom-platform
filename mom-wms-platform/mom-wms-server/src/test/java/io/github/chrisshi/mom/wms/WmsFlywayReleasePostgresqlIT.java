@@ -27,7 +27,7 @@ class WmsFlywayReleasePostgresqlIT {
         flyway.validate();
         try (Connection connection = connection("mom_wms_fresh")) {
             assertThat(number(connection, "SELECT count(*) FROM flyway_schema_history "
-                    + "WHERE success AND version IS NOT NULL")).isEqualTo(18);
+                    + "WHERE success AND version IS NOT NULL")).isEqualTo(21);
             assertThat(value(connection, "SELECT col_description('wms_code_rule'::regclass, "
                     + "(SELECT attnum FROM pg_attribute WHERE attrelid='wms_code_rule'::regclass "
                     + "AND attname='version'))")).isNotBlank();
@@ -54,6 +54,14 @@ class WmsFlywayReleasePostgresqlIT {
                     INSERT INTO wms_inventory_transaction_entry(id,transaction_id,line_no,balance_id,delta_quantity)
                     VALUES ('9000000000000000006','9000000000000000005',1,'9000000000000000001',1)
                     """);
+            connection.createStatement().executeUpdate("""
+                    INSERT INTO wms_warehouse_inventory_state(id,warehouse_id,warehouse_code,state)
+                    VALUES ('9000000000000000010','9000000000000000003','WH-1','ACTIVE')
+                    """);
+            connection.createStatement().executeUpdate("""
+                    INSERT INTO wms_opening_document(id,document_no,warehouse_id,warehouse_code,status,created_by)
+                    VALUES ('9000000000000000011','OB-OLD','9000000000000000003','WH-1','POSTED','original-actor')
+                    """);
         }
         Flyway latest = flyway("mom_wms_old", null);
         latest.migrate();
@@ -61,6 +69,12 @@ class WmsFlywayReleasePostgresqlIT {
         try (Connection connection = connection("mom_wms_old")) {
             assertThat(number(connection, "SELECT quantity FROM wms_inventory_balance WHERE id='9000000000000000001'"))
                     .isEqualTo(1);
+            assertThat(value(connection, "SELECT created_at::text FROM wms_inventory_balance WHERE id='9000000000000000001'"))
+                    .isNull();
+            assertThat(value(connection, "SELECT posted_by FROM wms_opening_document WHERE id='9000000000000000011'"))
+                    .isNull();
+            assertThat(value(connection, "SELECT updated_by FROM wms_warehouse_inventory_state WHERE id='9000000000000000010'"))
+                    .isNull();
             assertThat(number(connection, "SELECT count(*) FROM wms_inventory_transaction_entry "
                     + "WHERE transaction_id='9000000000000000005' AND delta_quantity=1")).isEqualTo(1);
             assertThatThrownBy(() -> connection.createStatement().executeUpdate("""

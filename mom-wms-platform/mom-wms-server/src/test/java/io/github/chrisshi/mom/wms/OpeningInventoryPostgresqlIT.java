@@ -110,6 +110,10 @@ class OpeningInventoryPostgresqlIT {
         String documentId = createDraft("2000000000000000001");
         add(documentId, "SN-A", "3001", "4.25");
         add(documentId, "SN-B", "3002", "2.75");
+        assertThat(jdbc.queryForMap("SELECT created_by,updated_by FROM wms_opening_document WHERE id=?", documentId))
+                .containsEntry("created_by", "operator-1").containsEntry("updated_by", "operator-1");
+        assertThat(jdbc.queryForObject("SELECT updated_by FROM wms_warehouse_inventory_state WHERE warehouse_id=?",
+                String.class, "2000000000000000001")).isEqualTo("operator-1");
         var document = mapper.find(documentId);
         var replayEntries = mapper.lines(documentId).stream().map(line -> new Entry(new Dimension(
                 line.materialId(), line.materialCode(), line.materialName(), line.uomCode(), line.batchCode(),
@@ -130,16 +134,31 @@ class OpeningInventoryPostgresqlIT {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_transaction_entry WHERE transaction_id=?", Integer.class, transactionId)).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_balance", Integer.class)).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT status FROM wms_opening_document WHERE id=?", String.class, documentId)).isEqualTo("POSTED");
+        assertThat(jdbc.queryForMap("SELECT updated_by,posted_by FROM wms_opening_document WHERE id=?", documentId))
+                .containsEntry("updated_by", "operator-1").containsEntry("posted_by", "operator-1");
+        assertThat(jdbc.queryForObject("SELECT posted_at IS NOT NULL FROM wms_opening_document WHERE id=?", Boolean.class,
+                documentId)).isTrue();
         assertThat(mapper.find(documentId).warehouseState()).isEqualTo("PENDING_ACTIVATION");
         assertThat(queries.details(new io.github.chrisshi.mom.core.page.PageQuery<>(
                 new InventoryQueryService.DetailFilter("1001", "2000000000000000001", null,
                         null, null, null, null), 1, 10)).records()).hasSize(2);
         commits.activate("2000000000000000001", "operator-2");
+        assertThat(jdbc.queryForMap("SELECT updated_by,activated_by FROM wms_warehouse_inventory_state WHERE warehouse_id=?",
+                "2000000000000000001")).containsEntry("updated_by", "operator-2")
+                .containsEntry("activated_by", "operator-2");
         assertThat(mapper.find(documentId).warehouseState()).isEqualTo("ACTIVE");
         assertThatThrownBy(() -> commits.activate("2000000000000000001", "operator-2"))
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> createDraft("2000000000000000001")).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> commits.deleteDraft(documentId)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> commits.addLine(mapper.find(documentId),
+                new MaterialSnapshot("1001", "MAT-1", "物料一", "REQUIRED", "kg"),
+                new LocationSnapshot("3001", "LOC-3001"),
+                new LineInput("1001", "3001", "BATCH-1", "SN-LATE", QualityStatus.QUALIFIED,
+                        WarehouseStatus.NORMAL, BigDecimal.ONE), ids.nextId(), "operator-3"))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(jdbc.queryForObject("SELECT posted_by FROM wms_opening_document WHERE id=?", String.class,
+                documentId)).isEqualTo("operator-1");
     }
 
     @Test void duplicateSnAcrossLinesRollsBackWholeOpeningTransaction() {
@@ -183,6 +202,6 @@ class OpeningInventoryPostgresqlIT {
         commits.addLine(document, new MaterialSnapshot("1001", "MAT-1", "物料一", "REQUIRED", "kg"),
                 new LocationSnapshot(locationId, "LOC-" + locationId),
                 new LineInput("1001", locationId, "BATCH-1", sn, QualityStatus.QUALIFIED,
-                        WarehouseStatus.NORMAL, new BigDecimal(quantity)), ids.nextId());
+                        WarehouseStatus.NORMAL, new BigDecimal(quantity)), ids.nextId(), "operator-1");
     }
 }
