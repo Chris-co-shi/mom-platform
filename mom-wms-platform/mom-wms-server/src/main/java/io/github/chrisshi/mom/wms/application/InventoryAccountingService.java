@@ -71,6 +71,10 @@ public class InventoryAccountingService {
     @Transactional
     public String post(Posting posting) {
         validate(posting);
+        // 已提交请求必须先按不可变交易事实重放：当前仓库状态、盘点锁或余额可能早已变化。
+        String digest = digest(posting);
+        String committed = replayCommitted(posting.requestKey(), digest);
+        if (committed != null) return committed;
         // 仓库锁总是在 SN 锁之前，盘点快照与所有普通库存写入因此串行化。
         List<String> warehouseIds = posting.entries().stream().map(entry -> entry.dimension().warehouseId())
                 .distinct().sorted().toList();
@@ -78,6 +82,9 @@ public class InventoryAccountingService {
         if (!adjustment && warehouseIds.stream().anyMatch(warehouseId -> mapper.countLockOwner(warehouseId) != null))
             throw new IllegalStateException("仓库正在盘点，普通库存记账已锁定");
         warehouseIds.forEach(warehouseId -> mapper.lockAccountingKey("WMS:WH:" + warehouseId));
+        // 等待仓库锁期间原请求可能已经提交；先核对原操作，再检查新的执行条件。
+        committed = replayCommitted(posting.requestKey(), digest);
+        if (committed != null) return committed;
         if (adjustment && (!"INVENTORY_COUNT".equals(posting.sourceType()) || warehouseIds.size() != 1))
             throw new IllegalArgumentException("盘点调整来源非法");
         for (String warehouseId : warehouseIds) {
@@ -90,7 +97,6 @@ public class InventoryAccountingService {
         // 所有携带 SN 的记账统一串行化，库位移动据此检查不可拆标签的唯一正余额。
         posting.entries().stream().map(entry -> entry.dimension().snCode()).filter(value -> value != null)
                 .distinct().sorted().forEach(sn -> mapper.lockAccountingKey("WMS:SN:" + sn));
-        String digest = digest(posting);
         String id = ids.nextId();
         String claimed = mapper.claim(id, posting.requestKey(), digest, posting.transactionType(),
                 posting.sourceType(), posting.sourceId(), posting.operatorId());
@@ -114,6 +120,16 @@ public class InventoryAccountingService {
                 throw new IllegalStateException("库存分录写入失败");
         }
         return claimed;
+    }
+
+    /** 重放只读取已提交事实，不依赖当前仓库或库存状态；并发抢占仍由 claim 唯一约束兜底。 */
+    private String replayCommitted(String requestKey, String digest) {
+        String savedHash = mapper.hashOf(requestKey);
+        if (savedHash == null) return null;
+        if (!digest.equals(savedHash)) throw new IllegalArgumentException("库存请求键已用于不同内容");
+        String transactionId = mapper.idOf(requestKey);
+        if (transactionId == null) throw new IllegalStateException("库存幂等事实缺少交易标识");
+        return transactionId;
     }
 
     private static void validate(Posting posting) {
