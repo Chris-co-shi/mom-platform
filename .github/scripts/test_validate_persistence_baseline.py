@@ -34,6 +34,14 @@ class PersistenceBaselineTest(unittest.TestCase):
         baseline.check_versioned_immutability([("D", path)], {path}, report)
         self.assertTrue(report.errors)
 
+    def test_approved_v28_repair_is_exact_and_never_generalizes(self):
+        path, original_blob, corrected_blob = baseline.ONE_TIME_V28_FIX
+        self.assertTrue(baseline.is_approved_v28_fix(path, original_blob, corrected_blob))
+        self.assertFalse(baseline.is_approved_v28_fix(path, original_blob, "other-blob"))
+        self.assertFalse(baseline.is_approved_v28_fix(path, "other-blob", corrected_blob))
+        self.assertFalse(baseline.is_approved_v28_fix(path.replace("V28__", "V27__"),
+                                                        original_blob, corrected_blob))
+
     def test_new_valid_migration_is_accepted(self):
         report = self.report()
         path = "mom-mdm-platform/mom-mdm-server/src/main/resources/db/migration/mdm/V2__add_item.sql"
