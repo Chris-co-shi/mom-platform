@@ -239,6 +239,17 @@ class UserApplicationTest {
         verify(roleMapper, never()).selectByIds(any());
     }
 
+    @Test
+    void replaceRolesMustNotTouchRelationsWhenAggregateCasFails() {
+        when(userMapper.selectById("user-1")).thenReturn(user("user-1", true, 4L));
+        when(roleMapper.selectByIds(any())).thenReturn(List.of(role("role-1", "A", true)));
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(0);
+        assertError(() -> application.replaceRoles("user-1", List.of("role-1"), 4L),
+                AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
+        verify(userRoleMapper, never()).delete(any());
+        verify(userRoleMapper, never()).insert(anyCollection());
+    }
+
     private static UserEntity user(String id, boolean enabled, long version) {
         UserEntity entity = new UserEntity();
         entity.setId(id);
