@@ -344,9 +344,9 @@ class AuthManagementPostgresqlIT {
         assertThat(userApplication.enable(user.id(), enabled.version()).version()).isEqualTo(enabled.version());
 
         var role = roleApplication.create("OPERATOR", "Operator", null, true);
-        userApplication.replaceRoles(user.id(), List.of(role.id()));
+        userApplication.replaceRoles(user.id(), List.of(role.id()), userApplication.get(user.id()).version());
         assertError(() -> userApplication.delete(user.id()), AuthErrorCode.RESOURCE_REFERENCED);
-        userApplication.replaceRoles(user.id(), List.of());
+        userApplication.replaceRoles(user.id(), List.of(), userApplication.get(user.id()).version());
         userApplication.delete(user.id());
         assertError(() -> userApplication.get(user.id()), AuthErrorCode.RESOURCE_NOT_FOUND);
     }
@@ -355,30 +355,30 @@ class AuthManagementPostgresqlIT {
     void roleAndPermissionLifecycleMustRejectDisabledAssignmentsAndProtectReferences() {
         var user = userApplication.create("operator", "Password@123", "Operator", true);
         var disabledRole = roleApplication.create("OPERATOR", "Operator", null, false);
-        assertError(() -> userApplication.replaceRoles(user.id(), List.of(disabledRole.id())),
+        assertError(() -> userApplication.replaceRoles(user.id(), List.of(disabledRole.id()), userApplication.get(user.id()).version()),
             AuthErrorCode.ROLE_DISABLED);
 
         var enabledRole = roleApplication.enable(disabledRole.id(), disabledRole.version());
-        assertThat(userApplication.replaceRoles(user.id(), List.of(enabledRole.id(), enabledRole.id())))
+        assertThat(userApplication.replaceRoles(user.id(), List.of(enabledRole.id(), enabledRole.id()), userApplication.get(user.id()).version()))
             .extracting("id").containsExactly(enabledRole.id());
         assertError(() -> roleApplication.delete(enabledRole.id()), AuthErrorCode.RESOURCE_REFERENCED);
 
         var testResource = resourceApplication.create("AUTH", "TEST", "测试资源", null, 10, true);
         var disabledPermission = permissionApplication.create(testResource.id(), "READ", "Test Read", null, false);
         assertError(() -> roleApplication.replacePermissions(
-                enabledRole.id(), List.of(disabledPermission.id())),
+                enabledRole.id(), List.of(disabledPermission.id()), roleApplication.get(enabledRole.id()).version()),
             AuthErrorCode.PERMISSION_DISABLED);
 
         var enabledPermission = permissionApplication.enable(
             disabledPermission.id(), disabledPermission.version());
         assertThat(roleApplication.replacePermissions(
-            enabledRole.id(), List.of(enabledPermission.id(), enabledPermission.id())))
+            enabledRole.id(), List.of(enabledPermission.id(), enabledPermission.id()), roleApplication.get(enabledRole.id()).version()))
             .extracting("id").containsExactly(enabledPermission.id());
         assertError(() -> permissionApplication.delete(enabledPermission.id()), AuthErrorCode.RESOURCE_REFERENCED);
         assertError(() -> roleApplication.delete(enabledRole.id()), AuthErrorCode.RESOURCE_REFERENCED);
 
-        roleApplication.replacePermissions(enabledRole.id(), List.of());
-        userApplication.replaceRoles(user.id(), List.of());
+        roleApplication.replacePermissions(enabledRole.id(), List.of(), roleApplication.get(enabledRole.id()).version());
+        userApplication.replaceRoles(user.id(), List.of(), userApplication.get(user.id()).version());
         permissionApplication.delete(enabledPermission.id());
         roleApplication.delete(enabledRole.id());
         assertError(() -> permissionApplication.get(enabledPermission.id()), AuthErrorCode.RESOURCE_NOT_FOUND);
@@ -390,12 +390,12 @@ class AuthManagementPostgresqlIT {
         var user = userApplication.create("rollback", "Password@123", "Rollback", true);
         var original = roleApplication.create("ORIGINAL", "Original", null, true);
         var rejected = roleApplication.create("REJECTED", "Rejected", null, true);
-        userApplication.replaceRoles(user.id(), List.of(original.id()));
+        userApplication.replaceRoles(user.id(), List.of(original.id()), userApplication.get(user.id()).version());
 
         jdbcTemplate.execute("ALTER TABLE auth_user_role ADD CONSTRAINT ck_test_rejected_role "
             + "CHECK (role_id <> '" + rejected.id() + "')");
         try {
-            assertThatThrownBy(() -> userApplication.replaceRoles(user.id(), List.of(rejected.id())))
+            assertThatThrownBy(() -> userApplication.replaceRoles(user.id(), List.of(rejected.id()), userApplication.get(user.id()).version()))
                 .isInstanceOf(PersistenceException.class);
             assertThat(userApplication.roles(user.id())).extracting("id").containsExactly(original.id());
         } finally {
@@ -410,12 +410,12 @@ class AuthManagementPostgresqlIT {
         var rejectedResource = resourceApplication.create("AUTH", "REJECTED", "Rejected", null, 20, true);
         var original = permissionApplication.create(originalResource.id(), "READ", "Original", null, true);
         var rejected = permissionApplication.create(rejectedResource.id(), "READ", "Rejected", null, true);
-        roleApplication.replacePermissions(role.id(), List.of(original.id()));
+        roleApplication.replacePermissions(role.id(), List.of(original.id()), roleApplication.get(role.id()).version());
 
         jdbcTemplate.execute("ALTER TABLE auth_role_permission ADD CONSTRAINT ck_test_rejected_permission "
             + "CHECK (permission_id <> '" + rejected.id() + "')");
         try {
-            assertThatThrownBy(() -> roleApplication.replacePermissions(role.id(), List.of(rejected.id())))
+            assertThatThrownBy(() -> roleApplication.replacePermissions(role.id(), List.of(rejected.id()), roleApplication.get(role.id()).version()))
                 .isInstanceOf(PersistenceException.class);
             assertThat(roleApplication.permissions(role.id())).extracting("id").containsExactly(original.id());
         } finally {
