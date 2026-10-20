@@ -195,6 +195,17 @@ class RoleApplicationTest {
         verify(permissionMapper, never()).selectByIds(any());
     }
 
+    @Test
+    void replacePermissionsMustNotTouchRelationsWhenAggregateCasFails() {
+        when(roleMapper.selectById("role-1")).thenReturn(role("role-1", "A", true, 7L));
+        when(permissionMapper.selectByIds(any())).thenReturn(List.of(permission("permission-1", "a:read", true)));
+        when(roleMapper.updateById(any(RoleEntity.class))).thenReturn(0);
+        assertError(() -> application.replacePermissions("role-1", List.of("permission-1"), 7L),
+                AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
+        verify(rolePermissionMapper, never()).delete(any());
+        verify(rolePermissionMapper, never()).insert(anyCollection());
+    }
+
     private static RoleEntity role(String id, String code, boolean enabled, long version) {
         RoleEntity entity = new RoleEntity();
         entity.setId(id);
