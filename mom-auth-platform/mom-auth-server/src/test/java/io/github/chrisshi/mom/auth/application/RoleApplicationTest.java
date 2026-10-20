@@ -114,6 +114,7 @@ class RoleApplicationTest {
     @Test
     void deleteMustProtectBothRelationshipDirections() {
         when(roleMapper.selectById("role-1")).thenReturn(role("role-1", "A", true, 0L));
+        when(roleMapper.updateById(any(RoleEntity.class))).thenReturn(1);
         when(userRoleMapper.selectCount(any())).thenReturn(1L);
         assertError(() -> application.delete("role-1"), AuthErrorCode.RESOURCE_REFERENCED);
 
@@ -132,6 +133,7 @@ class RoleApplicationTest {
     @Test
     void replacePermissionsMustDeduplicateAndAllowEmptySet() {
         when(roleMapper.selectById("role-1")).thenReturn(role("role-1", "A", true, 0L));
+        when(roleMapper.updateById(any(RoleEntity.class))).thenReturn(1);
         PermissionEntity p1 = permission("permission-1", "a:read", true);
         PermissionEntity p2 = permission("permission-2", "b:read", true);
         when(permissionMapper.selectByIds(any())).thenReturn(List.of(p1, p2));
@@ -140,7 +142,7 @@ class RoleApplicationTest {
         ));
 
         var result = application.replacePermissions(
-            "role-1", List.of("permission-1", "permission-1", "permission-2"));
+            "role-1", List.of("permission-1", "permission-1", "permission-2"), 0L);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Collection<RolePermissionEntity>> batchCaptor = ArgumentCaptor.forClass(Collection.class);
@@ -149,20 +151,21 @@ class RoleApplicationTest {
         assertThat(result).extracting("id").containsExactly("permission-1", "permission-2");
 
         when(rolePermissionMapper.selectList(any())).thenReturn(List.of());
-        assertThat(application.replacePermissions("role-1", List.of())).isEmpty();
+        assertThat(application.replacePermissions("role-1", List.of(), 0L)).isEmpty();
         verify(rolePermissionMapper, times(1)).insert(anyCollection());
     }
 
     @Test
     void replacePermissionsMustRejectMissingOrDisabledPermissionBeforeChangingRelations() {
         when(roleMapper.selectById("role-1")).thenReturn(role("role-1", "A", true, 0L));
+        when(roleMapper.updateById(any(RoleEntity.class))).thenReturn(1);
         when(permissionMapper.selectByIds(any())).thenReturn(List.of());
-        assertError(() -> application.replacePermissions("role-1", List.of("missing")),
+        assertError(() -> application.replacePermissions("role-1", List.of("missing"), 0L),
             AuthErrorCode.RESOURCE_NOT_FOUND);
 
         when(permissionMapper.selectByIds(any())).thenReturn(
             List.of(permission("permission-1", "a:read", false)));
-        assertError(() -> application.replacePermissions("role-1", List.of("permission-1")),
+        assertError(() -> application.replacePermissions("role-1", List.of("permission-1"), 0L),
             AuthErrorCode.PERMISSION_DISABLED);
         verify(rolePermissionMapper, never()).delete(any());
     }
@@ -170,6 +173,7 @@ class RoleApplicationTest {
     @Test
     void queryPermissionsMustReturnStableCodeOrder() {
         when(roleMapper.selectById("role-1")).thenReturn(role("role-1", "A", true, 0L));
+        when(roleMapper.updateById(any(RoleEntity.class))).thenReturn(1);
         when(rolePermissionMapper.selectList(any())).thenReturn(List.of(
             relation("role-1", "permission-2"), relation("role-1", "permission-1")
         ));
@@ -185,11 +189,12 @@ class RoleApplicationTest {
     @Test
     void replacePermissionsMustRejectUnboundedSelection() {
         when(roleMapper.selectById("role-1")).thenReturn(role("role-1", "A", true, 0L));
+        when(roleMapper.updateById(any(RoleEntity.class))).thenReturn(1);
         List<String> permissionIds = IntStream.range(0, 201)
             .mapToObj(index -> "permission-" + index)
             .toList();
 
-        assertError(() -> application.replacePermissions("role-1", permissionIds),
+        assertError(() -> application.replacePermissions("role-1", permissionIds, 0L),
             AuthErrorCode.RELATION_SELECTION_TOO_LARGE);
         verify(permissionMapper, never()).selectByIds(any());
     }
