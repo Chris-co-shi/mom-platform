@@ -191,7 +191,7 @@ public class UserController {
         @Valid @RequestBody ReplaceUserRolesRequest request
     ) {
         return Result.success(
-            userApplication.replaceRoles(id, request.roleIds(), request.version()).stream().map(RoleResponse::from).toList()
+            userApplication.replaceRoles(id, request.roleIds()).stream().map(RoleResponse::from).toList()
         );
     }
 }
