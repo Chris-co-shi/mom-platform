@@ -386,6 +386,27 @@ class AuthManagementPostgresqlIT {
     }
 
     @Test
+    void relationReplacementMustRejectStaleAggregateVersionWithoutLosingChanges() {
+        var user = userApplication.create("cas-user", "Password@123", "CAS User", true);
+        var r1 = roleApplication.create("CAS_ROLE_ONE", "First", null, true);
+        var r2 = roleApplication.create("CAS_ROLE_TWO", "Second", null, true);
+        long userVersion = userApplication.get(user.id()).version();
+        userApplication.replaceRoles(user.id(), List.of(r1.id()), userVersion);
+        assertError(() -> userApplication.replaceRoles(user.id(), List.of(r2.id()), userVersion),
+                AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
+        assertThat(userApplication.roles(user.id())).extracting("id").containsExactly(r1.id());
+
+        var resource = resourceApplication.create("AUTH", "CAS_PERMISSION", "CAS Resource", null, 10, true);
+        var p1 = permissionApplication.create(resource.id(), "READ", "Read", null, true);
+        var p2 = permissionApplication.create(resource.id(), "WRITE", "Write", null, true);
+        long roleVersion = roleApplication.get(r1.id()).version();
+        roleApplication.replacePermissions(r1.id(), List.of(p1.id()), roleVersion);
+        assertError(() -> roleApplication.replacePermissions(r1.id(), List.of(p2.id()), roleVersion),
+                AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
+        assertThat(roleApplication.permissions(r1.id())).extracting("id").containsExactly(p1.id());
+    }
+
+    @Test
     void replaceRolesMustRollbackDeleteWhenRelationInsertFails() {
         var user = userApplication.create("rollback", "Password@123", "Rollback", true);
         var original = roleApplication.create("ORIGINAL", "Original", null, true);
