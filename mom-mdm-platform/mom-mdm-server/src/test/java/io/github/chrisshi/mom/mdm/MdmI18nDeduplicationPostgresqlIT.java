@@ -160,7 +160,8 @@ class MdmI18nDeduplicationPostgresqlIT {
         JdbcTemplate jdbc = jdbc(schema);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM mdm_i18n_message_definition WHERE id IN (" + IDS + ")", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM mdm_i18n_translation WHERE message_id IN (" + IDS + ")", Integer.class)).isZero();
-        assertThat(flyway(schema, null).info().current().getVersion().getVersion()).isEqualTo("128");
+        // V128 保证清理成立；之后的 V129+ 可以新增独立能力，不应使清理测试失效。
+        assertThat(Integer.parseInt(flyway(schema, null).info().current().getVersion().getVersion())).isGreaterThanOrEqualTo(128);
     }
 
     private String baseline() {
