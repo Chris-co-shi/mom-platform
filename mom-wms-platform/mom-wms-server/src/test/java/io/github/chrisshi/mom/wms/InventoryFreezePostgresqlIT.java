@@ -134,6 +134,18 @@ class InventoryFreezePostgresqlIT {
                 InventoryFreezeApplication.FreezeReason.WAREHOUSE_CHECK))).isInstanceOf(IllegalStateException.class);
     }
 
+    @Test void fullFreezeReplaysAfterLiveBalanceWasConsumed() {
+        String balance = seed(QualityStatus.QUALIFIED, "5");
+        var command = freezeCommand("full-replay", balance, "5",
+                InventoryFreezeApplication.FreezeReason.WAREHOUSE_CHECK);
+        var first = freezes.freezeInventory(command);
+        // 首次冻结后 NORMAL 余额归零，不允许用当前余额否认历史成功操作。
+        assertThat(freezes.freezeInventory(command).transactionId()).isEqualTo(first.transactionId());
+        assertThatThrownBy(() -> freezes.freezeInventory(freezeCommand("full-replay", balance, "4",
+                InventoryFreezeApplication.FreezeReason.WAREHOUSE_CHECK))).isInstanceOf(IllegalArgumentException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_transaction WHERE transaction_type='FREEZE'", Integer.class)).isEqualTo(1);
+    }
+
     @Test void invalidReasonAmountAndOtherWithoutNoteAreRejectedBeforePosting() {
         String balance = seed(QualityStatus.PENDING, "10");
         assertThatThrownBy(() -> freezes.freezeInventory(freezeCommand("bad-amount", balance, "0",
