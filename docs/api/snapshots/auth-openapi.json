@@ -608,16 +608,10 @@
             "maxItems": 200,
             "minItems": 0,
             "type": "array"
-          },
-          "version": {
-            "format": "int64",
-            "minimum": 0,
-            "type": "integer"
           }
         },
         "required": [
-          "permissionIds",
-          "version"
+          "permissionIds"
         ],
         "type": "object"
       },
@@ -631,16 +625,10 @@
             "maxItems": 200,
             "minItems": 0,
             "type": "array"
-          },
-          "version": {
-            "format": "int64",
-            "minimum": 0,
-            "type": "integer"
           }
         },
         "required": [
-          "roleIds",
-          "version"
+          "roleIds"
         ],
         "type": "object"
       },
