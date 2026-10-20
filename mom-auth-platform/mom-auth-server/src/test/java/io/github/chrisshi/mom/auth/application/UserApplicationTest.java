@@ -219,7 +219,6 @@ class UserApplicationTest {
     @Test
     void replaceRolesMustRejectMissingOrDisabledRoleBeforeChangingRelations() {
         when(userMapper.selectById("user-1")).thenReturn(user("user-1", true, 0L));
-        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
         when(roleMapper.selectByIds(any())).thenReturn(List.of());
         assertError(() -> application.replaceRoles("user-1", List.of("missing"), 0L),
             AuthErrorCode.RESOURCE_NOT_FOUND);
@@ -233,7 +232,6 @@ class UserApplicationTest {
     @Test
     void replaceRolesMustRejectUnboundedSelection() {
         when(userMapper.selectById("user-1")).thenReturn(user("user-1", true, 0L));
-        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
         List<String> roleIds = IntStream.range(0, 201).mapToObj(index -> "role-" + index).toList();
 
         assertError(() -> application.replaceRoles("user-1", roleIds, 0L),
