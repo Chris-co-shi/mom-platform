@@ -86,6 +86,14 @@ public class InventoryFreezeApplication {
                 || command.note() != null && command.note().length() > 500
                 || command.reason() == FreezeReason.OTHER && (command.note() == null || command.note().isBlank()))
             throw new IllegalArgumentException("冻结库存、原因或说明非法");
+        // 与移库共享同键事务锁：重复冻结等待首次提交，再按不可变冻结事实重放。
+        operations.lockAccountingKey("WMS:REQUEST:" + command.requestKey());
+        String previousTransactionId = operations.idOf(command.requestKey());
+        if (previousTransactionId != null) {
+            FreezeRecord committed = operations.findFreezeByTransaction(previousTransactionId);
+            if (committed == null) throw new IllegalArgumentException("冻结请求键已用于其他库存交易");
+            return replayFreeze(committed, command);
+        }
         Balance balance = operations.findInventoryBalance(command.balanceId());
         if (balance == null || balance.warehouseStatus() != WarehouseStatus.NORMAL)
             throw new IllegalStateException("只能选择正常仓储状态的库存冻结");
@@ -95,12 +103,12 @@ public class InventoryFreezeApplication {
                 new InventoryAccountingService.Entry(dimension(balance, WarehouseStatus.NORMAL), command.quantity().negate()),
                 new InventoryAccountingService.Entry(dimension(balance, WarehouseStatus.FROZEN), command.quantity()))));
         FreezeRecord existing = operations.findFreezeByTransaction(transactionId);
-        if (existing != null) return replayFreeze(existing, balance, command);
+        if (existing != null) return replayFreeze(existing, command);
         String id = ids.nextId();
         if (operations.insertFreeze(id, transactionId, balance, command.reason().name(), clean(command.note()),
                 command.quantity(), command.sourceType(), command.sourceId(), command.operatorId()) != 1) {
             existing = operations.findFreezeByTransaction(transactionId);
-            if (existing != null) return replayFreeze(existing, balance, command);
+            if (existing != null) return replayFreeze(existing, command);
             throw new IllegalStateException("冻结限制写入失败");
         }
         return view(operations.findFreezeByTransaction(transactionId));
@@ -172,8 +180,8 @@ public class InventoryFreezeApplication {
         return new UnfreezeResult(replay.transactionId(), freezeId, freeze.remainingQuantity());
     }
 
-    private static FreezeView replayFreeze(FreezeRecord existing, Balance balance, FreezeCommand command) {
-        if (!existing.originalBalanceId().equals(balance.id())
+    private static FreezeView replayFreeze(FreezeRecord existing, FreezeCommand command) {
+        if (!existing.originalBalanceId().equals(command.balanceId())
                 || existing.originalQuantity().compareTo(command.quantity()) != 0
                 || !existing.reasonCode().equals(command.reason().name())
                 || !java.util.Objects.equals(existing.note(), clean(command.note()))
