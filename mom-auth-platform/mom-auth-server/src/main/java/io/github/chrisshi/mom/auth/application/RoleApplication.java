@@ -245,22 +245,18 @@ public class RoleApplication {
      *
      * @param roleId 角色主键
      * @param requestedPermissionIds 目标 Permission 主键集合
-     * @param expectedVersion 编辑前读取的角色聚合版本，阻止并发授权覆盖
      * @return 替换后的 Permission 列表
      * @throws AuthException 角色/Permission 不存在、Permission 已停用或目标数量超限时抛出
      */
     @Transactional
-    public List<PermissionView> replacePermissions(String roleId, List<String> requestedPermissionIds, long expectedVersion) {
-        RoleEntity owner = requireRole(roleId);
-        requireVersion(owner.getVersion(), expectedVersion);
+    public List<PermissionView> replacePermissions(String roleId, List<String> requestedPermissionIds) {
+        requireRole(roleId);
         if (requestedPermissionIds.size() > MAX_PERMISSION_SELECTION) {
             throw new AuthException(AuthErrorCode.RELATION_SELECTION_TOO_LARGE);
         }
         Set<String> permissionIds = new LinkedHashSet<>(requestedPermissionIds);
         validatePermissions(permissionIds);
 
-        // 角色聚合 version 同时保护授权关系；乐观锁失败时整单事务回滚。
-        requireUpdateSucceeded(roleId, roleMapper.updateById(owner));
         rolePermissionMapper.delete(
             new LambdaQueryWrapper<RolePermissionEntity>().eq(RolePermissionEntity::getRoleId, roleId)
         );
