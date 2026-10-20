@@ -171,7 +171,7 @@ public class RoleController {
         @Valid @RequestBody ReplaceRolePermissionsRequest request
     ) {
         return Result.success(
-            roleApplication.replacePermissions(id, request.permissionIds(), request.version()).stream()
+            roleApplication.replacePermissions(id, request.permissionIds()).stream()
                 .map(PermissionResponse::from)
                 .toList()
         );
