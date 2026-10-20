@@ -195,7 +195,6 @@ class UserApplicationTest {
     @Test
     void replaceRolesMustDeduplicateAndAllowEmptySet() {
         when(userMapper.selectById("user-1")).thenReturn(user("user-1", true, 0L));
-        when(userMapper.updateById(any(UserEntity.class))).thenReturn(1);
         RoleEntity role1 = role("role-1", "A", true);
         RoleEntity role2 = role("role-2", "B", true);
         when(roleMapper.selectByIds(any())).thenReturn(List.of(role1, role2));
@@ -203,7 +202,7 @@ class UserApplicationTest {
             relation("user-1", "role-1"), relation("user-1", "role-2")
         ));
 
-        var result = application.replaceRoles("user-1", List.of("role-1", "role-1", "role-2"), 0L);
+        var result = application.replaceRoles("user-1", List.of("role-1", "role-1", "role-2"));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Collection<UserRoleEntity>> batchCaptor = ArgumentCaptor.forClass(Collection.class);
@@ -212,7 +211,7 @@ class UserApplicationTest {
         assertThat(result).extracting("id").containsExactly("role-1", "role-2");
 
         when(userRoleMapper.selectList(any())).thenReturn(List.of());
-        assertThat(application.replaceRoles("user-1", List.of(), 0L)).isEmpty();
+        assertThat(application.replaceRoles("user-1", List.of())).isEmpty();
         verify(userRoleMapper, times(1)).insert(anyCollection());
     }
 
@@ -220,11 +219,11 @@ class UserApplicationTest {
     void replaceRolesMustRejectMissingOrDisabledRoleBeforeChangingRelations() {
         when(userMapper.selectById("user-1")).thenReturn(user("user-1", true, 0L));
         when(roleMapper.selectByIds(any())).thenReturn(List.of());
-        assertError(() -> application.replaceRoles("user-1", List.of("missing"), 0L),
+        assertError(() -> application.replaceRoles("user-1", List.of("missing")),
             AuthErrorCode.RESOURCE_NOT_FOUND);
 
         when(roleMapper.selectByIds(any())).thenReturn(List.of(role("role-1", "A", false)));
-        assertError(() -> application.replaceRoles("user-1", List.of("role-1"), 0L),
+        assertError(() -> application.replaceRoles("user-1", List.of("role-1")),
             AuthErrorCode.ROLE_DISABLED);
         verify(userRoleMapper, never()).delete(any());
     }
@@ -234,20 +233,9 @@ class UserApplicationTest {
         when(userMapper.selectById("user-1")).thenReturn(user("user-1", true, 0L));
         List<String> roleIds = IntStream.range(0, 201).mapToObj(index -> "role-" + index).toList();
 
-        assertError(() -> application.replaceRoles("user-1", roleIds, 0L),
+        assertError(() -> application.replaceRoles("user-1", roleIds),
             AuthErrorCode.RELATION_SELECTION_TOO_LARGE);
         verify(roleMapper, never()).selectByIds(any());
-    }
-
-    @Test
-    void replaceRolesMustNotTouchRelationsWhenAggregateCasFails() {
-        when(userMapper.selectById("user-1")).thenReturn(user("user-1", true, 4L));
-        when(roleMapper.selectByIds(any())).thenReturn(List.of(role("role-1", "A", true)));
-        when(userMapper.updateById(any(UserEntity.class))).thenReturn(0);
-        assertError(() -> application.replaceRoles("user-1", List.of("role-1"), 4L),
-                AuthErrorCode.OPTIMISTIC_LOCK_CONFLICT);
-        verify(userRoleMapper, never()).delete(any());
-        verify(userRoleMapper, never()).insert(anyCollection());
     }
 
     private static UserEntity user(String id, boolean enabled, long version) {
