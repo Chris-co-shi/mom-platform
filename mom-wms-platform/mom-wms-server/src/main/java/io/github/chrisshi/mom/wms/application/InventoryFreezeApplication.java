@@ -1,10 +1,10 @@
 package io.github.chrisshi.mom.wms.application;
 
 import io.github.chrisshi.mom.core.id.IdGenerator;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations.Balance;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations.FreezeRecord;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations.UnfreezeRecord;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper.Balance;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper.FreezeRecord;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper.UnfreezeRecord;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +23,7 @@ import java.util.List;
 /** WMS 仓储冻结限制用例；只改变 WarehouseStatus，通过库存唯一记账入口保持余额、交易、分录及限制原子一致。 */
 @Service
 public class InventoryFreezeApplication {
-    private final InventoryAccountingOperations operations;
+    private final InventoryAccountingMapper operations;
     private final InventoryAccountingService accounting;
     private final IdGenerator ids;
 
@@ -32,7 +32,7 @@ public class InventoryFreezeApplication {
      * @param accounting WMS 唯一库存余额过账入口
      * @param ids MOM 字符串技术主键生成器
      */
-    public InventoryFreezeApplication(InventoryAccountingOperations operations, InventoryAccountingService accounting,
+    public InventoryFreezeApplication(InventoryAccountingMapper operations, InventoryAccountingService accounting,
                                       IdGenerator ids) {
         this.operations = operations;
         this.accounting = accounting;
