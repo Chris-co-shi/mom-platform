@@ -14,6 +14,7 @@ import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryCountTaskMapper
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryCountLineMapper;
 import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -21,22 +22,16 @@ import java.util.List;
 
 /** 盘点任务、持久整仓锁、快照与库存调整的 WMS 本地 REQUIRED 事务入口。 */
 @Service
+@RequiredArgsConstructor
 public class InventoryCountCommitService {
     private final InventoryCountTaskMapper tasks;
-    private final InventoryAccountingMapper inventory;
     private final InventoryCountLineMapper lineMapper;
+    private final InventoryAccountingMapper inventory;
     private final InventoryAccountingService accounting;
     private final OpeningDocumentNumberService numbers;
     private final IdGenerator ids;
     private final CurrentActorProvider actors;
 
-    /** @param store WMS 盘点 SQL @param accounting 唯一库存记账入口 @param numbers 现有编码规则
-     * @param ids 技术 ID @param actors 可信认证上下文 */
-    public InventoryCountCommitService(InventoryCountTaskMapper tasks, InventoryCountLineMapper lineMapper,
-                                       InventoryAccountingMapper inventory, InventoryAccountingService accounting,
-                                       OpeningDocumentNumberService numbers, IdGenerator ids, CurrentActorProvider actors) {
-        this.tasks=tasks; this.lineMapper=lineMapper; this.inventory=inventory; this.accounting=accounting; this.numbers=numbers; this.ids=ids; this.actors=actors;
-    }
     private String actor() { return actors.requireCurrentActor().actorId(); }
     private Task require(String id,String state) {
         Task task=InventoryCountModels.task(tasks.lockTask(id));

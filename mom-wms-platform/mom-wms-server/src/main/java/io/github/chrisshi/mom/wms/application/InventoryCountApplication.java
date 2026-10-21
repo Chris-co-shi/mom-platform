@@ -16,6 +16,7 @@ import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryCountLineMapper
 import io.github.chrisshi.mom.wms.infrastructure.query.InventoryCountQueryMapper;
 import io.github.chrisshi.mom.wms.infrastructure.query.InventoryCountQueryMapper.Summary;
 import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
@@ -28,6 +29,7 @@ import java.util.List;
 
 /** 盘点用例编排；MDM 只读引用在 WMS 本地事务之外验证。 */
 @Service
+@RequiredArgsConstructor
 public class InventoryCountApplication {
     private final InventoryCountTaskMapper tasks;
     private final InventoryCountLineMapper lines;
@@ -37,14 +39,6 @@ public class InventoryCountApplication {
     private final PageAdapter pages;
     private final CurrentActorProvider actors;
 
-    /** @param tasks 盘点任务 Mapper @param lines 盘点行 Mapper @param queries 服务端分页 @param references 事务外 MDM 引用
-     * @param commits WMS 本地原子提交 @param pages 平台分页转换 @param actors 当前认证操作人 */
-    public InventoryCountApplication(InventoryCountTaskMapper tasks,InventoryCountLineMapper lines,
-                                     InventoryCountQueryMapper queries,
-                                     OpeningInventoryReferenceService references,InventoryCountCommitService commits,
-                                     PageAdapter pages,CurrentActorProvider actors) {
-        this.tasks=tasks; this.lines=lines; this.queries=queries; this.references=references; this.commits=commits; this.pages=pages; this.actors=actors;
-    }
     /** 按仓库筛选盘点任务；服务端分页是权威。 */
     public PageResult<Summary> list(PageQuery<Filter> query) {
         Page<Summary> page=pages.toPage(query);

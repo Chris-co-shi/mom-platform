@@ -13,6 +13,7 @@ import io.github.chrisshi.mom.mdm.infrastructure.mapper.InspectionMethodMapper;
 import io.github.chrisshi.mom.mdm.infrastructure.mapper.QualitySpecificationMapper;
 import io.github.chrisshi.mom.mdm.infrastructure.mapper.SpecificationItemMapper;
 import io.github.chrisshi.mom.mdm.infrastructure.mapper.SpecificationRevisionMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,7 @@ import java.util.TreeMap;
  * 该边界不访问 QMS；已发布修订不可变，后续修正只能产生新业务修订。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class QualityDefinitionWriter {
     private static final String DRAFT = "DRAFT";
     private static final String RELEASED = "RELEASED";
@@ -45,17 +47,6 @@ public class QualityDefinitionWriter {
     private final SpecificationRevisionMapper revisions;
     private final SpecificationItemMapper items;
     private final QualityDefinitionReferenceValidator references;
-
-    public QualityDefinitionWriter(InspectionCharacteristicMapper characteristics, InspectionMethodMapper methods,
-                                   QualitySpecificationMapper specifications, SpecificationRevisionMapper revisions,
-                                   SpecificationItemMapper items, QualityDefinitionReferenceValidator references) {
-        this.characteristics = characteristics;
-        this.methods = methods;
-        this.specifications = specifications;
-        this.revisions = revisions;
-        this.items = items;
-        this.references = references;
-    }
 
     /** 校验默认单位并创建数值型检验特性。 */
     @Transactional

@@ -4,6 +4,7 @@ import io.github.chrisshi.mom.mdm.application.model.GovernanceModels.*;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.*;
 import io.github.chrisshi.mom.mdm.infrastructure.mapper.*;
 import io.github.chrisshi.mom.data.entity.BaseIdEntity;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
  * 不能替代创建/发布命令中的实时引用校验；单次最多返回 1000 个问题以保护管理请求。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class MasterDataGovernanceApplication {
     private static final int ISSUE_LIMIT = 1000;
     private static final String ENABLED = "ENABLED";
@@ -33,25 +35,6 @@ public class MasterDataGovernanceApplication {
     private final InspectionCharacteristicMapper inspectionCharacteristics; private final InspectionMethodMapper inspectionMethods;
     private final QualitySpecificationMapper qualitySpecifications; private final SpecificationRevisionMapper specificationRevisions;
     private final SpecificationItemMapper specificationItems;
-
-    public MasterDataGovernanceApplication(PlantMapper plants, WorkshopMapper workshops, ProductionLineMapper lines,
-            WorkstationMapper stations, WarehouseMapper warehouses, WarehouseAreaMapper areas, LocationMapper locations,
-            LocationTypeMapper locationTypes, MaterialCategoryMapper categories, MaterialMapper materials,
-            DimensionMapper dimensions, UomCategoryMapper uomCategories, UomMapper uoms, FormulaMapper formulas,
-            FormulaRevisionMapper formulaRevisions, FormulaItemMapper formulaItems, RoutingMapper routings,
-            RoutingRevisionMapper routingRevisions, RoutingStepMapper routingSteps, ProductionVersionMapper productionVersions,
-            InspectionCharacteristicMapper inspectionCharacteristics, InspectionMethodMapper inspectionMethods,
-            QualitySpecificationMapper qualitySpecifications, SpecificationRevisionMapper specificationRevisions,
-            SpecificationItemMapper specificationItems) {
-        this.plants=plants;this.workshops=workshops;this.lines=lines;this.stations=stations;this.warehouses=warehouses;
-        this.areas=areas;this.locations=locations;this.locationTypes=locationTypes;this.categories=categories;this.materials=materials;
-        this.dimensions=dimensions;this.uomCategories=uomCategories;this.uoms=uoms;this.formulas=formulas;
-        this.formulaRevisions=formulaRevisions;this.formulaItems=formulaItems;this.routings=routings;
-        this.routingRevisions=routingRevisions;this.routingSteps=routingSteps;this.productionVersions=productionVersions;
-        this.inspectionCharacteristics=inspectionCharacteristics;this.inspectionMethods=inspectionMethods;
-        this.qualitySpecifications=qualitySpecifications;this.specificationRevisions=specificationRevisions;
-        this.specificationItems=specificationItems;
-    }
 
     /** 执行所选范围的一致性扫描；ALL 按稳定板块顺序合并。 */
     @Transactional(readOnly = true)

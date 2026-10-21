@@ -7,16 +7,16 @@ import io.github.chrisshi.mom.wms.application.InventoryCountApplication;
 import io.github.chrisshi.mom.wms.application.InventoryCountApplication.*;
 import io.github.chrisshi.mom.wms.infrastructure.query.InventoryCountQueryMapper.Summary;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /** WMS 库存盘点 HTTP 边界；最终权限在 Resource Server 校验。 */
 @RestController
 @RequestMapping("/inventory-counts")
+@RequiredArgsConstructor
 public class InventoryCountController {
     private final InventoryCountApplication application;
-    /** @param application 盘点业务用例 */
-    public InventoryCountController(InventoryCountApplication application) { this.application=application; }
     /** 服务端分页查询任务。 */
     @PostMapping("/search")
     @PreAuthorize("hasAuthority('wms:inventory-count:read')")

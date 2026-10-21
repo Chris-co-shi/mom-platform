@@ -7,6 +7,7 @@ import io.github.chrisshi.mom.wms.application.InventoryCountFrozenDifferenceExce
 import io.github.chrisshi.mom.wms.application.InventoryCountWarehouseInactiveException;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceException;
 import io.github.chrisshi.mom.wms.controller.InventoryCountController;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -22,10 +23,9 @@ import java.util.Locale;
 /** 库存盘点 HTTP 业务错误边界；不向客户端泄露 SQL 或数据库约束。 */
 @RestControllerAdvice(assignableTypes=InventoryCountController.class)
 @ConditionalOnWebApplication(type=ConditionalOnWebApplication.Type.SERVLET)
+@RequiredArgsConstructor
 public class InventoryCountExceptionHandler {
     private final I18nMessageResolver messages;
-    /** @param messages WMS Owner 国际化错误文案 */
-    public InventoryCountExceptionHandler(I18nMessageResolver messages) { this.messages=messages; }
     /** 非零差异超出整单记账上限，提示缩小盘点范围。 */
     @ExceptionHandler(InventoryCountLimitException.class)
     public ResponseEntity<Result<Void>> limit(Locale locale) {

@@ -20,6 +20,7 @@ import io.github.chrisshi.mom.wms.application.OpeningInventoryApplication.Docume
 import io.github.chrisshi.mom.wms.infrastructure.query.OpeningInventoryQueryMapper.DocumentRow;
 import io.github.chrisshi.mom.mdm.api.WarehouseResourceReference;
 import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -29,23 +30,15 @@ import java.util.List;
  * <p>所有写操作使用 PostgreSQL REQUIRED 事务；过账同时写期初状态、仓库生命周期与库存交易/余额/分录。此类不进行 Feign 调用。</p>
  */
 @Service
+@RequiredArgsConstructor
 public class OpeningInventoryCommitService {
     private final OpeningInventoryMapper mapper;
+    private final OpeningInventoryLineMapper lineMapper;
     private final WarehouseInventoryStateMapper warehouseStates;
     private final OpeningInventoryQueryMapper queries;
-    private final OpeningInventoryLineMapper lineMapper;
     private final InventoryAccountingService accounting;
     private final IdGenerator ids;
     private final OpeningDocumentNumberService numbers;
-
-    /** @param mapper 期初单持久化入口 @param accounting 唯一库存记账服务 @param ids 技术主键生成器 @param numbers WMS 正式单据发号入口 */
-    public OpeningInventoryCommitService(OpeningInventoryMapper mapper, OpeningInventoryLineMapper lineMapper,
-                                         WarehouseInventoryStateMapper warehouseStates, OpeningInventoryQueryMapper queries,
-                                         InventoryAccountingService accounting,
-                                         IdGenerator ids, OpeningDocumentNumberService numbers) {
-        this.mapper = mapper; this.lineMapper = lineMapper;
-        this.warehouseStates = warehouseStates; this.queries = queries; this.accounting = accounting; this.ids = ids; this.numbers = numbers;
-    }
 
     /**
      * 创建唯一仓库期初单并原子进入 INITIALIZING。
