@@ -11,6 +11,7 @@ import io.github.chrisshi.mom.wms.application.InventoryCountModels.Line;
 import io.github.chrisshi.mom.wms.infrastructure.entity.InventoryCountTaskEntity;
 import io.github.chrisshi.mom.wms.infrastructure.entity.InventoryCountLineEntity;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryCountTaskMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryCountLineMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ import java.util.List;
 @Service
 public class InventoryCountCommitService {
     private final InventoryCountTaskMapper tasks;
+    private final InventoryAccountingMapper inventory;
     private final InventoryCountLineMapper lineMapper;
     private final InventoryAccountingService accounting;
     private final OpeningDocumentNumberService numbers;
@@ -31,9 +33,9 @@ public class InventoryCountCommitService {
     /** @param store WMS 盘点 SQL @param accounting 唯一库存记账入口 @param numbers 现有编码规则
      * @param ids 技术 ID @param actors 可信认证上下文 */
     public InventoryCountCommitService(InventoryCountTaskMapper tasks, InventoryCountLineMapper lineMapper,
-                                       InventoryAccountingService accounting,
+                                       InventoryAccountingMapper inventory, InventoryAccountingService accounting,
                                        OpeningDocumentNumberService numbers, IdGenerator ids, CurrentActorProvider actors) {
-        this.tasks=tasks; this.lineMapper=lineMapper; this.accounting=accounting; this.numbers=numbers; this.ids=ids; this.actors=actors;
+        this.tasks=tasks; this.lineMapper=lineMapper; this.inventory=inventory; this.accounting=accounting; this.numbers=numbers; this.ids=ids; this.actors=actors;
     }
     private String actor() { return actors.requireCurrentActor().actorId(); }
     private Task require(String id,String state) {
@@ -43,7 +45,7 @@ public class InventoryCountCommitService {
         return task;
     }
     private void requireOwner(Task task) {
-        if(!task.id().equals(tasks.lockOwner(task.warehouseId())))
+        if(!task.id().equals(inventory.countLockOwner(task.warehouseId())))
             throw new IllegalStateException("盘点任务不持有整仓锁");
     }
     /** 创建任务草稿和正式编号；MDM 仓库已在事务外验证。 */
@@ -51,7 +53,7 @@ public class InventoryCountCommitService {
     public String create(String requestKey,WarehouseResourceReference warehouse,List<String> locations,List<String> materials) {
         if(requestKey==null || requestKey.isBlank() || requestKey.length()>128)
             throw new IllegalArgumentException("盘点创建请求键非法");
-        tasks.lockCreateRequest("WMS:COUNT:CREATE:" + requestKey);
+        inventory.lockAccountingKey("WMS:COUNT:CREATE:" + requestKey);
         Task existing=InventoryCountModels.task(tasks.findByRequestKey(requestKey));
         if(existing!=null) {
             if(!existing.warehouseId().equals(warehouse.id()) || !existing.locationIds().equals(locations)
@@ -59,7 +61,7 @@ public class InventoryCountCommitService {
                 throw new IllegalArgumentException("盘点创建请求键已用于不同内容");
             return existing.id();
         }
-        if(!"ACTIVE".equals(tasks.warehouseState(warehouse.id())))
+        if(!"ACTIVE".equals(inventory.warehouseInventoryState(warehouse.id())))
             throw new InventoryCountWarehouseInactiveException();
         String id=ids.nextId();
         InventoryCountTaskEntity draft = new InventoryCountTaskEntity();
@@ -86,8 +88,8 @@ public class InventoryCountCommitService {
     public void start(String id,long expectedVersion) {
         Task task=require(id,"DRAFT");
         if(task.version()!=expectedVersion) throw new IllegalStateException("盘点范围已变化，请刷新");
-        tasks.lockWarehouse("WMS:WH:" + task.warehouseId());
-        if(!"ACTIVE".equals(tasks.warehouseState(task.warehouseId())))
+        inventory.lockAccountingKey("WMS:WH:" + task.warehouseId());
+        if(!"ACTIVE".equals(inventory.warehouseInventoryState(task.warehouseId())))
             throw new InventoryCountWarehouseInactiveException();
         if(tasks.acquire(task.warehouseId(),id)!=1) throw new IllegalStateException("仓库已有进行中的盘点任务");
         String actor=actor();
@@ -119,7 +121,7 @@ public class InventoryCountCommitService {
             throw new IllegalArgumentException("账外实物不在盘点范围内");
         if(quantity==null || quantity.signum()<0 || quantity.scale()>6 || quantity.precision()-quantity.scale()>18)
             throw new IllegalArgumentException("账外实物数量非法");
-        if(dimension.snCode()!=null && Boolean.TRUE.equals(tasks.snExists(dimension.snCode())))
+        if(dimension.snCode()!=null && inventory.positiveBalanceCountForSn(dimension.snCode()) > 0)
             throw new IllegalStateException("SN 已有正余额，请在对应完整库存维度录入实盘");
         String operator=actor();
         InventoryCountLineEntity extra=InventoryCountModels.lineRow(ids.nextId(),id,dimension,operator);
