@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.i18n.runtime;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.i18n.model.I18nBundle;
 import io.github.chrisshi.mom.i18n.model.I18nMessage;
 import io.github.chrisshi.mom.i18n.model.I18nTranslation;
@@ -18,15 +19,12 @@ import java.util.stream.Collectors;
  * <p>每次请求批量读取当前 Owner 全部启用消息及所需 Locale 译文，不逐 Key 查询。
  * 请求语言缺失时回退本地 base Locale，再回退稳定 messageKey；数据库故障直接失败。</p>
  */
+@RequiredArgsConstructor
 public class I18nRuntimeService {
     private final I18nStore store;
     private final I18nLocalePolicy locales;
 
-    /** @param store 当前服务 Store @param locales 本地 Locale 回退策略 */
-    public I18nRuntimeService(I18nStore store, I18nLocalePolicy locales) {
-        this.store = store;
-        this.locales = locales;
-    }
+    
 
     /** 返回当前 Owner 在给定 Locale 下的扁平只读译文表。 */
     @Transactional(readOnly = true)

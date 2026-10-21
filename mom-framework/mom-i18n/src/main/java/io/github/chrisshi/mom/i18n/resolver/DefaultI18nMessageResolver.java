@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.i18n.resolver;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.i18n.I18nMessageResolver;
 import io.github.chrisshi.mom.i18n.model.I18nMessage;
 import io.github.chrisshi.mom.i18n.model.I18nTranslation;
@@ -16,18 +17,13 @@ import java.util.Locale;
  * <p>Owner 已由本地 Store 确定，完整 Key 不再拆分或推断 namespace。Framework 技术错误继续走
  * classpath；单条业务错误只查询目标消息和至多两种 Locale 译文，数据库故障向上暴露。</p>
  */
+@RequiredArgsConstructor
 public final class DefaultI18nMessageResolver implements I18nMessageResolver {
     private final I18nStore store;
     private final I18nLocalePolicy locales;
     private final I18nMessageResolver frameworkResolver;
 
-    /** @param store 本服务 Store @param locales 本地回退策略 @param frameworkResolver 无数据库技术错误解析器 */
-    public DefaultI18nMessageResolver(I18nStore store, I18nLocalePolicy locales,
-                                     I18nMessageResolver frameworkResolver) {
-        this.store = store;
-        this.locales = locales;
-        this.frameworkResolver = frameworkResolver;
-    }
+    
 
     /** {@inheritDoc} */
     @Override
