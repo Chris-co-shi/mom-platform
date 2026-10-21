@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.cache.local;
 
+import lombok.RequiredArgsConstructor;
 import com.github.benmanes.caffeine.cache.Cache;
 import io.github.chrisshi.mom.cache.api.CacheKey;
 import io.github.chrisshi.mom.cache.api.CacheEntryKey;
@@ -17,14 +18,12 @@ import java.time.Duration;
  * <p>Adapter 不负责 Key Scope、序列化或 L2 协调，只按 Core 提供的完整 Key 访问对应 Region。Caffeine
  * 原生支持并发，基础设施位于进程内，不会把异常降级为远程旧值；整个 Region 失效仅清理本实例。</p>
  */
+@RequiredArgsConstructor
 public class CaffeineCacheProvider implements CacheProvider {
 
     private final CaffeineCacheManager cacheManager;
 
-    /** @param cacheManager Region 隔离的 Caffeine 管理器 */
-    public CaffeineCacheProvider(CaffeineCacheManager cacheManager) {
-        this.cacheManager = cacheManager;
-    }
+    
 
     @Override
     public CacheLayer layer() {

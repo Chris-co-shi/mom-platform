@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.cache.local;
 
+import lombok.RequiredArgsConstructor;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.chrisshi.mom.cache.api.CacheType;
@@ -17,16 +18,14 @@ import java.util.concurrent.ConcurrentMap;
  * Map 仅为旧 Provider SPI 保留。底层 ConcurrentMap 与 Caffeine Cache 均支持并发访问；Region 失效只清理
  * 当前进程，不影响 Redis L2。</p>
  */
+@RequiredArgsConstructor
 public class CaffeineCacheManager {
 
     private final CaffeineCacheProperties properties;
     private final EnumMap<CacheType, Cache<String, Object>> caches = new EnumMap<>(CacheType.class);
     private final ConcurrentMap<String, Cache<String, Object>> regionCaches = new ConcurrentHashMap<>();
 
-    /** @param properties 全局容量上限与旧 API 默认 TTL */
-    public CaffeineCacheManager(CaffeineCacheProperties properties) {
-        this.properties = properties;
-    }
+    
 
     /**
      * 获取旧 CacheType 的本地实例。
