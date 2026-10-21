@@ -8,7 +8,7 @@ import io.github.chrisshi.mom.wms.application.OpeningInventoryApplication.Detail
 import io.github.chrisshi.mom.wms.application.OpeningInventoryApplication.LineInput;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryApplication.ListFilter;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryApplication.PostedResult;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryPersistence.Document;
+import io.github.chrisshi.mom.wms.application.OpeningInventoryApplication.Document;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
