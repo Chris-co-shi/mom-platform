@@ -21,10 +21,6 @@ import java.util.List;
  */
 @Mapper
 public interface InventoryCountTaskMapper extends MomBaseMapper<InventoryCountTaskEntity> {
-    /** 与库存记账的事务隔离协议一致，创建前锁住同一个请求键。 */
-    @Select("SELECT pg_advisory_xact_lock(hashtextextended(#{key},0))")
-    Object lockCreateRequest(@Param("key") String key);
-
     /** 按创建 Key 读取类型化原任务。 */
     @Select("SELECT * FROM wms_inventory_count_task WHERE request_key=#{requestKey}")
     @Results({
@@ -52,20 +48,9 @@ public interface InventoryCountTaskMapper extends MomBaseMapper<InventoryCountTa
     int updateScope(@Param("id") String id,@Param("locations") String[] locations,
                     @Param("materials") String[] materials,@Param("actor") String actor);
 
-    /** 检查仓库库存生命周期。 */
-    @Select("SELECT state FROM wms_warehouse_inventory_state WHERE warehouse_id=#{warehouseId}")
-    String warehouseState(@Param("warehouseId") String warehouseId);
-
-    /** 与记账入口使用完全相同的仓库事务锁键。 */
-    @Select("SELECT pg_advisory_xact_lock(hashtextextended(#{key},0))")
-    Object lockWarehouse(@Param("key") String key);
-
     /** 整仓独占锁利用唯一约束原子领取。 */
     @Insert("INSERT INTO wms_inventory_count_scope_lock(warehouse_id,task_id) VALUES (#{warehouseId},#{taskId}) ON CONFLICT (warehouse_id) DO NOTHING")
     int acquire(@Param("warehouseId") String warehouseId,@Param("taskId") String taskId);
-
-    @Select("SELECT task_id FROM wms_inventory_count_scope_lock WHERE warehouse_id=#{warehouseId}")
-    String lockOwner(@Param("warehouseId") String warehouseId);
 
     @Delete("DELETE FROM wms_inventory_count_scope_lock WHERE warehouse_id=#{warehouseId} AND task_id=#{taskId}")
     int release(@Param("warehouseId") String warehouseId,@Param("taskId") String taskId);
@@ -96,7 +81,4 @@ public interface InventoryCountTaskMapper extends MomBaseMapper<InventoryCountTa
     @Update("UPDATE wms_inventory_count_task SET status='CANCELLED',updated_by=#{actor},updated_at=now(),cancelled_by=#{actor},cancelled_at=now(),transaction_id=COALESCE(#{transactionId},transaction_id),version=version+1 WHERE id=#{id} AND status=#{from}")
     int cancel(@Param("id") String id,@Param("from") String from,@Param("actor") String actor,@Param("transactionId") String transactionId);
 
-    /** 禁止凭空复制已有正余额 SN。 */
-    @Select("SELECT EXISTS(SELECT 1 FROM wms_inventory_balance WHERE sn_code=#{sn} AND quantity>0)")
-    Boolean snExists(@Param("sn") String sn);
 }
