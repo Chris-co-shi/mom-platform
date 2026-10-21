@@ -198,7 +198,7 @@ class OpeningInventoryPostgresqlIT {
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> createDraft("2000000000000000001")).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> commits.deleteDraft(documentId)).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> commits.addLine(mapper.find(documentId),
+        assertThatThrownBy(() -> commits.addLine(opening.get(documentId).document(),
                 new MaterialSnapshot("1001", "MAT-1", "物料一", "REQUIRED", "kg"),
                 new LocationSnapshot("3001", "LOC-3001"),
                 new LineInput("1001", "3001", "BATCH-1", "SN-LATE", QualityStatus.QUALIFIED,
@@ -245,7 +245,7 @@ class OpeningInventoryPostgresqlIT {
     }
 
     private void add(String documentId, String sn, String locationId, String quantity) {
-        var document = mapper.find(documentId);
+        var document = opening.get(documentId).document();
         commits.addLine(document, new MaterialSnapshot("1001", "MAT-1", "物料一", "REQUIRED", "kg"),
                 new LocationSnapshot(locationId, "LOC-" + locationId),
                 new LineInput("1001", locationId, "BATCH-1", sn, QualityStatus.QUALIFIED,
