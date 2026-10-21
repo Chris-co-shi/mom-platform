@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.system.application.i18n;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.i18n.runtime.I18nLocalePolicy;
 import io.github.chrisshi.mom.i18n.validation.I18nRules;
 import org.springframework.stereotype.Component;
@@ -11,13 +12,11 @@ import org.springframework.stereotype.Component;
  * 其他 Owner 不依赖此类或远程请求 System。该类无可变共享状态，数据库不可用时读取失败。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class SystemI18nPolicy implements I18nLocalePolicy {
     private final SupportedLocaleApplication locales;
 
-    /** @param locales System 自有 SupportedLocale 用例 */
-    public SystemI18nPolicy(SupportedLocaleApplication locales) {
-        this.locales = locales;
-    }
+    
 
     /** {@inheritDoc} */
     @Override

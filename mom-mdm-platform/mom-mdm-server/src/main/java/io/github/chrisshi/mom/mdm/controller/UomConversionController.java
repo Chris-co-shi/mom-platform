@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.mdm.application.UomConversionApplication;
 import io.github.chrisshi.mom.mdm.application.model.UomMasterDataViews.CompatibilityView;
 import io.github.chrisshi.mom.mdm.application.model.UomMasterDataViews.ConversionView;
@@ -20,14 +21,11 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/uom-conversions")
 @PreAuthorize("hasAuthority('mdm:uom:read')")
+@RequiredArgsConstructor
 public class UomConversionController {
     private final UomConversionApplication application;
 
-    /**
-     * 注入换算用例入口。
-     * @param application 不感知 HTTP Result 的换算 Application
-     */
-    public UomConversionController(UomConversionApplication application) { this.application = application; }
+    
 
     /**
      * 使用当前启用规则换算；请求幂等且无持久化副作用。

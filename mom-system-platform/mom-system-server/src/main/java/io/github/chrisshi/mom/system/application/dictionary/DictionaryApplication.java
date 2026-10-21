@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.system.application.dictionary;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.system.api.ResolvedSystemDictionaryItem;
 import io.github.chrisshi.mom.system.api.SystemDictionaryItemOption;
@@ -31,18 +32,12 @@ import static io.github.chrisshi.mom.system.application.dictionary.DictionaryMod
  * 回滚，不使用 Redis、MQ、Outbox 或跨服务调用。并发由业务唯一约束和 Version CAS 兜底。</p>
  */
 @Service
+@RequiredArgsConstructor
 public class DictionaryApplication {
     private final DictionaryTypeMapper typeMapper;
     private final DictionaryItemMapper itemMapper;
 
-    /**
-     * @param typeMapper 字典类型单表 Mapper
-     * @param itemMapper 字典条目单表 Mapper
-     */
-    public DictionaryApplication(DictionaryTypeMapper typeMapper, DictionaryItemMapper itemMapper) {
-        this.typeMapper = typeMapper;
-        this.itemMapper = itemMapper;
-    }
+    
 
     /** 创建全局唯一且后续不可改名的字典类型。 */
     @Transactional
