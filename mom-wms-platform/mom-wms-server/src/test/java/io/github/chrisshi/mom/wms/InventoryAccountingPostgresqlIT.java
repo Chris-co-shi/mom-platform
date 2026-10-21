@@ -193,10 +193,16 @@ class InventoryAccountingPostgresqlIT {
         // 权威余额只允许列出的原子数据库动作，不暴露 BaseMapper 通用插入/删除/更新。
         assertThat(operationNames).containsExactlyInAnyOrder(
                 "claim", "hashOf", "idOf", "increase", "decrease", "insertEntry",
-                "warehouseInventoryState", "findInventoryBalance", "findFreezeByTransaction", "lockFreeze",
-                "insertFreeze", "activeFreezesByDimension", "decreaseFreezeRemaining", "findUnfreeze",
-                "insertUnfreeze", "lockAccountingKey", "positiveBalanceCountForSn", "findTransferReplay",
-                "countLockOwner", "confirmedCountOwner");
+                "warehouseInventoryState", "findInventoryBalance", "lockAccountingKey",
+                "positiveBalanceCountForSn", "findTransferReplay", "countLockOwner", "confirmedCountOwner");
+        assertThat(io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryFreezeMapper.class.getInterfaces())
+                .isEmpty();
+        assertThat(java.util.Arrays.stream(
+                io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryFreezeMapper.class.getDeclaredMethods())
+                .map(java.lang.reflect.Method::getName))
+                .containsExactlyInAnyOrder(
+                        "findFreezeByTransaction", "lockFreeze", "insertFreeze",
+                        "activeFreezesByDimension", "decreaseFreezeRemaining", "findUnfreeze", "insertUnfreeze");
     }
 
     @Test
