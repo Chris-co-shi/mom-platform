@@ -1,9 +1,9 @@
 package io.github.chrisshi.mom.wms.application;
 
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.LocationSnapshot;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations.Balance;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations.TransferReplay;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper.Balance;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper.TransferReplay;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -14,13 +14,13 @@ import java.math.BigDecimal;
  */
 @Service
 public class InventoryTransferApplication {
-    private final InventoryAccountingOperations operations;
+    private final InventoryAccountingMapper operations;
     private final OpeningInventoryReferenceService references;
     private final InventoryTransferCommitService commits;
 
     /** @param operations 只读余额与交易历史入口 @param references 事务外 MDM 权威引用校验
      * @param commits WMS 本地原子提交入口 */
-    public InventoryTransferApplication(InventoryAccountingOperations operations,
+    public InventoryTransferApplication(InventoryAccountingMapper operations,
                                         OpeningInventoryReferenceService references,
                                         InventoryTransferCommitService commits) {
         this.operations = operations;
