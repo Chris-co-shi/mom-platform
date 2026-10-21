@@ -125,7 +125,7 @@ class OpeningInventoryPostgresqlIT {
         assertThat(saved.getQuantity()).isEqualByComparingTo("2.50");
         assertThat(saved.getCreatedAt()).isNotNull();
         assertThat(opening.get(documentId).lines()).hasSize(1);
-        assertThat(opening.get(documentId).lines().getFirst().quantity()).isEqualTo("2.50");
+        // DB numeric(24,6) returns scale 6: keep existing decimal-string API precision.\n        assertThat(opening.get(documentId).lines().getFirst().quantity()).isEqualTo("2.500000");
         assertThat(mapper.find(documentId).version()).isEqualTo(1);
 
         // MyBatis-Plus 的实体 update 默认会跳过 null，清空 SN 必须通过 wrapper.set(null)。
