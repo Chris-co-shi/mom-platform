@@ -150,6 +150,23 @@ class OpeningInventoryPostgresqlIT {
         assertThat(mapper.find(documentId).version()).isEqualTo(4);
     }
 
+    /** 父单据 FOR UPDATE + mom-data 条件删除必须在同事务清空明细和可重新建账的仓库状态。 */
+    @Test void deletingDraftRemovesLinesAndInitializingStateAtomically() {
+        String warehouseId = "2000000000000000112";
+        String documentId = createDraft(warehouseId);
+        add(documentId, "SN-TO-DELETE", "3001", "1.25");
+        assertThat(opening.get(documentId).lines()).hasSize(1);
+
+        commits.deleteDraft(documentId);
+        assertThat(mapper.find(documentId)).isNull();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_opening_document_line WHERE document_id=?",
+                Integer.class, documentId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_warehouse_inventory_state WHERE warehouse_id=?",
+                Integer.class, warehouseId)).isZero();
+        // 已撤销的草稿不锁死仓库，下一个合法初始化仍可创建。
+        assertThat(createDraft(warehouseId)).isNotEqualTo(documentId);
+    }
+
     @Test void postsMultipleLinesOnceAndActivationIsSeparate() {
         String documentId = createDraft("2000000000000000001");
         add(documentId, "SN-A", "3001", "4.25");
