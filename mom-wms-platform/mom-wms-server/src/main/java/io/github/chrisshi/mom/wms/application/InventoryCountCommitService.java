@@ -78,7 +78,7 @@ public class InventoryCountCommitService {
         for(var book:store.books(task)) {
             if(store.snapshot(ids.nextId(),id,book,actor)!=1) throw new IllegalStateException("盘点快照写入失败");
         }
-        if(store.transition(id,"DRAFT","COUNTING",actor,null)!=1)
+        if(store.start(id,actor)!=1)
             throw new IllegalStateException("盘点任务开始失败");
     }
     /** 录入实盘数量；NULL 只表示尚未录入，零是有效实盘。 */
@@ -111,9 +111,9 @@ public class InventoryCountCommitService {
         if(lines.stream().anyMatch(line->line.countedQuantity()==null))
             throw new IllegalStateException("仍有未录入实盘数量的库存维度");
         rejectFrozenDifferences(lines);
-        if(lines.stream().filter(line->line.difference().signum()!=0).count()>100)
+        if(lines.stream().filter(line->difference(line).signum()!=0).count()>100)
             throw new InventoryCountLimitException();
-        if(store.transition(id,"COUNTING","CONFIRMED",actor(),null)!=1)
+        if(store.confirm(id,actor())!=1)
             throw new IllegalStateException("盘点差异确认失败");
     }
     /** 将全部差异作为单笔库存交易过账；失败时任务保持 CONFIRMED 且仓库锁有效。 */
@@ -128,12 +128,12 @@ public class InventoryCountCommitService {
         List<Line> lines=store.lines(id);
         rejectFrozenDifferences(lines);
         List<Entry> entries=lines.stream()
-            .filter(line->line.difference().signum()!=0)
-            .map(line->new Entry(line.dimension(),line.difference())).toList();
+            .filter(line->difference(line).signum()!=0)
+            .map(line->new Entry(line.dimension(),difference(line))).toList();
         if(entries.size()>100) throw new InventoryCountLimitException();
         String transactionId=entries.isEmpty()?null:accounting.post(new Posting("INVENTORY_COUNT:"+id,
             "INVENTORY_COUNT_ADJUSTMENT","INVENTORY_COUNT",id,actor,entries));
-        if(store.transition(id,"CONFIRMED","COMPLETED",actor,transactionId)!=1
+        if(store.complete(id,actor,transactionId)!=1
                 || store.release(task.warehouseId(),id)!=1)
             throw new IllegalStateException("盘点完成或锁释放失败");
         return transactionId;
@@ -147,15 +147,20 @@ public class InventoryCountCommitService {
         if(!"DRAFT".equals(task.status()) && !"COUNTING".equals(task.status()))
             throw new IllegalStateException("已确认盘点不可取消");
         if("COUNTING".equals(task.status())) requireOwner(task);
-        if(store.transition(id,task.status(),"CANCELLED",actor(),null)!=1)
+        if(store.cancel(id,task.status(),actor())!=1)
             throw new IllegalStateException("盘点取消失败");
         if("COUNTING".equals(task.status()) && store.release(task.warehouseId(),id)!=1)
             throw new IllegalStateException("盘点锁释放失败");
     }
 
+    /** 盘点差异属于业务计算，不属于 Infrastructure 的行映射职责。 */
+    private static java.math.BigDecimal difference(Line line) {
+        return line.countedQuantity().subtract(line.bookQuantity());
+    }
+
     private void rejectFrozenDifferences(List<Line> lines) {
         if(lines.stream().anyMatch(line->line.dimension().warehouseStatus()==WarehouseStatus.FROZEN
-                && line.difference().signum()!=0)) {
+                && difference(line).signum()!=0)) {
             throw new InventoryCountFrozenDifferenceException();
         }
     }
