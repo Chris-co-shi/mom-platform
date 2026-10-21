@@ -117,6 +117,15 @@
     </dependencies>
   </dependencyManagement>
 
+  <!-- Lombok 为全项目统一的编译期构造注入约定，不进入运行时依赖。 -->
+  <dependencies>
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
   <build>
     <pluginManagement>
       <plugins>
