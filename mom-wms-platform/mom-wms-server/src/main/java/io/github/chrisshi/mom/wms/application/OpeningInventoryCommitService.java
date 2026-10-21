@@ -10,6 +10,7 @@ import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.M
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.wms.infrastructure.entity.OpeningDocumentLineEntity;
+import io.github.chrisshi.mom.wms.infrastructure.entity.OpeningDocumentEntity;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryLineMapper;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryMapper;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryApplication.Document;
@@ -125,7 +126,9 @@ public class OpeningInventoryCommitService {
         DocumentRow document = requireDraft(documentId);
         lineMapper.delete(Wrappers.<OpeningDocumentLineEntity>lambdaQuery()
                 .eq(OpeningDocumentLineEntity::getDocumentId, documentId));
-        if (mapper.deleteDraft(documentId) != 1) throw new IllegalStateException("期初单状态发生并发冲突");
+        if (mapper.delete(Wrappers.<OpeningDocumentEntity>lambdaQuery()
+                .eq(OpeningDocumentEntity::getId, documentId)
+                .eq(OpeningDocumentEntity::getStatus, "DRAFT")) != 1) throw new IllegalStateException("期初单状态发生并发冲突");
         if (mapper.deleteInitializingWarehouse(document.warehouseId()) != 1)
             throw new IllegalStateException("仓库初始化状态发生并发冲突");
     }
