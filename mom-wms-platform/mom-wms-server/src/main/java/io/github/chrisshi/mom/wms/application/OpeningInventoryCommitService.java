@@ -80,7 +80,25 @@ public class OpeningInventoryCommitService {
                          LineInput input, String actor) {
         DocumentRow document = requireDraft(requested.id());
         if (!document.warehouseId().equals(requested.warehouseId())) throw new IllegalStateException("建账单仓库已变化");
-        if (lineMapper.updateLine(line(document, material, location, input, lineId)) != 1) throw new IllegalArgumentException("期初明细不存在");
+        // 使用 mom-data 的 update(entity, wrapper)，同时保持 id + documentId 归属条件。
+        // batch_code、sn_code 可以清空；必须显式 wrapper.set(null)，不能依赖默认 NOT_NULL 字段策略。
+        OpeningDocumentLineEntity changes = new OpeningDocumentLineEntity();
+        changes.setMaterialId(material.id());
+        changes.setMaterialCode(material.code());
+        changes.setMaterialName(material.name());
+        changes.setLocationId(location.id());
+        changes.setLocationCode(location.code());
+        changes.setQualityStatus(input.qualityStatus());
+        changes.setWarehouseStatus(input.warehouseStatus());
+        changes.setQuantity(input.quantity());
+        changes.setUomCode(material.uomCode());
+        var scopedUpdate = Wrappers.<OpeningDocumentLineEntity>lambdaUpdate()
+                .eq(OpeningDocumentLineEntity::getId, lineId)
+                .eq(OpeningDocumentLineEntity::getDocumentId, document.id())
+                .set(OpeningDocumentLineEntity::getBatchCode, input.batchCode())
+                .set(OpeningDocumentLineEntity::getSnCode, input.snCode());
+        if (lineMapper.update(changes, scopedUpdate) != 1)
+            throw new IllegalArgumentException("期初明细不存在");
         bumpVersion(document.id(), actor);
     }
 
@@ -91,7 +109,10 @@ public class OpeningInventoryCommitService {
     @Transactional
     public void deleteLine(String documentId, String lineId, String actor) {
         requireDraft(documentId);
-        if (lineMapper.deleteLine(documentId, lineId) != 1) throw new IllegalArgumentException("期初明细不存在");
+        if (lineMapper.delete(Wrappers.<OpeningDocumentLineEntity>lambdaQuery()
+                .eq(OpeningDocumentLineEntity::getId, lineId)
+                .eq(OpeningDocumentLineEntity::getDocumentId, documentId)) != 1)
+            throw new IllegalArgumentException("期初明细不存在");
         bumpVersion(documentId, actor);
     }
 
@@ -102,7 +123,8 @@ public class OpeningInventoryCommitService {
     @Transactional
     public void deleteDraft(String documentId) {
         DocumentRow document = requireDraft(documentId);
-        lineMapper.deleteLinesByDocument(documentId);
+        lineMapper.delete(Wrappers.<OpeningDocumentLineEntity>lambdaQuery()
+                .eq(OpeningDocumentLineEntity::getDocumentId, documentId));
         if (mapper.deleteDraft(documentId) != 1) throw new IllegalStateException("期初单状态发生并发冲突");
         if (mapper.deleteInitializingWarehouse(document.warehouseId()) != 1)
             throw new IllegalStateException("仓库初始化状态发生并发冲突");
