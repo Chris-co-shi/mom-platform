@@ -97,6 +97,26 @@ class InventoryCountPostgresqlIT {
             new UsernamePasswordAuthenticationToken("operator-2","secret",List.of()));
         assertThat(application.findCreatedByRequestKey("count-reconcile")).isNull();
     }
+    /** 用真实 PostgreSQL 验证 varchar[] 的类型化读写，以及同一请求键的原始范围恢复。 */
+    @Test void typedTaskMapperPreservesArrayScopeAndCreationAuditOnReplay() {
+        String key = "typed-array-scope";
+        List<String> locations = List.of("3001");
+        List<String> materials = List.of("1001");
+        String id = counts.create(key, warehouse(), locations, materials);
+        var persisted = store.find(id);
+        assertThat(persisted.locationIds()).containsExactly("3001");
+        assertThat(persisted.materialIds()).containsExactly("1001");
+        assertThat(persisted.createdBy()).isEqualTo("operator-1");
+        assertThat(persisted.updatedBy()).isEqualTo("operator-1");
+        assertThat(persisted.createdAt()).isNotNull();
+        assertThat(persisted.updatedAt()).isNotNull();
+        assertThat(persisted.version()).isZero();
+        assertThat(store.findByRequestKey(key).locationIds()).containsExactly("3001");
+        assertThat(counts.create(key, warehouse(), locations, materials)).isEqualTo(id);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_count_task WHERE request_key = ?", Integer.class, key))
+                .isEqualTo(1);
+    }
+
     @Test void createRejectsWarehouseBeforeInventoryActivation() {
         jdbc.update("UPDATE wms_warehouse_inventory_state SET state='INITIALIZING' WHERE warehouse_id='2001'");
         assertThatThrownBy(()->counts.create("inactive-warehouse",warehouse(),List.of(),List.of()))
