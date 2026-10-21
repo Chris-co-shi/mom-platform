@@ -128,16 +128,26 @@ class OpeningInventoryPostgresqlIT {
         assertThat(opening.get(documentId).lines().getFirst().quantity()).isEqualTo("2.50");
         assertThat(mapper.find(documentId).version()).isEqualTo(1);
 
-        LineInput changed = new LineInput("1001", "3001", "BATCH-1", "SN-NEW",
+        // MyBatis-Plus 的实体 update 默认会跳过 null，清空 SN 必须通过 wrapper.set(null)。
+        LineInput changed = new LineInput("1001", "3001", "BATCH-1", null,
                 QualityStatus.QUALIFIED, WarehouseStatus.NORMAL, new BigDecimal("3.75"));
         commits.editLine(opening.get(documentId).document(), lineId, material, location, changed, "operator-1");
         assertThat(lineMapper.selectById(lineId).getQuantity()).isEqualByComparingTo("3.75");
+        assertThat(lineMapper.selectById(lineId).getSnCode()).isNull();
         assertThat(mapper.find(documentId).version()).isEqualTo(2);
+
+        // 模拟 MDM 批次策略由 REQUIRED 调整为 NONE 后，刷新可信物料快照并清除旧批次。
+        var untracked = new MaterialSnapshot("1001", "MAT-1", "物料一", "NONE", "kg");
+        LineInput noBatch = new LineInput("1001", "3001", null, null,
+                QualityStatus.QUALIFIED, WarehouseStatus.NORMAL, new BigDecimal("3.75"));
+        commits.editLine(opening.get(documentId).document(), lineId, untracked, location, noBatch, "operator-1");
+        assertThat(lineMapper.selectById(lineId).getBatchCode()).isNull();
+        assertThat(mapper.find(documentId).version()).isEqualTo(3);
 
         commits.deleteLine(documentId, lineId, "operator-1");
         assertThat(lineMapper.selectById(lineId)).isNull();
         assertThat(opening.get(documentId).lines()).isEmpty();
-        assertThat(mapper.find(documentId).version()).isEqualTo(3);
+        assertThat(mapper.find(documentId).version()).isEqualTo(4);
     }
 
     @Test void postsMultipleLinesOnceAndActivationIsSeparate() {
