@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
@@ -22,6 +23,7 @@ import java.util.List;
  * 本类另承担无写副作用的分页查询。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class QualityDefinitionApplication {
     private final QualityDefinitionWriter writer;
     private final InspectionCharacteristicMapper characteristics;
@@ -30,12 +32,7 @@ public class QualityDefinitionApplication {
     private final SpecificationRevisionMapper revisions;
     private final PageAdapter pages;
 
-    public QualityDefinitionApplication(QualityDefinitionWriter writer,
-            InspectionCharacteristicMapper characteristics, InspectionMethodMapper methods,
-            QualitySpecificationMapper specifications, SpecificationRevisionMapper revisions, PageAdapter pages) {
-        this.writer = writer; this.characteristics = characteristics; this.methods = methods;
-        this.specifications = specifications; this.revisions = revisions; this.pages = pages;
-    }
+
 
     /** 在 MDM 本地事务内校验 UOM 并创建特性。 */
     public QualityModels.CharacteristicView createCharacteristic(String code, String name, String uomId) {

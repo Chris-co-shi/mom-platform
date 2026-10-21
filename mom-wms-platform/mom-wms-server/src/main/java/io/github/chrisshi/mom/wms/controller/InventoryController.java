@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.wms.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.webmvc.response.Result;
@@ -26,20 +27,13 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/inventory")
+@RequiredArgsConstructor
 public class InventoryController {
     private final InventoryQueryService query;
     private final InventoryFreezeApplication freezes;
     private final InventoryTransferApplication transfers;
 
-    /**
-     * @param query 库存实时查询用例 @param freezes 仓储冻结与解冻用例 @param transfers 同仓库库位移动用例
-     */
-    public InventoryController(InventoryQueryService query, InventoryFreezeApplication freezes,
-                               InventoryTransferApplication transfers) {
-        this.query = query;
-        this.freezes = freezes;
-        this.transfers = transfers;
-    }
+    
 
     /**
      * 按 Material 返回实时汇总；必须持有 WMS 库存读权限。

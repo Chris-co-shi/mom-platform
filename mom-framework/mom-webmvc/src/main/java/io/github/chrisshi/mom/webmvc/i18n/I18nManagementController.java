@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.webmvc.i18n;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.i18n.management.I18nManagementService;
 import io.github.chrisshi.mom.i18n.model.I18nMessage;
 import io.github.chrisshi.mom.i18n.model.I18nTranslation;
@@ -26,13 +27,11 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/i18n/messages")
+@RequiredArgsConstructor
 public class I18nManagementController {
     private final I18nManagementService management;
 
-    /** @param management Framework 公共管理用例 */
-    public I18nManagementController(I18nManagementService management) {
-        this.management = management;
-    }
+    
 
     /** 创建稳定 Message 定义。 */
     @PostMapping

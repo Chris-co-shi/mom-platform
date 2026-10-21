@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.wms.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.github.chrisshi.mom.core.page.PageQuery;
@@ -18,15 +19,12 @@ import java.util.List;
 
 /** 库存不可变交易与分录的只读查询用例；不以当前余额补写历史空值。 */
 @Service
+@RequiredArgsConstructor
 public class InventoryHistoryApplication {
     private final InventoryHistoryQueryMapper mapper;
     private final PageAdapter pages;
 
-    /** @param mapper 历史事实查询 Mapper @param pages 统一分页适配器 */
-    public InventoryHistoryApplication(InventoryHistoryQueryMapper mapper, PageAdapter pages) {
-        this.mapper = mapper;
-        this.pages = pages;
-    }
+    
 
     /** 交易时间采用左闭右开区间，最长 366 天；可按分录中的历史名称和编码筛选。 */
     public record Filter(String materialId, String batchCode, String snCode, String warehouseId,

@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.wms.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.webmvc.response.Result;
@@ -23,15 +24,11 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/opening-documents")
 @Validated
+@RequiredArgsConstructor
 public class OpeningInventoryController {
     private final OpeningInventoryApplication application;
 
-    /**
-     * @param application 期初建账用例编排
-     */
-    public OpeningInventoryController(OpeningInventoryApplication application) {
-        this.application = application;
-    }
+    
 
     /**
      * 查询期初建账单列表；要求期初读取权限。

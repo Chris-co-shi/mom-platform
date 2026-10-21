@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.DimensionEntity;
 import io.github.chrisshi.mom.mdm.infrastructure.entity.UomCategoryEntity;
@@ -28,6 +29,7 @@ import static io.github.chrisshi.mom.mdm.application.model.UomMasterDataViews.Co
  * PostgreSQL 不可用时 fail-closed，调用方不得把失败当作原值成功。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class UomConversionApplication {
     private final UomMapper uomMapper;
     private final UomCategoryMapper categoryMapper;
@@ -35,16 +37,7 @@ public class UomConversionApplication {
     private final UomConversionRuleMapper ruleMapper;
     private final UomConversionCalculator calculator;
 
-    /** 注入目录 Mapper 与纯计算组件；不依赖 HTTP Result。 */
-    public UomConversionApplication(UomMapper uomMapper, UomCategoryMapper categoryMapper,
-                                    DimensionMapper dimensionMapper, UomConversionRuleMapper ruleMapper,
-                                    UomConversionCalculator calculator) {
-        this.uomMapper = uomMapper;
-        this.categoryMapper = categoryMapper;
-        this.dimensionMapper = dimensionMapper;
-        this.ruleMapper = ruleMapper;
-        this.calculator = calculator;
-    }
+    
 
     /**
      * 使用两侧当前启用规则换算。

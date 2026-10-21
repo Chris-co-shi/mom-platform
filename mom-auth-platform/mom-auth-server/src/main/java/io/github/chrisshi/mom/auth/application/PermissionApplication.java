@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.auth.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.auth.application.model.PermissionView;
@@ -29,6 +30,7 @@ import java.util.regex.Pattern;
  * 创建、启用与 Resource 删除通过资源行锁串行化，无物理 FK 下避免新增孤儿；数据库故障失败关闭。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class PermissionApplication {
     private static final Pattern ACTION_CODE = Pattern.compile("[A-Z][A-Z0-9_-]*");
 
@@ -38,26 +40,7 @@ public class PermissionApplication {
     private final RolePermissionMapper rolePermissionMapper;
     private final PageAdapter pageAdapter;
 
-    /**
-     * 注入 Permission、Role-Permission 持久化能力与统一分页适配器。
-     *
-     * @param permissionMapper Permission 单表 Mapper
-     * @param resourceMapper 授权资源 Mapper
-     * @param catalogQueryMapper 本地一对一 JOIN 分页 Mapper
-     * @param rolePermissionMapper Role-Permission 关系 Mapper
-     * @param pageAdapter 配置化分页适配器
-     */
-    public PermissionApplication(
-        PermissionMapper permissionMapper, PermissionResourceMapper resourceMapper,
-        PermissionCatalogQueryMapper catalogQueryMapper, RolePermissionMapper rolePermissionMapper,
-        PageAdapter pageAdapter
-    ) {
-        this.permissionMapper = permissionMapper;
-        this.resourceMapper = resourceMapper;
-        this.catalogQueryMapper = catalogQueryMapper;
-        this.rolePermissionMapper = rolePermissionMapper;
-        this.pageAdapter = pageAdapter;
-    }
+    
 
     /**
      * 创建 Permission。

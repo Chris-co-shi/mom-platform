@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.mdm.application.MasterDataGovernanceApplication;
 import io.github.chrisshi.mom.mdm.application.model.GovernanceModels;
 import io.github.chrisshi.mom.webmvc.response.Result;
@@ -16,12 +17,11 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/governance")
+@RequiredArgsConstructor
 public class MasterDataGovernanceController {
     private final MasterDataGovernanceApplication application;
 
-    public MasterDataGovernanceController(MasterDataGovernanceApplication application) {
-        this.application = application;
-    }
+
 
     /**
      * 执行选定板块的一致性扫描；POST 仅承载查询参数，不产生业务写。

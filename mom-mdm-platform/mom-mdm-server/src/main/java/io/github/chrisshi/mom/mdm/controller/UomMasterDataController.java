@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.mdm.application.UomMasterDataApplication;
@@ -28,15 +29,11 @@ import java.math.BigDecimal;
  */
 @RestController
 @RequestMapping
+@RequiredArgsConstructor
 public class UomMasterDataController {
     private final UomMasterDataApplication application;
 
-    /**
-     * 注入 UOM 主数据用例入口。 @param application 不返回 Result 的 Application
-     */
-    public UomMasterDataController(UomMasterDataApplication application) {
-        this.application = application;
-    }
+    
 
     /**
      * 创建量纲，成功返回 201；非幂等。 @param r 创建协议 @return 统一量纲结果 @throws io.github.chrisshi.mom.mdm.application.MdmException 校验或冲突时抛出

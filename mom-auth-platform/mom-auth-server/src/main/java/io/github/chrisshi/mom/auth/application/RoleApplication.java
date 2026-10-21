@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.auth.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.auth.application.model.PermissionView;
@@ -35,6 +36,7 @@ import java.util.stream.Collectors;
  * 允许直接使用本模块 Mapper/Entity，但不承担 HTTP 返回协议，也不通过特殊角色硬编码绕过 Permission。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class RoleApplication {
 
     private static final int MAX_PERMISSION_SELECTION = 200;
@@ -46,31 +48,7 @@ public class RoleApplication {
     private final PermissionResourceMapper resourceMapper;
     private final PageAdapter pageAdapter;
 
-    /**
-     * 注入角色、用户关系、权限关系持久化能力与统一分页适配器。
-     *
-     * @param roleMapper Role 单表 Mapper
-     * @param userRoleMapper User-Role 关系 Mapper
-     * @param rolePermissionMapper Role-Permission 关系 Mapper
-     * @param permissionMapper Permission 单表 Mapper
-     * @param resourceMapper Permission 所属资源 Mapper，批量补足授权展示元数据
-     * @param pageAdapter 配置化分页适配器
-     */
-    public RoleApplication(
-        RoleMapper roleMapper,
-        UserRoleMapper userRoleMapper,
-        RolePermissionMapper rolePermissionMapper,
-        PermissionMapper permissionMapper,
-        PermissionResourceMapper resourceMapper,
-        PageAdapter pageAdapter
-    ) {
-        this.roleMapper = roleMapper;
-        this.userRoleMapper = userRoleMapper;
-        this.rolePermissionMapper = rolePermissionMapper;
-        this.permissionMapper = permissionMapper;
-        this.resourceMapper = resourceMapper;
-        this.pageAdapter = pageAdapter;
-    }
+    
 
     /**
      * 创建角色。

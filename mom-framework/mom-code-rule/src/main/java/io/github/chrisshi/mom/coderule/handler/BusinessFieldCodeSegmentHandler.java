@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.coderule.handler;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.coderule.field.CodeFieldProvider;
 import io.github.chrisshi.mom.coderule.field.CodeFieldRegistry;
 import io.github.chrisshi.mom.coderule.segment.CodeSegmentException;
@@ -15,9 +16,10 @@ import java.util.Map;
 /** 从当前 Owner 的 Provider 目录暴露业务字段选项。 */
 @Component
 @ConditionalOnBean(CodeFieldProvider.class)
+@RequiredArgsConstructor
 public final class BusinessFieldCodeSegmentHandler implements CodeSegmentHandler {
     private final CodeFieldRegistry fields;
-    public BusinessFieldCodeSegmentHandler(CodeFieldRegistry fields) { this.fields = fields; }
+
     public CodeSegmentMetadata metadata() {
         List<CodeSegmentParameterSchema.Option> options = fields.catalog().stream()
                 .map(m -> new CodeSegmentParameterSchema.Option(m.label(), m.fieldKey())).toList();

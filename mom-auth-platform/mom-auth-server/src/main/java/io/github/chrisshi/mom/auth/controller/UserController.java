@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.auth.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.auth.application.UserApplication;
 import io.github.chrisshi.mom.auth.application.model.AuthPageParams.UserPageParams;
 import io.github.chrisshi.mom.auth.controller.request.ChangeStatusRequest;
@@ -36,13 +37,12 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/users")
+@RequiredArgsConstructor
 public class UserController {
 
     private final UserApplication userApplication;
 
-    public UserController(UserApplication userApplication) {
-        this.userApplication = userApplication;
-    }
+
 
     /**
      * 创建用户。

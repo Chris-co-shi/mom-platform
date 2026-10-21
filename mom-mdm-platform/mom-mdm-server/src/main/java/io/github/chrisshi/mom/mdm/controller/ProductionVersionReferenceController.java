@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.mdm.api.ProductionVersionReference;
 import io.github.chrisshi.mom.mdm.application.ProductionVersionApplication;
 import io.github.chrisshi.mom.webmvc.response.Result;
@@ -10,13 +11,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** 已发布 ProductionVersion 的跨域只读 HTTP 契约边界。 */
 @RestController
+@RequiredArgsConstructor
 public class ProductionVersionReferenceController {
     private final ProductionVersionApplication application;
 
-    /** 注入生产版本读取用例。 */
-    public ProductionVersionReferenceController(ProductionVersionApplication application) {
-        this.application = application;
-    }
+    
 
     /** 返回当前新业务可用性；历史工单仍应使用其已固定快照。 */
     @GetMapping("/production-version-references/{id}")

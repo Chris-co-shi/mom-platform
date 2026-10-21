@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.wms.application;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.LocationSnapshot;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper.Balance;
@@ -13,20 +14,13 @@ import java.math.BigDecimal;
  * 不直接写余额，也不改变物料、质量或仓储状态。
  */
 @Service
+@RequiredArgsConstructor
 public class InventoryTransferApplication {
     private final InventoryAccountingMapper operations;
     private final OpeningInventoryReferenceService references;
     private final InventoryTransferCommitService commits;
 
-    /** @param operations 只读余额与交易历史入口 @param references 事务外 MDM 权威引用校验
-     * @param commits WMS 本地原子提交入口 */
-    public InventoryTransferApplication(InventoryAccountingMapper operations,
-                                        OpeningInventoryReferenceService references,
-                                        InventoryTransferCommitService commits) {
-        this.operations = operations;
-        this.references = references;
-        this.commits = commits;
-    }
+    
 
     /**
      * 执行同仓库库位移动；已成功请求按不可变分录重放，不再依赖当前库存或 MDM 状态。

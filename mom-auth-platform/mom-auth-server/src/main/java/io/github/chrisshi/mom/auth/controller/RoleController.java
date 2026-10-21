@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.auth.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.auth.application.RoleApplication;
 import io.github.chrisshi.mom.auth.application.model.AuthPageParams.RolePageParams;
 import io.github.chrisshi.mom.auth.controller.request.ChangeStatusRequest;
@@ -34,13 +35,12 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/roles")
+@RequiredArgsConstructor
 public class RoleController {
 
     private final RoleApplication roleApplication;
 
-    public RoleController(RoleApplication roleApplication) {
-        this.roleApplication = roleApplication;
-    }
+
 
     /**
      * 创建角色。

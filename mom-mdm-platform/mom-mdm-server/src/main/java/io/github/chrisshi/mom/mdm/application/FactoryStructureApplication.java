@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
@@ -38,6 +39,7 @@ import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireV
  * Redis、MQ 或跨服务调用，数据库不可用或锁等待失败时本地事务整体回滚。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class FactoryStructureApplication {
     private final PlantMapper plantMapper;
     private final WorkshopMapper workshopMapper;
@@ -45,24 +47,7 @@ public class FactoryStructureApplication {
     private final WorkstationMapper workstationMapper;
     private final PageAdapter pageAdapter;
 
-    /**
-     * 注入四类主数据的单表 Mapper 与统一分页适配器。
-     *
-     * @param plantMapper Plant 单表 Mapper
-     * @param workshopMapper Workshop 单表 Mapper
-     * @param productionLineMapper ProductionLine 单表 Mapper
-     * @param workstationMapper Workstation 单表 Mapper
-     * @param pageAdapter 配置化分页适配器
-     */
-    public FactoryStructureApplication(PlantMapper plantMapper, WorkshopMapper workshopMapper,
-                                       ProductionLineMapper productionLineMapper, WorkstationMapper workstationMapper,
-                                       PageAdapter pageAdapter) {
-        this.plantMapper = plantMapper;
-        this.workshopMapper = workshopMapper;
-        this.productionLineMapper = productionLineMapper;
-        this.workstationMapper = workstationMapper;
-        this.pageAdapter = pageAdapter;
-    }
+    
 
     /** 创建平台编码唯一的 Plant；重复请求不会视为幂等成功。 */
     @Transactional

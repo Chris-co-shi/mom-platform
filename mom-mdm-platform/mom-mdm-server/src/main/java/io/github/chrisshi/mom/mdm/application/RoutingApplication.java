@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
@@ -41,6 +42,7 @@ import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireV
  * 不回写已发布历史定义。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class RoutingApplication {
     private static final String DRAFT = "DRAFT";
     private static final String RELEASED = "RELEASED";
@@ -56,22 +58,7 @@ public class RoutingApplication {
     private final FactoryStructureApplication factoryApplication;
     private final PageAdapter pageAdapter;
 
-    /** 注入本领域单表 Mapper、有效资源目录和现有分页转换器。 */
-    public RoutingApplication(RoutingMapper routingMapper, RoutingRevisionMapper revisionMapper,
-                              RoutingStepMapper stepMapper, PlantMapper plantMapper,
-                              WorkshopMapper workshopMapper, ProductionLineMapper lineMapper,
-                              WorkstationMapper stationMapper, FactoryStructureApplication factoryApplication,
-                              PageAdapter pageAdapter) {
-        this.routingMapper = routingMapper;
-        this.revisionMapper = revisionMapper;
-        this.stepMapper = stepMapper;
-        this.plantMapper = plantMapper;
-        this.workshopMapper = workshopMapper;
-        this.lineMapper = lineMapper;
-        this.stationMapper = stationMapper;
-        this.factoryApplication = factoryApplication;
-        this.pageAdapter = pageAdapter;
-    }
+    
 
     /** 原子创建路线身份、首个草稿修订和有序工序。 */
     @Transactional

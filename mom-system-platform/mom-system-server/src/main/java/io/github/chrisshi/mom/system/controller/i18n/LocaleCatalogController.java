@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.system.controller.i18n;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.system.application.i18n.I18nModels.ChangeLocaleStatus;
 import io.github.chrisshi.mom.system.application.i18n.I18nModels.CreateLocale;
 import io.github.chrisshi.mom.system.application.i18n.I18nModels.LocaleView;
@@ -14,9 +15,10 @@ import java.util.List;
 /** 平台 Locale 目录维护 HTTP 边界。 */
 @RestController
 @RequestMapping("/i18n/locale-catalog")
+@RequiredArgsConstructor
 public class LocaleCatalogController {
     private final SupportedLocaleApplication application;
-    public LocaleCatalogController(SupportedLocaleApplication application) { this.application = application; }
+
 
     @GetMapping
     public Result<List<LocaleView>> list() { return Result.success(application.list()); }

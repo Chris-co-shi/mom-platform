@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
@@ -30,27 +31,14 @@ import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireV
  * 或锁等待失败时本地事务整体回滚。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class WarehouseStructureApplication {
     private final PlantMapper plantMapper;
     private final WarehouseMapper warehouseMapper;
     private final WarehouseAreaMapper warehouseAreaMapper;
     private final PageAdapter pageAdapter;
 
-    /**
-     * 注入 Plant 引用校验、仓库结构 Mapper 与统一分页适配器。
-     *
-     * @param plantMapper Plant 单表 Mapper
-     * @param warehouseMapper Warehouse 单表 Mapper
-     * @param warehouseAreaMapper WarehouseArea 单表 Mapper
-     * @param pageAdapter 配置化分页适配器
-     */
-    public WarehouseStructureApplication(PlantMapper plantMapper, WarehouseMapper warehouseMapper,
-                                         WarehouseAreaMapper warehouseAreaMapper, PageAdapter pageAdapter) {
-        this.plantMapper = plantMapper;
-        this.warehouseMapper = warehouseMapper;
-        this.warehouseAreaMapper = warehouseAreaMapper;
-        this.pageAdapter = pageAdapter;
-    }
+    
 
     /** 在已启用 Plant 下创建 Warehouse，同一 Plant 内 Code 唯一。 */
     @Transactional

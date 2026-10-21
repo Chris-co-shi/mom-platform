@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.auth.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.auth.application.AuthenticationApplication;
 import io.github.chrisshi.mom.auth.controller.request.LoginRequest;
 import io.github.chrisshi.mom.auth.controller.response.LoginResponse;
@@ -20,13 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/sessions")
+@RequiredArgsConstructor
 public class AuthenticationController {
 
     private final AuthenticationApplication authenticationApplication;
 
-    public AuthenticationController(AuthenticationApplication authenticationApplication) {
-        this.authenticationApplication = authenticationApplication;
-    }
+
 
     /**
      * 用户名密码登录。

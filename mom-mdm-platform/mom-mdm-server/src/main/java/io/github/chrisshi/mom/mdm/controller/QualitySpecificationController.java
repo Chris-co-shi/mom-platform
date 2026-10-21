@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.mdm.application.MdmException;
@@ -21,12 +22,11 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/quality-specifications")
+@RequiredArgsConstructor
 public class QualitySpecificationController {
     private final QualityDefinitionApplication application;
 
-    public QualitySpecificationController(QualityDefinitionApplication application) {
-        this.application = application;
-    }
+
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)

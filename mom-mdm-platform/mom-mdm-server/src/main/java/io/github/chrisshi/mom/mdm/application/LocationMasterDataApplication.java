@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
@@ -34,6 +35,7 @@ import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireV
  * 库存、容器或 AGV 运行时事实，数据库或锁等待失败时本地事务整体回滚。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class LocationMasterDataApplication {
     private final PlantMapper plantMapper;
     private final WarehouseMapper warehouseMapper;
@@ -42,26 +44,7 @@ public class LocationMasterDataApplication {
     private final LocationMapper locationMapper;
     private final PageAdapter pageAdapter;
 
-    /**
-     * 注入 Location 本地引用校验 Mapper、单表持久化 Mapper 与统一分页适配器。
-     *
-     * @param plantMapper Plant 单表 Mapper
-     * @param warehouseMapper Warehouse 单表 Mapper
-     * @param warehouseAreaMapper WarehouseArea 单表 Mapper
-     * @param locationTypeMapper LocationType 单表 Mapper
-     * @param locationMapper Location 单表 Mapper
-     * @param pageAdapter 配置化分页适配器
-     */
-    public LocationMasterDataApplication(PlantMapper plantMapper, WarehouseMapper warehouseMapper,
-                                         WarehouseAreaMapper warehouseAreaMapper, LocationTypeMapper locationTypeMapper,
-                                         LocationMapper locationMapper, PageAdapter pageAdapter) {
-        this.plantMapper = plantMapper;
-        this.warehouseMapper = warehouseMapper;
-        this.warehouseAreaMapper = warehouseAreaMapper;
-        this.locationTypeMapper = locationTypeMapper;
-        this.locationMapper = locationMapper;
-        this.pageAdapter = pageAdapter;
-    }
+    
 
     /** 创建平台唯一 Code 的动态 LocationType。 */
     @Transactional

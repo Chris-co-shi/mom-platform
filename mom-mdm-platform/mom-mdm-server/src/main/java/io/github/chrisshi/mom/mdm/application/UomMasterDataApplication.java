@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
@@ -43,6 +44,7 @@ import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireV
  * 其余并发，数据库不可用或锁等待失败时 fail-closed。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class UomMasterDataApplication {
     private final DimensionMapper dimensionMapper;
     private final UomCategoryMapper categoryMapper;
@@ -51,26 +53,7 @@ public class UomMasterDataApplication {
     private final MaterialMapper materialMapper;
     private final PageAdapter pageAdapter;
 
-    /**
-     * 注入当前 bounded context 的四个单表 Mapper 与统一分页适配器。
-     *
-     * @param dimensionMapper Dimension 单表 Mapper
-     * @param categoryMapper UOM Category 单表 Mapper
-     * @param uomMapper UOM 单表 Mapper
-     * @param ruleMapper 换算规则单表 Mapper
-     * @param materialMapper Material 引用保护 Mapper
-     * @param pageAdapter 配置化分页适配器
-     */
-    public UomMasterDataApplication(DimensionMapper dimensionMapper, UomCategoryMapper categoryMapper,
-                                    UomMapper uomMapper, UomConversionRuleMapper ruleMapper,
-                                    MaterialMapper materialMapper, PageAdapter pageAdapter) {
-        this.dimensionMapper = dimensionMapper;
-        this.categoryMapper = categoryMapper;
-        this.uomMapper = uomMapper;
-        this.ruleMapper = ruleMapper;
-        this.materialMapper = materialMapper;
-        this.pageAdapter = pageAdapter;
-    }
+    
 
     /**
      * 创建固定向量量纲；Code 与向量创建后不可普通修改。

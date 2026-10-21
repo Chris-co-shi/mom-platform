@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.WarehouseAreaPageParams;
@@ -25,15 +26,11 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping
+@RequiredArgsConstructor
 public class WarehouseStructureController {
     private final WarehouseStructureApplication application;
 
-    /**
-     * @param application 仓库结构用例入口
-     */
-    public WarehouseStructureController(WarehouseStructureApplication application) {
-        this.application = application;
-    }
+    
 
     /**
      * 创建 Warehouse。

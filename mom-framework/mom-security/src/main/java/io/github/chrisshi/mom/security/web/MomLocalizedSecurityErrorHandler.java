@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.security.web;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.i18n.I18nMessageResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -21,6 +22,7 @@ import java.nio.charset.StandardCharsets;
  * Security 入口。处理过程无共享可变状态且线程安全；写响应失败时向 Servlet 容器传播 IOException，不伪造
  * 成功。副作用仅为写入当前 HTTP 响应，不记录 Token 或异常详情。</p>
  */
+@RequiredArgsConstructor
 public final class MomLocalizedSecurityErrorHandler
         implements AuthenticationEntryPoint, AccessDeniedHandler {
     private static final String AUTHENTICATION_KEY = "framework.security.unauthorized";
@@ -29,18 +31,7 @@ public final class MomLocalizedSecurityErrorHandler
     private final I18nMessageResolver messageResolver;
     private final ObjectMapper objectMapper;
 
-    /**
-     * 创建统一 Security 失败入口。
-     *
-     * @param messageResolver 可为空的消息解析器；为空时直接返回稳定 messageKey
-     * @param objectMapper Framework 管理的 Jackson JSON 序列化器
-     */
-    public MomLocalizedSecurityErrorHandler(
-            I18nMessageResolver messageResolver,
-            ObjectMapper objectMapper) {
-        this.messageResolver = messageResolver;
-        this.objectMapper = objectMapper;
-    }
+    
 
     /**
      * 写出未认证响应，不暴露认证异常内部细节。

@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.github.chrisshi.mom.core.page.PageQuery;
@@ -39,17 +40,11 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/materials")
+@RequiredArgsConstructor
 public class MaterialController {
     private final MaterialApplication application;
 
-    /**
-     * 注入 Material 用例入口。
-     *
-     * @param application Material Application
-     */
-    public MaterialController(MaterialApplication application) {
-        this.application = application;
-    }
+    
 
     /**
      * 创建 Material。

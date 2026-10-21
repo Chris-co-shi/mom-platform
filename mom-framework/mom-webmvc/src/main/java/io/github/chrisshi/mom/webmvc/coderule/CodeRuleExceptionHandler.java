@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.webmvc.coderule;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.coderule.CodeRuleFailure;
 import io.github.chrisshi.mom.coderule.segment.CodeSegmentException;
 import io.github.chrisshi.mom.core.page.PageQueryValidationException;
@@ -15,9 +16,10 @@ import java.util.Locale;
 
 /** 编码规则公共接口的安全错误映射。 */
 @RestControllerAdvice(assignableTypes = CodeRuleController.class)
+@RequiredArgsConstructor
 public final class CodeRuleExceptionHandler {
     private final I18nMessageResolver messages;
-    public CodeRuleExceptionHandler(I18nMessageResolver messages) { this.messages = messages; }
+
     @ExceptionHandler(CodeRuleFailure.class)
     public ResponseEntity<Result<Void>> business(CodeRuleFailure failure, Locale locale) {
         HttpStatus status = switch (failure.kind()) {

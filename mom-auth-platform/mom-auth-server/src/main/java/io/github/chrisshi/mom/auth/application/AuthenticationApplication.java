@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.auth.application;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.auth.application.model.LoginView;
 import io.github.chrisshi.mom.auth.infrastructure.configuration.AuthProperties;
 import io.github.chrisshi.mom.auth.infrastructure.security.AuthUserPrincipal;
@@ -29,6 +30,7 @@ import java.util.Locale;
  * <p>TokenStore 或认证基础设施不可用时统一 Fail Closed，不签发“降级 Token”。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class AuthenticationApplication {
 
     /** 256 bit 随机数，Base64URL 无填充编码后约 43 个字符。 */
@@ -40,17 +42,7 @@ public class AuthenticationApplication {
     private final Clock clock;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    public AuthenticationApplication(
-        AuthenticationManager authenticationManager,
-        MomTokenStore tokenStore,
-        AuthProperties properties,
-        Clock clock
-    ) {
-        this.authenticationManager = authenticationManager;
-        this.tokenStore = tokenStore;
-        this.properties = properties;
-        this.clock = clock;
-    }
+
 
     /**
      * 使用用户名密码完成 Spring Security 认证，并在成功后签发 MOM Opaque Token。

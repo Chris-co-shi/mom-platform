@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.gateway.error;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
@@ -20,13 +21,12 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>未识别异常继续交给 Spring Cloud Gateway 默认错误处理链。</p>
  */
 @Component
+@RequiredArgsConstructor
 public final class GatewayExceptionHandler implements WebExceptionHandler, Ordered {
 
     private final JsonMapper jsonMapper;
 
-    public GatewayExceptionHandler(JsonMapper jsonMapper) {
-        this.jsonMapper = jsonMapper;
-    }
+
 
     @Override
     public Mono<Void> handle(ServerWebExchange exchange, Throwable exception) {

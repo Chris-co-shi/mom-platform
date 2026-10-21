@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.system.controller.dictionary;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.system.application.dictionary.DictionaryApplication;
 import io.github.chrisshi.mom.system.application.dictionary.DictionaryModels.ChangeStatus;
 import io.github.chrisshi.mom.system.application.dictionary.DictionaryModels.CreateItem;
@@ -14,9 +15,10 @@ import java.util.List;
 /** 字典条目管理 HTTP 边界；父类型 ID 作为条目的所属关系参数。 */
 @RestController
 @RequestMapping("/dictionary-items")
+@RequiredArgsConstructor
 public class DictionaryItemController {
     private final DictionaryApplication application;
-    public DictionaryItemController(DictionaryApplication application) { this.application = application; }
+
 
     @PostMapping("/{typeId}") @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('system:dictionary:write')")
     public Result<ItemView> create(@PathVariable String typeId, @RequestBody CreateItemRequest request) {

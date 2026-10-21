@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.mdm.application.QualityDefinitionApplication;
@@ -14,9 +15,10 @@ import org.springframework.web.bind.annotation.*;
 
 /** 检验方法静态定义的 HTTP 边界。 */
 @RestController @RequestMapping("/inspection-methods")
+@RequiredArgsConstructor
 public class InspectionMethodController {
     private final QualityDefinitionApplication application;
-    public InspectionMethodController(QualityDefinitionApplication application) { this.application = application; }
+
     @PostMapping @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('mdm:quality-definition:write')")
     public Result<QualityModels.MethodView> create(@Valid @RequestBody CreateRequest request) {
         return Result.success(application.createMethod(request.code(), request.name(), request.description()));

@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.system.application.i18n;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.system.api.SupportedLocaleInfo;
 import io.github.chrisshi.mom.system.application.SystemV1Exception;
@@ -27,18 +28,12 @@ import static io.github.chrisshi.mom.system.application.i18n.I18nModels.UpdateLo
  * 所有通知由 Framework 在 after-commit 广播；SSE 故障不回滚数据库，数据库故障时不降级为本地假数据。</p>
  */
 @Service
+@RequiredArgsConstructor
 public class SupportedLocaleApplication {
     private final SupportedLocaleMapper localeMapper;
     private final I18nChangeNotifier notifier;
 
-    /**
-     * @param localeMapper SupportedLocale 单表 Mapper
-     * @param notifier Framework after-commit 本地通知器
-     */
-    public SupportedLocaleApplication(SupportedLocaleMapper localeMapper, I18nChangeNotifier notifier) {
-        this.localeMapper = localeMapper;
-        this.notifier = notifier;
-    }
+    
 
     /** 创建动态 Locale；创建默认 Locale 必须使用单独的默认切换用例。 */
     @Transactional

@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.qms.infrastructure;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.i18n.model.I18nMessage;
 import io.github.chrisshi.mom.i18n.model.I18nTranslation;
@@ -13,12 +14,11 @@ import java.util.List;
 
 /** QMS 自有 I18n 表对 Framework Store SPI 的适配器。 */
 @Component
+@RequiredArgsConstructor
 public class QmsI18nStore implements I18nStore {
     private final QmsI18nMessageMapper messages;
     private final QmsI18nTranslationMapper translations;
-    public QmsI18nStore(QmsI18nMessageMapper messages, QmsI18nTranslationMapper translations) {
-        this.messages = messages; this.translations = translations;
-    }
+
     @Override public I18nMessage message(String id, boolean forUpdate) {
         var query = Wrappers.<QmsI18nMessageEntity>lambdaQuery().eq(QmsI18nMessageEntity::getId, id);
         if (forUpdate) query.last("FOR UPDATE");

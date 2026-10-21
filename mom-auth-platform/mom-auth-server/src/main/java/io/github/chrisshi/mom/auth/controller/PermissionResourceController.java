@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.auth.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.auth.application.PermissionResourceApplication;
 import io.github.chrisshi.mom.auth.application.model.AuthPageParams.PermissionResourcePageParams;
 import io.github.chrisshi.mom.auth.controller.request.ChangeStatusRequest;
@@ -30,17 +31,11 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/permission-resources")
+@RequiredArgsConstructor
 public class PermissionResourceController {
     private final PermissionResourceApplication application;
 
-    /**
-     * 注入目录用例，无副作用。
-     *
-     * @param application 资源用例
-     */
-    public PermissionResourceController(PermissionResourceApplication application) {
-        this.application = application;
-    }
+    
 
     /**
      * 创建资源，HTTP 201；唯一冲突返回 409。

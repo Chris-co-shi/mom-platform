@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.wms.application;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.id.IdGenerator;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper.Balance;
@@ -26,6 +27,7 @@ import java.util.List;
 
 /** WMS 仓储冻结限制用例；只改变 WarehouseStatus，通过库存唯一记账入口保持余额、交易、分录及限制原子一致。 */
 @Service
+@RequiredArgsConstructor
 public class InventoryFreezeApplication {
     private final InventoryAccountingMapper inventory;
     private final InventoryFreezeMapper freezes;
@@ -34,22 +36,7 @@ public class InventoryFreezeApplication {
     private final InventoryAccountingService accounting;
     private final IdGenerator ids;
 
-    /**
-     * @param inventory 库存余额只读映射 @param freezes 冻结事实和条件更新 Mapper
-     * @param accounting WMS 唯一库存余额过账入口
-     * @param ids MOM 字符串技术主键生成器
-     */
-    public InventoryFreezeApplication(InventoryAccountingMapper inventory, InventoryFreezeMapper freezes,
-                                      InventoryFreezeRecordMapper freezeReads, InventoryUnfreezeRecordMapper unfreezeReads,
-                                      InventoryAccountingService accounting,
-                                      IdGenerator ids) {
-        this.inventory = inventory;
-        this.freezes = freezes;
-        this.freezeReads = freezeReads;
-        this.unfreezeReads = unfreezeReads;
-        this.accounting = accounting;
-        this.ids = ids;
-    }
+    
 
     /** 冻结原因受 WMS 业务语义约束；字典展示不能替代服务端允许值校验。 */
     public enum FreezeReason {

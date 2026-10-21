@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.mdm.application.RoutingApplication;
@@ -30,11 +31,11 @@ import java.util.List;
 /** Routing 的 HTTP 协议、DTO 和权限边界；状态、并发和引用校验由 Application 承担。 */
 @RestController
 @RequestMapping("/routings")
+@RequiredArgsConstructor
 public class RoutingController {
     private final RoutingApplication application;
 
-    /** 注入工艺路线用例，不让 Controller 直接访问持久化 Entity。 */
-    public RoutingController(RoutingApplication application) { this.application = application; }
+    
 
     /** 创建路线和第一草稿修订。 */
     @PostMapping

@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.webmvc.i18n;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -14,13 +15,11 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  */
 @RestController
 @RequestMapping("/i18n/runtime")
+@RequiredArgsConstructor
 public final class I18nSseController {
     private final I18nChangeNotifier notifier;
 
-    /** @param notifier Framework 管理的单实例通知器 */
-    public I18nSseController(I18nChangeNotifier notifier) {
-        this.notifier = notifier;
-    }
+    
 
     /**
      * 建立 SSE 连接。

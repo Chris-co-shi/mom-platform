@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.coderule.application;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.coderule.CodeRuleDefinition;
 import io.github.chrisshi.mom.coderule.CodeRuleFailure;
 import io.github.chrisshi.mom.coderule.CodeRulePageParams;
@@ -25,16 +26,14 @@ import java.util.Set;
  * <p>每个写用例只操作当前 Owner 的本地数据库，并通过规则级版本控制并发更新。
  * 本类负责规则定义校验和状态流转，不负责 HTTP 协议包装或跨 Owner 数据访问。</p>
  */
+@RequiredArgsConstructor
 public class DefaultCodeRuleApplication implements CodeRuleApplication {
     private final CodeRuleStore store;
     private final CodeSegmentRegistry handlers;
     private final CodeFieldRegistry fields;
     private final IdGenerator ids;
 
-    public DefaultCodeRuleApplication(CodeRuleStore store, CodeSegmentRegistry handlers,
-                                      CodeFieldRegistry fields, IdGenerator ids) {
-        this.store = store; this.handlers = handlers; this.fields = fields; this.ids = ids;
-    }
+
 
     /**
      * 在同一事务中创建规则身份和首个草稿修订。

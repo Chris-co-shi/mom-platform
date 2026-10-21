@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.mdm.application.QualityDefinitionApplication;
@@ -17,9 +18,10 @@ import org.springframework.web.bind.annotation.*;
 
 /** 数值型检验特性的 HTTP 边界。 */
 @RestController @RequestMapping("/inspection-characteristics")
+@RequiredArgsConstructor
 public class InspectionCharacteristicController {
     private final QualityDefinitionApplication application;
-    public InspectionCharacteristicController(QualityDefinitionApplication application) { this.application = application; }
+
 
     /** 创建特性并在 MDM 本地事务内校验默认 UOM。 */
     @PostMapping @ResponseStatus(HttpStatus.CREATED)
