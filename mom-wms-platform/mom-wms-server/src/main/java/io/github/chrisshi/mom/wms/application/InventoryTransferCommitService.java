@@ -6,9 +6,9 @@ import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Posting
 import io.github.chrisshi.mom.wms.application.InventoryTransferApplication.TransferCommand;
 import io.github.chrisshi.mom.wms.application.InventoryTransferApplication.TransferResult;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.LocationSnapshot;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations.Balance;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations.TransferReplay;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper.Balance;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper.TransferReplay;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,11 +21,11 @@ import java.util.stream.Stream;
  */
 @Service
 public class InventoryTransferCommitService {
-    private final InventoryAccountingOperations operations;
+    private final InventoryAccountingMapper operations;
     private final InventoryAccountingService accounting;
 
     /** @param operations PostgreSQL 锁及余额读取入口 @param accounting 唯一库存记账入口 */
-    public InventoryTransferCommitService(InventoryAccountingOperations operations, InventoryAccountingService accounting) {
+    public InventoryTransferCommitService(InventoryAccountingMapper operations, InventoryAccountingService accounting) {
         this.operations = operations;
         this.accounting = accounting;
     }
