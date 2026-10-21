@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.wms.application;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Dimension;
 import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Entry;
 import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Posting;
@@ -20,15 +21,12 @@ import java.util.stream.Stream;
  * 不在事务内调用 MDM，也不创建移库单或修改库存状态。
  */
 @Service
+@RequiredArgsConstructor
 public class InventoryTransferCommitService {
     private final InventoryAccountingMapper operations;
     private final InventoryAccountingService accounting;
 
-    /** @param operations PostgreSQL 锁及余额读取入口 @param accounting 唯一库存记账入口 */
-    public InventoryTransferCommitService(InventoryAccountingMapper operations, InventoryAccountingService accounting) {
-        this.operations = operations;
-        this.accounting = accounting;
-    }
+    
 
     /**
      * 在 REQUIRED 本地事务内按请求键、库位、SN 顺序锁定，复核余额并完成两条分录。

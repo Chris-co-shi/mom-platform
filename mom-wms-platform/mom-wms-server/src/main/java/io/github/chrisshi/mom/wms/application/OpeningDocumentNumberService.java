@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.wms.application;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.coderule.CodeRuleDefinition;
 import io.github.chrisshi.mom.coderule.field.CodeGenerationContext;
 import io.github.chrisshi.mom.coderule.segment.CodeSegmentRegistry;
@@ -14,6 +15,7 @@ import java.util.Map;
 
 /** 将已发布的 WMS 规则渲染为期初单正式编号；流水与单据共享本地事务。 */
 @Service
+@RequiredArgsConstructor
 public class OpeningDocumentNumberService {
     private static final String RULE_CODE = "wms.opening.document";
     private final OpeningDocumentNumberOperations numbers;
@@ -21,11 +23,7 @@ public class OpeningDocumentNumberService {
     private final CodeSegmentRegistry handlers;
     private final Clock clock;
 
-    /** @param numbers WMS 本地规则锁及流水 @param rules 当前 WMS Owner 的规则存储 @param handlers 已注册片段 @param clock 编码日期使用的 UTC 时钟 */
-    public OpeningDocumentNumberService(OpeningDocumentNumberOperations numbers, CodeRuleStore rules,
-                                        CodeSegmentRegistry handlers, Clock clock) {
-        this.numbers = numbers; this.rules = rules; this.handlers = handlers; this.clock = clock;
-    }
+    
 
     /** 在期初单创建事务内取正式编号；规则缺失、停用或输出无效时抛错并回滚。 */
     public String allocate() { return allocate(RULE_CODE); }

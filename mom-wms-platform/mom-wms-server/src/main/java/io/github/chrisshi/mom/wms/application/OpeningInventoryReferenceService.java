@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.wms.application;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.mdm.api.LocationReference;
 import io.github.chrisshi.mom.mdm.api.MaterialReference;
 import io.github.chrisshi.mom.mdm.api.UomReference;
@@ -15,11 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>负责确认静态主数据有效并生成快照；不写 MDM，也不负责期初单生命周期。所有网络调用禁止处于 WMS 数据库事务。</p>
  */
 @Service
+@RequiredArgsConstructor
 public class OpeningInventoryReferenceService {
     private final MdmReferenceClient mdm;
 
-    /** @param mdm MDM 跨模块只读引用 Client */
-    public OpeningInventoryReferenceService(MdmReferenceClient mdm) { this.mdm = mdm; }
+    
 
     /**
      * 验证仓库当前可供新业务引用并返回可信编码快照。

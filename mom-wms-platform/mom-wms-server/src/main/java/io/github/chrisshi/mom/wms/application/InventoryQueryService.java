@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.wms.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.github.chrisshi.mom.core.page.PageQuery;
@@ -15,18 +16,12 @@ import java.math.BigDecimal;
 
 /** 从唯一余额表现算实时库存，不维护第二份汇总表。 */
 @Service
+@RequiredArgsConstructor
 public class InventoryQueryService {
     private final InventoryQueryMapper mapper;
     private final PageAdapter pages;
 
-    /**
-     * @param mapper WMS 余额只读 Mapper
-     * @param pages 平台分页适配器
-     */
-    public InventoryQueryService(InventoryQueryMapper mapper, PageAdapter pages) {
-        this.mapper = mapper;
-        this.pages = pages;
-    }
+    
 
     /**
      * 总览组合条件，空串由 Application 转为无过滤条件。

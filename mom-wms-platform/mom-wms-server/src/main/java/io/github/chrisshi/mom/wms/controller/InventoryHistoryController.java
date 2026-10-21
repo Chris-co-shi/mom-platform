@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.wms.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.webmvc.response.Result;
@@ -20,11 +21,11 @@ import org.springframework.web.server.ResponseStatusException;
 /** 库存历史只读 HTTP 边界；搜索与交易详情均要求库存读取权限。 */
 @RestController
 @RequestMapping("/inventory")
+@RequiredArgsConstructor
 public class InventoryHistoryController {
     private final InventoryHistoryApplication history;
 
-    /** @param history 不可变历史查询用例 */
-    public InventoryHistoryController(InventoryHistoryApplication history) { this.history = history; }
+    
 
     /**
      * 分页搜索符合条件的分录，单笔交易的其他分录不并入当前页。
