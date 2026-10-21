@@ -1,8 +1,8 @@
 package io.github.chrisshi.mom.wms.application;
 
 import io.github.chrisshi.mom.core.id.IdGenerator;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations.BalanceChange;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper.BalanceChange;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,14 +19,14 @@ import java.util.List;
 /** WMS 唯一余额写入口；调用方需提供已核验的 MDM 快照、真实责任主体及允许过账的 WMS 仓库状态。 */
 @Service
 public class InventoryAccountingService {
-    private final InventoryAccountingOperations mapper;
+    private final InventoryAccountingMapper mapper;
     private final IdGenerator ids;
 
     /**
      * @param mapper 同库原子 SQL 入口
      * @param ids MOM 字符串技术主键生成器
      */
-    public InventoryAccountingService(InventoryAccountingOperations mapper, IdGenerator ids) {
+    public InventoryAccountingService(InventoryAccountingMapper mapper, IdGenerator ids) {
         this.mapper = mapper;
         this.ids = ids;
     }
