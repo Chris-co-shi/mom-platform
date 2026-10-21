@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.i18n.management;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.i18n.model.I18nMessage;
 import io.github.chrisshi.mom.i18n.model.I18nTranslation;
 import io.github.chrisshi.mom.i18n.runtime.I18nChangePublisher;
@@ -19,17 +20,13 @@ import java.util.Set;
  * <p>Owner 由当前服务注入的 Store 决定，稳定 Key 在该 Owner 内唯一且不可改名。译文在本地事务中
  * 按 Locale 版本化；重复译文查询只是提交前提醒，不参与保存判定。通知在事务提交后执行。</p>
  */
+@RequiredArgsConstructor
 public class I18nManagementService {
     private final I18nStore store;
     private final I18nLocalePolicy locales;
     private final I18nChangePublisher changes;
 
-    /** @param store 当前服务唯一 Store @param locales 本地 Locale 规则 @param changes 提交后失效通知 */
-    public I18nManagementService(I18nStore store, I18nLocalePolicy locales, I18nChangePublisher changes) {
-        this.store = store;
-        this.locales = locales;
-        this.changes = changes;
-    }
+    
 
     /** 创建当前 Owner 的不可改稳定键，重复 Key 返回冲突。 */
     @Transactional
