@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.webmvc.i18n;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.i18n.model.I18nBundle;
 import io.github.chrisshi.mom.i18n.runtime.I18nRuntimeService;
 import io.github.chrisshi.mom.webmvc.response.Result;
@@ -18,13 +19,11 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/i18n/runtime")
+@RequiredArgsConstructor
 public final class I18nRuntimeController {
     private final I18nRuntimeService runtime;
 
-    /** @param runtime Framework 公共 Bundle 用例 */
-    public I18nRuntimeController(I18nRuntimeService runtime) {
-        this.runtime = runtime;
-    }
+    
 
     /**
      * 加载当前服务 Owner 一个 Locale 的完整扁平 Bundle。

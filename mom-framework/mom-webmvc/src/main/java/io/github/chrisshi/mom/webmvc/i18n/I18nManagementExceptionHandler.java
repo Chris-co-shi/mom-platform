@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.webmvc.i18n;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.i18n.management.I18nFailure;
 import io.github.chrisshi.mom.core.i18n.I18nMessageResolver;
 import io.github.chrisshi.mom.webmvc.response.Result;
@@ -18,13 +19,11 @@ import java.util.Locale;
  * 认证授权异常仍交给 Resource Server Filter Chain；数据库故障返回 503，不伪造空 Bundle。</p>
  */
 @RestControllerAdvice(assignableTypes = {I18nManagementController.class, I18nRuntimeController.class})
+@RequiredArgsConstructor
 public final class I18nManagementExceptionHandler {
     private final I18nMessageResolver messages;
 
-    /** @param messages 宿主的业务与 Framework classpath 解析器 */
-    public I18nManagementExceptionHandler(I18nMessageResolver messages) {
-        this.messages = messages;
-    }
+    
 
     /** @return 不存在资源的 404 或业务冲突的 409 */
     @ExceptionHandler(I18nFailure.class)

@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.webmvc.coderule;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.coderule.CodeRuleDefinition;
 import io.github.chrisshi.mom.coderule.CodeRuleFailure;
 import io.github.chrisshi.mom.coderule.CodeRulePageParams;
@@ -22,13 +23,11 @@ import java.util.Map;
 /** 各显式启用 Owner 共用的编码规则 HTTP 边界。 */
 @RestController
 @RequestMapping("/code-rules")
+@RequiredArgsConstructor
 public class CodeRuleController {
     private final CodeRuleApplication application;
     private final CodeSegmentRegistry handlers;
-    /** 使用当前服务装配的 Application 与片段目录，不接受请求指定 Owner。 */
-    public CodeRuleController(CodeRuleApplication application, CodeSegmentRegistry handlers) {
-        this.application = application; this.handlers = handlers;
-    }
+    
 
     /** 返回与 CodeRuleDesigner 精确兼容的 V1 目录。 */
     @GetMapping("/segments")
