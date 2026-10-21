@@ -110,6 +110,36 @@ class OpeningInventoryPostgresqlIT {
         assertThat(filtered.records()).extracting(OpeningInventoryApplication.Document::id).containsExactly(first);
     }
 
+    /** 覆盖 MP 明细 insert/select 与受单据归属约束的编辑、删除；业务版本按操作精确推进。 */
+    @Test void openingLineMomDataCrudPreservesDocumentVersionAndView() {
+        String documentId = createDraft("2000000000000000111");
+        var material = new MaterialSnapshot("1001", "MAT-1", "物料一", "REQUIRED", "kg");
+        var location = new LocationSnapshot("3001", "LOC-3001");
+        LineInput original = new LineInput("1001", "3001", "BATCH-1", "SN-NEW",
+                QualityStatus.QUALIFIED, WarehouseStatus.NORMAL, new BigDecimal("2.50"));
+        String lineId = ids.nextId();
+        commits.addLine(opening.get(documentId).document(), material, location, original, lineId, "operator-1");
+
+        var saved = lineMapper.selectById(lineId);
+        assertThat(saved.getDocumentId()).isEqualTo(documentId);
+        assertThat(saved.getQuantity()).isEqualByComparingTo("2.50");
+        assertThat(saved.getCreatedAt()).isNotNull();
+        assertThat(opening.get(documentId).lines()).hasSize(1);
+        assertThat(opening.get(documentId).lines().getFirst().quantity()).isEqualTo("2.50");
+        assertThat(mapper.find(documentId).version()).isEqualTo(1);
+
+        LineInput changed = new LineInput("1001", "3001", "BATCH-1", "SN-NEW",
+                QualityStatus.QUALIFIED, WarehouseStatus.NORMAL, new BigDecimal("3.75"));
+        commits.editLine(opening.get(documentId).document(), lineId, material, location, changed, "operator-1");
+        assertThat(lineMapper.selectById(lineId).getQuantity()).isEqualByComparingTo("3.75");
+        assertThat(mapper.find(documentId).version()).isEqualTo(2);
+
+        commits.deleteLine(documentId, lineId, "operator-1");
+        assertThat(lineMapper.selectById(lineId)).isNull();
+        assertThat(opening.get(documentId).lines()).isEmpty();
+        assertThat(mapper.find(documentId).version()).isEqualTo(3);
+    }
+
     @Test void postsMultipleLinesOnceAndActivationIsSeparate() {
         String documentId = createDraft("2000000000000000001");
         add(documentId, "SN-A", "3001", "4.25");
