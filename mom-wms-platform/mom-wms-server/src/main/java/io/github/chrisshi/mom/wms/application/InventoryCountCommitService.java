@@ -78,7 +78,7 @@ public class InventoryCountCommitService {
         for(var book:store.books(task)) {
             if(store.snapshot(ids.nextId(),id,book,actor)!=1) throw new IllegalStateException("盘点快照写入失败");
         }
-        if(store.start(id,actor)!=1)
+        if(store.start(id,"DRAFT",actor)!=1)
             throw new IllegalStateException("盘点任务开始失败");
     }
     /** 录入实盘数量；NULL 只表示尚未录入，零是有效实盘。 */
@@ -113,7 +113,7 @@ public class InventoryCountCommitService {
         rejectFrozenDifferences(lines);
         if(lines.stream().filter(line->difference(line).signum()!=0).count()>100)
             throw new InventoryCountLimitException();
-        if(store.confirm(id,actor())!=1)
+        if(store.confirm(id,"COUNTING",actor())!=1)
             throw new IllegalStateException("盘点差异确认失败");
     }
     /** 将全部差异作为单笔库存交易过账；失败时任务保持 CONFIRMED 且仓库锁有效。 */
@@ -133,7 +133,7 @@ public class InventoryCountCommitService {
         if(entries.size()>100) throw new InventoryCountLimitException();
         String transactionId=entries.isEmpty()?null:accounting.post(new Posting("INVENTORY_COUNT:"+id,
             "INVENTORY_COUNT_ADJUSTMENT","INVENTORY_COUNT",id,actor,entries));
-        if(store.complete(id,actor,transactionId)!=1
+        if(store.complete(id,"CONFIRMED",actor,transactionId)!=1
                 || store.release(task.warehouseId(),id)!=1)
             throw new IllegalStateException("盘点完成或锁释放失败");
         return transactionId;
