@@ -52,7 +52,7 @@ public class InventoryCountApplication {
         if(task==null) throw new IllegalArgumentException("盘点任务不存在");
         return new Detail(task,store.lines(id).stream().map(line->new LineView(line.id(),line.dimension(),
             line.bookQuantity().toPlainString(),line.countedQuantity()==null?null:line.countedQuantity().toPlainString(),
-            line.countedQuantity()==null?null:line.difference().toPlainString(),line.snapshotBy(),line.snapshotAt(),
+            line.countedQuantity()==null?null:line.countedQuantity().subtract(line.bookQuantity()).toPlainString(),line.snapshotBy(),line.snapshotAt(),
             line.countedBy(),line.countedAt())).toList());
     }
     /** 只返回当前操作人同键创建的已提交任务；缺失时不能证明原请求未提交。 */
