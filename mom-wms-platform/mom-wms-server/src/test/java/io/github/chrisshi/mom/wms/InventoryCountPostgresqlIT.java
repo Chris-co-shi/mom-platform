@@ -135,6 +135,10 @@ class InventoryCountPostgresqlIT {
         assertThat(counts.create(key, warehouse(), locations, materials)).isEqualTo(id);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_count_task WHERE request_key = ?", Integer.class, key))
                 .isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_code_rule_issue WHERE code = ?", Integer.class, persisted.taskNo()))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT last_value FROM wms_code_rule_sequence", Long.class))
+                .isEqualTo(1L);
     }
 
     @Test void createRejectsWarehouseBeforeInventoryActivation() {
