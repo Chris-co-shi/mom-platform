@@ -36,9 +36,7 @@ public class InventoryCountPersistence {
     /** 盘点明细视图：业务差异只依赖账面与实盘事实。 */
     public record Line(String id, String taskId, Dimension dimension, BigDecimal bookQuantity,
                        BigDecimal countedQuantity, String snapshotBy, Instant snapshotAt,
-                       String countedBy, Instant countedAt) {
-        public BigDecimal difference() { return countedQuantity.subtract(bookQuantity); }
-    }
+                       String countedBy, Instant countedAt) { }
 
     /** 账面余额维度快照，包含已有零余额。 */
     public record Book(Dimension dimension, BigDecimal quantity) { }
@@ -148,15 +146,13 @@ public class InventoryCountPersistence {
         return lines.insert(row);
     }
 
-    public int transition(String id,String from,String to,String actor,String transactionId) {
-        return switch (to) {
-            case "COUNTING" -> tasks.start(id,from,actor,transactionId);
-            case "CONFIRMED" -> tasks.confirm(id,from,actor,transactionId);
-            case "COMPLETED" -> tasks.complete(id,from,actor,transactionId);
-            case "CANCELLED" -> tasks.cancel(id,from,actor,transactionId);
-            default -> throw new IllegalArgumentException("盘点目标状态非法");
-        };
+    /** 这里只代理数据库原子条件 SQL；目标状态选择由 Application 决定。 */
+    public int start(String id,String actor) { return tasks.start(id,"DRAFT",actor,null); }
+    public int confirm(String id,String actor) { return tasks.confirm(id,"COUNTING",actor,null); }
+    public int complete(String id,String actor,String transactionId) {
+        return tasks.complete(id,"CONFIRMED",actor,transactionId);
     }
+    public int cancel(String id,String from,String actor) { return tasks.cancel(id,from,actor,null); }
 
     public int count(String taskId,String lineId,BigDecimal quantity,String actor) {
         return lines.recordCount(taskId,lineId,quantity,actor);
