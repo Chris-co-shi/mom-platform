@@ -12,6 +12,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.wms.infrastructure.entity.OpeningDocumentLineEntity;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryLineMapper;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -30,6 +31,7 @@ import jakarta.validation.constraints.Size;
 @Service
 public class OpeningInventoryApplication {
     private final OpeningInventoryMapper mapper;
+    private final InventoryAccountingMapper inventory;
     private final OpeningInventoryLineMapper lineMapper;
     private final OpeningInventoryReferenceService references;
     private final OpeningInventoryCommitService commits;
@@ -39,10 +41,10 @@ public class OpeningInventoryApplication {
 
     /** @param mapper WMS 期初持久化入口 @param references 事务外 MDM 权威引用 @param commits WMS 本地事务入口 @param ids 字符串技术 ID @param actors 当前责任主体 */
     public OpeningInventoryApplication(OpeningInventoryMapper mapper, OpeningInventoryLineMapper lineMapper,
-                                       OpeningInventoryReferenceService references,
+                                       InventoryAccountingMapper inventory, OpeningInventoryReferenceService references,
                                        OpeningInventoryCommitService commits, IdGenerator ids,
                                        CurrentActorProvider actors, PageAdapter pages) {
-        this.mapper = mapper; this.lineMapper = lineMapper; this.references = references; this.commits = commits; this.ids = ids; this.actors = actors;
+        this.mapper = mapper; this.lineMapper = lineMapper; this.inventory = inventory; this.references = references; this.commits = commits; this.ids = ids; this.actors = actors;
         this.pages = pages;
     }
 
@@ -148,7 +150,7 @@ public class OpeningInventoryApplication {
     public String activate(String warehouseId) {
         references.warehouse(warehouseId);
         commits.activate(warehouseId, actors.requireCurrentActor().actorId());
-        return mapper.warehouseState(warehouseId);
+        return inventory.warehouseInventoryState(warehouseId);
     }
 
     private Document requireDocument(String id) {
