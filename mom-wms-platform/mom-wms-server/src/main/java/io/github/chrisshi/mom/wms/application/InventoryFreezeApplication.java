@@ -7,8 +7,8 @@ import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryFreezeMapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.wms.infrastructure.entity.InventoryFreezeEntity;
 import io.github.chrisshi.mom.wms.infrastructure.entity.InventoryUnfreezeEntity;
-import io.github.chrisshi.mom.wms.infrastructure.query.InventoryFreezeQueryMapper;
-import io.github.chrisshi.mom.wms.infrastructure.query.InventoryUnfreezeQueryMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryFreezeRecordMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryUnfreezeRecordMapper;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,8 +29,8 @@ import java.util.List;
 public class InventoryFreezeApplication {
     private final InventoryAccountingMapper inventory;
     private final InventoryFreezeMapper freezes;
-    private final InventoryFreezeQueryMapper freezeReads;
-    private final InventoryUnfreezeQueryMapper unfreezeReads;
+    private final InventoryFreezeRecordMapper freezeReads;
+    private final InventoryUnfreezeRecordMapper unfreezeReads;
     private final InventoryAccountingService accounting;
     private final IdGenerator ids;
 
@@ -40,7 +40,7 @@ public class InventoryFreezeApplication {
      * @param ids MOM 字符串技术主键生成器
      */
     public InventoryFreezeApplication(InventoryAccountingMapper inventory, InventoryFreezeMapper freezes,
-                                      InventoryFreezeQueryMapper freezeReads, InventoryUnfreezeQueryMapper unfreezeReads,
+                                      InventoryFreezeRecordMapper freezeReads, InventoryUnfreezeRecordMapper unfreezeReads,
                                       InventoryAccountingService accounting,
                                       IdGenerator ids) {
         this.inventory = inventory;
