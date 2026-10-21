@@ -199,7 +199,7 @@ class InventoryAccountingPostgresqlIT {
                 .isEmpty();
         assertThat(java.util.Arrays.stream(
                 io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryFreezeMapper.class.getDeclaredMethods())
-                .map(java.lang.reflect.Method::getName))
+                .map(java.lang.reflect.Method::getName).toList())
                 .containsExactlyInAnyOrder(
                         "findFreezeByTransaction", "lockFreeze", "insertFreeze",
                         "activeFreezesByDimension", "decreaseFreezeRemaining", "findUnfreeze", "insertUnfreeze");
