@@ -21,4 +21,8 @@ public interface OpeningInventoryQueryMapper {
     IPage<DocumentRow> list(IPage<DocumentRow> page,@Param("warehouseId") String warehouseId);
 
 
+    /** 仓库已出现任何权威余额（包含零余额）时，禁止二次执行期初建账。 */
+    @Select("SELECT EXISTS(SELECT 1 FROM wms_inventory_balance WHERE warehouse_id=#{warehouseId})")
+    boolean hasWarehouseBalance(@Param("warehouseId") String warehouseId);
+
 }
