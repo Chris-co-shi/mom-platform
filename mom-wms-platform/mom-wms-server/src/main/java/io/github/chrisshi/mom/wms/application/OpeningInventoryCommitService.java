@@ -11,10 +11,13 @@ import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMappe
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.wms.infrastructure.entity.OpeningDocumentLineEntity;
 import io.github.chrisshi.mom.wms.infrastructure.entity.OpeningDocumentEntity;
+import io.github.chrisshi.mom.wms.infrastructure.entity.WarehouseInventoryStateEntity;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryLineMapper;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.WarehouseInventoryStateMapper;
+import io.github.chrisshi.mom.wms.infrastructure.query.OpeningInventoryQueryMapper;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryApplication.Document;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryMapper.DocumentRow;
+import io.github.chrisshi.mom.wms.infrastructure.query.OpeningInventoryQueryMapper.DocumentRow;
 import io.github.chrisshi.mom.mdm.api.WarehouseResourceReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +31,8 @@ import java.util.List;
 @Service
 public class OpeningInventoryCommitService {
     private final OpeningInventoryMapper mapper;
+    private final WarehouseInventoryStateMapper warehouseStates;
+    private final OpeningInventoryQueryMapper queries;
     private final OpeningInventoryLineMapper lineMapper;
     private final InventoryAccountingService accounting;
     private final IdGenerator ids;
@@ -35,9 +40,11 @@ public class OpeningInventoryCommitService {
 
     /** @param mapper 期初单持久化入口 @param accounting 唯一库存记账服务 @param ids 技术主键生成器 @param numbers WMS 正式单据发号入口 */
     public OpeningInventoryCommitService(OpeningInventoryMapper mapper, OpeningInventoryLineMapper lineMapper,
+                                         WarehouseInventoryStateMapper warehouseStates, OpeningInventoryQueryMapper queries,
                                          InventoryAccountingService accounting,
                                          IdGenerator ids, OpeningDocumentNumberService numbers) {
-        this.mapper = mapper; this.lineMapper = lineMapper; this.accounting = accounting; this.ids = ids; this.numbers = numbers;
+        this.mapper = mapper; this.lineMapper = lineMapper;
+        this.warehouseStates = warehouseStates; this.queries = queries; this.accounting = accounting; this.ids = ids; this.numbers = numbers;
     }
 
     /**
@@ -47,10 +54,10 @@ public class OpeningInventoryCommitService {
      */
     @Transactional
     public void create(String id, WarehouseResourceReference warehouse, String actor) {
-        mapper.initialize(ids.nextId(), warehouse.id(), warehouse.code(), actor);
-        String state = mapper.lockWarehouse(warehouse.id());
+        warehouseStates.initialize(ids.nextId(), warehouse.id(), warehouse.code(), actor);
+        String state = warehouseStates.lockWarehouse(warehouse.id());
         if (!"INITIALIZING".equals(state)) throw new IllegalStateException("仓库已过账待启用或已启用，不可再次进行期初建账");
-        if (mapper.hasWarehouseBalance(warehouse.id()))
+        if (queries.hasWarehouseBalance(warehouse.id()))
             throw new IllegalStateException("该仓库已存在实时余额，不能通过期初单重复增加初始库存");
         String documentNo = numbers.allocate();
         if (mapper.createDocument(id, documentNo, warehouse.id(), warehouse.code(), actor) != 1)
@@ -129,7 +136,10 @@ public class OpeningInventoryCommitService {
         if (mapper.delete(Wrappers.<OpeningDocumentEntity>lambdaQuery()
                 .eq(OpeningDocumentEntity::getId, documentId)
                 .eq(OpeningDocumentEntity::getStatus, "DRAFT")) != 1) throw new IllegalStateException("期初单状态发生并发冲突");
-        if (mapper.deleteInitializingWarehouse(document.warehouseId()) != 1)
+        if (warehouseStates.delete(Wrappers.<WarehouseInventoryStateEntity>lambdaQuery()
+                .eq(WarehouseInventoryStateEntity::getWarehouseId, document.warehouseId())
+                .eq(WarehouseInventoryStateEntity::getState, "INITIALIZING")
+                .isNull(WarehouseInventoryStateEntity::getOpeningDocumentId)) != 1)
             throw new IllegalStateException("仓库初始化状态发生并发冲突");
     }
 
@@ -144,7 +154,7 @@ public class OpeningInventoryCommitService {
         if ("POSTED".equals(document.status())) return document.transactionId();
         if (!"DRAFT".equals(document.status())) throw new IllegalStateException("期初建账单状态不可过账");
         if (document.version() != expectedVersion) throw new IllegalStateException("期初明细在校验后发生变化，请刷新后重新确认");
-        if (!"INITIALIZING".equals(mapper.lockWarehouse(document.warehouseId())))
+        if (!"INITIALIZING".equals(warehouseStates.lockWarehouse(document.warehouseId())))
             throw new IllegalStateException("仓库不处于期初初始化状态");
         List<OpeningDocumentLineEntity> lines = lines(documentId);
         if (lines.isEmpty() || lines.size() > 100) throw new IllegalArgumentException("期初明细须为 1 至 100 条");
@@ -155,7 +165,14 @@ public class OpeningInventoryCommitService {
         String transactionId = accounting.post(new Posting("OPENING:" + documentId, "OPENING", "OPENING_DOCUMENT",
                 documentId, actor, entries));
         if (mapper.postDocument(documentId, transactionId, expectedVersion, actor) != 1
-                || mapper.markPending(document.warehouseId(), documentId, actor) != 1)
+                || warehouseStates.update(new WarehouseInventoryStateEntity(),
+                    Wrappers.<WarehouseInventoryStateEntity>lambdaUpdate()
+                            .set(WarehouseInventoryStateEntity::getState, "PENDING_ACTIVATION")
+                            .set(WarehouseInventoryStateEntity::getOpeningDocumentId, documentId)
+                            .set(WarehouseInventoryStateEntity::getUpdatedBy, actor)
+                            .setSql("updated_at=now()")
+                            .eq(WarehouseInventoryStateEntity::getWarehouseId, document.warehouseId())
+                            .eq(WarehouseInventoryStateEntity::getState, "INITIALIZING")) != 1)
             throw new IllegalStateException("期初单或仓库状态发生并发冲突");
         return transactionId;
     }
@@ -166,9 +183,16 @@ public class OpeningInventoryCommitService {
      */
     @Transactional
     public void activate(String warehouseId, String actor) {
-        String state = mapper.lockWarehouse(warehouseId);
+        String state = warehouseStates.lockWarehouse(warehouseId);
         if (!"PENDING_ACTIVATION".equals(state)) throw new IllegalStateException("仓库必须处于已过账待启用状态");
-        if (mapper.activate(warehouseId, actor) != 1) throw new IllegalStateException("仓库启用状态发生并发冲突");
+        if (warehouseStates.update(new WarehouseInventoryStateEntity(),
+                Wrappers.<WarehouseInventoryStateEntity>lambdaUpdate()
+                        .set(WarehouseInventoryStateEntity::getState, "ACTIVE")
+                        .set(WarehouseInventoryStateEntity::getActivatedBy, actor)
+                        .set(WarehouseInventoryStateEntity::getUpdatedBy, actor)
+                        .setSql("activated_at=now(), updated_at=now()")
+                        .eq(WarehouseInventoryStateEntity::getWarehouseId, warehouseId)
+                        .eq(WarehouseInventoryStateEntity::getState, "PENDING_ACTIVATION")) != 1) throw new IllegalStateException("仓库启用状态发生并发冲突");
     }
 
     private void insert(DocumentRow document, MaterialSnapshot material, LocationSnapshot location,
