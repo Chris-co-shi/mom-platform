@@ -53,9 +53,6 @@ public interface OpeningInventoryMapper extends MomBaseMapper<OpeningDocumentEnt
     int postDocument(@Param("id") String id,@Param("transactionId") String transactionId,
                      @Param("version") long version,@Param("actor") String actor);
 
-    @Delete("DELETE FROM wms_opening_document WHERE id=#{id} AND status='DRAFT'")
-    int deleteDraft(@Param("id") String id);
-
     @Delete("DELETE FROM wms_warehouse_inventory_state WHERE warehouse_id=#{warehouseId} AND state='INITIALIZING' AND opening_document_id IS NULL")
     int deleteInitializingWarehouse(@Param("warehouseId") String warehouseId);
 
