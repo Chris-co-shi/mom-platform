@@ -1,6 +1,9 @@
 package io.github.chrisshi.mom.mdm;
 
 import io.github.chrisshi.mom.coderule.CodeRuleDefinition;
+import io.github.chrisshi.mom.coderule.application.CodeGenerationApplication;
+import io.github.chrisshi.mom.coderule.application.DefaultCodeGenerationApplication;
+import io.github.chrisshi.mom.coderule.store.JdbcCodeRuleStore;
 import io.github.chrisshi.mom.coderule.CodeRuleFailure;
 import io.github.chrisshi.mom.coderule.CodeRulePageParams;
 import io.github.chrisshi.mom.coderule.CodeRuleView;
@@ -93,6 +96,7 @@ class MdmCodeRulePostgresqlIT {
         registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
     }
     @Autowired CodeRuleApplication rules;
+    @Autowired CodeGenerationApplication generation;
     @MockitoSpyBean CodeRuleStore store;
     @Autowired CodeSegmentRegistry segments;
     @Autowired CodeFieldRegistry fields;
@@ -106,6 +110,8 @@ class MdmCodeRulePostgresqlIT {
 
     @BeforeEach void setup() {
         mvc = webAppContextSetup(web).apply(springSecurity()).build();
+        jdbc.update("DELETE FROM mdm_code_rule_issue WHERE rule_id IN (SELECT id FROM mdm_code_rule WHERE rule_code LIKE 'it.code.%')");
+        jdbc.update("DELETE FROM mdm_code_rule_sequence WHERE rule_id IN (SELECT id FROM mdm_code_rule WHERE rule_code LIKE 'it.code.%')");
         jdbc.update("DELETE FROM mdm_code_rule_revision WHERE rule_id IN (SELECT id FROM mdm_code_rule WHERE rule_code LIKE 'it.code.%')");
         jdbc.update("DELETE FROM mdm_code_rule WHERE rule_code LIKE 'it.code.%'");
         actor();
@@ -119,6 +125,201 @@ class MdmCodeRulePostgresqlIT {
                 new CodeRuleDefinition.Segment("prefix", "LITERAL", Map.of("value", "M-")),
                 new CodeRuleDefinition.Segment("field", "BUSINESS_FIELD", Map.of("fieldKey", "mdm.materialCategory.code")),
                 new CodeRuleDefinition.Segment("seq", "SEQUENCE", Map.of("width", 4, "step", 1))));
+    }
+
+    private static CodeRuleDefinition executable(String reset, int width) {
+        return new CodeRuleDefinition(1, List.of(
+                new CodeRuleDefinition.Segment("prefix", "LITERAL", Map.of("value", "M-")),
+                new CodeRuleDefinition.Segment("date", "DATE", Map.of("format", "YYYYMMDD")),
+                new CodeRuleDefinition.Segment("seq", "SEQUENCE", Map.of("width", width, "step", 1, "reset", reset))));
+    }
+
+    @Test void officialCodePersistsAcrossGeneratorInstancesAndRetries() {
+        var draft = rules.create("it.code.generate", "测试正式发号", null, executable("NONE", 4));
+        var enabled = rules.enable(draft.id(), draft.ruleVersion());
+        var first = generation.generate("it.code.generate", Map.of(), "retry-1");
+        var reopened = new DefaultCodeGenerationApplication(store, segments, fields, Clock.systemUTC());
+        var transactions = new org.springframework.transaction.support.TransactionTemplate(
+                context.getBean(org.springframework.transaction.PlatformTransactionManager.class));
+        var second = transactions.execute(s -> reopened.generate("it.code.generate", Map.of(), "retry-2"));
+        assertThat(first.code()).startsWith("M-").endsWith("0001");
+        assertThat(second.code()).endsWith("0002");
+        assertThat(first.revisionId()).isEqualTo(enabled.id());
+        assertThat(generation.generate("it.code.generate", Map.of(), "retry-1")).isEqualTo(first);
+        assertThat(jdbc.queryForObject("SELECT last_value FROM mdm_code_rule_sequence WHERE rule_id=? AND scope_key=''",
+                Long.class, enabled.ruleId())).isEqualTo(2);
+        assertThatThrownBy(() -> generation.generate("it.code.generate", Map.of("other", "value"), "retry-1"))
+                .isInstanceOfSatisfying(CodeRuleFailure.class, failure -> assertThat(failure.code()).isEqualTo("request_key_conflict"));
+        rules.disable(enabled.id(), enabled.ruleVersion());
+        assertThat(generation.generate("it.code.generate", Map.of(), "retry-1")).isEqualTo(first);
+        assertThatThrownBy(() -> generation.generate("it.code.generate", Map.of(), "retry-3"))
+                .isInstanceOfSatisfying(CodeRuleFailure.class, failure -> assertThat(failure.code()).isEqualTo("rule_not_enabled"));
+    }
+
+    @Test void concurrentFirstAllocationUsesOnePostgresqlSequence() throws Exception {
+        var draft = rules.create("it.code.race", "测试并发发号", null, executable("NONE", 4));
+        rules.enable(draft.id(), draft.ruleVersion());
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(16)) {
+            var futures = new java.util.ArrayList<Future<String>>();
+            for (int i = 0; i < 100; i++) {
+                final int index = i;
+                futures.add(executor.submit(() -> { start.await(); return generation.generate("it.code.race", Map.of(), "concurrent-" + index).code(); }));
+            }
+            start.countDown();
+            var codes = new java.util.HashSet<String>();
+            for (Future<String> future : futures) codes.add(future.get(60, TimeUnit.SECONDS));
+            assertThat(codes).hasSize(100);
+        }
+        assertThat(jdbc.queryForObject("SELECT last_value FROM mdm_code_rule_sequence WHERE rule_id=? AND scope_key=''",
+                Long.class, draft.ruleId())).isEqualTo(100);
+    }
+
+    @Test void independentDataSourcesAllocateWithoutJvmSharedState() throws Exception {
+        var draft = rules.create("it.code.instances", "测试独立实例", null, executable("NONE", 4));
+        rules.enable(draft.id(), draft.ruleVersion());
+        var sourceA = new org.springframework.jdbc.datasource.DriverManagerDataSource(
+                PG.getJdbcUrl() + "&currentSchema=mom_mdm", PG.getUsername(), PG.getPassword());
+        var sourceB = new org.springframework.jdbc.datasource.DriverManagerDataSource(
+                PG.getJdbcUrl() + "&currentSchema=mom_mdm", PG.getUsername(), PG.getPassword());
+        var actors = context.getBean(io.github.chrisshi.mom.core.security.CurrentActorProvider.class);
+        var first = new DefaultCodeGenerationApplication(new JdbcCodeRuleStore(sourceA, json, 200, actors, Clock.systemUTC(), "mdm"),
+                segments, fields, Clock.systemUTC());
+        var second = new DefaultCodeGenerationApplication(new JdbcCodeRuleStore(sourceB, json, 200, actors, Clock.systemUTC(), "mdm"),
+                segments, fields, Clock.systemUTC());
+        var txA = new org.springframework.transaction.support.TransactionTemplate(new org.springframework.jdbc.datasource.DataSourceTransactionManager(sourceA));
+        var txB = new org.springframework.transaction.support.TransactionTemplate(new org.springframework.jdbc.datasource.DataSourceTransactionManager(sourceB));
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(8)) {
+            var futures = new java.util.ArrayList<Future<String>>();
+            for (int i = 0; i < 100; i++) {
+                final int index = i;
+                futures.add(executor.submit(() -> {
+                    start.await();
+                    return index % 2 == 0
+                            ? txA.execute(s -> first.generate("it.code.instances", Map.of(), "instance-" + index).code())
+                            : txB.execute(s -> second.generate("it.code.instances", Map.of(), "instance-" + index).code());
+                }));
+            }
+            start.countDown();
+            var codes = new java.util.HashSet<String>();
+            for (Future<String> future : futures) codes.add(future.get(60, TimeUnit.SECONDS));
+            assertThat(codes).hasSize(100);
+        }
+        assertThat(jdbc.queryForObject("SELECT last_value FROM mdm_code_rule_sequence WHERE rule_id=? AND scope_key=''",
+                Long.class, draft.ruleId())).isEqualTo(100);
+    }
+
+    @Test void dailyResetAndRevisionCollisionAreProtectedByCompleteCodeConstraint() {
+        var draft = rules.create("it.code.reset", "测试日期重置", null, executable("DAY", 4));
+        var enabled = rules.enable(draft.id(), draft.ruleVersion());
+        var transactions = new org.springframework.transaction.support.TransactionTemplate(
+                context.getBean(org.springframework.transaction.PlatformTransactionManager.class));
+        var day1 = new DefaultCodeGenerationApplication(store, segments, fields,
+                Clock.fixed(Instant.parse("2026-03-04T23:59:00Z"), java.time.ZoneOffset.UTC));
+        var day2 = new DefaultCodeGenerationApplication(store, segments, fields,
+                Clock.fixed(Instant.parse("2026-03-05T00:01:00Z"), java.time.ZoneOffset.UTC));
+        String firstDay = transactions.execute(s -> day1.generate("it.code.reset", Map.of(), "day-1").code());
+        String secondDay = transactions.execute(s -> day2.generate("it.code.reset", Map.of(), "day-2").code());
+        assertThat(firstDay).isEqualTo("M-202603040001");
+        assertThat(secondDay).isEqualTo("M-202603050001");
+        var revised = rules.revise(enabled.id(), enabled.ruleVersion());
+        var changed = rules.updateDraft(revised.id(), "测试日期重置", null, executable("NONE", 4), revised.ruleVersion());
+        rules.enable(changed.id(), changed.ruleVersion());
+        assertThatThrownBy(() -> transactions.execute(s -> day1.generate("it.code.reset", Map.of(), "collision")))
+                .isInstanceOfSatisfying(CodeRuleFailure.class, failure -> assertThat(failure.code()).isEqualTo("code_collision"));
+    }
+
+    @Test void sequenceOverflowAndInvalidContextDoNotConsumeNumber() {
+        var draft = rules.create("it.code.overflow", "测试溢出", null, executable("NONE", 1));
+        rules.enable(draft.id(), draft.ruleVersion());
+        assertThatThrownBy(() -> generation.generate("it.code.overflow", Map.of("bad-key", "x"), "invalid"))
+                .isInstanceOf(CodeRuleFailure.class);
+        for (int i = 1; i <= 9; i++) assertThat(generation.generate("it.code.overflow", Map.of(), "n-" + i).code()).endsWith("" + i);
+        assertThatThrownBy(() -> generation.generate("it.code.overflow", Map.of(), "overflow"))
+                .isInstanceOfSatisfying(CodeRuleFailure.class, failure -> assertThat(failure.code()).isEqualTo("sequence_overflow"));
+        assertThat(jdbc.queryForObject("SELECT last_value FROM mdm_code_rule_sequence WHERE rule_id=? AND scope_key=''",
+                Long.class, draft.ruleId())).isEqualTo(9);
+    }
+
+    @Test void providerFailureAndMissingRequiredContextLeaveNoSequence() {
+        var draft = rules.create("it.code.provider", "测试字段来源", null, definition());
+        rules.enable(draft.id(), draft.ruleVersion());
+        assertThatThrownBy(() -> generation.generate("it.code.provider", Map.of(), "missing"))
+                .isInstanceOfSatisfying(CodeRuleFailure.class, failure -> assertThat(failure.code()).isEqualTo("context_missing"));
+        assertThatThrownBy(() -> generation.generate("it.code.provider", Map.of("materialCategoryId", "9999999999999999999"), "absent"))
+                .isInstanceOfSatisfying(CodeRuleFailure.class, failure -> assertThat(failure.code()).isEqualTo("segment_execution_failed"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mdm_code_rule_sequence WHERE rule_id=?", Long.class, draft.ruleId())).isZero();
+    }
+
+    @Test void independentRulesStartAtTheirOwnFirstNumber() {
+        var left = rules.create("it.code.scope.a", "规则 A", null, executable("NONE", 4));
+        var right = rules.create("it.code.scope.b", "规则 B", null, executable("NONE", 4));
+        rules.enable(left.id(), left.ruleVersion());
+        rules.enable(right.id(), right.ruleVersion());
+        assertThat(generation.generate("it.code.scope.a", Map.of(), "scope-a").code()).endsWith("0001");
+        assertThat(generation.generate("it.code.scope.b", Map.of(), "scope-b").code()).endsWith("0001");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mdm_code_rule_sequence WHERE rule_id IN (?,?)",
+                Long.class, left.ruleId(), right.ruleId())).isEqualTo(2);
+    }
+
+    @Test void publishAndGenerateObserveOneCompleteRevision() throws Exception {
+        var first = rules.create("it.code.publishrace", "发布并发", null, executable("NONE", 4));
+        var enabled = rules.enable(first.id(), first.ruleVersion());
+        var draft = rules.revise(enabled.id(), enabled.ruleVersion());
+        var changedDefinition = new CodeRuleDefinition(1, List.of(
+                new CodeRuleDefinition.Segment("prefix", "LITERAL", Map.of("value", "N-")),
+                new CodeRuleDefinition.Segment("date", "DATE", Map.of("format", "YYYYMMDD")),
+                new CodeRuleDefinition.Segment("seq", "SEQUENCE", Map.of("width", 4, "step", 1))));
+        var changed = rules.updateDraft(draft.id(), "发布并发", null, changedDefinition, draft.ruleVersion());
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<CodeRuleView> publish = executor.submit(() -> {
+                start.await(); actor();
+                try { return rules.enable(changed.id(), changed.ruleVersion()); }
+                finally { SecurityContextHolder.clearContext(); }
+            });
+            Future<io.github.chrisshi.mom.coderule.application.CodeGenerationResult> allocate = executor.submit(() -> {
+                start.await(); return generation.generate("it.code.publishrace", Map.of(), "publish-race");
+            });
+            start.countDown();
+            assertThat(publish.get(20, TimeUnit.SECONDS).status()).isEqualTo("ENABLED");
+            var result = allocate.get(20, TimeUnit.SECONDS);
+            if (result.revisionId().equals(enabled.id())) assertThat(result.code()).startsWith("M-");
+            else { assertThat(result.revisionId()).isEqualTo(changed.id()); assertThat(result.code()).startsWith("N-"); }
+        }
+    }
+
+    @Test void resetWithoutMatchingFullYearDateCannotBePublished() {
+        var draft = rules.create("it.code.badreset", "测试重置配置", null, new CodeRuleDefinition(1, List.of(
+                new CodeRuleDefinition.Segment("date", "DATE", Map.of("format", "YYMM")),
+                new CodeRuleDefinition.Segment("seq", "SEQUENCE", Map.of("width", 4, "step", 1, "reset", "YEAR")))));
+        assertThatThrownBy(() -> rules.enable(draft.id(), draft.ruleVersion()))
+                .isInstanceOfSatisfying(CodeRuleFailure.class, failure -> assertThat(failure.code()).isEqualTo("reset_date_missing"));
+    }
+
+    @Test void httpGenerationRequiresUsePermissionAndRejectsWrongContextType() throws Exception {
+        var draft = rules.create("it.code.httpgenerate", "HTTP 正式发号", null, executable("NONE", 4));
+        rules.enable(draft.id(), draft.ruleVersion());
+        SecurityContextHolder.clearContext();
+        org.springframework.security.test.context.TestSecurityContextHolder.clearContext();
+        tokens.store("rule-reader", new MomTokenPrincipal("reader", List.of("mdm:code-rule:read"), Instant.now().plusSeconds(300)));
+        tokens.store("code-user", new MomTokenPrincipal("generator", List.of("mdm:code-rule:generate"), Instant.now().plusSeconds(300)));
+        String body = json.writeValueAsString(Map.of("ruleCode", "it.code.httpgenerate", "context", Map.of(), "requestKey", "same-request"));
+        mvc.perform(post("/code-rules/generate").header(HttpHeaders.AUTHORIZATION, "Bearer rule-reader")
+                .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
+        mvc.perform(post("/code-rules/generate").header(HttpHeaders.AUTHORIZATION, "Bearer code-user")
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.code").value(org.hamcrest.Matchers.endsWith("0001")));
+        mvc.perform(post("/code-rules/generate").header(HttpHeaders.AUTHORIZATION, "Bearer code-user")
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.code").value(org.hamcrest.Matchers.endsWith("0001")));
+        mvc.perform(post("/code-rules/generate").header(HttpHeaders.AUTHORIZATION, "Bearer code-user")
+                .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of(
+                        "ruleCode", "it.code.httpgenerate", "context", Map.of("category", 12), "requestKey", "bad-context"))))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("code_rule.context_invalid"));
+        mvc.perform(get("/code-rules/generation-fields").header(HttpHeaders.AUTHORIZATION, "Bearer code-user"))
+                .andExpect(status().isOk());
     }
 
     @TestConfiguration(proxyBeanMethods = false)

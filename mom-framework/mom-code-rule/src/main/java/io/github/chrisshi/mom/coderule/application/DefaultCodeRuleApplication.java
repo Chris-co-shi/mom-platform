@@ -192,13 +192,17 @@ public class DefaultCodeRuleApplication implements CodeRuleApplication {
         if (complete && definition.segments().isEmpty()) bad("definition_incomplete");
         Set<String> ids = new HashSet<>();
         int sequence = 0;
+        String reset = "NONE";
         for (CodeRuleDefinition.Segment segment : definition.segments()) {
             if (segment == null || segment.id() == null || !segment.id().matches("[A-Za-z][A-Za-z0-9_-]{0,63}")
                     || !ids.add(segment.id()) || segment.params() == null) bad("segment_invalid");
             CodeSegmentHandler handler;
             try { handler = handlers.require(segment.type()); }
             catch (CodeSegmentException ex) { bad("segment_unsupported"); return; }
-            if ("SEQUENCE".equals(segment.type())) sequence++;
+            if ("SEQUENCE".equals(segment.type())) {
+                sequence++;
+                if (segment.params().get("reset") instanceof String value) reset = value;
+            }
             Map<String, Object> params = segment.params();
             var schema = handler.metadata().parameterSchema();
             Set<String> allowed = new HashSet<>();
@@ -233,7 +237,9 @@ public class DefaultCodeRuleApplication implements CodeRuleApplication {
                     catch (CodeSegmentException ex) { bad("field_key_unsupported"); }
                 }
             }
-            boolean allPresent = schema.fields().stream().allMatch(f -> params.containsKey(f.name())
+            if ("LITERAL".equals(segment.type()) && params.get("value") instanceof String literal
+                    && !literal.matches("[\\p{L}\\p{N}._-]{1,128}")) bad("parameter_invalid");
+            boolean allPresent = schema.fields().stream().filter(io.github.chrisshi.mom.coderule.segment.CodeSegmentParameterSchema.Field::required).allMatch(f -> params.containsKey(f.name())
                     && params.get(f.name()) != null && !(params.get(f.name()) instanceof String s && s.isBlank()));
             if (complete && !allPresent) bad("parameter_missing");
             if (allPresent) {
@@ -242,6 +248,7 @@ public class DefaultCodeRuleApplication implements CodeRuleApplication {
             }
         }
         if (sequence > 1 || complete && sequence != 1) bad("sequence_count_invalid");
+        if (complete && !DefaultCodeGenerationApplication.hasMatchingDate(definition, reset)) bad("reset_date_missing");
     }
 
     private CodeRuleStore.Rule lock(String ruleId, long expected) {

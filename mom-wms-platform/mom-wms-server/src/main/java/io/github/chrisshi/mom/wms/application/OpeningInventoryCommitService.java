@@ -52,7 +52,7 @@ public class OpeningInventoryCommitService {
         if (!"INITIALIZING".equals(state)) throw new IllegalStateException("仓库已过账待启用或已启用，不可再次进行期初建账");
         if (queries.hasWarehouseBalance(warehouse.id()))
             throw new IllegalStateException("该仓库已存在实时余额，不能通过期初单重复增加初始库存");
-        String documentNo = numbers.allocate();
+        String documentNo = numbers.allocate(id);
         if (mapper.createDocument(id, documentNo, warehouse.id(), warehouse.code(), actor) != 1)
             throw new IllegalStateException("期初草稿写入失败");
     }

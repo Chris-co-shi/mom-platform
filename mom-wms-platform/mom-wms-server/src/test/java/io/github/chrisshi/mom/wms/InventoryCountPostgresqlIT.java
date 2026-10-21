@@ -74,7 +74,7 @@ class InventoryCountPostgresqlIT {
     @BeforeEach void clean() {
         jdbc.execute("TRUNCATE wms_inventory_count_line,wms_inventory_count_scope_lock,wms_inventory_count_task,"+
             "wms_inventory_unfreeze,wms_inventory_freeze,wms_inventory_transaction_entry,wms_inventory_transaction,"+
-            "wms_inventory_balance,wms_warehouse_inventory_state,wms_code_rule_sequence CASCADE");
+            "wms_inventory_balance,wms_warehouse_inventory_state,wms_code_rule_sequence,wms_code_rule_issue CASCADE");
         jdbc.update("INSERT INTO wms_warehouse_inventory_state(id,warehouse_id,warehouse_code,state) VALUES ('9000000000000000001','2001','WH-1','ACTIVE')");
         SecurityContextHolder.getContext().setAuthentication(
             new UsernamePasswordAuthenticationToken("operator-1","secret",List.of()));

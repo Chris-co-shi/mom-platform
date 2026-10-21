@@ -31,6 +31,8 @@ public final class JdbcCodeRuleStore implements CodeRuleStore {
     private final Clock clock;
     private final String ruleTable;
     private final String revisionTable;
+    private final String sequenceTable;
+    private final String issueTable;
 
     /** 创建 Owner 本地 Store；分页上限沿用 mom.data.pagination.max-page-size。 */
     public JdbcCodeRuleStore(DataSource source, JsonMapper json, long maxPageSize,
@@ -44,11 +46,39 @@ public final class JdbcCodeRuleStore implements CodeRuleStore {
         this.clock = clock;
         this.ruleTable = prefix + "_code_rule";
         this.revisionTable = prefix + "_code_rule_revision";
+        this.sequenceTable = prefix + "_code_rule_sequence";
+        this.issueTable = prefix + "_code_rule_issue";
     }
 
     public Rule lockRule(String id) {
         return one(jdbc.query("SELECT id, rule_code, usage_scenario, description, version FROM " + ruleTable + " WHERE id=? FOR UPDATE",
             (r, n) -> new Rule(r.getString(1), r.getString(2), r.getString(3), r.getString(4), r.getLong(5)), id));
+    }
+
+    public Rule lockRuleByCode(String code) {
+        return one(jdbc.query("SELECT id, rule_code, usage_scenario, description, version FROM " + ruleTable + " WHERE rule_code=? FOR UPDATE",
+            (r, n) -> new Rule(r.getString(1), r.getString(2), r.getString(3), r.getString(4), r.getLong(5)), code));
+    }
+
+    public Issue issued(String requestKey) {
+        return one(jdbc.query("SELECT rule_id,request_key,request_hash,code,revision_id,revision_no FROM " + issueTable
+                + " WHERE request_key=?", (r, n) -> new Issue(r.getString(1), r.getString(2),
+                r.getString(3), r.getString(4), r.getString(5), r.getInt(6)), requestKey));
+    }
+
+    public Long nextSequence(String ruleId, String scopeKey, long maximum) {
+        return one(jdbc.query("INSERT INTO " + sequenceTable + "(rule_id,scope_key,last_value) VALUES (?,?,1)"
+                + " ON CONFLICT(rule_id,scope_key) DO UPDATE SET last_value=" + sequenceTable + ".last_value+1"
+                + " WHERE " + sequenceTable + ".last_value < ? RETURNING last_value",
+                (r, n) -> r.getLong(1), ruleId, scopeKey, maximum));
+    }
+
+    public boolean insertIssue(Issue issue) {
+        return jdbc.update("INSERT INTO " + issueTable
+                + "(rule_id,request_key,request_hash,code,revision_id,revision_no,created_at) VALUES (?,?,?,?,?,?,?)"
+                + " ON CONFLICT(request_key) DO NOTHING",
+                issue.ruleId(), issue.requestKey(), issue.requestHash(), issue.code(), issue.revisionId(),
+                issue.revisionNo(), Timestamp.from(clock.instant())) == 1;
     }
 
     public Rule rule(String id) {

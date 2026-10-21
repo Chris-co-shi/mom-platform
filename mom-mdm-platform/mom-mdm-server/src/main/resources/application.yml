@@ -60,6 +60,8 @@ mom:
   code-rule:
     enabled: true
     owner: mdm
+    generation:
+      authority: mdm:code-rule:generate
     management:
       read-authority: mdm:code-rule:read
       write-authority: mdm:code-rule:write

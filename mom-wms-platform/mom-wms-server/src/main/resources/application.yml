@@ -48,6 +48,8 @@ mom:
   code-rule:
     enabled: true
     owner: wms
+    generation:
+      authority: wms:code-rule:generate
     management:
       read-authority: wms:code-rule:read
       write-authority: wms:code-rule:write

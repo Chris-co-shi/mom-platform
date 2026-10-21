@@ -15,7 +15,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import java.util.Locale;
 
 /** 编码规则公共接口的安全错误映射。 */
-@RestControllerAdvice(assignableTypes = CodeRuleController.class)
+@RestControllerAdvice(assignableTypes = {CodeRuleController.class, CodeGenerationController.class})
 @RequiredArgsConstructor
 public final class CodeRuleExceptionHandler {
     private final I18nMessageResolver messages;

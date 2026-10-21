@@ -8,11 +8,18 @@ import org.springframework.security.core.Authentication;
 public final class CodeRuleManagementAccess {
     private final String readAuthority;
     private final String writeAuthority;
+    private final String generateAuthority;
 
     /** 未配置或无效权限保留为拒绝状态，不从请求推导权限。 */
     public CodeRuleManagementAccess(String owner, String readAuthority, String writeAuthority) {
+        this(owner, readAuthority, writeAuthority, null);
+    }
+
+    /** 使用权限独立配置，缺失时拒绝正式发号。 */
+    public CodeRuleManagementAccess(String owner, String readAuthority, String writeAuthority, String generateAuthority) {
         this.readAuthority = valid(owner, readAuthority) ? readAuthority : null;
         this.writeAuthority = valid(owner, writeAuthority) ? writeAuthority : null;
+        this.generateAuthority = valid(owner, generateAuthority) ? generateAuthority : null;
     }
 
     /** 当前身份必须具有本 Owner 的显式读取权限。 */
@@ -23,6 +30,11 @@ public final class CodeRuleManagementAccess {
     /** 当前身份必须具有本 Owner 的显式写入权限。 */
     public boolean canWrite(Authentication authentication) {
         return has(authentication, writeAuthority);
+    }
+
+    /** 当前身份必须具有本 Owner 的独立正式发号权限。 */
+    public boolean canGenerate(Authentication authentication) {
+        return has(authentication, generateAuthority);
     }
 
     private static boolean valid(String owner, String authority) {

@@ -1,9 +1,12 @@
 package io.github.chrisshi.mom.webmvc.autoconfigure;
 
 import io.github.chrisshi.mom.coderule.application.CodeRuleApplication;
+import io.github.chrisshi.mom.coderule.application.CodeGenerationApplication;
 import io.github.chrisshi.mom.coderule.segment.CodeSegmentRegistry;
+import io.github.chrisshi.mom.coderule.field.CodeFieldRegistry;
 import io.github.chrisshi.mom.core.i18n.I18nMessageResolver;
 import io.github.chrisshi.mom.webmvc.coderule.CodeRuleController;
+import io.github.chrisshi.mom.webmvc.coderule.CodeGenerationController;
 import io.github.chrisshi.mom.webmvc.coderule.CodeRuleManagementAccess;
 import org.springframework.beans.factory.annotation.Value;
 import io.github.chrisshi.mom.webmvc.coderule.CodeRuleExceptionHandler;
@@ -25,13 +28,18 @@ public class CodeRuleWebMvcAutoConfiguration {
     CodeRuleManagementAccess codeRuleManagementAccess(
             @Value("${mom.code-rule.owner:}") String owner,
             @Value("${mom.code-rule.management.read-authority:}") String read,
-            @Value("${mom.code-rule.management.write-authority:}") String write) {
-        return new CodeRuleManagementAccess(owner, read, write);
+            @Value("${mom.code-rule.management.write-authority:}") String write,
+            @Value("${mom.code-rule.generation.authority:}") String generate) {
+        return new CodeRuleManagementAccess(owner, read, write, generate);
     }
 
     @Bean @ConditionalOnBean({CodeRuleApplication.class, CodeSegmentRegistry.class})
     CodeRuleController codeRuleController(CodeRuleApplication application, CodeSegmentRegistry handlers) {
         return new CodeRuleController(application, handlers);
+    }
+    @Bean @ConditionalOnBean(CodeGenerationApplication.class)
+    CodeGenerationController codeGenerationController(CodeGenerationApplication generation, CodeFieldRegistry fields) {
+        return new CodeGenerationController(generation, fields);
     }
     @Bean @ConditionalOnBean(CodeRuleController.class)
     CodeRuleExceptionHandler codeRuleExceptionHandler(I18nMessageResolver messages) {

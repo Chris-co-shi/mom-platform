@@ -14,24 +14,32 @@ import org.springframework.stereotype.Component;
 public final class AuthI18nPolicy implements I18nLocalePolicy {
     private final LocalBaseLocalePolicy locales;
 
-    /** 使用 zh-CN 作为服务端缺失译文的固定技术兜底，不代表 System 动态平台默认语言。 */
+    /**
+     * 使用 zh-CN 作为服务端缺失译文的固定技术兜底，不代表 System 动态平台默认语言。
+     */
     public AuthI18nPolicy() {
         this.locales = new LocalBaseLocalePolicy("zh-CN");
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String requireLocale(String localeCode) {
         return locales.requireLocale(localeCode);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String effectiveLocale(String requestedLocale) {
         return locales.effectiveLocale(requestedLocale);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String baseLocale() {
         return locales.baseLocale();

@@ -1,6 +1,8 @@
 package io.github.chrisshi.mom.coderule.autoconfigure;
 
 import io.github.chrisshi.mom.coderule.application.DefaultCodeRuleApplication;
+import io.github.chrisshi.mom.coderule.application.DefaultCodeGenerationApplication;
+import io.github.chrisshi.mom.coderule.application.CodeGenerationApplication;
 import io.github.chrisshi.mom.coderule.field.CodeFieldProvider;
 import io.github.chrisshi.mom.coderule.field.CodeFieldRegistry;
 import io.github.chrisshi.mom.coderule.segment.CodeSegmentHandler;
@@ -45,5 +47,9 @@ public class CodeRuleAutoConfiguration {
     @Bean CodeRuleApplication codeRuleApplication(CodeRuleStore store, CodeSegmentRegistry handlers,
                                                    CodeFieldRegistry fields, IdGenerator ids) {
         return new DefaultCodeRuleApplication(store, handlers, fields, ids);
+    }
+    @Bean CodeGenerationApplication codeGenerationApplication(CodeRuleStore store, CodeSegmentRegistry handlers,
+                                                                CodeFieldRegistry fields, Clock clock) {
+        return new DefaultCodeGenerationApplication(store, handlers, fields, clock);
     }
 }

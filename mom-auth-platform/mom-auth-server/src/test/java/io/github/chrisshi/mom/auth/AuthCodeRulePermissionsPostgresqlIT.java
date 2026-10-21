@@ -27,22 +27,22 @@ class AuthCodeRulePermissionsPostgresqlIT {
         registry.add("spring.flyway.default-schema", () -> "mom_auth");
     }
     @Autowired JdbcTemplate jdbc;
-    @Test void mdmOwnsReadAndWriteAuthorities() {
+    @Test void mdmOwnsReadWriteAndSeparateGenerateAuthorities() {
         List<String> codes = jdbc.queryForList("""
                 SELECT p.code FROM auth_permission p
                 JOIN auth_permission_resource r ON p.resource_id=r.id
                 WHERE r.domain_code='MDM' AND r.resource_code='CODE_RULE'
                   AND p.enabled=true AND p.deleted=false ORDER BY p.code
                 """, String.class);
-        assertThat(codes).containsExactly("mdm:code-rule:read", "mdm:code-rule:write");
+        assertThat(codes).containsExactly("mdm:code-rule:generate", "mdm:code-rule:read", "mdm:code-rule:write");
     }
-    @Test void wmsOwnsReadAndWriteAuthorities() {
+    @Test void wmsOwnsReadWriteAndSeparateGenerateAuthorities() {
         List<String> codes = jdbc.queryForList("""
                 SELECT p.code FROM auth_permission p
                 JOIN auth_permission_resource r ON p.resource_id=r.id
                 WHERE r.domain_code='WMS' AND r.resource_code='CODE_RULE'
                   AND p.enabled=true AND p.deleted=false ORDER BY p.code
                 """, String.class);
-        assertThat(codes).containsExactly("wms:code-rule:read", "wms:code-rule:write");
+        assertThat(codes).containsExactly("wms:code-rule:generate", "wms:code-rule:read", "wms:code-rule:write");
     }
 }

@@ -112,7 +112,7 @@ class SystemV1PostgresqlIT {
                 .isInstanceOf(I18nFailure.class);
     }
 
-    /** 历史 Migration 保持存在，现行 Web 文案种子（含 V27 编码规则使用场景）已生效。 */
+    /** 本测试按 test/resources 固定在 V27 验证历史 System 基线；后续升级由 I18n Store 测试覆盖。 */
     @Test
     void migrationMustPreserveHistoryAndCreateOnlyCurrentV1Tables() {
         assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("27");

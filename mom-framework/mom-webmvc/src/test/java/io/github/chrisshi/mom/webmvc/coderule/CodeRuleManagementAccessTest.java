@@ -26,6 +26,13 @@ class CodeRuleManagementAccessTest {
         assertThat(mdm.canWrite(actor("system:code-rule:write"))).isFalse();
         assertThat(mdm.canWrite(actor("mdm:code-rule:read"))).isFalse();
     }
+    @Test void generationUsesSeparateOwnerAuthority() {
+        var access = new CodeRuleManagementAccess("mdm", "mdm:code-rule:read", "mdm:code-rule:write", "mdm:code-rule:generate");
+        assertThat(access.canGenerate(actor("mdm:code-rule:generate"))).isTrue();
+        assertThat(access.canGenerate(actor("mdm:code-rule:write"))).isFalse();
+        assertThat(access.canGenerate(actor("wms:code-rule:generate"))).isFalse();
+        assertThat(access.canWrite(actor("mdm:code-rule:generate"))).isFalse();
+    }
     @Test void invalidConfigurationAndMissingIdentityFailClosed() {
         var access = new CodeRuleManagementAccess("mdm", "mdm:code-rule:read", "mdm:code-rule:write");
         assertThat(access.canRead(null)).isFalse();

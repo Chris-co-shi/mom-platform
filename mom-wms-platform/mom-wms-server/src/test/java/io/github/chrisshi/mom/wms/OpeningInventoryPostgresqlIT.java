@@ -59,7 +59,7 @@ class OpeningInventoryPostgresqlIT {
 
     @BeforeEach void clean() {
         jdbc.execute("TRUNCATE wms_opening_document_line,wms_opening_document,wms_warehouse_inventory_state," +
-                "wms_inventory_transaction_entry,wms_inventory_transaction,wms_inventory_balance,wms_code_rule_sequence CASCADE");
+                "wms_inventory_transaction_entry,wms_inventory_transaction,wms_inventory_balance,wms_code_rule_sequence,wms_code_rule_issue CASCADE");
         jdbc.update("UPDATE wms_code_rule_revision SET status='ENABLED' WHERE rule_id='8300000000000000001' AND revision_no=1");
     }
 
@@ -82,7 +82,8 @@ class OpeningInventoryPostgresqlIT {
     @Test void disabledRuleLeavesNoOpeningDraftOrWarehouseState() {
         jdbc.update("UPDATE wms_code_rule_revision SET status='DISABLED' WHERE rule_id='8300000000000000001'");
         assertThatThrownBy(() -> createDraft("2000000000000000104"))
-                .isInstanceOf(IllegalStateException.class).hasMessage("期初单编码规则未发布");
+                .isInstanceOfSatisfying(io.github.chrisshi.mom.coderule.CodeRuleFailure.class,
+                        failure -> assertThat(failure.code()).isEqualTo("rule_not_enabled"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_opening_document", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_warehouse_inventory_state", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_code_rule_sequence", Integer.class)).isZero();

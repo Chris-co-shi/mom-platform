@@ -129,7 +129,7 @@ class SystemI18nStorePostgresqlIT {
                     .containsAll(definitions);
             assertThat(isolated.queryForList("SELECT * FROM system_i18n_translation ORDER BY id"))
                     .containsAll(translations);
-            assertThat(isolated.queryForObject("SELECT COUNT(*) FROM system_i18n_message_definition WHERE message_key LIKE 'system.coderules.%'", Long.class)).isEqualTo(41);
+            assertThat(isolated.queryForObject("SELECT COUNT(*) FROM system_i18n_message_definition WHERE message_key LIKE 'system.coderules.%'", Long.class)).isEqualTo(50);
         } finally { jdbc.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE"); }
     }
 

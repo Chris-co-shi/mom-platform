@@ -20,10 +20,25 @@ public interface CodeRuleStore {
                     CodeRuleDefinition definition, java.time.Instant createdAt, java.time.Instant updatedAt) {
     }
 
+    /** 已提交的正式编码及请求指纹；同一请求键只能对应同一输入。 */
+    record Issue(String ruleId, String requestKey, String requestHash, String code, String revisionId, int revisionNo) { }
+
     /**
      * 按 ID 锁定规则身份行，调用者必须已开启本地事务。
      */
     Rule lockRule(String ruleId);
+
+    /** 按稳定规则编码锁定身份行，使发号与发布/停用串行化。 */
+    Rule lockRuleByCode(String ruleCode);
+
+    /** 按当前 Owner 内唯一的请求键查询结果；调用方已持有目标规则身份行锁。 */
+    Issue issued(String requestKey);
+
+    /** 原子分配作用域内下一流水；溢出时返回 null。 */
+    Long nextSequence(String ruleId, String scopeKey, long maximum);
+
+    /** 写入请求幂等与完整编码唯一记录，和流水分配处于同一本地事务。 */
+    boolean insertIssue(Issue issue);
 
     Rule rule(String ruleId);
 

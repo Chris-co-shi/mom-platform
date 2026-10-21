@@ -61,7 +61,7 @@ public class InventoryCountCommitService {
         String id=ids.nextId();
         InventoryCountTaskEntity draft = new InventoryCountTaskEntity();
         draft.setId(id);
-        draft.setTaskNo(numbers.allocate("wms.inventory.count"));
+        draft.setTaskNo(numbers.allocate("wms.inventory.count", requestKey));
         draft.setRequestKey(requestKey);
         draft.setWarehouseId(warehouse.id());
         draft.setWarehouseCode(warehouse.code());

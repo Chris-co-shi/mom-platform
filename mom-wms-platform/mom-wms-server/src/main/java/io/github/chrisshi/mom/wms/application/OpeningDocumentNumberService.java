@@ -1,66 +1,39 @@
 package io.github.chrisshi.mom.wms.application;
 
+import io.github.chrisshi.mom.coderule.application.CodeGenerationApplication;
 import lombok.RequiredArgsConstructor;
-import io.github.chrisshi.mom.coderule.CodeRuleDefinition;
-import io.github.chrisshi.mom.coderule.field.CodeGenerationContext;
-import io.github.chrisshi.mom.coderule.segment.CodeSegmentRegistry;
-import io.github.chrisshi.mom.coderule.segment.CodeSegmentRenderContext;
-import io.github.chrisshi.mom.coderule.store.CodeRuleStore;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningDocumentNumberOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.time.Clock;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Map;
 
-/** 将已发布的 WMS 规则渲染为期初单正式编号；流水与单据共享本地事务。 */
+/** WMS 业务单据在自身本地事务中调用公共正式发号契约。 */
 @Service
 @RequiredArgsConstructor
 public class OpeningDocumentNumberService {
-    private static final String RULE_CODE = "wms.opening.document";
-    private final OpeningDocumentNumberOperations numbers;
-    private final CodeRuleStore rules;
-    private final CodeSegmentRegistry handlers;
-    private final Clock clock;
+    private static final String OPENING_RULE = "wms.opening.document";
+    private final CodeGenerationApplication generation;
 
-    
+    /** 期初建账使用单据 ID 作为稳定业务请求键。 */
+    public String allocate(String documentId) {
+        return allocate(OPENING_RULE, documentId);
+    }
 
-    /** 在期初单创建事务内取正式编号；规则缺失、停用或输出无效时抛错并回滚。 */
-    public String allocate() { return allocate(RULE_CODE); }
-
-    /** 在当前 WMS 本地事务中按已发布规则分配正式业务编号。 */
-    public String allocate(String ruleCode) {
+    /** 在当前 WMS 本地事务中发号，随单据写入一起提交或回滚。 */
+    public String allocate(String ruleCode, String businessRequestKey) {
         if (!TransactionSynchronizationManager.isActualTransactionActive())
-            throw new IllegalStateException("期初单发号必须处于 WMS 本地事务中");
-        String ruleId = numbers.lockRuleId(ruleCode);
-        if (ruleId == null) throw new IllegalStateException("期初单编码规则不存在");
-        CodeRuleDefinition definition = rules.revisions(ruleId).stream()
-                .filter(revision -> "ENABLED".equals(revision.status()))
-                .findFirst().orElseThrow(() -> new IllegalStateException("期初单编码规则未发布"))
-                .definition();
-        if (definition.schemaVersion() != 1 || definition.segments() == null)
-            throw new IllegalStateException("期初单编码规则定义无效");
-        int sequences = 0;
-        for (CodeRuleDefinition.Segment segment : definition.segments()) {
-            handlers.require(segment.type()).validate(segment.params());
-            if ("SEQUENCE".equals(segment.type())) sequences++;
-        }
-        if (sequences != 1) throw new IllegalStateException("期初单编码规则必须包含一个流水片段");
-        Long serial = numbers.next(ruleId);
-        if (serial == null) throw new IllegalStateException("期初单流水号分配失败");
-        var context = new CodeSegmentRenderContext(clock, new CodeGenerationContext(Map.of()));
-        StringBuilder code = new StringBuilder();
-        for (CodeRuleDefinition.Segment segment : definition.segments()) {
-            if ("SEQUENCE".equals(segment.type())) {
-                int width = ((Number) segment.params().get("width")).intValue();
-                String digits = Long.toString(serial);
-                if (digits.length() > width) throw new IllegalStateException("期初单流水号超过规则宽度");
-                code.append("0".repeat(width - digits.length())).append(digits);
-            } else {
-                code.append(handlers.require(segment.type()).render(segment.params(), context));
-            }
-        }
-        if (code.isEmpty() || code.length() > 32) throw new IllegalStateException("期初单编码超过数据库字段长度");
-        return code.toString();
+            throw new IllegalStateException("WMS 正式发号必须处于本地事务中");
+        return generation.generate(ruleCode, Map.of(), "business:" + hash(ruleCode + "\u0000" + businessRequestKey)).code();
+    }
+
+    private static String hash(String value) {
+        if (value == null || value.isBlank()) throw new IllegalArgumentException("业务发号请求键不能为空");
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException ex) { throw new IllegalStateException(ex); }
     }
 }
