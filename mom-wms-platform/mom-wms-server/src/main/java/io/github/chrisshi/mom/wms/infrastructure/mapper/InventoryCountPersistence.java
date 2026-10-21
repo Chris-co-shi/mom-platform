@@ -147,10 +147,10 @@ public class InventoryCountPersistence {
     }
 
     /** 这里只代理数据库原子条件 SQL；目标状态选择由 Application 决定。 */
-    public int start(String id,String actor) { return tasks.start(id,"DRAFT",actor,null); }
-    public int confirm(String id,String actor) { return tasks.confirm(id,"COUNTING",actor,null); }
-    public int complete(String id,String actor,String transactionId) {
-        return tasks.complete(id,"CONFIRMED",actor,transactionId);
+    public int start(String id,String from,String actor) { return tasks.start(id,from,actor,null); }
+    public int confirm(String id,String from,String actor) { return tasks.confirm(id,from,actor,null); }
+    public int complete(String id,String from,String actor,String transactionId) {
+        return tasks.complete(id,from,actor,transactionId);
     }
     public int cancel(String id,String from,String actor) { return tasks.cancel(id,from,actor,null); }
 
