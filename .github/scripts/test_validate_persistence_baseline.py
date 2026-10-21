@@ -42,6 +42,13 @@ class PersistenceBaselineTest(unittest.TestCase):
         self.assertFalse(baseline.is_approved_v28_fix(path.replace("V28__", "V27__"),
                                                         original_blob, corrected_blob))
 
+    def test_approved_wms_v16_repair_is_exact_and_never_generalizes(self):
+        path, original_blob, corrected_blob = baseline.ONE_TIME_WMS_V16_FIX
+        self.assertTrue(baseline.is_approved_wms_v16_fix(path, original_blob, corrected_blob))
+        self.assertFalse(baseline.is_approved_wms_v16_fix(path, original_blob, "other-blob"))
+        self.assertFalse(baseline.is_approved_wms_v16_fix(path.replace("V16__", "V17__"),
+                                                            original_blob, corrected_blob))
+
     def test_new_valid_migration_is_accepted(self):
         report = self.report()
         path = "mom-mdm-platform/mom-mdm-server/src/main/resources/db/migration/mdm/V2__add_item.sql"

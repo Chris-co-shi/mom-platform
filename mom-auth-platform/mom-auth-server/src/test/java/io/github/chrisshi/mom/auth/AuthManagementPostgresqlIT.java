@@ -132,7 +132,7 @@ class AuthManagementPostgresqlIT {
 
     @Test
     void flywayAndDatabaseConstraintsMustMatchMiniAuthModel() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("17");
+        flyway.validate();
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("show timezone", String.class)).isEqualTo("UTC");
         assertThat(jdbcTemplate.queryForObject("""
@@ -201,7 +201,8 @@ class AuthManagementPostgresqlIT {
             .locations("classpath:db/migration/auth")
             .load();
         seeded.migrate();
-        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("17");
+        seeded.validate();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM mom_auth_system_seed.flyway_schema_history WHERE version='6' AND success", Long.class)).isEqualTo(1L);
         assertThat(jdbcTemplate.queryForList("""
             SELECT permission.code
               FROM mom_auth_system_seed.auth_permission permission
@@ -228,7 +229,8 @@ class AuthManagementPostgresqlIT {
             .locations("classpath:db/migration/auth")
             .load();
         seeded.migrate();
-        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("17");
+        seeded.validate();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM mom_auth_mdm_seed.flyway_schema_history WHERE version='11' AND success", Long.class)).isEqualTo(1L);
 
         assertThat(jdbcTemplate.queryForObject("""
             SELECT COUNT(*) FROM mom_auth_mdm_seed.auth_permission_resource

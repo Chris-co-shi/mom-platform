@@ -94,6 +94,11 @@ class SystemI18nStorePostgresqlIT {
         verifyCodeRuleMessagesUpgrade("26");
     }
 
+    @Test
+    void referenceQuantityMessagesUpgradeFromV27PreservesExistingAndCustomTranslations() {
+        verifyCodeRuleMessagesUpgrade("27");
+    }
+
     private void verifyCodeRuleMessagesUpgrade(String fromVersion) {
         String schema = "code_rule_messages_upgrade";
         var source = new org.springframework.jdbc.datasource.DriverManagerDataSource(
@@ -114,8 +119,10 @@ class SystemI18nStorePostgresqlIT {
                     """);
             var definitions = isolated.queryForList("SELECT * FROM system_i18n_message_definition ORDER BY id");
             var translations = isolated.queryForList("SELECT * FROM system_i18n_translation ORDER BY id");
-            org.flywaydb.core.Flyway.configure().dataSource(source).schemas(schema).defaultSchema(schema)
-                    .locations("classpath:db/migration/system").load().migrate();
+            var upgraded = org.flywaydb.core.Flyway.configure().dataSource(source).schemas(schema).defaultSchema(schema)
+                    .locations("classpath:db/migration/system").load();
+            upgraded.migrate();
+            upgraded.validate();
             // 后续 Migration 可以新增种子；这里应断言原有记录与自定义翻译逐行不变，
             // 而不是假设升级后只可能新增 code-rule 系列 Key（V27/V28 已新增其他系列）。
             assertThat(isolated.queryForList("SELECT * FROM system_i18n_message_definition ORDER BY id"))

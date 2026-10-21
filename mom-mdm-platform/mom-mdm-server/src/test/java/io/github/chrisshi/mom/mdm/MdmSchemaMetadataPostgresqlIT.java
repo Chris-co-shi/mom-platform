@@ -11,7 +11,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 验证 V128 升级补注释时保留制造定义数据和已发布迁移校验和。 */
+/** 验证 V129 升级补注释时保留制造定义数据和已发布迁移校验和。 */
 @Testcontainers
 class MdmSchemaMetadataPostgresqlIT {
     @Container
@@ -34,18 +34,25 @@ class MdmSchemaMetadataPostgresqlIT {
                 SELECT oid, conname, pg_get_constraintdef(oid) FROM pg_constraint
                  WHERE connamespace = 'upgrade_metadata'::regnamespace ORDER BY oid
                 """);
+        var originalConstraintNames = constraints.stream().map(row -> row.get("conname")).toList();
         flyway("upgrade_metadata", null).migrate();
         assertThat(jdbc.queryForList("SELECT to_jsonb(f)::text FROM mdm_formula f", String.class)).isEqualTo(before);
-        assertThat(jdbc.queryForList("SELECT version, checksum FROM flyway_schema_history WHERE version <> '129' ORDER BY installed_rank"))
+        assertThat(jdbc.queryForList("SELECT version, checksum FROM flyway_schema_history WHERE version IS NOT NULL AND version::integer <= 128 ORDER BY installed_rank"))
                 .isEqualTo(history);
         assertThat(jdbc.queryForList("""
                 SELECT oid, conname, pg_get_constraintdef(oid) FROM pg_constraint
                  WHERE connamespace = 'upgrade_metadata'::regnamespace ORDER BY oid
-                """)).isEqualTo(constraints);
-        assertThat(flyway("upgrade_metadata", null).info().current().getVersion().getVersion()).isEqualTo("129");
+                """).stream().filter(row -> originalConstraintNames.contains(row.get("conname"))).toList())
+                .isEqualTo(constraints);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version = '129' AND success = true", Long.class))
+                .isEqualTo(1L);
+        flyway("upgrade_metadata", null).validate();
         flyway("fresh_metadata", null).migrate();
         var comments = comments(jdbc);
         assertThat(comments).hasSize(25).allSatisfy(row -> assertThat(row.get("description")).isNotNull());
+        assertThat(comments.stream()
+                .filter(row -> "mdm_formula_revision".equals(row.get("relname")) && "status".equals(row.get("attname")))
+                .map(row -> row.get("description"))).containsExactly("配方修订状态：DRAFT、RELEASED 或 OBSOLETE");
         assertThat(comments(jdbc("fresh_metadata"))).isEqualTo(comments);
     }
 

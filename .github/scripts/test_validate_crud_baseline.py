@@ -35,6 +35,16 @@ class CrudBaselineTest(unittest.TestCase):
         self.assertTrue(any("MomBaseMapper" in item for item in report.errors))
         self.assertTrue(any("重复声明" in item for item in report.errors))
 
+    def test_inventory_count_special_sql_mapper_exception_is_exact(self):
+        path = next(iter(module.SPECIAL_SQL_MAPPERS))
+        report = module.Report()
+        module.check_java_file(path, "interface InventoryCountSqlMapper {}", report)
+        self.assertEqual([], report.errors)
+        other = module.Report()
+        module.check_java_file(path.replace("InventoryCountSqlMapper", "OtherSqlMapper"),
+                               "interface OtherSqlMapper {}", other)
+        self.assertTrue(any("MomBaseMapper" in item for item in other.errors))
+
     def test_controller_repository_dependency_is_rejected(self):
         report = self.check("web/item/ItemController.java", "import a.b.ItemRepository; class ItemController {}")
         self.assertTrue(report.errors)
