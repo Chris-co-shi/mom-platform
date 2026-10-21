@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.auth.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.auth.application.model.AuthPageParams.PermissionResourcePageParams;
@@ -25,26 +26,14 @@ import java.util.regex.Pattern;
  * 停用资源不级联改写 Permission 或角色关系，也不回收既有 Token。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class PermissionResourceApplication {
     private static final Pattern CODE = Pattern.compile("[A-Z][A-Z0-9_-]*");
     private final PermissionResourceMapper resourceMapper;
     private final PermissionMapper permissionMapper;
     private final PageAdapter pageAdapter;
 
-    /**
-     * 注入 Auth 本地 Mapper 和统一分页适配器；不产生数据库副作用。
-     *
-     * @param resourceMapper 资源 Mapper
-     * @param permissionMapper 权限 Mapper，用于删除引用保护
-     * @param pageAdapter 统一分页适配器
-     */
-    public PermissionResourceApplication(
-        PermissionResourceMapper resourceMapper, PermissionMapper permissionMapper, PageAdapter pageAdapter
-    ) {
-        this.resourceMapper = resourceMapper;
-        this.permissionMapper = permissionMapper;
-        this.pageAdapter = pageAdapter;
-    }
+    
 
     /**
      * 创建稳定编码的资源；重复域/资源组合返回 409，不自动重试。

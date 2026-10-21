@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.auth.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.auth.application.PermissionApplication;
 import io.github.chrisshi.mom.auth.application.model.AuthPageParams.PermissionPageParams;
 import io.github.chrisshi.mom.auth.controller.request.ChangeStatusRequest;
@@ -30,13 +31,12 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/permissions")
+@RequiredArgsConstructor
 public class PermissionController {
 
     private final PermissionApplication permissionApplication;
 
-    public PermissionController(PermissionApplication permissionApplication) {
-        this.permissionApplication = permissionApplication;
-    }
+
 
     /**
      * 创建 Permission。

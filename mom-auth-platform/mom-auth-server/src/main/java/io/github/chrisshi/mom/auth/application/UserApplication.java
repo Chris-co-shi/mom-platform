@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.auth.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.auth.application.model.RoleView;
@@ -36,6 +37,7 @@ import java.util.Set;
  * <p>当前为 Level 1 分层，因此不为单表 CRUD 额外引入 Repository Port、ServiceImpl 或 Converter。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class UserApplication {
 
     private static final int MAX_ROLE_SELECTION = 200;
@@ -46,28 +48,7 @@ public class UserApplication {
     private final PasswordEncoder passwordEncoder;
     private final PageAdapter pageAdapter;
 
-    /**
-     * 注入用户、关系、角色持久化能力、密码编码器和统一分页适配器。
-     *
-     * @param userMapper User 单表 Mapper
-     * @param userRoleMapper User-Role 关系 Mapper
-     * @param roleMapper Role 单表 Mapper
-     * @param passwordEncoder Spring Security 密码编码器
-     * @param pageAdapter 配置化分页适配器
-     */
-    public UserApplication(
-        UserMapper userMapper,
-        UserRoleMapper userRoleMapper,
-        RoleMapper roleMapper,
-        PasswordEncoder passwordEncoder,
-        PageAdapter pageAdapter
-    ) {
-        this.userMapper = userMapper;
-        this.userRoleMapper = userRoleMapper;
-        this.roleMapper = roleMapper;
-        this.passwordEncoder = passwordEncoder;
-        this.pageAdapter = pageAdapter;
-    }
+    
 
     /**
      * 创建本地登录用户。

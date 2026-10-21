@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.auth.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.auth.application.UserApplication;
 import io.github.chrisshi.mom.auth.application.model.UserView;
 import io.github.chrisshi.mom.auth.controller.request.ChangeOwnPasswordRequest;
@@ -18,13 +19,11 @@ import org.springframework.web.bind.annotation.RestController;
 /** 本人资料与认证快照的 HTTP 边界；用户身份始终来自已验证 Token。 */
 @RestController
 @RequestMapping("/users")
+@RequiredArgsConstructor
 public class CurrentUserController {
     private final UserApplication userApplication;
 
-    /** @param userApplication 用户用例入口 */
-    public CurrentUserController(UserApplication userApplication) {
-        this.userApplication = userApplication;
-    }
+    
 
     /** 查询实时用户资料与当前 Token 权限快照，不延长 Token。 */
     @GetMapping("/me")
