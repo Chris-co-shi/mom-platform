@@ -3,8 +3,9 @@ package io.github.chrisshi.mom.wms.application;
 import io.github.chrisshi.mom.core.id.IdGenerator;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper.Balance;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper.FreezeRecord;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper.UnfreezeRecord;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryFreezeMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryFreezeMapper.FreezeRecord;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryFreezeMapper.UnfreezeRecord;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,18 +24,21 @@ import java.util.List;
 /** WMS 仓储冻结限制用例；只改变 WarehouseStatus，通过库存唯一记账入口保持余额、交易、分录及限制原子一致。 */
 @Service
 public class InventoryFreezeApplication {
-    private final InventoryAccountingMapper operations;
+    private final InventoryAccountingMapper inventory;
+    private final InventoryFreezeMapper freezes;
     private final InventoryAccountingService accounting;
     private final IdGenerator ids;
 
     /**
-     * @param operations 库存记账与冻结限制的受限 PostgreSQL 原子操作入口
+     * @param inventory 库存余额只读映射 @param freezes 冻结事实和条件更新 Mapper
      * @param accounting WMS 唯一库存余额过账入口
      * @param ids MOM 字符串技术主键生成器
      */
-    public InventoryFreezeApplication(InventoryAccountingMapper operations, InventoryAccountingService accounting,
+    public InventoryFreezeApplication(InventoryAccountingMapper inventory, InventoryFreezeMapper freezes,
+                                      InventoryAccountingService accounting,
                                       IdGenerator ids) {
-        this.operations = operations;
+        this.inventory = inventory;
+        this.freezes = freezes;
         this.accounting = accounting;
         this.ids = ids;
     }
@@ -86,7 +90,7 @@ public class InventoryFreezeApplication {
                 || command.note() != null && command.note().length() > 500
                 || command.reason() == FreezeReason.OTHER && (command.note() == null || command.note().isBlank()))
             throw new IllegalArgumentException("冻结库存、原因或说明非法");
-        Balance balance = operations.findInventoryBalance(command.balanceId());
+        Balance balance = inventory.findInventoryBalance(command.balanceId());
         if (balance == null || balance.warehouseStatus() != WarehouseStatus.NORMAL)
             throw new IllegalStateException("只能选择正常仓储状态的库存冻结");
 
@@ -94,16 +98,16 @@ public class InventoryFreezeApplication {
                 "FREEZE", command.sourceType(), command.sourceId(), command.operatorId(), List.of(
                 new InventoryAccountingService.Entry(dimension(balance, WarehouseStatus.NORMAL), command.quantity().negate()),
                 new InventoryAccountingService.Entry(dimension(balance, WarehouseStatus.FROZEN), command.quantity()))));
-        FreezeRecord existing = operations.findFreezeByTransaction(transactionId);
+        FreezeRecord existing = freezes.findFreezeByTransaction(transactionId);
         if (existing != null) return replayFreeze(existing, balance, command);
         String id = ids.nextId();
-        if (operations.insertFreeze(id, transactionId, balance, command.reason().name(), clean(command.note()),
+        if (freezes.insertFreeze(id, transactionId, balance, command.reason().name(), clean(command.note()),
                 command.quantity(), command.sourceType(), command.sourceId(), command.operatorId()) != 1) {
-            existing = operations.findFreezeByTransaction(transactionId);
+            existing = freezes.findFreezeByTransaction(transactionId);
             if (existing != null) return replayFreeze(existing, balance, command);
             throw new IllegalStateException("冻结限制写入失败");
         }
-        return view(operations.findFreezeByTransaction(transactionId));
+        return view(freezes.findFreezeByTransaction(transactionId));
     }
 
     /**
@@ -115,9 +119,9 @@ public class InventoryFreezeApplication {
     @Transactional(readOnly = true)
     public List<FreezeView> queryActiveFreezes(String balanceId) {
         if (balanceId == null || balanceId.isBlank()) throw new IllegalArgumentException("库存余额标识不能为空");
-        Balance balance = operations.findInventoryBalance(balanceId);
+        Balance balance = inventory.findInventoryBalance(balanceId);
         if (balance == null) throw new IllegalArgumentException("库存余额不存在");
-        return operations.activeFreezesByDimension(balance).stream().map(InventoryFreezeApplication::view).toList();
+        return freezes.activeFreezesByDimension(balance).stream().map(InventoryFreezeApplication::view).toList();
     }
 
     /**
@@ -137,17 +141,17 @@ public class InventoryFreezeApplication {
                 || command.note().length() > 500)
             throw new IllegalArgumentException("解冻限制或说明非法");
         String requestHash = digest(command);
-        UnfreezeRecord replay = operations.findUnfreeze(command.requestKey());
+        UnfreezeRecord replay = freezes.findUnfreeze(command.requestKey());
         if (replay != null) return replay(replay, requestHash, command.freezeId());
 
-        FreezeRecord freeze = operations.lockFreeze(command.freezeId());
+        FreezeRecord freeze = freezes.lockFreeze(command.freezeId());
         if (freeze == null) throw new IllegalStateException("冻结限制不存在");
         // 同一冻结限制的重复请求可能在首次查询后等待了行锁，锁内必须再次检查幂等事实。
-        replay = operations.findUnfreeze(command.requestKey());
+        replay = freezes.findUnfreeze(command.requestKey());
         if (replay != null) return replay(replay, requestHash, command.freezeId());
         if (command.quantity().compareTo(freeze.remainingQuantity()) > 0)
             throw new IllegalStateException("解冻数量超过该限制的剩余冻结数量");
-        if (operations.decreaseFreezeRemaining(freeze.id(), command.quantity()) != 1)
+        if (freezes.decreaseFreezeRemaining(freeze.id(), command.quantity()) != 1)
             throw new IllegalStateException("冻结限制数量已被并发变更");
 
         Balance original = new Balance(freeze.originalBalanceId(), freeze.materialId(), freeze.materialCode(),
@@ -159,15 +163,15 @@ public class InventoryFreezeApplication {
                 "UNFREEZE", command.sourceType(), command.sourceId(), command.operatorId(), List.of(
                 new InventoryAccountingService.Entry(dimension(original, WarehouseStatus.NORMAL), command.quantity()),
                 new InventoryAccountingService.Entry(dimension(original, WarehouseStatus.FROZEN), command.quantity().negate()))));
-        operations.insertUnfreeze(ids.nextId(), command.requestKey(), requestHash, freeze.id(), transactionId,
+        freezes.insertUnfreeze(ids.nextId(), command.requestKey(), requestHash, freeze.id(), transactionId,
                 command.quantity(), clean(command.note()), command.sourceType(), command.sourceId(), command.operatorId());
-        FreezeRecord updated = operations.lockFreeze(freeze.id());
+        FreezeRecord updated = freezes.lockFreeze(freeze.id());
         return new UnfreezeResult(transactionId, freeze.id(), updated.remainingQuantity());
     }
 
     private UnfreezeResult replay(UnfreezeRecord replay, String requestHash, String freezeId) {
         if (!replay.requestHash().equals(requestHash)) throw new IllegalArgumentException("解冻请求键已用于不同内容");
-        FreezeRecord freeze = operations.lockFreeze(freezeId);
+        FreezeRecord freeze = freezes.lockFreeze(freezeId);
         if (freeze == null) throw new IllegalStateException("冻结限制不存在");
         return new UnfreezeResult(replay.transactionId(), freezeId, freeze.remainingQuantity());
     }
