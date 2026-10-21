@@ -1,16 +1,16 @@
 package io.github.chrisshi.mom.wms.application;
 
-import lombok.RequiredArgsConstructor;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.github.chrisshi.mom.core.id.IdGenerator;
+import io.github.chrisshi.mom.wms.infrastructure.entity.InventoryFreezeEntity;
+import io.github.chrisshi.mom.wms.infrastructure.entity.InventoryUnfreezeEntity;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper.Balance;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryFreezeMapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import io.github.chrisshi.mom.wms.infrastructure.entity.InventoryFreezeEntity;
-import io.github.chrisshi.mom.wms.infrastructure.entity.InventoryUnfreezeEntity;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryFreezeRecordMapper;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryUnfreezeRecordMapper;
-import com.fasterxml.jackson.annotation.JsonFormat;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,7 +25,9 @@ import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
 
-/** WMS 仓储冻结限制用例；只改变 WarehouseStatus，通过库存唯一记账入口保持余额、交易、分录及限制原子一致。 */
+/**
+ * WMS 仓储冻结限制用例；只改变 WarehouseStatus，通过库存唯一记账入口保持余额、交易、分录及限制原子一致。
+ */
 @Service
 @RequiredArgsConstructor
 public class InventoryFreezeApplication {
@@ -36,68 +38,98 @@ public class InventoryFreezeApplication {
     private final InventoryAccountingService accounting;
     private final IdGenerator ids;
 
-    
 
-    /** 冻结原因受 WMS 业务语义约束；字典展示不能替代服务端允许值校验。 */
+    /**
+     * 冻结原因受 WMS 业务语义约束；字典展示不能替代服务端允许值校验。
+     */
     public enum FreezeReason {
-        /** 包装破损，需要隔离实物。 */ PACKAGE_DAMAGE,
-        /** 账面与现场库存存在差异，等待核实。 */ STOCK_DISCREPANCY,
-        /** 仓储作业发现异常，等待核实。 */ WAREHOUSE_CHECK,
-        /** 出于仓储安全限制暂停使用。 */ SAFETY_HOLD,
-        /** 其他仓储原因；必须提供具体说明。 */ OTHER
+        /**
+         * 包装破损，需要隔离实物。
+         */
+        PACKAGE_DAMAGE,
+        /**
+         * 账面与现场库存存在差异，等待核实。
+         */
+        STOCK_DISCREPANCY,
+        /**
+         * 仓储作业发现异常，等待核实。
+         */
+        WAREHOUSE_CHECK,
+        /**
+         * 出于仓储安全限制暂停使用。
+         */
+        SAFETY_HOLD,
+        /**
+         * 其他仓储原因；必须提供具体说明。
+         */
+        OTHER
     }
 
-    /** 冻结命令；调用方传入经授权确认的库存余额 ID、业务来源和真实操作责任主体。 */
+    /**
+     * 冻结命令；调用方传入经授权确认的库存余额 ID、业务来源和真实操作责任主体。
+     */
     public record FreezeCommand(String requestKey, String balanceId, BigDecimal quantity, FreezeReason reason,
-                                String note, String sourceType, String sourceId, String operatorId) { }
+                                String note, String sourceType, String sourceId, String operatorId) {
+    }
 
-    /** 解冻命令必须指向一条具体冻结限制，不以 SN 或状态批量解冻。 */
+    /**
+     * 解冻命令必须指向一条具体冻结限制，不以 SN 或状态批量解冻。
+     */
     public record UnfreezeCommand(String requestKey, String freezeId, BigDecimal quantity, String note,
-                                  String sourceType, String sourceId, String operatorId) { }
+                                  String sourceType, String sourceId, String operatorId) {
+    }
 
-    /** 当前有效限制视图，包含原始库存维度、原因、来源与操作者快照。 */
+    /**
+     * 当前有效限制视图，包含原始库存维度、原因、来源与操作者快照。
+     */
     public record FreezeView(String id, String transactionId, String originalBalanceId, String materialId,
                              String materialCode, String materialName, String uomCode, String batchCode,
                              String snCode, String warehouseId, String warehouseCode, String locationId,
                              String locationCode, QualityStatus qualityStatus, String reasonCode, String note,
                              @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal originalQuantity,
-                             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal remainingQuantity, String sourceType,
-                             String sourceId, String operatorId, Instant frozenAt) { }
+                             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal remainingQuantity,
+                             String sourceType,
+                             String sourceId, String operatorId, Instant frozenAt) {
+    }
 
-    /** 解冻结果；剩余量为所指限制的最新数量。 */
+    /**
+     * 解冻结果；剩余量为所指限制的最新数量。
+     */
     public record UnfreezeResult(String transactionId, String freezeId,
-                                 @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal remainingQuantity) { }
+                                 @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal remainingQuantity) {
+    }
 
     /**
      * 对选定 NORMAL 余额执行部分或全部冻结。两条相反分录、交易及原因限制在 REQUIRED 本地事务提交。
      * 同键同内容重放返回相同限制；余额条件扣减失败、仓库非 ACTIVE 或任何持久化失败均回滚。
+     *
      * @param command 冻结业务命令
      * @return 冻结限制事实
      * @throws IllegalArgumentException 原因、数量、请求标识或业务来源非法
-     * @throws IllegalStateException 库存不足、余额非正常状态或仓库生命周期不允许操作
+     * @throws IllegalStateException    库存不足、余额非正常状态或仓库生命周期不允许操作
      */
     @Transactional
     public FreezeView freezeInventory(FreezeCommand command) {
         validateCommon(command == null ? null : command.requestKey(), command == null ? null : command.quantity(),
-                command == null ? null : command.sourceType(), command == null ? null : command.sourceId(),
-                command == null ? null : command.operatorId());
+            command == null ? null : command.sourceType(), command == null ? null : command.sourceId(),
+            command == null ? null : command.operatorId());
         if (command.balanceId() == null || command.balanceId().isBlank() || command.reason() == null
-                || command.note() != null && command.note().length() > 500
-                || command.reason() == FreezeReason.OTHER && (command.note() == null || command.note().isBlank()))
+            || command.note() != null && command.note().length() > 500
+            || command.reason() == FreezeReason.OTHER && (command.note() == null || command.note().isBlank()))
             throw new IllegalArgumentException("冻结库存、原因或说明非法");
         Balance balance = inventory.findInventoryBalance(command.balanceId());
         if (balance == null || balance.warehouseStatus() != WarehouseStatus.NORMAL)
             throw new IllegalStateException("只能选择正常仓储状态的库存冻结");
 
         String transactionId = accounting.post(new InventoryAccountingService.Posting(command.requestKey(),
-                "FREEZE", command.sourceType(), command.sourceId(), command.operatorId(), List.of(
-                new InventoryAccountingService.Entry(dimension(balance, WarehouseStatus.NORMAL), command.quantity().negate()),
-                new InventoryAccountingService.Entry(dimension(balance, WarehouseStatus.FROZEN), command.quantity()))));
+            "FREEZE", command.sourceType(), command.sourceId(), command.operatorId(), List.of(
+            new InventoryAccountingService.Entry(dimension(balance, WarehouseStatus.NORMAL), command.quantity().negate()),
+            new InventoryAccountingService.Entry(dimension(balance, WarehouseStatus.FROZEN), command.quantity()))));
         InventoryFreezeEntity existing = byTransaction(transactionId);
         if (existing != null) return replayFreeze(existing, balance, command);
         String id = ids.nextId();
         if (freezes.insertFreeze(id, transactionId, balance, command.reason().name(), clean(command.note()),
-                command.quantity(), command.sourceType(), command.sourceId(), command.operatorId()) != 1) {
+            command.quantity(), command.sourceType(), command.sourceId(), command.operatorId()) != 1) {
             existing = byTransaction(transactionId);
             if (existing != null) return replayFreeze(existing, balance, command);
             throw new IllegalStateException("冻结限制写入失败");
@@ -107,6 +139,7 @@ public class InventoryFreezeApplication {
 
     /**
      * 按库存维度读取所有有效限制；相同 SN 的多笔冻结保持独立并可分别选择解冻。
+     *
      * @param balanceId 实时库存明细余额 ID
      * @return 按冻结时间和技术 ID 排序的有效限制
      * @throws IllegalArgumentException 库存余额不存在
@@ -122,18 +155,19 @@ public class InventoryFreezeApplication {
     /**
      * 对明确冻结限制执行部分或全部解冻。冻结行锁与剩余量条件更新保护并发，历史请求键保证重放不重复记账。
      * 余额、交易、两条分录、限制剩余量和解冻历史在同一 REQUIRED 本地事务提交。
+     *
      * @param command 解冻业务命令
      * @return 解冻交易和该限制最新剩余量
      * @throws IllegalArgumentException 命令非法或同一请求键内容不一致
-     * @throws IllegalStateException 冻结限制不存在、数量超限或仓库生命周期不允许操作
+     * @throws IllegalStateException    冻结限制不存在、数量超限或仓库生命周期不允许操作
      */
     @Transactional
     public UnfreezeResult unfreezeInventory(UnfreezeCommand command) {
         validateCommon(command == null ? null : command.requestKey(), command == null ? null : command.quantity(),
-                command == null ? null : command.sourceType(), command == null ? null : command.sourceId(),
-                command == null ? null : command.operatorId());
+            command == null ? null : command.sourceType(), command == null ? null : command.sourceId(),
+            command == null ? null : command.operatorId());
         if (command.freezeId() == null || command.freezeId().isBlank() || !present(command.note())
-                || command.note().length() > 500)
+            || command.note().length() > 500)
             throw new IllegalArgumentException("解冻限制或说明非法");
         String requestHash = digest(command);
         InventoryUnfreezeEntity replay = findUnfreeze(command.requestKey());
@@ -150,22 +184,23 @@ public class InventoryFreezeApplication {
             throw new IllegalStateException("冻结限制数量已被并发变更");
 
         Balance original = new Balance(freeze.getOriginalBalanceId(), freeze.getMaterialId(), freeze.getMaterialCode(),
-                freeze.getMaterialName(), freeze.getUomCode(), freeze.getBatchCode(), freeze.getSnCode(), freeze.getWarehouseId(),
-                freeze.getWarehouseCode(), freeze.getLocationId(), freeze.getLocationCode(), freeze.getQualityStatus(),
-                WarehouseStatus.NORMAL, freeze.getOriginalQuantity());
+            freeze.getMaterialName(), freeze.getUomCode(), freeze.getBatchCode(), freeze.getSnCode(), freeze.getWarehouseId(),
+            freeze.getWarehouseCode(), freeze.getLocationId(), freeze.getLocationCode(), freeze.getQualityStatus(),
+            WarehouseStatus.NORMAL, freeze.getOriginalQuantity());
         // 所有冻结/解冻均先锁定 NORMAL 再锁定 FROZEN，避免互相反向锁余额行。
         String transactionId = accounting.post(new InventoryAccountingService.Posting(command.requestKey(),
-                "UNFREEZE", command.sourceType(), command.sourceId(), command.operatorId(), List.of(
-                new InventoryAccountingService.Entry(dimension(original, WarehouseStatus.NORMAL), command.quantity()),
-                new InventoryAccountingService.Entry(dimension(original, WarehouseStatus.FROZEN), command.quantity().negate()))));
+            "UNFREEZE", command.sourceType(), command.sourceId(), command.operatorId(), List.of(
+            new InventoryAccountingService.Entry(dimension(original, WarehouseStatus.NORMAL), command.quantity()),
+            new InventoryAccountingService.Entry(dimension(original, WarehouseStatus.FROZEN), command.quantity().negate()))));
         freezes.insertUnfreeze(ids.nextId(), command.requestKey(), requestHash, freeze.getId(), transactionId,
-                command.quantity(), clean(command.note()), command.sourceType(), command.sourceId(), command.operatorId());
+            command.quantity(), clean(command.note()), command.sourceType(), command.sourceId(), command.operatorId());
         InventoryFreezeEntity updated = freezes.lockFreeze(freeze.getId());
         return new UnfreezeResult(transactionId, freeze.getId(), updated.getRemainingQuantity());
     }
 
     private UnfreezeResult replay(InventoryUnfreezeEntity replay, String requestHash, String freezeId) {
-        if (!replay.getRequestHash().equals(requestHash)) throw new IllegalArgumentException("解冻请求键已用于不同内容");
+        if (!replay.getRequestHash().equals(requestHash))
+            throw new IllegalArgumentException("解冻请求键已用于不同内容");
         InventoryFreezeEntity freeze = freezes.lockFreeze(freezeId);
         if (freeze == null) throw new IllegalStateException("冻结限制不存在");
         return new UnfreezeResult(replay.getTransactionId(), freezeId, freeze.getRemainingQuantity());
@@ -173,35 +208,37 @@ public class InventoryFreezeApplication {
 
     private static FreezeView replayFreeze(InventoryFreezeEntity existing, Balance balance, FreezeCommand command) {
         if (!existing.getOriginalBalanceId().equals(balance.id())
-                || existing.getOriginalQuantity().compareTo(command.quantity()) != 0
-                || !existing.getReasonCode().equals(command.reason().name())
-                || !java.util.Objects.equals(existing.getNote(), clean(command.note()))
-                || !existing.getSourceType().equals(command.sourceType())
-                || !existing.getSourceId().equals(command.sourceId())
-                || !existing.getOperatorId().equals(command.operatorId()))
+            || existing.getOriginalQuantity().compareTo(command.quantity()) != 0
+            || !existing.getReasonCode().equals(command.reason().name())
+            || !java.util.Objects.equals(existing.getNote(), clean(command.note()))
+            || !existing.getSourceType().equals(command.sourceType())
+            || !existing.getSourceId().equals(command.sourceId())
+            || !existing.getOperatorId().equals(command.operatorId()))
             throw new IllegalArgumentException("冻结请求键已用于不同内容");
         return view(existing);
     }
 
-    /** 单表查询使用 MyBatis-Plus；只有真正需要锁/原子修改的操作才保留原生 SQL。 */
+    /**
+     * 单表查询使用 MyBatis-Plus；只有真正需要锁/原子修改的操作才保留原生 SQL。
+     */
     private InventoryFreezeEntity byTransaction(String transactionId) {
         return freezeReads.selectOne(Wrappers.<InventoryFreezeEntity>lambdaQuery()
-                .eq(InventoryFreezeEntity::getTransactionId, transactionId));
+            .eq(InventoryFreezeEntity::getTransactionId, transactionId));
     }
 
     private InventoryUnfreezeEntity findUnfreeze(String requestKey) {
         return unfreezeReads.selectOne(Wrappers.<InventoryUnfreezeEntity>lambdaQuery()
-                .eq(InventoryUnfreezeEntity::getRequestKey, requestKey));
+            .eq(InventoryUnfreezeEntity::getRequestKey, requestKey));
     }
 
     private List<InventoryFreezeEntity> activeFreezes(Balance balance) {
         var query = Wrappers.<InventoryFreezeEntity>lambdaQuery()
-                .eq(InventoryFreezeEntity::getMaterialId, balance.materialId())
-                .eq(InventoryFreezeEntity::getWarehouseId, balance.warehouseId())
-                .eq(InventoryFreezeEntity::getLocationId, balance.locationId())
-                .eq(InventoryFreezeEntity::getQualityStatus, balance.qualityStatus())
-                .gt(InventoryFreezeEntity::getRemainingQuantity, BigDecimal.ZERO)
-                .orderByAsc(InventoryFreezeEntity::getFrozenAt, InventoryFreezeEntity::getId);
+            .eq(InventoryFreezeEntity::getMaterialId, balance.materialId())
+            .eq(InventoryFreezeEntity::getWarehouseId, balance.warehouseId())
+            .eq(InventoryFreezeEntity::getLocationId, balance.locationId())
+            .eq(InventoryFreezeEntity::getQualityStatus, balance.qualityStatus())
+            .gt(InventoryFreezeEntity::getRemainingQuantity, BigDecimal.ZERO)
+            .orderByAsc(InventoryFreezeEntity::getFrozenAt, InventoryFreezeEntity::getId);
         // NULL 批次 / SN 必须精确匹配，不能将 null 条件忽略导致跨维度返回。
         if (balance.batchCode() == null) query.isNull(InventoryFreezeEntity::getBatchCode);
         else query.eq(InventoryFreezeEntity::getBatchCode, balance.batchCode());
@@ -212,24 +249,24 @@ public class InventoryFreezeApplication {
 
     private static InventoryAccountingService.Dimension dimension(Balance balance, WarehouseStatus status) {
         return new InventoryAccountingService.Dimension(balance.materialId(), balance.materialCode(), balance.materialName(),
-                balance.uomCode(), balance.batchCode(), balance.snCode(), balance.warehouseId(), balance.warehouseCode(),
-                balance.locationId(), balance.locationCode(), balance.qualityStatus(), status);
+            balance.uomCode(), balance.batchCode(), balance.snCode(), balance.warehouseId(), balance.warehouseCode(),
+            balance.locationId(), balance.locationCode(), balance.qualityStatus(), status);
     }
 
     private static FreezeView view(InventoryFreezeEntity record) {
         return new FreezeView(record.getId(), record.getTransactionId(), record.getOriginalBalanceId(), record.getMaterialId(),
-                record.getMaterialCode(), record.getMaterialName(), record.getUomCode(), record.getBatchCode(), record.getSnCode(),
-                record.getWarehouseId(), record.getWarehouseCode(), record.getLocationId(), record.getLocationCode(),
-                record.getQualityStatus(), record.getReasonCode(), record.getNote(), record.getOriginalQuantity(),
-                record.getRemainingQuantity(), record.getSourceType(), record.getSourceId(), record.getOperatorId(), record.getFrozenAt());
+            record.getMaterialCode(), record.getMaterialName(), record.getUomCode(), record.getBatchCode(), record.getSnCode(),
+            record.getWarehouseId(), record.getWarehouseCode(), record.getLocationId(), record.getLocationCode(),
+            record.getQualityStatus(), record.getReasonCode(), record.getNote(), record.getOriginalQuantity(),
+            record.getRemainingQuantity(), record.getSourceType(), record.getSourceId(), record.getOperatorId(), record.getFrozenAt());
     }
 
     private static void validateCommon(String requestKey, BigDecimal quantity, String sourceType,
                                        String sourceId, String operatorId) {
         if (!present(requestKey) || requestKey.length() > 128 || quantity == null || quantity.signum() <= 0
-                || quantity.scale() > 6 || quantity.precision() - quantity.scale() > 18
-                || !present(sourceType) || sourceType.length() > 64 || !present(sourceId) || sourceId.length() > 128
-                || !present(operatorId) || operatorId.length() > 128)
+            || quantity.scale() > 6 || quantity.precision() - quantity.scale() > 18
+            || !present(sourceType) || sourceType.length() > 64 || !present(sourceId) || sourceId.length() > 128
+            || !present(operatorId) || operatorId.length() > 128)
             throw new IllegalArgumentException("冻结或解冻请求字段非法");
     }
 
@@ -238,7 +275,7 @@ public class InventoryFreezeApplication {
             var bytes = new ByteArrayOutputStream();
             var output = new DataOutputStream(bytes);
             for (String value : new String[]{command.freezeId(), command.quantity().stripTrailingZeros().toPlainString(),
-                    clean(command.note()), command.sourceType(), command.sourceId(), command.operatorId()}) {
+                clean(command.note()), command.sourceType(), command.sourceId(), command.operatorId()}) {
                 if (value == null) output.writeInt(-1);
                 else {
                     byte[] encoded = value.getBytes(StandardCharsets.UTF_8);
@@ -252,6 +289,11 @@ public class InventoryFreezeApplication {
         }
     }
 
-    private static String clean(String value) { return value == null || value.isBlank() ? null : value.trim(); }
-    private static boolean present(String value) { return value != null && !value.isBlank(); }
+    private static String clean(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private static boolean present(String value) {
+        return value != null && !value.isBlank();
+    }
 }
