@@ -1,11 +1,9 @@
 package io.github.chrisshi.mom.wms.infrastructure.mapper;
 
-import io.github.chrisshi.mom.data.mapper.MomBaseMapper;
 import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Dimension;
-import io.github.chrisshi.mom.wms.infrastructure.entity.InventoryBalanceEntity;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations.Balance;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations.FreezeRecord;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations.UnfreezeRecord;
+
+
+
 import io.github.chrisshi.mom.wms.application.QualityStatus;
 import io.github.chrisshi.mom.wms.application.WarehouseStatus;
 import org.apache.ibatis.annotations.Arg;
@@ -24,7 +22,27 @@ import java.util.List;
  * 库存专用 PostgreSQL 原子写入；由 Application 的公共事务入口统一调用。
  */
 @Mapper
-interface InventoryAccountingMapper extends MomBaseMapper<InventoryBalanceEntity> {
+public interface InventoryAccountingMapper {
+    // 数据库原子 SQL 接口：刻意不继承 BaseMapper，防止库存权威余额被普通 CRUD 任意修改。
+    public record TransferReplay(String transactionId, String transactionType, String sourceType, String sourceId,
+                                 String operatorId, String balanceId, String targetLocationId, BigDecimal quantity) { }
+
+    public record BalanceChange(String id, BigDecimal beforeQuantity, BigDecimal afterQuantity) { }
+
+    public record Balance(String id, String materialId, String materialCode, String materialName, String uomCode,
+                          String batchCode, String snCode, String warehouseId, String warehouseCode,
+                          String locationId, String locationCode, QualityStatus qualityStatus,
+                          WarehouseStatus warehouseStatus, BigDecimal quantity) { }
+
+    public record FreezeRecord(String id, String transactionId, String originalBalanceId, String materialId,
+                               String materialCode, String materialName, String uomCode, String batchCode,
+                               String snCode, String warehouseId, String warehouseCode, String locationId,
+                               String locationCode, QualityStatus qualityStatus,
+                               String reasonCode, String note, BigDecimal originalQuantity, BigDecimal remainingQuantity,
+                               String sourceType, String sourceId, String operatorId, Instant frozenAt) { }
+
+    public record UnfreezeRecord(String requestHash, String transactionId) { }
+
     /** 同一事务按稳定键锁定库位或 SN；所有 SN 记账方共用此锁以阻止位置校验期间出现幻影余额。 */
     @Select("SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(#{key}, 0))")
     int lockAccountingKey(@Param("key") String key);
@@ -57,7 +75,7 @@ interface InventoryAccountingMapper extends MomBaseMapper<InventoryBalanceEntity
         @Arg(column="sourceId", javaType=String.class), @Arg(column="operatorId", javaType=String.class),
         @Arg(column="balanceId", javaType=String.class), @Arg(column="targetLocationId", javaType=String.class),
         @Arg(column="quantity", javaType=BigDecimal.class)})
-    InventoryAccountingOperations.TransferReplay findTransferReplay(@Param("requestKey") String requestKey);
+    TransferReplay findTransferReplay(@Param("requestKey") String requestKey);
     /** 读取冻结命令指向的余额快照；余额扣减必须由统一记账 SQL 完成。 */
     @Select("""
         SELECT id, material_id AS materialId, material_code AS materialCode, material_name AS materialName,
@@ -265,7 +283,7 @@ interface InventoryAccountingMapper extends MomBaseMapper<InventoryBalanceEntity
     @ConstructorArgs({@Arg(column = "id", javaType = String.class),
         @Arg(column = "before_quantity", javaType = BigDecimal.class),
         @Arg(column = "after_quantity", javaType = BigDecimal.class)})
-    InventoryAccountingOperations.BalanceChange increase(@Param("id") String id, @Param("d") Dimension dimension,
+    BalanceChange increase(@Param("id") String id, @Param("d") Dimension dimension,
                                                           @Param("delta") BigDecimal delta);
 
     /**
@@ -290,7 +308,7 @@ interface InventoryAccountingMapper extends MomBaseMapper<InventoryBalanceEntity
     @ConstructorArgs({@Arg(column = "id", javaType = String.class),
         @Arg(column = "before_quantity", javaType = BigDecimal.class),
         @Arg(column = "after_quantity", javaType = BigDecimal.class)})
-    InventoryAccountingOperations.BalanceChange decrease(@Param("d") Dimension dimension,
+    BalanceChange decrease(@Param("d") Dimension dimension,
                                                           @Param("delta") BigDecimal delta);
 
     /**
