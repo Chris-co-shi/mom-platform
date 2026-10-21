@@ -63,9 +63,6 @@ public interface OpeningInventoryMapper extends MomBaseMapper<OpeningDocumentEnt
     @Update("UPDATE wms_warehouse_inventory_state SET state='ACTIVE',activated_by=#{actor},activated_at=now(),updated_at=now(),updated_by=#{actor} WHERE warehouse_id=#{warehouseId} AND state='PENDING_ACTIVATION'")
     int activate(@Param("warehouseId") String warehouseId,@Param("actor") String actor);
 
-    @Select("SELECT state FROM wms_warehouse_inventory_state WHERE warehouse_id=#{warehouseId}")
-    String warehouseState(@Param("warehouseId") String warehouseId);
-
     @Select("SELECT EXISTS(SELECT 1 FROM wms_inventory_balance WHERE warehouse_id=#{warehouseId})")
     boolean hasWarehouseBalance(@Param("warehouseId") String warehouseId);
 }
