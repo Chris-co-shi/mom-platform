@@ -36,7 +36,8 @@ class CrudBaselineTest(unittest.TestCase):
         self.assertTrue(any("重复声明" in item for item in report.errors))
 
     def test_inventory_accounting_atomic_mapper_exception_is_exact(self):
-        path = next(iter(module.SPECIAL_SQL_MAPPERS))
+        path = next(value for value in module.SPECIAL_SQL_MAPPERS
+                    if value.endswith("/InventoryAccountingMapper.java"))
         report = module.Report()
         module.check_java_file(path, "interface InventoryAccountingMapper {}", report)
         self.assertEqual([], report.errors)
