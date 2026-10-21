@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.page.PageQueryValidationException;
 import io.github.chrisshi.mom.core.i18n.I18nMessageResolver;
 import io.github.chrisshi.mom.mdm.application.MdmException;
@@ -26,13 +27,11 @@ import java.util.Locale;
  */
 @RestControllerAdvice(basePackages = "io.github.chrisshi.mom.mdm.controller")
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+@RequiredArgsConstructor
 public class MdmExceptionHandler {
     private final I18nMessageResolver messages;
 
-    /** @param messages MDM 自有错误与 Framework 技术错误解析器 */
-    public MdmExceptionHandler(I18nMessageResolver messages) {
-        this.messages = messages;
-    }
+    
 
     /** 将 MDM 业务异常转换为 400、404 或 409。 */
     @ExceptionHandler(MdmException.class)

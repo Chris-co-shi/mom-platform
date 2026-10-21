@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.mdm.application.ProductionVersionApplication;
@@ -28,11 +29,11 @@ import java.time.LocalDate;
 /** ProductionVersion 的 HTTP DTO、状态动作和权限边界。 */
 @RestController
 @RequestMapping("/production-versions")
+@RequiredArgsConstructor
 public class ProductionVersionController {
     private final ProductionVersionApplication application;
 
-    /** 注入制造定义组合用例，不直接访问数据库。 */
-    public ProductionVersionController(ProductionVersionApplication application) { this.application = application; }
+    
 
     /** 创建 DRAFT 生产版本。 */
     @PostMapping

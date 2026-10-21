@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.mdm.application.model.MdmPageParams.MaterialCategoryPageParams;
@@ -34,17 +35,11 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/material-categories")
+@RequiredArgsConstructor
 public class MaterialCategoryController {
     private final MaterialCategoryApplication application;
 
-    /**
-     * 注入物料分类用例入口。
-     *
-     * @param application MaterialCategory Application
-     */
-    public MaterialCategoryController(MaterialCategoryApplication application) {
-        this.application = application;
-    }
+    
 
     /**
      * 创建根分类或子分类。

@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.mdm.api.ManufacturingResourceReference;
 import io.github.chrisshi.mom.mdm.application.FactoryStructureApplication;
 import io.github.chrisshi.mom.webmvc.response.Result;
@@ -14,15 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/manufacturing-resource-references")
+@RequiredArgsConstructor
 public class ManufacturingResourceReferenceController {
     private final FactoryStructureApplication application;
 
-    /**
-     * 复用工厂结构权威 Application，不建立第二写入模型。
-     */
-    public ManufacturingResourceReferenceController(FactoryStructureApplication application) {
-        this.application = application;
-    }
+    
 
     /**
      * 按资源类型与 ID 查询当前新业务引用有效性。

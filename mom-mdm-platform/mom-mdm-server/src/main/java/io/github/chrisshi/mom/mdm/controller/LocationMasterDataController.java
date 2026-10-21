@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.mdm.application.LocationMasterDataApplication;
@@ -24,15 +25,11 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping
+@RequiredArgsConstructor
 public class LocationMasterDataController {
     private final LocationMasterDataApplication application;
 
-    /**
-     * @param application 位置主数据用例入口
-     */
-    public LocationMasterDataController(LocationMasterDataApplication application) {
-        this.application = application;
-    }
+    
 
     /**
      * 创建动态 LocationType。
