@@ -23,6 +23,7 @@ import io.github.chrisshi.mom.wms.application.InventoryCountModels.Task;
 import io.github.chrisshi.mom.wms.application.InventoryCountModels.Line;
 import io.github.chrisshi.mom.wms.infrastructure.entity.InventoryCountLineEntity;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryCountTaskMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryCountLineMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,6 +64,7 @@ class InventoryCountPostgresqlIT {
     @Autowired InventoryCountCommitService counts;
     @Autowired InventoryCountApplication application;
     @Autowired InventoryCountTaskMapper taskMapper;
+    @Autowired InventoryAccountingMapper inventoryMapper;
     @Autowired InventoryCountLineMapper lineMapper;
     @Autowired InventoryAccountingService accounting;
     @Autowired InventoryFreezeApplication freezes;
@@ -172,7 +174,7 @@ class InventoryCountPostgresqlIT {
         assertThat(transactionId).isNotBlank();
         assertThat(counts.adjust(id)).isEqualTo(transactionId);
         assertThat(task(id).status()).isEqualTo("COMPLETED");
-        assertThat(taskMapper.lockOwner("2001")).isNull();
+        assertThat(inventoryMapper.countLockOwner("2001")).isNull();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_transaction WHERE source_type='INVENTORY_COUNT' AND source_id=?",Integer.class,id)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT sum(quantity) FROM wms_inventory_balance",BigDecimal.class)).isEqualByComparingTo("6");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_balance WHERE created_at IS NULL",Integer.class)).isZero();
@@ -184,9 +186,9 @@ class InventoryCountPostgresqlIT {
         counts.count(id,lines(id).getFirst().id(),BigDecimal.ONE);
         assertThatThrownBy(()->counts.confirm(id)).isInstanceOf(InventoryCountFrozenDifferenceException.class);
         assertThat(task(id).status()).isEqualTo("COUNTING");
-        assertThat(taskMapper.lockOwner("2001")).isEqualTo(id);
+        assertThat(inventoryMapper.countLockOwner("2001")).isEqualTo(id);
         counts.cancel(id);
-        assertThat(taskMapper.lockOwner("2001")).isNull();
+        assertThat(inventoryMapper.countLockOwner("2001")).isNull();
     }
     @Test void adjustmentDefensivelyRejectsConfirmedFrozenDifference() {
         seed(dimension("SN-F",WarehouseStatus.FROZEN),"2");
@@ -196,7 +198,7 @@ class InventoryCountPostgresqlIT {
         jdbc.update("UPDATE wms_inventory_count_task SET status='CONFIRMED',confirmed_by='operator-1',confirmed_at=now() WHERE id=?",id);
         assertThatThrownBy(()->counts.adjust(id)).isInstanceOf(InventoryCountFrozenDifferenceException.class);
         assertThat(task(id).status()).isEqualTo("CONFIRMED");
-        assertThat(taskMapper.lockOwner("2001")).isEqualTo(id);
+        assertThat(inventoryMapper.countLockOwner("2001")).isEqualTo(id);
     }
     @Test void failedAdjustmentKeepsConfirmedTaskAndWarehouseLock() {
         seed(dimension(null,WarehouseStatus.NORMAL),"2");
@@ -205,7 +207,7 @@ class InventoryCountPostgresqlIT {
         jdbc.update("UPDATE wms_inventory_balance SET quantity=0 WHERE warehouse_id='2001'");
         assertThatThrownBy(()->counts.adjust(id)).isInstanceOf(IllegalStateException.class);
         assertThat(task(id).status()).isEqualTo("CONFIRMED");
-        assertThat(taskMapper.lockOwner("2001")).isEqualTo(id);
+        assertThat(inventoryMapper.countLockOwner("2001")).isEqualTo(id);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_transaction WHERE source_id=?",Integer.class,id)).isZero();
     }
     @Test void cancellationReleasesLockAndOldCreatedAtSurvivesLaterIncrease() {
@@ -213,7 +215,7 @@ class InventoryCountPostgresqlIT {
         Instant created=jdbc.queryForObject("SELECT created_at FROM wms_inventory_balance",Instant.class);
         String id=counts.create(java.util.UUID.randomUUID().toString(),warehouse(),List.of(),List.of()); counts.start(id,0);
         counts.cancel(id);
-        assertThat(taskMapper.lockOwner("2001")).isNull();
+        assertThat(inventoryMapper.countLockOwner("2001")).isNull();
         accounting.post(new Posting("after-cancel","RECEIPT","TEST","after","operator-1",
             List.of(new Entry(d,BigDecimal.ONE))));
         assertThat(jdbc.queryForObject("SELECT created_at FROM wms_inventory_balance",Instant.class)).isEqualTo(created);
@@ -223,7 +225,7 @@ class InventoryCountPostgresqlIT {
         String second=counts.create(java.util.UUID.randomUUID().toString(),warehouse(),List.of(),List.of());
         counts.start(first,0);
         assertThatThrownBy(()->counts.start(second,0)).isInstanceOf(IllegalStateException.class);
-        assertThat(taskMapper.lockOwner("2001")).isEqualTo(first);
+        assertThat(inventoryMapper.countLockOwner("2001")).isEqualTo(first);
     }
     @Test void createRequestIsIdempotentAndRejectsChangedContent() {
         String id=counts.create("create-key-1",warehouse(),List.of(),List.of());
@@ -261,7 +263,7 @@ class InventoryCountPostgresqlIT {
         assertThatThrownBy(()->transfers.transfer(new TransferCommand("transfer-during",balanceId,"3002",
             BigDecimal.ONE,"operator-1"),"2001",new LocationSnapshot("3002","LOC-2")))
             .isInstanceOf(RuntimeException.class);
-        assertThat(taskMapper.lockOwner("2001")).isEqualTo(id);
+        assertThat(inventoryMapper.countLockOwner("2001")).isEqualTo(id);
     }
     @Test void postingCommittedBeforeCountLockIsIncludedInSnapshot() throws Exception {
         String id=counts.create("race-key",warehouse(),List.of(),List.of());
@@ -308,7 +310,7 @@ class InventoryCountPostgresqlIT {
             counter.get();
             assertThatThrownBy(writer::get).hasCauseInstanceOf(IllegalStateException.class);
         }
-        assertThat(taskMapper.lockOwner("2001")).isEqualTo(id);
+        assertThat(inventoryMapper.countLockOwner("2001")).isEqualTo(id);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_transaction WHERE request_key='race-locked'",Integer.class)).isZero();
     }
     @Test void tooManyDifferencesRejectsWholeTaskBeforePosting() {
@@ -324,7 +326,7 @@ class InventoryCountPostgresqlIT {
         }
         assertThatThrownBy(()->counts.confirm(id)).isInstanceOf(InventoryCountLimitException.class);
         assertThat(task(id).status()).isEqualTo("COUNTING");
-        assertThat(taskMapper.lockOwner("2001")).isEqualTo(id);
+        assertThat(inventoryMapper.countLockOwner("2001")).isEqualTo(id);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_inventory_transaction",Integer.class)).isZero();
     }
     @Test void extraPhysicalStockMustBelongToScopeAndDoesNotPostImmediately() {
