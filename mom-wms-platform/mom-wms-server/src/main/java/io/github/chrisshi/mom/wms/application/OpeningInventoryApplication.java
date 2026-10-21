@@ -11,7 +11,7 @@ import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.M
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.wms.infrastructure.entity.OpeningDocumentLineEntity;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryLineMapper;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryMapper;
+import io.github.chrisshi.mom.wms.infrastructure.query.OpeningInventoryQueryMapper;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
 import org.springframework.stereotype.Service;
 
@@ -30,7 +30,7 @@ import jakarta.validation.constraints.Size;
  */
 @Service
 public class OpeningInventoryApplication {
-    private final OpeningInventoryMapper mapper;
+    private final OpeningInventoryQueryMapper queries;
     private final InventoryAccountingMapper inventory;
     private final OpeningInventoryLineMapper lineMapper;
     private final OpeningInventoryReferenceService references;
@@ -39,12 +39,12 @@ public class OpeningInventoryApplication {
     private final CurrentActorProvider actors;
     private final PageAdapter pages;
 
-    /** @param mapper WMS 期初持久化入口 @param references 事务外 MDM 权威引用 @param commits WMS 本地事务入口 @param ids 字符串技术 ID @param actors 当前责任主体 */
-    public OpeningInventoryApplication(OpeningInventoryMapper mapper, OpeningInventoryLineMapper lineMapper,
+    /** @param queries 期初只读分页/详情 @param references 事务外 MDM 权威引用 @param commits WMS 本地事务入口 @param ids 字符串技术 ID @param actors 当前责任主体 */
+    public OpeningInventoryApplication(OpeningInventoryQueryMapper queries, OpeningInventoryLineMapper lineMapper,
                                        InventoryAccountingMapper inventory, OpeningInventoryReferenceService references,
                                        OpeningInventoryCommitService commits, IdGenerator ids,
                                        CurrentActorProvider actors, PageAdapter pages) {
-        this.mapper = mapper; this.lineMapper = lineMapper; this.inventory = inventory; this.references = references; this.commits = commits; this.ids = ids; this.actors = actors;
+        this.queries = queries; this.lineMapper = lineMapper; this.inventory = inventory; this.references = references; this.commits = commits; this.ids = ids; this.actors = actors;
         this.pages = pages;
     }
 
@@ -62,8 +62,8 @@ public class OpeningInventoryApplication {
      * @param query 分页条件 @return 服务端分页结果
      */
     public PageResult<Document> list(PageQuery<ListFilter> query) {
-        Page<OpeningInventoryMapper.DocumentRow> page = pages.toPage(query);
-        mapper.list(page, query.params().warehouseId());
+        Page<OpeningInventoryQueryMapper.DocumentRow> page = pages.toPage(query);
+        queries.list(page, query.params().warehouseId());
         return pages.toResult(page, OpeningInventoryApplication::document);
     }
 
@@ -154,7 +154,7 @@ public class OpeningInventoryApplication {
     }
 
     private Document requireDocument(String id) {
-        Document value = document(mapper.find(id));
+        Document value = document(queries.find(id));
         if (value == null) throw new IllegalArgumentException("期初建账单不存在");
         return value;
     }
@@ -210,7 +210,7 @@ public class OpeningInventoryApplication {
     /** 过账结果及其不可变库存交易关联。 @param detail 已过账单据 @param transactionId 记账交易 ID */
     public record PostedResult(Detail detail, String transactionId) { }
 
-    private static Document document(OpeningInventoryMapper.DocumentRow row) {
+    private static Document document(OpeningInventoryQueryMapper.DocumentRow row) {
         if (row == null) return null;
         return new Document(row.id(), row.documentNo(), row.warehouseId(), row.warehouseCode(),
                 row.status(), row.transactionId(), row.createdBy(), row.version(), row.warehouseState());
