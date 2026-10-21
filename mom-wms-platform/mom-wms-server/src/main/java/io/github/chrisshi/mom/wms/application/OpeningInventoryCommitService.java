@@ -7,7 +7,7 @@ import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Posting
 import io.github.chrisshi.mom.wms.application.OpeningInventoryApplication.LineInput;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.LocationSnapshot;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.MaterialSnapshot;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.wms.infrastructure.entity.OpeningDocumentLineEntity;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryLineMapper;
