@@ -204,9 +204,9 @@ class InventoryAccountingPostgresqlIT {
                         "lockFreeze", "insertFreeze", "decreaseFreezeRemaining", "insertUnfreeze");
         // 两个单表读 Mapper 复用平台能力；只有锁定和原子写 SQL 不开放普通写接口。
         assertThat(io.github.chrisshi.mom.data.mapper.MomBaseMapper.class.isAssignableFrom(
-                io.github.chrisshi.mom.wms.infrastructure.query.InventoryFreezeQueryMapper.class)).isTrue();
+                io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryFreezeRecordMapper.class)).isTrue();
         assertThat(io.github.chrisshi.mom.data.mapper.MomBaseMapper.class.isAssignableFrom(
-                io.github.chrisshi.mom.wms.infrastructure.query.InventoryUnfreezeQueryMapper.class)).isTrue();
+                io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryUnfreezeRecordMapper.class)).isTrue();
     }
 
     @Test
