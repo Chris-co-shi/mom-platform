@@ -14,7 +14,10 @@ import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.L
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.MaterialSnapshot;
 import io.github.chrisshi.mom.wms.application.QualityStatus;
 import io.github.chrisshi.mom.wms.application.WarehouseStatus;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryPersistence;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import io.github.chrisshi.mom.wms.infrastructure.entity.OpeningDocumentLineEntity;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryLineMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,7 +51,8 @@ class OpeningInventoryPostgresqlIT {
     @Autowired OpeningInventoryCommitService commits;
     @Autowired OpeningInventoryApplication opening;
     @Autowired InventoryAccountingService accounting;
-    @Autowired OpeningInventoryPersistence mapper;
+    @Autowired OpeningInventoryMapper mapper;
+    @Autowired OpeningInventoryLineMapper lineMapper;
     @Autowired InventoryQueryService queries;
     @Autowired IdGenerator ids;
     @Autowired JdbcTemplate jdbc;
@@ -103,7 +107,7 @@ class OpeningInventoryPostgresqlIT {
         var filtered = opening.list(new io.github.chrisshi.mom.core.page.PageQuery<>(
                 new OpeningInventoryApplication.ListFilter("2000000000000000107"), 1, 20));
         assertThat(filtered.total()).isEqualTo(1);
-        assertThat(filtered.records()).extracting(OpeningInventoryPersistence.Document::id).containsExactly(first);
+        assertThat(filtered.records()).extracting(OpeningInventoryApplication.Document::id).containsExactly(first);
     }
 
     @Test void postsMultipleLinesOnceAndActivationIsSeparate() {
@@ -115,10 +119,13 @@ class OpeningInventoryPostgresqlIT {
         assertThat(jdbc.queryForObject("SELECT updated_by FROM wms_warehouse_inventory_state WHERE warehouse_id=?",
                 String.class, "2000000000000000001")).isEqualTo("operator-1");
         var document = mapper.find(documentId);
-        var replayEntries = mapper.lines(documentId).stream().map(line -> new Entry(new Dimension(
-                line.materialId(), line.materialCode(), line.materialName(), line.uomCode(), line.batchCode(),
-                line.snCode(), line.warehouseId(), line.warehouseCode(), line.locationId(), line.locationCode(),
-                line.qualityStatus(), line.warehouseStatus()), line.quantity())).toList();
+        var replayEntries = lineMapper.selectList(Wrappers.<OpeningDocumentLineEntity>lambdaQuery()
+                .eq(OpeningDocumentLineEntity::getDocumentId, documentId)
+                .orderByAsc(OpeningDocumentLineEntity::getLineNo))
+                .stream().map(line -> new Entry(new Dimension(
+                line.getMaterialId(), line.getMaterialCode(), line.getMaterialName(), line.getUomCode(), line.getBatchCode(),
+                line.getSnCode(), line.getWarehouseId(), line.getWarehouseCode(), line.getLocationId(), line.getLocationCode(),
+                line.getQualityStatus(), line.getWarehouseStatus()), line.getQuantity())).toList();
         assertThat(document.warehouseState()).isEqualTo("INITIALIZING");
         String transactionId = commits.post(documentId, document.version(), "operator-1");
         assertThat(commits.post(documentId, document.version(), "operator-1")).isEqualTo(transactionId);
