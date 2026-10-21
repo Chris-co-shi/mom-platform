@@ -23,9 +23,10 @@ QUERY_MAPPER_NAME = re.compile(r"\binterface\s+\w+QueryMapper\b")
 
 # 库存余额是权威数量，增减和幂等 claim 必须走专用 PostgreSQL 原子 SQL。
 # 不允许向 Application 暴露任意 BaseMapper<InventoryBalanceEntity> 更新/删除入口。
-# 该唯一受控例外明确不承载普通 CRUD；盘点、Opening 等实体 Mapper 仍强制继承 MomBaseMapper。
+# 两个精确受控例外仅提供受限原子 SQL，不允许 BaseMapper 的任意删除和覆盖。
 SPECIAL_SQL_MAPPERS = {
     "mom-wms-platform/mom-wms-server/src/main/java/io/github/chrisshi/mom/wms/infrastructure/mapper/InventoryAccountingMapper.java",
+    "mom-wms-platform/mom-wms-server/src/main/java/io/github/chrisshi/mom/wms/infrastructure/mapper/InventoryFreezeMapper.java",
 }
 
 APPLICATION_EXCEPTIONS = {
