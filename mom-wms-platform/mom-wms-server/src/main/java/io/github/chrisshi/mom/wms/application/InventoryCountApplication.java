@@ -8,8 +8,11 @@ import io.github.chrisshi.mom.data.page.PageAdapter;
 import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Dimension;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.LocationSnapshot;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.MaterialSnapshot;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryCountPersistence;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryCountPersistence.Task;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import io.github.chrisshi.mom.wms.application.InventoryCountModels.Task;
+import io.github.chrisshi.mom.wms.infrastructure.entity.InventoryCountLineEntity;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryCountTaskMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryCountLineMapper;
 import io.github.chrisshi.mom.wms.infrastructure.query.InventoryCountQueryMapper;
 import io.github.chrisshi.mom.wms.infrastructure.query.InventoryCountQueryMapper.Summary;
 import org.springframework.stereotype.Service;
@@ -26,19 +29,21 @@ import java.util.List;
 /** 盘点用例编排；MDM 只读引用在 WMS 本地事务之外验证。 */
 @Service
 public class InventoryCountApplication {
-    private final InventoryCountPersistence store;
+    private final InventoryCountTaskMapper tasks;
+    private final InventoryCountLineMapper lines;
     private final InventoryCountQueryMapper queries;
     private final OpeningInventoryReferenceService references;
     private final InventoryCountCommitService commits;
     private final PageAdapter pages;
     private final CurrentActorProvider actors;
 
-    /** @param store 盘点持久化 @param queries 服务端分页 @param references 事务外 MDM 引用
+    /** @param tasks 盘点任务 Mapper @param lines 盘点行 Mapper @param queries 服务端分页 @param references 事务外 MDM 引用
      * @param commits WMS 本地原子提交 @param pages 平台分页转换 @param actors 当前认证操作人 */
-    public InventoryCountApplication(InventoryCountPersistence store,InventoryCountQueryMapper queries,
+    public InventoryCountApplication(InventoryCountTaskMapper tasks,InventoryCountLineMapper lines,
+                                     InventoryCountQueryMapper queries,
                                      OpeningInventoryReferenceService references,InventoryCountCommitService commits,
                                      PageAdapter pages,CurrentActorProvider actors) {
-        this.store=store; this.queries=queries; this.references=references; this.commits=commits; this.pages=pages; this.actors=actors;
+        this.tasks=tasks; this.lines=lines; this.queries=queries; this.references=references; this.commits=commits; this.pages=pages; this.actors=actors;
     }
     /** 按仓库筛选盘点任务；服务端分页是权威。 */
     public PageResult<Summary> list(PageQuery<Filter> query) {
@@ -48,17 +53,19 @@ public class InventoryCountApplication {
     }
     /** 读取任务和每条完整维度账面与实盘事实。 */
     public Detail get(String id) {
-        Task task=store.find(id);
+        Task task=InventoryCountModels.task(tasks.selectById(id));
         if(task==null) throw new IllegalArgumentException("盘点任务不存在");
-        return new Detail(task,store.lines(id).stream().map(line->new LineView(line.id(),line.dimension(),
+        return new Detail(task,lines.selectList(Wrappers.<InventoryCountLineEntity>lambdaQuery()
+            .eq(InventoryCountLineEntity::getTaskId,id)
+            .orderByAsc(InventoryCountLineEntity::getId)).stream().map(InventoryCountModels::line).map(line->new LineView(line.id(),line.dimension(),
             line.bookQuantity().toPlainString(),line.countedQuantity()==null?null:line.countedQuantity().toPlainString(),
-            line.countedQuantity()==null?null:line.difference().toPlainString(),line.snapshotBy(),line.snapshotAt(),
+            line.countedQuantity()==null?null:line.countedQuantity().subtract(line.bookQuantity()).toPlainString(),line.snapshotBy(),line.snapshotAt(),
             line.countedBy(),line.countedAt())).toList());
     }
     /** 只返回当前操作人同键创建的已提交任务；缺失时不能证明原请求未提交。 */
     public Detail findCreatedByRequestKey(String requestKey) {
         if(requestKey==null || requestKey.isBlank() || requestKey.length()>128) throw new IllegalArgumentException("盘点创建请求键非法");
-        Task task=store.findByRequestKey(requestKey);
+        Task task=InventoryCountModels.task(tasks.findByRequestKey(requestKey));
         return task!=null && task.createdBy().equals(actors.requireCurrentActor().actorId()) ? get(task.id()) : null;
     }
     /** 创建单仓盘点草稿，验证仓库及可选范围引用。 */
@@ -117,7 +124,7 @@ public class InventoryCountApplication {
     /** 取消未确认任务，并在同一事务释放持久仓库锁。 */
     public Detail cancel(String id) { commits.cancel(id); return get(id); }
     private Task require(String id) {
-        Task task=store.find(id);
+        Task task=InventoryCountModels.task(tasks.selectById(id));
         if(task==null) throw new IllegalArgumentException("盘点任务不存在");
         return task;
     }

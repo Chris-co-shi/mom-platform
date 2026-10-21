@@ -134,6 +134,34 @@ class InventoryFreezePostgresqlIT {
                 InventoryFreezeApplication.FreezeReason.WAREHOUSE_CHECK))).isInstanceOf(IllegalStateException.class);
     }
 
+    /** MP 维度查询必须匹配 NULL 批次和 NULL SN，不得忽略条件读出其他维度的冻结记录。 */
+    @Test void typedFreezeQueriesRespectNullableBatchAndSnDimensions() {
+        var withoutBatch = new InventoryAccountingService.Dimension(
+                "1001", "MAT-1", "材料一", "kg", null, null, "2001", "WH-1",
+                "3001", "LOC-1", QualityStatus.QUALIFIED, WarehouseStatus.NORMAL);
+        var withBatch = new InventoryAccountingService.Dimension(
+                "1001", "MAT-1", "材料一", "kg", "B-2", null, "2001", "WH-1",
+                "3001", "LOC-1", QualityStatus.QUALIFIED, WarehouseStatus.NORMAL);
+        accounting.post(new InventoryAccountingService.Posting("seed-null-batch", "RECEIPT", "TEST",
+                "seed-null", "operator-1", List.of(new InventoryAccountingService.Entry(withoutBatch, BigDecimal.TEN))));
+        accounting.post(new InventoryAccountingService.Posting("seed-present-batch", "RECEIPT", "TEST",
+                "seed-present", "operator-1", List.of(new InventoryAccountingService.Entry(withBatch, BigDecimal.TEN))));
+        String noBatchId = jdbc.queryForObject(
+                "SELECT id FROM wms_inventory_balance WHERE batch_code IS NULL AND warehouse_status='NORMAL'",
+                String.class);
+        String batchId = jdbc.queryForObject(
+                "SELECT id FROM wms_inventory_balance WHERE batch_code='B-2' AND warehouse_status='NORMAL'",
+                String.class);
+        var first = freezes.freezeInventory(freezeCommand("freeze-null-batch", noBatchId, "2",
+                InventoryFreezeApplication.FreezeReason.WAREHOUSE_CHECK));
+        var second = freezes.freezeInventory(freezeCommand("freeze-present-batch", batchId, "3",
+                InventoryFreezeApplication.FreezeReason.SAFETY_HOLD));
+        assertThat(freezes.queryActiveFreezes(noBatchId))
+                .extracting(InventoryFreezeApplication.FreezeView::id).containsExactly(first.id());
+        assertThat(freezes.queryActiveFreezes(batchId))
+                .extracting(InventoryFreezeApplication.FreezeView::id).containsExactly(second.id());
+    }
+
     @Test void invalidReasonAmountAndOtherWithoutNoteAreRejectedBeforePosting() {
         String balance = seed(QualityStatus.PENDING, "10");
         assertThatThrownBy(() -> freezes.freezeInventory(freezeCommand("bad-amount", balance, "0",

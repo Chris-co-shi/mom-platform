@@ -8,9 +8,11 @@ import io.github.chrisshi.mom.core.security.CurrentActorProvider;
 import io.github.chrisshi.mom.mdm.api.WarehouseResourceReference;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.LocationSnapshot;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.MaterialSnapshot;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryPersistence;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryPersistence.Document;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryPersistence.Line;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import io.github.chrisshi.mom.wms.infrastructure.entity.OpeningDocumentLineEntity;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryLineMapper;
+import io.github.chrisshi.mom.wms.infrastructure.query.OpeningInventoryQueryMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -28,18 +30,21 @@ import jakarta.validation.constraints.Size;
  */
 @Service
 public class OpeningInventoryApplication {
-    private final OpeningInventoryPersistence mapper;
+    private final OpeningInventoryQueryMapper queries;
+    private final InventoryAccountingMapper inventory;
+    private final OpeningInventoryLineMapper lineMapper;
     private final OpeningInventoryReferenceService references;
     private final OpeningInventoryCommitService commits;
     private final IdGenerator ids;
     private final CurrentActorProvider actors;
     private final PageAdapter pages;
 
-    /** @param mapper WMS 期初持久化入口 @param references 事务外 MDM 权威引用 @param commits WMS 本地事务入口 @param ids 字符串技术 ID @param actors 当前责任主体 */
-    public OpeningInventoryApplication(OpeningInventoryPersistence mapper, OpeningInventoryReferenceService references,
+    /** @param queries 期初只读分页/详情 @param references 事务外 MDM 权威引用 @param commits WMS 本地事务入口 @param ids 字符串技术 ID @param actors 当前责任主体 */
+    public OpeningInventoryApplication(OpeningInventoryQueryMapper queries, OpeningInventoryLineMapper lineMapper,
+                                       InventoryAccountingMapper inventory, OpeningInventoryReferenceService references,
                                        OpeningInventoryCommitService commits, IdGenerator ids,
                                        CurrentActorProvider actors, PageAdapter pages) {
-        this.mapper = mapper; this.references = references; this.commits = commits; this.ids = ids; this.actors = actors;
+        this.queries = queries; this.lineMapper = lineMapper; this.inventory = inventory; this.references = references; this.commits = commits; this.ids = ids; this.actors = actors;
         this.pages = pages;
     }
 
@@ -49,7 +54,7 @@ public class OpeningInventoryApplication {
      */
     public Detail get(String id) {
         Document document = requireDocument(id);
-        return toView(document, mapper.lines(id));
+        return toView(document, lines(id));
     }
 
     /**
@@ -57,9 +62,9 @@ public class OpeningInventoryApplication {
      * @param query 分页条件 @return 服务端分页结果
      */
     public PageResult<Document> list(PageQuery<ListFilter> query) {
-        Page<Document> page = pages.toPage(query);
-        mapper.list(page, query.params().warehouseId());
-        return pages.toResult(page);
+        Page<OpeningInventoryQueryMapper.DocumentRow> page = pages.toPage(query);
+        queries.list(page, query.params().warehouseId());
+        return pages.toResult(page, OpeningInventoryApplication::document);
     }
 
     /**
@@ -145,11 +150,11 @@ public class OpeningInventoryApplication {
     public String activate(String warehouseId) {
         references.warehouse(warehouseId);
         commits.activate(warehouseId, actors.requireCurrentActor().actorId());
-        return mapper.warehouseState(warehouseId);
+        return inventory.warehouseInventoryState(warehouseId);
     }
 
     private Document requireDocument(String id) {
-        Document value = mapper.find(id);
+        Document value = document(queries.find(id));
         if (value == null) throw new IllegalArgumentException("期初建账单不存在");
         return value;
     }
@@ -182,6 +187,11 @@ public class OpeningInventoryApplication {
                             @NotNull QualityStatus qualityStatus, @NotNull WarehouseStatus warehouseStatus,
                             @NotNull @DecimalMin(value = "0", inclusive = false) @Digits(integer = 18, fraction = 6)
                             BigDecimal quantity) { }
+    /** Application 输出契约：不得向 Controller 暴露 Mapper Projection 或数据库 Entity。 */
+    public record Document(String id, String documentNo, String warehouseId, String warehouseCode,
+                           String status, String transactionId, String createdBy, long version,
+                           String warehouseState) { }
+
     /** 单据及其库存明细查询结果。 @param document 建账单快照 @param lines 建账明细 */
     public record Detail(Document document, List<LineView> lines) { }
     /** 建账单列表可按仓库身份精确筛选，用于创建结果未知时核对。 */
@@ -200,10 +210,22 @@ public class OpeningInventoryApplication {
     /** 过账结果及其不可变库存交易关联。 @param detail 已过账单据 @param transactionId 记账交易 ID */
     public record PostedResult(Detail detail, String transactionId) { }
 
-    static Detail toView(Document document, List<Line> lines) {
-        return new Detail(document, lines.stream().map(line -> new LineView(line.id(), line.lineNo(), line.materialId(),
-                line.materialCode(), line.materialName(), line.batchCode(), line.snCode(), line.warehouseId(),
-                line.warehouseCode(), line.locationId(), line.locationCode(), line.qualityStatus(),
-                line.warehouseStatus(), line.quantity().toPlainString(), line.uomCode())).toList());
+    private static Document document(OpeningInventoryQueryMapper.DocumentRow row) {
+        if (row == null) return null;
+        return new Document(row.id(), row.documentNo(), row.warehouseId(), row.warehouseCode(),
+                row.status(), row.transactionId(), row.createdBy(), row.version(), row.warehouseState());
+    }
+
+    private List<OpeningDocumentLineEntity> lines(String documentId) {
+        return lineMapper.selectList(Wrappers.<OpeningDocumentLineEntity>lambdaQuery()
+                .eq(OpeningDocumentLineEntity::getDocumentId, documentId)
+                .orderByAsc(OpeningDocumentLineEntity::getLineNo));
+    }
+
+    static Detail toView(Document document, List<OpeningDocumentLineEntity> lines) {
+        return new Detail(document, lines.stream().map(line -> new LineView(line.getId(), line.getLineNo(), line.getMaterialId(),
+                line.getMaterialCode(), line.getMaterialName(), line.getBatchCode(), line.getSnCode(), line.getWarehouseId(),
+                line.getWarehouseCode(), line.getLocationId(), line.getLocationCode(), line.getQualityStatus(),
+                line.getWarehouseStatus(), line.getQuantity().toPlainString(), line.getUomCode())).toList());
     }
 }

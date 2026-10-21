@@ -35,15 +35,25 @@ class CrudBaselineTest(unittest.TestCase):
         self.assertTrue(any("MomBaseMapper" in item for item in report.errors))
         self.assertTrue(any("重复声明" in item for item in report.errors))
 
-    def test_inventory_count_special_sql_mapper_exception_is_exact(self):
-        path = next(iter(module.SPECIAL_SQL_MAPPERS))
-        report = module.Report()
-        module.check_java_file(path, "interface InventoryCountSqlMapper {}", report)
-        self.assertEqual([], report.errors)
-        other = module.Report()
-        module.check_java_file(path.replace("InventoryCountSqlMapper", "OtherSqlMapper"),
-                               "interface OtherSqlMapper {}", other)
-        self.assertTrue(any("MomBaseMapper" in item for item in other.errors))
+    def test_inventory_atomic_sql_mapper_exceptions_are_exact(self):
+        allowed = {
+            "InventoryAccountingMapper",
+            "InventoryFreezeMapper",
+        }
+        self.assertEqual(
+            {path.rsplit("/", 1)[-1].removesuffix(".java") for path in module.SPECIAL_SQL_MAPPERS},
+            allowed,
+        )
+        for mapper_name in sorted(allowed):
+            path = next(value for value in module.SPECIAL_SQL_MAPPERS
+                        if value.endswith(f"/{mapper_name}.java"))
+            report = module.Report()
+            module.check_java_file(path, f"interface {mapper_name} {{}}", report)
+            self.assertEqual([], report.errors)
+            other = module.Report()
+            module.check_java_file(path.replace(mapper_name, "OtherSqlMapper"),
+                                   "interface OtherSqlMapper {}", other)
+            self.assertTrue(any("MomBaseMapper" in item for item in other.errors))
 
     def test_controller_repository_dependency_is_rejected(self):
         report = self.check("web/item/ItemController.java", "import a.b.ItemRepository; class ItemController {}")

@@ -7,10 +7,17 @@ import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Posting
 import io.github.chrisshi.mom.wms.application.OpeningInventoryApplication.LineInput;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.LocationSnapshot;
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.MaterialSnapshot;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryPersistence;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryPersistence.Document;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryPersistence.Line;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import io.github.chrisshi.mom.wms.infrastructure.entity.OpeningDocumentLineEntity;
+import io.github.chrisshi.mom.wms.infrastructure.entity.OpeningDocumentEntity;
+import io.github.chrisshi.mom.wms.infrastructure.entity.WarehouseInventoryStateEntity;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryLineMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.WarehouseInventoryStateMapper;
+import io.github.chrisshi.mom.wms.infrastructure.query.OpeningInventoryQueryMapper;
+import io.github.chrisshi.mom.wms.application.OpeningInventoryApplication.Document;
+import io.github.chrisshi.mom.wms.infrastructure.query.OpeningInventoryQueryMapper.DocumentRow;
 import io.github.chrisshi.mom.mdm.api.WarehouseResourceReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,15 +30,21 @@ import java.util.List;
  */
 @Service
 public class OpeningInventoryCommitService {
-    private final OpeningInventoryPersistence mapper;
+    private final OpeningInventoryMapper mapper;
+    private final WarehouseInventoryStateMapper warehouseStates;
+    private final OpeningInventoryQueryMapper queries;
+    private final OpeningInventoryLineMapper lineMapper;
     private final InventoryAccountingService accounting;
     private final IdGenerator ids;
     private final OpeningDocumentNumberService numbers;
 
     /** @param mapper 期初单持久化入口 @param accounting 唯一库存记账服务 @param ids 技术主键生成器 @param numbers WMS 正式单据发号入口 */
-    public OpeningInventoryCommitService(OpeningInventoryPersistence mapper, InventoryAccountingService accounting,
+    public OpeningInventoryCommitService(OpeningInventoryMapper mapper, OpeningInventoryLineMapper lineMapper,
+                                         WarehouseInventoryStateMapper warehouseStates, OpeningInventoryQueryMapper queries,
+                                         InventoryAccountingService accounting,
                                          IdGenerator ids, OpeningDocumentNumberService numbers) {
-        this.mapper = mapper; this.accounting = accounting; this.ids = ids; this.numbers = numbers;
+        this.mapper = mapper; this.lineMapper = lineMapper;
+        this.warehouseStates = warehouseStates; this.queries = queries; this.accounting = accounting; this.ids = ids; this.numbers = numbers;
     }
 
     /**
@@ -41,10 +54,10 @@ public class OpeningInventoryCommitService {
      */
     @Transactional
     public void create(String id, WarehouseResourceReference warehouse, String actor) {
-        mapper.initialize(ids.nextId(), warehouse.id(), warehouse.code(), actor);
-        String state = mapper.lockWarehouse(warehouse.id());
+        warehouseStates.initialize(ids.nextId(), warehouse.id(), warehouse.code(), actor);
+        String state = warehouseStates.lockWarehouse(warehouse.id());
         if (!"INITIALIZING".equals(state)) throw new IllegalStateException("仓库已过账待启用或已启用，不可再次进行期初建账");
-        if (mapper.hasWarehouseBalance(warehouse.id()))
+        if (queries.hasWarehouseBalance(warehouse.id()))
             throw new IllegalStateException("该仓库已存在实时余额，不能通过期初单重复增加初始库存");
         String documentNo = numbers.allocate();
         if (mapper.createDocument(id, documentNo, warehouse.id(), warehouse.code(), actor) != 1)
@@ -59,7 +72,7 @@ public class OpeningInventoryCommitService {
     @Transactional
     public void addLine(Document requested, MaterialSnapshot material, LocationSnapshot location,
                         LineInput input, String lineId, String actor) {
-        Document document = requireDraft(requested.id());
+        DocumentRow document = requireDraft(requested.id());
         if (!document.warehouseId().equals(requested.warehouseId())) throw new IllegalStateException("建账单仓库已变化");
         insert(document, material, location, input, lineId);
         bumpVersion(document.id(), actor);
@@ -73,11 +86,27 @@ public class OpeningInventoryCommitService {
     @Transactional
     public void editLine(Document requested, String lineId, MaterialSnapshot material, LocationSnapshot location,
                          LineInput input, String actor) {
-        Document document = requireDraft(requested.id());
+        DocumentRow document = requireDraft(requested.id());
         if (!document.warehouseId().equals(requested.warehouseId())) throw new IllegalStateException("建账单仓库已变化");
-        if (mapper.updateLine(document.id(), lineId, material.id(), material.code(), material.name(), input.batchCode(),
-                input.snCode(), location.id(), location.code(), input.qualityStatus(), input.warehouseStatus(),
-                input.quantity(), material.uomCode()) != 1) throw new IllegalArgumentException("期初明细不存在");
+        // 使用 mom-data 的 update(entity, wrapper)，同时保持 id + documentId 归属条件。
+        // batch_code、sn_code 可以清空；必须显式 wrapper.set(null)，不能依赖默认 NOT_NULL 字段策略。
+        OpeningDocumentLineEntity changes = new OpeningDocumentLineEntity();
+        changes.setMaterialId(material.id());
+        changes.setMaterialCode(material.code());
+        changes.setMaterialName(material.name());
+        changes.setLocationId(location.id());
+        changes.setLocationCode(location.code());
+        changes.setQualityStatus(input.qualityStatus());
+        changes.setWarehouseStatus(input.warehouseStatus());
+        changes.setQuantity(input.quantity());
+        changes.setUomCode(material.uomCode());
+        var scopedUpdate = Wrappers.<OpeningDocumentLineEntity>lambdaUpdate()
+                .eq(OpeningDocumentLineEntity::getId, lineId)
+                .eq(OpeningDocumentLineEntity::getDocumentId, document.id())
+                .set(OpeningDocumentLineEntity::getBatchCode, input.batchCode())
+                .set(OpeningDocumentLineEntity::getSnCode, input.snCode());
+        if (lineMapper.update(changes, scopedUpdate) != 1)
+            throw new IllegalArgumentException("期初明细不存在");
         bumpVersion(document.id(), actor);
     }
 
@@ -88,7 +117,10 @@ public class OpeningInventoryCommitService {
     @Transactional
     public void deleteLine(String documentId, String lineId, String actor) {
         requireDraft(documentId);
-        if (mapper.deleteLine(documentId, lineId) != 1) throw new IllegalArgumentException("期初明细不存在");
+        if (lineMapper.delete(Wrappers.<OpeningDocumentLineEntity>lambdaQuery()
+                .eq(OpeningDocumentLineEntity::getId, lineId)
+                .eq(OpeningDocumentLineEntity::getDocumentId, documentId)) != 1)
+            throw new IllegalArgumentException("期初明细不存在");
         bumpVersion(documentId, actor);
     }
 
@@ -98,10 +130,16 @@ public class OpeningInventoryCommitService {
      */
     @Transactional
     public void deleteDraft(String documentId) {
-        Document document = requireDraft(documentId);
-        mapper.deleteLinesByDocument(documentId);
-        if (mapper.deleteDraft(documentId) != 1) throw new IllegalStateException("期初单状态发生并发冲突");
-        if (mapper.deleteInitializingWarehouse(document.warehouseId()) != 1)
+        DocumentRow document = requireDraft(documentId);
+        lineMapper.delete(Wrappers.<OpeningDocumentLineEntity>lambdaQuery()
+                .eq(OpeningDocumentLineEntity::getDocumentId, documentId));
+        if (mapper.delete(Wrappers.<OpeningDocumentEntity>lambdaQuery()
+                .eq(OpeningDocumentEntity::getId, documentId)
+                .eq(OpeningDocumentEntity::getStatus, "DRAFT")) != 1) throw new IllegalStateException("期初单状态发生并发冲突");
+        if (warehouseStates.delete(Wrappers.<WarehouseInventoryStateEntity>lambdaQuery()
+                .eq(WarehouseInventoryStateEntity::getWarehouseId, document.warehouseId())
+                .eq(WarehouseInventoryStateEntity::getState, "INITIALIZING")
+                .isNull(WarehouseInventoryStateEntity::getOpeningDocumentId)) != 1)
             throw new IllegalStateException("仓库初始化状态发生并发冲突");
     }
 
@@ -111,23 +149,30 @@ public class OpeningInventoryCommitService {
      */
     @Transactional
     public String post(String documentId, long expectedVersion, String actor) {
-        Document document = mapper.lockDocument(documentId);
+        DocumentRow document = mapper.lockDocument(documentId);
         if (document == null) throw new IllegalArgumentException("期初建账单不存在");
         if ("POSTED".equals(document.status())) return document.transactionId();
         if (!"DRAFT".equals(document.status())) throw new IllegalStateException("期初建账单状态不可过账");
         if (document.version() != expectedVersion) throw new IllegalStateException("期初明细在校验后发生变化，请刷新后重新确认");
-        if (!"INITIALIZING".equals(mapper.lockWarehouse(document.warehouseId())))
+        if (!"INITIALIZING".equals(warehouseStates.lockWarehouse(document.warehouseId())))
             throw new IllegalStateException("仓库不处于期初初始化状态");
-        List<Line> lines = mapper.lines(documentId);
+        List<OpeningDocumentLineEntity> lines = lines(documentId);
         if (lines.isEmpty() || lines.size() > 100) throw new IllegalArgumentException("期初明细须为 1 至 100 条");
-        List<Entry> entries = lines.stream().map(line -> new Entry(new Dimension(line.materialId(), line.materialCode(),
-                line.materialName(), line.uomCode(), line.batchCode(), line.snCode(), line.warehouseId(),
-                line.warehouseCode(), line.locationId(), line.locationCode(), line.qualityStatus(),
-                line.warehouseStatus()), line.quantity())).toList();
+        List<Entry> entries = lines.stream().map(line -> new Entry(new Dimension(line.getMaterialId(), line.getMaterialCode(),
+                line.getMaterialName(), line.getUomCode(), line.getBatchCode(), line.getSnCode(), line.getWarehouseId(),
+                line.getWarehouseCode(), line.getLocationId(), line.getLocationCode(), line.getQualityStatus(),
+                line.getWarehouseStatus()), line.getQuantity())).toList();
         String transactionId = accounting.post(new Posting("OPENING:" + documentId, "OPENING", "OPENING_DOCUMENT",
                 documentId, actor, entries));
         if (mapper.postDocument(documentId, transactionId, expectedVersion, actor) != 1
-                || mapper.markPending(document.warehouseId(), documentId, actor) != 1)
+                || warehouseStates.update(new WarehouseInventoryStateEntity(),
+                    Wrappers.<WarehouseInventoryStateEntity>lambdaUpdate()
+                            .set(WarehouseInventoryStateEntity::getState, "PENDING_ACTIVATION")
+                            .set(WarehouseInventoryStateEntity::getOpeningDocumentId, documentId)
+                            .set(WarehouseInventoryStateEntity::getUpdatedBy, actor)
+                            .setSql("updated_at=now()")
+                            .eq(WarehouseInventoryStateEntity::getWarehouseId, document.warehouseId())
+                            .eq(WarehouseInventoryStateEntity::getState, "INITIALIZING")) != 1)
             throw new IllegalStateException("期初单或仓库状态发生并发冲突");
         return transactionId;
     }
@@ -138,17 +183,51 @@ public class OpeningInventoryCommitService {
      */
     @Transactional
     public void activate(String warehouseId, String actor) {
-        String state = mapper.lockWarehouse(warehouseId);
+        String state = warehouseStates.lockWarehouse(warehouseId);
         if (!"PENDING_ACTIVATION".equals(state)) throw new IllegalStateException("仓库必须处于已过账待启用状态");
-        if (mapper.activate(warehouseId, actor) != 1) throw new IllegalStateException("仓库启用状态发生并发冲突");
+        if (warehouseStates.update(new WarehouseInventoryStateEntity(),
+                Wrappers.<WarehouseInventoryStateEntity>lambdaUpdate()
+                        .set(WarehouseInventoryStateEntity::getState, "ACTIVE")
+                        .set(WarehouseInventoryStateEntity::getActivatedBy, actor)
+                        .set(WarehouseInventoryStateEntity::getUpdatedBy, actor)
+                        .setSql("activated_at=now(), updated_at=now()")
+                        .eq(WarehouseInventoryStateEntity::getWarehouseId, warehouseId)
+                        .eq(WarehouseInventoryStateEntity::getState, "PENDING_ACTIVATION")) != 1) throw new IllegalStateException("仓库启用状态发生并发冲突");
     }
 
-    private void insert(Document document, MaterialSnapshot material, LocationSnapshot location,
-                        LineInput input, String lineId) {
-        if (mapper.insertLine(lineId, document.id(), mapper.nextLineNo(document.id()), material.id(), material.code(),
-                material.name(), input.batchCode(), input.snCode(), document.warehouseId(), document.warehouseCode(),
-                location.id(), location.code(), input.qualityStatus(), input.warehouseStatus(), input.quantity(),
-                material.uomCode()) != 1) throw new IllegalStateException("期初明细写入失败");
+    private void insert(DocumentRow document, MaterialSnapshot material, LocationSnapshot location,
+                         LineInput input, String lineId) {
+        OpeningDocumentLineEntity row = line(document, material, location, input, lineId);
+        row.setLineNo(lineMapper.nextLineNo(document.id()));
+        if (lineMapper.insert(row) != 1) throw new IllegalStateException("期初明细写入失败");
+    }
+
+    /** 类型化行装配属于 Application；Mapper 不解释物料、库位或生命周期业务规则。 */
+    private static OpeningDocumentLineEntity line(DocumentRow document, MaterialSnapshot material,
+                                                  LocationSnapshot location, LineInput input, String lineId) {
+        OpeningDocumentLineEntity row = new OpeningDocumentLineEntity();
+        row.setId(lineId);
+        row.setDocumentId(document.id());
+        row.setMaterialId(material.id());
+        row.setMaterialCode(material.code());
+        row.setMaterialName(material.name());
+        row.setBatchCode(input.batchCode());
+        row.setSnCode(input.snCode());
+        row.setWarehouseId(document.warehouseId());
+        row.setWarehouseCode(document.warehouseCode());
+        row.setLocationId(location.id());
+        row.setLocationCode(location.code());
+        row.setQualityStatus(input.qualityStatus());
+        row.setWarehouseStatus(input.warehouseStatus());
+        row.setQuantity(input.quantity());
+        row.setUomCode(material.uomCode());
+        return row;
+    }
+
+    private List<OpeningDocumentLineEntity> lines(String documentId) {
+        return lineMapper.selectList(Wrappers.<OpeningDocumentLineEntity>lambdaQuery()
+                .eq(OpeningDocumentLineEntity::getDocumentId, documentId)
+                .orderByAsc(OpeningDocumentLineEntity::getLineNo));
     }
 
     private void bumpVersion(String documentId, String actor) {
@@ -156,15 +235,11 @@ public class OpeningInventoryCommitService {
             throw new IllegalStateException("期初单版本更新发生并发冲突");
     }
 
-    private Document requireDraft(String id) {
-        Document document = mapper.lockDocument(id);
+    private DocumentRow requireDraft(String id) {
+        DocumentRow document = mapper.lockDocument(id);
         if (document == null) throw new IllegalArgumentException("期初建账单不存在");
         if (!"DRAFT".equals(document.status())) throw new IllegalStateException("已过账建账单不可修改");
         return document;
     }
 
-    private OpeningInventoryApplication.Detail detail(String id) {
-        Document document = mapper.find(id);
-        return OpeningInventoryApplication.toView(document, mapper.lines(id));
-    }
 }

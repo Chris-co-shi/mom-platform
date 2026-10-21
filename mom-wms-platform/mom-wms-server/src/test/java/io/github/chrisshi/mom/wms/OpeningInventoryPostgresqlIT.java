@@ -14,7 +14,10 @@ import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.L
 import io.github.chrisshi.mom.wms.application.OpeningInventoryReferenceService.MaterialSnapshot;
 import io.github.chrisshi.mom.wms.application.QualityStatus;
 import io.github.chrisshi.mom.wms.application.WarehouseStatus;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryPersistence;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import io.github.chrisshi.mom.wms.infrastructure.entity.OpeningDocumentLineEntity;
+import io.github.chrisshi.mom.wms.infrastructure.query.OpeningInventoryQueryMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryLineMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,7 +51,8 @@ class OpeningInventoryPostgresqlIT {
     @Autowired OpeningInventoryCommitService commits;
     @Autowired OpeningInventoryApplication opening;
     @Autowired InventoryAccountingService accounting;
-    @Autowired OpeningInventoryPersistence mapper;
+    @Autowired OpeningInventoryQueryMapper mapper;
+    @Autowired OpeningInventoryLineMapper lineMapper;
     @Autowired InventoryQueryService queries;
     @Autowired IdGenerator ids;
     @Autowired JdbcTemplate jdbc;
@@ -103,7 +107,64 @@ class OpeningInventoryPostgresqlIT {
         var filtered = opening.list(new io.github.chrisshi.mom.core.page.PageQuery<>(
                 new OpeningInventoryApplication.ListFilter("2000000000000000107"), 1, 20));
         assertThat(filtered.total()).isEqualTo(1);
-        assertThat(filtered.records()).extracting(OpeningInventoryPersistence.Document::id).containsExactly(first);
+        assertThat(filtered.records()).extracting(OpeningInventoryApplication.Document::id).containsExactly(first);
+    }
+
+    /** 覆盖 MP 明细 insert/select 与受单据归属约束的编辑、删除；业务版本按操作精确推进。 */
+    @Test void openingLineMomDataCrudPreservesDocumentVersionAndView() {
+        String documentId = createDraft("2000000000000000111");
+        var material = new MaterialSnapshot("1001", "MAT-1", "物料一", "REQUIRED", "kg");
+        var location = new LocationSnapshot("3001", "LOC-3001");
+        LineInput original = new LineInput("1001", "3001", "BATCH-1", "SN-NEW",
+                QualityStatus.QUALIFIED, WarehouseStatus.NORMAL, new BigDecimal("2.50"));
+        String lineId = ids.nextId();
+        commits.addLine(opening.get(documentId).document(), material, location, original, lineId, "operator-1");
+
+        var saved = lineMapper.selectById(lineId);
+        assertThat(saved.getDocumentId()).isEqualTo(documentId);
+        assertThat(saved.getQuantity()).isEqualByComparingTo("2.50");
+        assertThat(saved.getCreatedAt()).isNotNull();
+        assertThat(opening.get(documentId).lines()).hasSize(1);
+        // DB numeric(24,6) returns scale 6: keep existing decimal-string API precision.\n        assertThat(opening.get(documentId).lines().getFirst().quantity()).isEqualTo("2.500000");
+        assertThat(mapper.find(documentId).version()).isEqualTo(1);
+
+        // MyBatis-Plus 的实体 update 默认会跳过 null，清空 SN 必须通过 wrapper.set(null)。
+        LineInput changed = new LineInput("1001", "3001", "BATCH-1", null,
+                QualityStatus.QUALIFIED, WarehouseStatus.NORMAL, new BigDecimal("3.75"));
+        commits.editLine(opening.get(documentId).document(), lineId, material, location, changed, "operator-1");
+        assertThat(lineMapper.selectById(lineId).getQuantity()).isEqualByComparingTo("3.75");
+        assertThat(lineMapper.selectById(lineId).getSnCode()).isNull();
+        assertThat(mapper.find(documentId).version()).isEqualTo(2);
+
+        // 模拟 MDM 批次策略由 REQUIRED 调整为 NONE 后，刷新可信物料快照并清除旧批次。
+        var untracked = new MaterialSnapshot("1001", "MAT-1", "物料一", "NONE", "kg");
+        LineInput noBatch = new LineInput("1001", "3001", null, null,
+                QualityStatus.QUALIFIED, WarehouseStatus.NORMAL, new BigDecimal("3.75"));
+        commits.editLine(opening.get(documentId).document(), lineId, untracked, location, noBatch, "operator-1");
+        assertThat(lineMapper.selectById(lineId).getBatchCode()).isNull();
+        assertThat(mapper.find(documentId).version()).isEqualTo(3);
+
+        commits.deleteLine(documentId, lineId, "operator-1");
+        assertThat(lineMapper.selectById(lineId)).isNull();
+        assertThat(opening.get(documentId).lines()).isEmpty();
+        assertThat(mapper.find(documentId).version()).isEqualTo(4);
+    }
+
+    /** 父单据 FOR UPDATE + mom-data 条件删除必须在同事务清空明细和可重新建账的仓库状态。 */
+    @Test void deletingDraftRemovesLinesAndInitializingStateAtomically() {
+        String warehouseId = "2000000000000000112";
+        String documentId = createDraft(warehouseId);
+        add(documentId, "SN-TO-DELETE", "3001", "1.25");
+        assertThat(opening.get(documentId).lines()).hasSize(1);
+
+        commits.deleteDraft(documentId);
+        assertThat(mapper.find(documentId)).isNull();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_opening_document_line WHERE document_id=?",
+                Integer.class, documentId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM wms_warehouse_inventory_state WHERE warehouse_id=?",
+                Integer.class, warehouseId)).isZero();
+        // 已撤销的草稿不锁死仓库，下一个合法初始化仍可创建。
+        assertThat(createDraft(warehouseId)).isNotEqualTo(documentId);
     }
 
     @Test void postsMultipleLinesOnceAndActivationIsSeparate() {
@@ -115,10 +176,13 @@ class OpeningInventoryPostgresqlIT {
         assertThat(jdbc.queryForObject("SELECT updated_by FROM wms_warehouse_inventory_state WHERE warehouse_id=?",
                 String.class, "2000000000000000001")).isEqualTo("operator-1");
         var document = mapper.find(documentId);
-        var replayEntries = mapper.lines(documentId).stream().map(line -> new Entry(new Dimension(
-                line.materialId(), line.materialCode(), line.materialName(), line.uomCode(), line.batchCode(),
-                line.snCode(), line.warehouseId(), line.warehouseCode(), line.locationId(), line.locationCode(),
-                line.qualityStatus(), line.warehouseStatus()), line.quantity())).toList();
+        var replayEntries = lineMapper.selectList(Wrappers.<OpeningDocumentLineEntity>lambdaQuery()
+                .eq(OpeningDocumentLineEntity::getDocumentId, documentId)
+                .orderByAsc(OpeningDocumentLineEntity::getLineNo))
+                .stream().map(line -> new Entry(new Dimension(
+                line.getMaterialId(), line.getMaterialCode(), line.getMaterialName(), line.getUomCode(), line.getBatchCode(),
+                line.getSnCode(), line.getWarehouseId(), line.getWarehouseCode(), line.getLocationId(), line.getLocationCode(),
+                line.getQualityStatus(), line.getWarehouseStatus()), line.getQuantity())).toList();
         assertThat(document.warehouseState()).isEqualTo("INITIALIZING");
         String transactionId = commits.post(documentId, document.version(), "operator-1");
         assertThat(commits.post(documentId, document.version(), "operator-1")).isEqualTo(transactionId);
@@ -151,7 +215,7 @@ class OpeningInventoryPostgresqlIT {
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> createDraft("2000000000000000001")).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> commits.deleteDraft(documentId)).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> commits.addLine(mapper.find(documentId),
+        assertThatThrownBy(() -> commits.addLine(opening.get(documentId).document(),
                 new MaterialSnapshot("1001", "MAT-1", "物料一", "REQUIRED", "kg"),
                 new LocationSnapshot("3001", "LOC-3001"),
                 new LineInput("1001", "3001", "BATCH-1", "SN-LATE", QualityStatus.QUALIFIED,
@@ -198,7 +262,7 @@ class OpeningInventoryPostgresqlIT {
     }
 
     private void add(String documentId, String sn, String locationId, String quantity) {
-        var document = mapper.find(documentId);
+        var document = opening.get(documentId).document();
         commits.addLine(document, new MaterialSnapshot("1001", "MAT-1", "物料一", "REQUIRED", "kg"),
                 new LocationSnapshot(locationId, "LOC-" + locationId),
                 new LineInput("1001", locationId, "BATCH-1", sn, QualityStatus.QUALIFIED,

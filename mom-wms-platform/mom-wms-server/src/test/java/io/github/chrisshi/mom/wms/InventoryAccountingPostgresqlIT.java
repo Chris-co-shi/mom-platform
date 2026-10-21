@@ -8,7 +8,7 @@ import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Entry;
 import io.github.chrisshi.mom.wms.application.InventoryAccountingService.Posting;
 import io.github.chrisshi.mom.wms.application.QualityStatus;
 import io.github.chrisshi.mom.wms.application.WarehouseStatus;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingOperations;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -187,14 +187,26 @@ class InventoryAccountingPostgresqlIT {
 
     @Test
     void genericBalanceMapperWritesAreBlockedOutsideAccountingEntry() {
-        var operationNames = java.util.Arrays.stream(InventoryAccountingOperations.class.getDeclaredMethods())
+        var operationNames = java.util.Arrays.stream(InventoryAccountingMapper.class.getDeclaredMethods())
                 .map(java.lang.reflect.Method::getName).toList();
+        assertThat(InventoryAccountingMapper.class.getInterfaces()).isEmpty();
+        // 权威余额只允许列出的原子数据库动作，不暴露 BaseMapper 通用插入/删除/更新。
         assertThat(operationNames).containsExactlyInAnyOrder(
                 "claim", "hashOf", "idOf", "increase", "decrease", "insertEntry",
-                "warehouseInventoryState", "findInventoryBalance", "findFreezeByTransaction", "lockFreeze",
-                "insertFreeze", "activeFreezesByDimension", "decreaseFreezeRemaining", "findUnfreeze",
-                "insertUnfreeze", "lockAccountingKey", "positiveBalanceCountForSn", "findTransferReplay",
-                "countLockOwner", "confirmedCountOwner");
+                "warehouseInventoryState", "findInventoryBalance", "lockAccountingKey",
+                "positiveBalanceCountForSn", "findTransferReplay", "countLockOwner", "confirmedCountOwner");
+        assertThat(io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryFreezeMapper.class.getInterfaces())
+                .isEmpty();
+        assertThat(java.util.Arrays.stream(
+                io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryFreezeMapper.class.getDeclaredMethods())
+                .map(java.lang.reflect.Method::getName).toList())
+                .containsExactlyInAnyOrder(
+                        "lockFreeze", "insertFreeze", "decreaseFreezeRemaining", "insertUnfreeze");
+        // 两个单表读 Mapper 复用平台能力；只有锁定和原子写 SQL 不开放普通写接口。
+        assertThat(io.github.chrisshi.mom.data.mapper.MomBaseMapper.class.isAssignableFrom(
+                io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryFreezeRecordMapper.class)).isTrue();
+        assertThat(io.github.chrisshi.mom.data.mapper.MomBaseMapper.class.isAssignableFrom(
+                io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryUnfreezeRecordMapper.class)).isTrue();
     }
 
     @Test
