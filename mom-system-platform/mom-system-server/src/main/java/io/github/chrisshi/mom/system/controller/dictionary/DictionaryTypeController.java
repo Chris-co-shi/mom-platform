@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.system.controller.dictionary;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.system.application.dictionary.DictionaryApplication;
 import io.github.chrisshi.mom.system.application.dictionary.DictionaryModels.ChangeStatus;
 import io.github.chrisshi.mom.system.application.dictionary.DictionaryModels.CreateType;
@@ -14,9 +15,10 @@ import java.util.List;
 /** 字典类型管理 HTTP 边界。 */
 @RestController
 @RequestMapping("/dictionary-types")
+@RequiredArgsConstructor
 public class DictionaryTypeController {
     private final DictionaryApplication application;
-    public DictionaryTypeController(DictionaryApplication application) { this.application = application; }
+
 
     @PostMapping @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('system:dictionary:write')")
     public Result<TypeView> create(@RequestBody CreateTypeRequest request) {

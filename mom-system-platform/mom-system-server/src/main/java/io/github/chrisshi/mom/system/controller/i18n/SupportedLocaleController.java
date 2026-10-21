@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.system.controller.i18n;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.system.api.SupportedLocaleInfo;
 import io.github.chrisshi.mom.system.application.i18n.SupportedLocaleApplication;
 import io.github.chrisshi.mom.webmvc.response.Result;
@@ -17,13 +18,11 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/i18n/locales")
+@RequiredArgsConstructor
 public class SupportedLocaleController {
     private final SupportedLocaleApplication application;
 
-    /** @param application SupportedLocale 用例入口 */
-    public SupportedLocaleController(SupportedLocaleApplication application) {
-        this.application = application;
-    }
+    
 
     /** 返回平台 Locale 稳定只读列表。 */
     @GetMapping

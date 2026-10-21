@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.system.controller.dictionary;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.system.api.ResolvedSystemDictionaryItem;
 import io.github.chrisshi.mom.system.api.SystemDictionaryItemOption;
 import io.github.chrisshi.mom.system.application.dictionary.DictionaryApplication;
@@ -11,9 +12,10 @@ import java.util.List;
 /** 字典运行时只读解析 HTTP 边界。 */
 @RestController
 @RequestMapping("/dictionaries")
+@RequiredArgsConstructor
 public class RuntimeDictionaryController {
     private final DictionaryApplication application;
-    public RuntimeDictionaryController(DictionaryApplication application) { this.application = application; }
+
 
     @GetMapping("/{dictionaryCode}/items") @PreAuthorize("hasAuthority('system:dictionary:read')")
     public Result<List<SystemDictionaryItemOption>> activeItems(@PathVariable String dictionaryCode) {

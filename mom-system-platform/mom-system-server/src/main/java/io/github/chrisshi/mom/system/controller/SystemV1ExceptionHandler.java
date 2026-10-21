@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.system.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.system.application.SystemV1Exception;
 import io.github.chrisshi.mom.system.controller.dictionary.DictionaryItemController;
 import io.github.chrisshi.mom.system.controller.dictionary.DictionaryTypeController;
@@ -32,13 +33,11 @@ import java.util.Locale;
         SupportedLocaleController.class,
         LocaleCatalogController.class
 })
+@RequiredArgsConstructor
 public class SystemV1ExceptionHandler {
     private final I18nMessageResolver messageResolver;
 
-    /** @param messageResolver Framework/System 组合消息解析器 */
-    public SystemV1ExceptionHandler(I18nMessageResolver messageResolver) {
-        this.messageResolver = messageResolver;
-    }
+    
 
     /** 将不存在资源映射为 404。 */
     @ExceptionHandler(SystemV1Exception.NotFound.class)

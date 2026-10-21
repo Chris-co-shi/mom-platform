@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.wms;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.i18n.I18nMessageResolver;
 import io.github.chrisshi.mom.core.page.PageQueryValidationException;
 import io.github.chrisshi.mom.webmvc.response.Result;
@@ -24,15 +25,11 @@ import java.util.Locale;
 @RestControllerAdvice(assignableTypes = {InventoryController.class, OpeningInventoryController.class,
     InventoryHistoryController.class})
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+@RequiredArgsConstructor
 public class InventoryQueryExceptionHandler {
     private final I18nMessageResolver messages;
 
-    /**
-     * @param messages 框架固定错误文案解析器
-     */
-    public InventoryQueryExceptionHandler(I18nMessageResolver messages) {
-        this.messages = messages;
-    }
+    
 
     /**
      * 非法筛选、分页与 JSON 均返回稳定 400。
