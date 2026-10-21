@@ -87,11 +87,12 @@ class AuthManagementPostgresqlIT {
     void selfServiceMustPersistOnlyAllowedFieldsAndRejectStaleCredentials() {
         var user = userApplication.create("self.service", " OldPassword@123 ", "Before", true);
         var other = userApplication.create("other.user", "OtherPassword@123", "Other", true);
+        var otherPersisted = userApplication.get(other.id());
         var profile = userApplication.updateOwnProfile(user.id(), " After ", user.version());
         assertThat(profile.version()).isEqualTo(user.version() + 1);
         assertThat(profile.displayName()).isEqualTo("After");
         assertThat(profile.username()).isEqualTo("self.service");
-        assertThat(userApplication.get(other.id())).isEqualTo(other);
+        assertThat(userApplication.get(other.id())).isEqualTo(otherPersisted);
         assertError(() -> userApplication.changeOwnPassword(user.id(), "wrong", "NewPassword@123", profile.version()),
             AuthErrorCode.CURRENT_PASSWORD_INVALID);
         assertThat(userApplication.get(user.id()).version()).isEqualTo(profile.version());
