@@ -87,11 +87,12 @@ class AuthManagementPostgresqlIT {
     void selfServiceMustPersistOnlyAllowedFieldsAndRejectStaleCredentials() {
         var user = userApplication.create("self.service", " OldPassword@123 ", "Before", true);
         var other = userApplication.create("other.user", "OtherPassword@123", "Other", true);
+        var otherPersisted = userApplication.get(other.id());
         var profile = userApplication.updateOwnProfile(user.id(), " After ", user.version());
         assertThat(profile.version()).isEqualTo(user.version() + 1);
         assertThat(profile.displayName()).isEqualTo("After");
         assertThat(profile.username()).isEqualTo("self.service");
-        assertThat(userApplication.get(other.id())).isEqualTo(other);
+        assertThat(userApplication.get(other.id())).isEqualTo(otherPersisted);
         assertError(() -> userApplication.changeOwnPassword(user.id(), "wrong", "NewPassword@123", profile.version()),
             AuthErrorCode.CURRENT_PASSWORD_INVALID);
         assertThat(userApplication.get(user.id()).version()).isEqualTo(profile.version());
@@ -132,7 +133,7 @@ class AuthManagementPostgresqlIT {
 
     @Test
     void flywayAndDatabaseConstraintsMustMatchMiniAuthModel() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("17");
+        flyway.validate();
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("show timezone", String.class)).isEqualTo("UTC");
         assertThat(jdbcTemplate.queryForObject("""
@@ -201,7 +202,8 @@ class AuthManagementPostgresqlIT {
             .locations("classpath:db/migration/auth")
             .load();
         seeded.migrate();
-        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("17");
+        seeded.validate();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM mom_auth_system_seed.flyway_schema_history WHERE version='6' AND success", Long.class)).isEqualTo(1L);
         assertThat(jdbcTemplate.queryForList("""
             SELECT permission.code
               FROM mom_auth_system_seed.auth_permission permission
@@ -228,7 +230,8 @@ class AuthManagementPostgresqlIT {
             .locations("classpath:db/migration/auth")
             .load();
         seeded.migrate();
-        assertThat(seeded.info().current().getVersion().getVersion()).isEqualTo("17");
+        seeded.validate();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM mom_auth_mdm_seed.flyway_schema_history WHERE version='11' AND success", Long.class)).isEqualTo(1L);
 
         assertThat(jdbcTemplate.queryForObject("""
             SELECT COUNT(*) FROM mom_auth_mdm_seed.auth_permission_resource

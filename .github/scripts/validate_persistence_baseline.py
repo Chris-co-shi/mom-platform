@@ -32,9 +32,21 @@ ONE_TIME_V28_FIX = (
     "575e46ab538453578e9eb2782a9a24d945dbd338",
 )
 
+# V16 的驼峰键违反 V2 已发布的小写约束，无法在新库执行；用户批准仅修正这一对 Git Blob。
+ONE_TIME_WMS_V16_FIX = (
+    "mom-wms-platform/mom-wms-server/src/main/resources/db/migration/wms/"
+    "V16__transfer_quantity_label.sql",
+    "257032b2d1a5e63b3730e8f1969c672033897f39",
+    "c225b729eb4f3b498b25505f0f8234838c0341b3",
+)
+
 
 def is_approved_v28_fix(path: str, old_blob: str, new_blob: str) -> bool:
     return (path, old_blob, new_blob) == ONE_TIME_V28_FIX
+
+
+def is_approved_wms_v16_fix(path: str, old_blob: str, new_blob: str) -> bool:
+    return (path, old_blob, new_blob) == ONE_TIME_WMS_V16_FIX
 
 
 @dataclass
@@ -217,11 +229,14 @@ def run(root: pathlib.Path, base: str | None, head: str, report: Report) -> None
         changes, base_files = collect_git_changes(root, base, head)
         checked_changes: list[tuple[str, ...]] = []
         for change in changes:
-            if change[0] == "M" and change[1] == ONE_TIME_V28_FIX[0]:
+            if change[0] == "M" and change[1] in {ONE_TIME_V28_FIX[0], ONE_TIME_WMS_V16_FIX[0]}:
                 old_blob = git_lines(root, "rev-parse", f"{base}:{change[1]}")[0]
                 new_blob = git_lines(root, "rev-parse", f"{head}:{change[1]}")[0]
                 if is_approved_v28_fix(change[1], old_blob, new_blob):
                     report.reviews.append("一次性修复了不可执行的 System V28 小写 i18n Key；仅此精确 Git Blob 对允许")
+                    continue
+                if is_approved_wms_v16_fix(change[1], old_blob, new_blob):
+                    report.reviews.append("一次性修复了不可执行的 WMS V16 小写 i18n Key；仅此精确 Git Blob 对允许，部署须核查旧 checksum")
                     continue
             checked_changes.append(change)
         check_versioned_immutability(checked_changes, base_files, report)

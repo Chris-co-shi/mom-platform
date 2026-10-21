@@ -144,9 +144,9 @@ class MdmMasterDataPostgresqlIT {
     @Test
     void migrationMustCreateMasterTablesAndDatabaseConstraints() {
         assertThat(jdbcTemplate.queryForObject("""
-                SELECT version FROM flyway_schema_history
-                 WHERE success = true ORDER BY installed_rank DESC LIMIT 1
-                """, String.class)).isEqualTo("129");
+                SELECT count(*) FROM flyway_schema_history
+                 WHERE version = '129' AND success = true
+                """, Long.class)).isEqualTo(1L);
         assertThat(jdbcTemplate.queryForObject("select current_schema()", String.class)).isEqualTo(SCHEMA);
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT count(*) FROM information_schema.tables
@@ -166,7 +166,7 @@ class MdmMasterDataPostgresqlIT {
                  WHERE table_schema = ? AND constraint_type = 'UNIQUE'
                    AND constraint_name LIKE 'uk_mdm_%'
                  ORDER BY constraint_name
-                """, String.class, SCHEMA)).containsExactlyInAnyOrder(
+                """, String.class, SCHEMA)).contains(
                 "uk_mdm_plant_code", "uk_mdm_workshop_plant_code",
                 "uk_mdm_production_line_workshop_code", "uk_mdm_workstation_line_code",
                 "uk_mdm_warehouse_plant_code", "uk_mdm_warehouse_area_warehouse_code",

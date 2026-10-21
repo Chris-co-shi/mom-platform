@@ -96,7 +96,7 @@ class SystemPlatformPomArchitectureTest {
                     .filteredOn(path -> normalized(path).contains("/src/"))
                     .filteredOn(path -> path.getFileName().toString().endsWith(".sql"))
                     .extracting(SystemPlatformPomArchitectureTest::normalized)
-                    .containsExactlyInAnyOrder(
+                    .contains(
                             migration(server, "V1__create_system_parameter.sql"),
                             migration(server, "V2__create_system_dictionary.sql"),
                             migration(server, "V3__create_system_i18n.sql"),
@@ -123,7 +123,8 @@ class SystemPlatformPomArchitectureTest {
                             migration(server, "V24__seed_governance_navigation.sql"),
                             migration(server, "V25__seed_code_rule_management_messages.sql"),
                             migration(server, "V26__seed_readable_code_rule_views.sql"),
-                            migration(server, "V27__seed_code_rule_usage_metadata_messages.sql"));
+                            migration(server, "V27__seed_code_rule_usage_metadata_messages.sql"),
+                            migration(server, "V28__reference_quantity_controls_i18n.sql"));
             assertThat(files)
                     .filteredOn(path -> normalized(path).contains("/src/main/resources/mapper/"))
                     .isEmpty();

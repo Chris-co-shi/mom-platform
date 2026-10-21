@@ -21,6 +21,11 @@ FORBIDDEN_DOMAIN_IMPORT = re.compile(
 )
 QUERY_MAPPER_NAME = re.compile(r"\binterface\s+\w+QueryMapper\b")
 
+# 盘点的锁、条件状态更新与快照 SQL 不属于 BaseMapper 的单表 CRUD。
+SPECIAL_SQL_MAPPERS = {
+    "mom-wms-platform/mom-wms-server/src/main/java/io/github/chrisshi/mom/wms/infrastructure/mapper/InventoryCountSqlMapper.java",
+}
+
 APPLICATION_EXCEPTIONS = {
     "mom-mdm-platform/mom-mdm-server/src/main/java/io/github/chrisshi/mom/mdm/application/MdmDataProbeService.java",
     "mom-mdm-platform/mom-mdm-server/src/main/java/io/github/chrisshi/mom/mdm/application/MdmOutboxProbeService.java",
@@ -78,7 +83,7 @@ def check_java_file(path: str, text: str, report: Report) -> None:
                 report.errors.append(f"Query Mapper 必须位于明确 query 包: {path}")
             if re.search(r"\b(?:List|Page|Optional)?\s*<?\s*\w+Entity\b", text):
                 report.errors.append(f"Query Mapper 必须返回 Row/Projection，禁止 Entity: {path}")
-        elif "MomBaseMapper<" not in mapper.group(2):
+        elif path not in SPECIAL_SQL_MAPPERS and "MomBaseMapper<" not in mapper.group(2):
             report.errors.append(f"正式 Mapper 默认必须继承 MomBaseMapper: {path}")
         if CRUD_METHOD.search(text):
             report.errors.append(f"Mapper 重复声明 BaseMapper 普通 CRUD: {path}")
