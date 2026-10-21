@@ -16,7 +16,7 @@ import io.github.chrisshi.mom.wms.application.QualityStatus;
 import io.github.chrisshi.mom.wms.application.WarehouseStatus;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.chrisshi.mom.wms.infrastructure.entity.OpeningDocumentLineEntity;
-import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryMapper;
+import io.github.chrisshi.mom.wms.infrastructure.query.OpeningInventoryQueryMapper;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.OpeningInventoryLineMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,7 +51,7 @@ class OpeningInventoryPostgresqlIT {
     @Autowired OpeningInventoryCommitService commits;
     @Autowired OpeningInventoryApplication opening;
     @Autowired InventoryAccountingService accounting;
-    @Autowired OpeningInventoryMapper mapper;
+    @Autowired OpeningInventoryQueryMapper mapper;
     @Autowired OpeningInventoryLineMapper lineMapper;
     @Autowired InventoryQueryService queries;
     @Autowired IdGenerator ids;
