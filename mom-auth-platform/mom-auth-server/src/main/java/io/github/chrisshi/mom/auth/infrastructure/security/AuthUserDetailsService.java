@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.auth.infrastructure.security;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import io.github.chrisshi.mom.auth.infrastructure.entity.UserEntity;
 import io.github.chrisshi.mom.auth.infrastructure.mapper.UserMapper;
@@ -21,15 +22,13 @@ import java.util.List;
  * 不把多表 JOIN 塞回单表 Mapper。</p>
  */
 @Component
+@RequiredArgsConstructor
 public final class AuthUserDetailsService implements UserDetailsService {
 
     private final UserMapper userMapper;
     private final AuthenticationQueryMapper authenticationQueryMapper;
 
-    public AuthUserDetailsService(UserMapper userMapper, AuthenticationQueryMapper authenticationQueryMapper) {
-        this.userMapper = userMapper;
-        this.authenticationQueryMapper = authenticationQueryMapper;
-    }
+
 
     /**
      * 按规范化后的用户名加载 Spring Security Principal。

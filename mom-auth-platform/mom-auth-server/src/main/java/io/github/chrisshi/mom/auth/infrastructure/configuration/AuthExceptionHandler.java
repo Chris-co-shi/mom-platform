@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.auth.infrastructure.configuration;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.auth.application.AuthErrorCode;
 import io.github.chrisshi.mom.auth.application.AuthException;
 import io.github.chrisshi.mom.auth.controller.response.FieldErrorResponse;
@@ -27,13 +28,11 @@ import java.util.Locale;
  * 数据库不可用时解析失败向上传播，不回退为单一中文。</p>
  */
 @RestControllerAdvice(basePackages = "io.github.chrisshi.mom.auth.controller")
+@RequiredArgsConstructor
 public class AuthExceptionHandler {
     private final I18nMessageResolver messages;
 
-    /** @param messages Auth 业务与 Framework 技术错误共用的解析边界 */
-    public AuthExceptionHandler(I18nMessageResolver messages) {
-        this.messages = messages;
-    }
+    
 
     /** 根据请求 Locale 解析业务错误，不改机器错误码。 */
     @ExceptionHandler(AuthException.class)
