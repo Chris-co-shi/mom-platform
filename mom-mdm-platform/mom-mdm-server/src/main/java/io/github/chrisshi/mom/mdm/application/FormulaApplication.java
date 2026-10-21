@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
@@ -43,6 +44,7 @@ import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireV
  * 配方写入只落 MDM Schema，任何失败整体回滚。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class FormulaApplication {
     private static final String DRAFT = "DRAFT";
     private static final String RELEASED = "RELEASED";
@@ -59,23 +61,7 @@ public class FormulaApplication {
     private final UomMasterDataApplication uomApplication;
     private final PageAdapter pageAdapter;
 
-    /** 注入 MDM 本地 Mapper、已有有效引用用例与分页适配器，不访问其他领域 Server。 */
-    public FormulaApplication(
-            FormulaMapper formulaMapper, FormulaRevisionMapper revisionMapper, FormulaItemMapper itemMapper,
-            PlantMapper plantMapper, MaterialMapper materialMapper, UomMapper uomMapper,
-            FactoryStructureApplication factoryApplication, MaterialApplication materialApplication,
-            UomMasterDataApplication uomApplication, PageAdapter pageAdapter) {
-        this.formulaMapper = formulaMapper;
-        this.revisionMapper = revisionMapper;
-        this.itemMapper = itemMapper;
-        this.plantMapper = plantMapper;
-        this.materialMapper = materialMapper;
-        this.uomMapper = uomMapper;
-        this.factoryApplication = factoryApplication;
-        this.materialApplication = materialApplication;
-        this.uomApplication = uomApplication;
-        this.pageAdapter = pageAdapter;
-    }
+    
 
     /** 原子创建配方身份、第一草稿修订和有序明细；重复 Code 不是幂等成功。 */
     @Transactional

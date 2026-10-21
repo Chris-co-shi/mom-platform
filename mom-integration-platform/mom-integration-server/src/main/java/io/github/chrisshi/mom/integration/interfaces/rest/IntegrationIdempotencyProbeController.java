@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.integration.interfaces.rest;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.context.CorrelationContext;
 import io.github.chrisshi.mom.core.context.IdempotencyHeaders;
 import io.github.chrisshi.mom.idempotency.IdempotencyAcquireResult;
@@ -28,6 +29,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/idempotency-probe")
 @ConditionalOnProperty(prefix = "mom.technical-probe", name = "enabled", havingValue = "true")
+@RequiredArgsConstructor
 public class IntegrationIdempotencyProbeController {
 
     private static final String IDEMPOTENCY_SCOPE = "integration-probe";
@@ -35,18 +37,7 @@ public class IntegrationIdempotencyProbeController {
     private final IdempotencyGuard idempotencyGuard;
     private final RedisIdempotencyProperties properties;
 
-    /**
-     * 创建幂等验证控制器。
-     *
-     * @param idempotencyGuard Redis 幂等保护接口
-     * @param properties 默认 TTL 与失败策略配置
-     */
-    public IntegrationIdempotencyProbeController(
-            IdempotencyGuard idempotencyGuard,
-            RedisIdempotencyProperties properties) {
-        this.idempotencyGuard = idempotencyGuard;
-        this.properties = properties;
-    }
+    
 
     /**
      * 尝试为当前请求取得幂等执行资格。
