@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
@@ -38,6 +39,7 @@ import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireV
  * 更新及启停通过 BaseEntity Version 防止丢失更新。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class MaterialApplication {
     private static final String RESOURCE_NAME = "Material";
 
@@ -48,30 +50,7 @@ public class MaterialApplication {
     private final DimensionMapper dimensionMapper;
     private final PageAdapter pageAdapter;
 
-    /**
-     * 注入 Material 单表 Mapper、引用主数据 Mapper 和统一分页适配器。
-     *
-     * @param materialMapper Material 单表 Mapper
-     * @param materialCategoryMapper MaterialCategory 单表 Mapper
-     * @param uomMapper UOM 单表 Mapper
-     * @param uomCategoryMapper UOM Category 单表 Mapper
-     * @param dimensionMapper Dimension 单表 Mapper
-     * @param pageAdapter 配置化分页适配器
-     */
-    public MaterialApplication(
-            MaterialMapper materialMapper,
-            MaterialCategoryMapper materialCategoryMapper,
-            UomMapper uomMapper,
-            UomCategoryMapper uomCategoryMapper,
-            DimensionMapper dimensionMapper,
-            PageAdapter pageAdapter) {
-        this.materialMapper = materialMapper;
-        this.materialCategoryMapper = materialCategoryMapper;
-        this.uomMapper = uomMapper;
-        this.uomCategoryMapper = uomCategoryMapper;
-        this.dimensionMapper = dimensionMapper;
-        this.pageAdapter = pageAdapter;
-    }
+    
 
     /**
      * 创建物料并固化物料用途、批次策略和本次选择得到的保质期天数。

@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.mdm.application.FactoryStructureApplication;
@@ -28,15 +29,11 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping
+@RequiredArgsConstructor
 public class FactoryStructureController {
     private final FactoryStructureApplication application;
 
-    /**
-     * @param application 工厂结构用例入口
-     */
-    public FactoryStructureController(FactoryStructureApplication application) {
-        this.application = application;
-    }
+    
 
     /**
      * 创建 Plant，成功返回 201。

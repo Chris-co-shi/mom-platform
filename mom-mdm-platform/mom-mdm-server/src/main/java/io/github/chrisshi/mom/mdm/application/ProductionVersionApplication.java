@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
@@ -41,6 +42,7 @@ import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireV
  * Material 主行锁串行化同工厂同产出物料的发布，从而使有效期重叠检查不受幻读影响。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class ProductionVersionApplication {
     private static final String DRAFT = "DRAFT";
     private static final String RELEASED = "RELEASED";
@@ -58,25 +60,7 @@ public class ProductionVersionApplication {
     private final PageAdapter pageAdapter;
     private final Clock clock;
 
-    /** 注入 MDM 本地 Mapper、稳定引用用例、分页转换器和可测试时钟。 */
-    public ProductionVersionApplication(ProductionVersionMapper mapper,
-            FormulaRevisionMapper formulaRevisionMapper, FormulaMapper formulaMapper,
-            RoutingRevisionMapper routingRevisionMapper, RoutingMapper routingMapper,
-            PlantMapper plantMapper, MaterialMapper materialMapper,
-            FactoryStructureApplication factoryApplication, MaterialApplication materialApplication,
-            PageAdapter pageAdapter, Clock clock) {
-        this.mapper = mapper;
-        this.formulaRevisionMapper = formulaRevisionMapper;
-        this.formulaMapper = formulaMapper;
-        this.routingRevisionMapper = routingRevisionMapper;
-        this.routingMapper = routingMapper;
-        this.plantMapper = plantMapper;
-        this.materialMapper = materialMapper;
-        this.factoryApplication = factoryApplication;
-        this.materialApplication = materialApplication;
-        this.pageAdapter = pageAdapter;
-        this.clock = clock;
-    }
+    
 
     /** 创建草稿；引用必须已经发布且工厂、产出物料一致。 */
     @Transactional

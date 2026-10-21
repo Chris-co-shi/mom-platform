@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.application;
 
+import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.chrisshi.mom.core.page.PageQuery;
@@ -32,6 +33,7 @@ import static io.github.chrisshi.mom.mdm.application.MdmMasterDataRules.requireV
  * 数据库不可用或锁等待失败时 fail-closed，不做缓存或降级成功。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class MaterialCategoryApplication {
     private static final String RESOURCE_NAME = "MaterialCategory";
     private static final int MAX_CASCADE_CATEGORIES = 1000;
@@ -40,19 +42,7 @@ public class MaterialCategoryApplication {
     private final MaterialMapper materialMapper;
     private final PageAdapter pageAdapter;
 
-    /**
-     * 注入分类、物料引用保护 Mapper 与统一分页适配器。
-     *
-     * @param materialCategoryMapper 分类单表 Mapper
-     * @param materialMapper Material 引用保护 Mapper
-     * @param pageAdapter 配置化分页适配器
-     */
-    public MaterialCategoryApplication(MaterialCategoryMapper materialCategoryMapper,
-                                       MaterialMapper materialMapper, PageAdapter pageAdapter) {
-        this.materialCategoryMapper = materialCategoryMapper;
-        this.materialMapper = materialMapper;
-        this.pageAdapter = pageAdapter;
-    }
+    
 
     /**
      * 创建根分类或已启用、未被物料引用的父分类下的直接子分类。

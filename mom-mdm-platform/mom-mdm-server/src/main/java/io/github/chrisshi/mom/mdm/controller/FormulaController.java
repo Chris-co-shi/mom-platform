@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.controller;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.mdm.application.FormulaApplication;
@@ -21,15 +22,11 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/formulas")
+@RequiredArgsConstructor
 public class FormulaController {
     private final FormulaApplication application;
 
-    /**
-     * 注入 MDM Formula 用例，不直接访问数据库 Entity。
-     */
-    public FormulaController(FormulaApplication application) {
-        this.application = application;
-    }
+    
 
     /**
      * 原子创建配方及第一草稿修订，成功返回 201。

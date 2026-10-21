@@ -1,5 +1,6 @@
 package io.github.chrisshi.mom.mdm.codesegment;
 
+import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.coderule.field.CodeFieldMetadata;
 import io.github.chrisshi.mom.coderule.field.CodeFieldProvider;
 import io.github.chrisshi.mom.coderule.field.CodeGenerationContext;
@@ -11,9 +12,10 @@ import java.util.List;
 
 /** MDM 真实物料分类编码字段。 */
 @Component
+@RequiredArgsConstructor
 public final class MaterialCategoryCodeFieldProvider implements CodeFieldProvider {
     private final MaterialCategoryMapper categories;
-    public MaterialCategoryCodeFieldProvider(MaterialCategoryMapper categories) { this.categories = categories; }
+
     public CodeFieldMetadata metadata() {
         return new CodeFieldMetadata("mdm.materialCategory.code", "物料分类编码", "当前物料分类的业务编码", List.of("materialCategoryId"));
     }
