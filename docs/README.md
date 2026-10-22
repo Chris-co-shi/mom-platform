@@ -22,7 +22,7 @@
 | Locale/时间/数量/UOM | [工程规范索引](engineering/standards/README.md) | 只读命中的单项规范 |
 | 测试/CI | [测试策略](engineering/standards/testing-strategy-standard.md) | Maven 或 CI 专项规范 |
 | 质量定义所有权 | [ADR-045](adr/ADR-045-MDM质量基础定义与QMS运行时边界.md) | MDM/QMS 当前源码 |
-| 产品范围与路线 | [V1 路线图](plans/V1路线图.md) | [垂直切片计划](plans/V1垂直切片计划.md) |
+| 产品范围与路线 | [MOM 项目基线](plans/MOM项目基线.md) | [需求索引](requirements/MOM需求索引.md)、[V1 业务验收基线](testing/V1业务验收基线.md) |
 | Framework 公共技术能力 | [真实模块与接入边界](framework/README.md) | 对应源码、专题规范 |
 | 平台可复用业务契约 | [平台契约](platform/README.md) | Auth、System、MDM 的 Owner 接口 |
 | WMS 内部业务入口 | [WMS 模块文档](modules/wms.md) | WMS 源码和 Slice 验收证据 |
@@ -36,6 +36,6 @@
 - `platform/`：跨业务模块复用的 Owner 契约；业务内部流程留在 `modules/`。
 - `engineering/standards/`：可执行工程规则。
 - `adr/`：决策及替代关系；历史 ADR 不代表当前运行时。
-- `plans/`：只保留未来路线与尚未完成的垂直切片。
+- `plans/`：只保留现行路线与尚未完成的里程碑，不保存实施流水账。
 
 文档维护方式见 [文档维护约定](文档维护约定.md)。

@@ -54,6 +54,6 @@ bash scripts/codex-verify-changed.sh
 - [当前实现地图](docs/当前实现地图.md)
 - [ADR 索引](docs/adr/README.md)
 - [工程规范索引](docs/engineering/standards/README.md)
-- [产品范围](docs/requirements/产品范围.md)
+- [MOM 项目基线](docs/plans/MOM项目基线.md)
 
 架构默认采用渐进式分层，详见 [ADR-042](docs/adr/ADR-042-MOM渐进式分层与对象模型.md)。
