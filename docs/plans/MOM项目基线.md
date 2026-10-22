@@ -1,6 +1,6 @@
 # MOM Platform 项目基线
 
-> 状态：M00 三份权威文档已审核，GitHub 项目管理对象已建立；M00 尚待最终签收。本文是产品定位、版本和里程碑的唯一现行规划入口；运行时事实以[当前实现地图](../当前实现地图.md)及源码为准，不能从本规划推断能力已交付。
+> 状态：M00 已于 2026-10-22 经用户最终验收并关闭；V1-01 及后续业务里程碑仍开放。本文是产品定位、版本和里程碑的唯一现行规划入口；运行时事实以[当前实现地图](../当前实现地图.md)及源码为准，不能从本规划推断能力已交付。
 >
 > 需求详情与旧编号映射见[需求索引](../requirements/MOM需求索引.md)，V1 场景及质量门见[业务验收基线](../testing/V1业务验收基线.md)。
 
@@ -84,7 +84,7 @@ V2 从 V1 的库存、质量和谱系事实延伸；V3 从经批次业务检验�
 - 风险记录触发信号、影响、Owner、缓解动作与解除证据；每个里程碑复盘未通过场景、配置复用效果和遗留债务。新需求先评估对当前门禁的影响，由用户决定置换、延后或变更。Agent 不得自行扩大范围。
 - Codex 实施已批准切片前必须阅读相关规则、源码与需求，说明改动边界和验证。对领域 Owner、状态机、事务、失败语义、API 或安全边界的争议用 `DESIGN ISSUE` 暂停相关切片，提交选项与证据给用户；可继续不依赖争议的工作。
 
-M00 文档审核及 [GitHub Milestone 初始化](https://github.com/Chris-co-shi/mom-platform/milestones)已完成；[M00 最终签收 Issue](https://github.com/Chris-co-shi/mom-platform/issues/51)在用户签收前保持开放，且不以此启动 V1-01 业务开发。[V1-01 平台 Issue](https://github.com/Chris-co-shi/mom-platform/issues/52)与 [mom-web 前端 Issue](https://github.com/Chris-co-shi/mom-web/issues/27)双向关联；平台 Issue 关闭不代表前端交付或业务验收通过。
+M00 文档审核及 GitHub 初始化已完成；[M00 最终签收 Issue](https://github.com/Chris-co-shi/mom-platform/issues/51)与 [M00 Milestone](https://github.com/Chris-co-shi/mom-platform/milestone/1)于 2026-10-22 经用户批准后关闭。M00 关闭不代表 V1-01 开发获批，也不代表 V1 业务验收通过。[V1-01 平台 Issue](https://github.com/Chris-co-shi/mom-platform/issues/52)与 [mom-web 前端 Issue](https://github.com/Chris-co-shi/mom-web/issues/27)双向关联；平台 Issue 关闭不代表前端交付或业务验收通过。
 
 ### M00 文档责任与关闭门
 
@@ -96,4 +96,4 @@ M00 文档审核及 [GitHub Milestone 初始化](https://github.com/Chris-co-shi
 | ④ V1 场景、异常和质量门 | [验收基线](../testing/V1业务验收基线.md)；业务验收负责人和领域 Owner | 场景、需求、NFG 可双向追踪；全部状态仍为未执行 |
 | ⑤ GitHub 与执行规则 | 本文第 4 节；项目负责人 | 用户核对 Issue/PR/签收分离、变更、风险及 Agent 停止条件 |
 
-五项文档成果已获用户审核；GitHub 初始化结果和跨仓关联仍需最终核对。M00 是否关闭由用户最终签收决定；不以文档提交、CI 通过或 GitHub 对象创建替代业务验收。
+五项文档成果、GitHub 初始化结果及跨仓关联已获用户于 2026-10-22 最终签收，验收依据见 [Issue #51](https://github.com/Chris-co-shi/mom-platform/issues/51)。该签收只确认 M00 项目治理基线，不以文档提交、CI 通过或 GitHub 对象关闭替代 V1 业务验收。
