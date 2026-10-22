@@ -188,7 +188,18 @@ public class FormulaApplication {
         }
         conditions.orderByAsc(FormulaEntity::getCode).orderByAsc(FormulaEntity::getId);
         formulaMapper.selectPage(page, conditions);
-        return pageAdapter.toResult(page, FormulaApplication::formulaView);
+        Map<String, List<FormulaModels.ReleasedRevisionView>> released = new HashMap<>();
+        if (!page.getRecords().isEmpty()) {
+            List<String> ids = page.getRecords().stream().map(FormulaEntity::getId).toList();
+            revisionMapper.selectList(new LambdaQueryWrapper<FormulaRevisionEntity>()
+                    .in(FormulaRevisionEntity::getFormulaId, ids)
+                    .eq(FormulaRevisionEntity::getStatus, RELEASED)
+                    .orderByAsc(FormulaRevisionEntity::getRevisionNo)).forEach(row ->
+                    released.computeIfAbsent(row.getFormulaId(), ignored -> new ArrayList<>())
+                            .add(new FormulaModels.ReleasedRevisionView(row.getId(), row.getRevisionNo())));
+        }
+        return pageAdapter.toResult(page, entity -> formulaView(entity,
+                released.getOrDefault(entity.getId(), List.of())));
     }
 
     private void lockAndValidateReferences(FormulaEntity formula, List<FormulaModels.ItemInput> items) {
@@ -327,11 +338,21 @@ public class FormulaApplication {
         return new FormulaModels.DetailView(formulaView(formula), revisionView(revision), items);
     }
 
-    private static FormulaModels.FormulaView formulaView(FormulaEntity formula) {
+    private FormulaModels.FormulaView formulaView(FormulaEntity formula) {
+        List<FormulaModels.ReleasedRevisionView> released = revisionMapper.selectList(new LambdaQueryWrapper<FormulaRevisionEntity>()
+                .eq(FormulaRevisionEntity::getFormulaId, formula.getId())
+                .eq(FormulaRevisionEntity::getStatus, RELEASED)
+                .orderByAsc(FormulaRevisionEntity::getRevisionNo)).stream()
+                .map(row -> new FormulaModels.ReleasedRevisionView(row.getId(), row.getRevisionNo())).toList();
+        return formulaView(formula, released);
+    }
+
+    private static FormulaModels.FormulaView formulaView(FormulaEntity formula,
+            List<FormulaModels.ReleasedRevisionView> released) {
         return new FormulaModels.FormulaView(formula.getId(), formula.getCode(), formula.getName(),
                 formula.getPlantId(), formula.getOutputMaterialId(),
                 formula.getBaseBatchQuantity().toPlainString(), formula.getBaseUomId(),
-                formula.getCreatedAt(), formula.getCreatedBy(), formula.getUpdatedAt(), formula.getUpdatedBy());
+                formula.getCreatedAt(), formula.getCreatedBy(), formula.getUpdatedAt(), formula.getUpdatedBy(), released);
     }
 
     private static FormulaModels.RevisionView revisionView(FormulaRevisionEntity revision) {

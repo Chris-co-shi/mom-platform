@@ -403,6 +403,10 @@ class MdmHttpPostgresqlConnectivityIT {
                 .andExpect(jsonPath("$.data.revision.status").value("DRAFT"))
                 .andReturn().getResponse().getContentAsString();
         String nextRevisionId = JsonPath.read(nextResponse, "$.data.revision.id");
+        performPost("/formulas/search", "{\"params\":{},\"pageNo\":1,\"pageSize\":20}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].releasedRevisions[0].id").value(revisionId))
+                .andExpect(jsonPath("$.data.records[0].releasedRevisions[0].revisionNo").value(1));
         mockMvc.perform(put("/formulas/revisions/{id}", nextRevisionId).with(actor())
                         .contentType(MediaType.APPLICATION_JSON).content("""
                                 {"lockVersion":5,"items":[{"sequenceNo":10,"materialId":"%s",
@@ -412,6 +416,32 @@ class MdmHttpPostgresqlConnectivityIT {
         mockMvc.perform(get("/formulas/revisions/{id}", revisionId).with(actor()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].quantity").value("80.000000000"));
+    }
+
+    /** 成品标准入口的读取和写入权限由 MDM Resource Server 分别执行。 */
+    @Test
+    void finishedGoodsQualityEndpointsMustRejectMissingAuthority() throws Exception {
+        String search = "{\"params\":{},\"pageNo\":1,\"pageSize\":20}";
+        mockMvc.perform(post("/quality-specifications/search")
+                        .with(opaqueToken().attributes(attributes -> attributes.put("sub", ACTOR))
+                                .authorities(new SimpleGrantedAuthority("mdm:manufacturing-definition:read")))
+                        .contentType(MediaType.APPLICATION_JSON).content(search))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/quality-specifications/search")
+                        .with(opaqueToken().attributes(attributes -> attributes.put("sub", ACTOR))
+                                .authorities(new SimpleGrantedAuthority("mdm:quality-definition:read")))
+                        .contentType(MediaType.APPLICATION_JSON).content(search))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/quality-specifications")
+                        .with(opaqueToken().attributes(attributes -> attributes.put("sub", ACTOR))
+                                .authorities(new SimpleGrantedAuthority("mdm:quality-definition:read")))
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                        {"code":"NO-AUTH","name":"无权创建","plantId":"1","materialId":"2",
+                         "inspectionUsage":"FINISHED_GOODS","items":[{"sequenceNo":10,
+                         "characteristicId":"3","methodId":"4","uomId":"5",
+                         "lowerLimit":"99","targetValue":"99.5","upperLimit":"100","mandatory":true}]}
+                        """))
+                .andExpect(status().isForbidden());
     }
 
     /** 工艺路线必须锁定同工厂的制造资源，发布后历史步骤保持不可变。 */
@@ -462,6 +492,10 @@ class MdmHttpPostgresqlConnectivityIT {
                 .andExpect(jsonPath("$.data.revision.revisionNo").value(2))
                 .andReturn().getResponse().getContentAsString();
         String nextRevisionId = JsonPath.read(nextResponse, "$.data.revision.id");
+        performPost("/routings/search", "{\"params\":{},\"pageNo\":1,\"pageSize\":20}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].releasedRevisions[0].id").value(revisionId))
+                .andExpect(jsonPath("$.data.records[0].releasedRevisions[0].revisionNo").value(1));
         mockMvc.perform(put("/routings/revisions/{id}", nextRevisionId).with(actor())
                         .contentType(MediaType.APPLICATION_JSON).content("""
                                 {"lockVersion":0,"steps":[{"sequenceNo":10,"operationCode":"MIX",
@@ -480,6 +514,10 @@ class MdmHttpPostgresqlConnectivityIT {
         mockMvc.perform(patch("/routings/revisions/release/{id}", nextRevisionId).with(actor())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"lockVersion\":1}"))
                 .andExpect(status().isOk());
+        performPost("/routings/search", "{\"params\":{},\"pageNo\":1,\"pageSize\":20}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].releasedRevisions[0].id").value(revisionId))
+                .andExpect(jsonPath("$.data.records[0].releasedRevisions[1].id").value(nextRevisionId));
     }
 
     /** 生产版本只绑定已发布定义，同工厂同产出物料的已发布有效期不得重叠。 */
@@ -539,6 +577,46 @@ class MdmHttpPostgresqlConnectivityIT {
                 .andReturn().getResponse().getContentAsString();
         String productionVersionId = JsonPath.read(pvResponse, "$.data.id");
         mockMvc.perform(patch("/production-versions/release/{id}", productionVersionId).with(actor())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"lockVersion\":0}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("RELEASED"));
+        String secondOutputId = create("/materials", """
+                {"code":"OUTPUT-PV-2","name":"第二种电解液","categoryId":"%s","baseUomId":"%s",
+                 "materialType":"FINISHED_PRODUCT","batchTrackingSource":"CATEGORY_DEFAULT",
+                 "shelfLifeSource":"EXPLICIT","shelfLifeDays":90,"status":"ENABLED"}
+                """.formatted(categoryId, KILOGRAM_ID));
+        String secondFormulaResponse = performPost("/formulas", """
+                {"code":"FORMULA-PV-2","name":"第二产品配方","plantId":"%s",
+                 "outputMaterialId":"%s","baseBatchQuantity":"100","baseUomId":"%s",
+                 "items":[{"sequenceNo":10,"materialId":"%s","quantity":"75","uomId":"%s"}]}
+                """.formatted(plantId, secondOutputId, KILOGRAM_ID, inputId, KILOGRAM_ID))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String secondFormulaRevisionId = JsonPath.read(secondFormulaResponse, "$.data.revision.id");
+        mockMvc.perform(patch("/formulas/revisions/release/{id}", secondFormulaRevisionId).with(actor())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"lockVersion\":0}"))
+                .andExpect(status().isOk());
+        String secondRoutingResponse = performPost("/routings", """
+                {"code":"ROUTING-PV-2","name":"第二产品路线","plantId":"%s",
+                 "steps":[{"sequenceNo":10,"operationCode":"MIX-2","name":"第二配液",
+                           "resourceType":"PRODUCTION_LINE","resourceId":"%s"}]}
+                """.formatted(plantId, lineId))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String secondRoutingRevisionId = JsonPath.read(secondRoutingResponse, "$.data.revision.id");
+        mockMvc.perform(patch("/routings/revisions/release/{id}", secondRoutingRevisionId).with(actor())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"lockVersion\":0}"))
+                .andExpect(status().isOk());
+        performPost("/production-versions", """
+                {"code":"PV-WRONG-PAIR","name":"错误配方引用","businessVersion":"1.0",
+                 "plantId":"%s","outputMaterialId":"%s","formulaRevisionId":"%s",
+                 "routingRevisionId":"%s","validFrom":"2026-01-01","validTo":"2027-01-01"}
+                """.formatted(plantId, secondOutputId, formulaRevisionId, secondRoutingRevisionId))
+                .andExpect(status().isBadRequest());
+        String secondPvId = create("/production-versions", """
+                {"code":"PV-DMC-002","name":"第二产品版本","businessVersion":"1.0",
+                 "plantId":"%s","outputMaterialId":"%s","formulaRevisionId":"%s",
+                 "routingRevisionId":"%s","validFrom":"2026-01-01","validTo":"2027-01-01"}
+                """.formatted(plantId, secondOutputId, secondFormulaRevisionId, secondRoutingRevisionId));
+        mockMvc.perform(patch("/production-versions/release/{id}", secondPvId).with(actor())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"lockVersion\":0}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("RELEASED"));

@@ -13,7 +13,11 @@ public final class RoutingModels {
 
     /** 可复用路线身份；Plant 固定且不包含 MES 执行事实。 */
     public record RoutingView(String id, String code, String name, String plantId,
-                              Instant createdAt, Instant updatedAt) { }
+                              Instant createdAt, Instant updatedAt,
+                              List<ReleasedRevisionView> releasedRevisions) { }
+
+    /** 当前仍可供生产版本选取的已发布路线修订摘要。 */
+    public record ReleasedRevisionView(String id, Integer revisionNo) { }
 
     /** 业务生命周期和技术锁版本的只读视图。 */
     public record RevisionView(String id, String routingId, Integer revisionNo, String status,

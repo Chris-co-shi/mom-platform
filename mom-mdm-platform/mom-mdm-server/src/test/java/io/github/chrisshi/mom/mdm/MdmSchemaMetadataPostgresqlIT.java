@@ -34,7 +34,10 @@ class MdmSchemaMetadataPostgresqlIT {
                 SELECT oid, conname, pg_get_constraintdef(oid) FROM pg_constraint
                  WHERE connamespace = 'upgrade_metadata'::regnamespace ORDER BY oid
                 """);
-        var originalConstraintNames = constraints.stream().map(row -> row.get("conname")).toList();
+        // V133 有意扩展质量用途 CHECK；其余旧约束仍须逐项保持。
+        var preservedConstraints = constraints.stream()
+                .filter(row -> !"ck_mdm_quality_specification_usage".equals(row.get("conname"))).toList();
+        var originalConstraintNames = preservedConstraints.stream().map(row -> row.get("conname")).toList();
         flyway("upgrade_metadata", null).migrate();
         assertThat(jdbc.queryForList("SELECT to_jsonb(f)::text FROM mdm_formula f", String.class)).isEqualTo(before);
         assertThat(jdbc.queryForList("SELECT version, checksum FROM flyway_schema_history WHERE version IS NOT NULL AND version::integer <= 128 ORDER BY installed_rank"))
@@ -43,7 +46,7 @@ class MdmSchemaMetadataPostgresqlIT {
                 SELECT oid, conname, pg_get_constraintdef(oid) FROM pg_constraint
                  WHERE connamespace = 'upgrade_metadata'::regnamespace ORDER BY oid
                 """).stream().filter(row -> originalConstraintNames.contains(row.get("conname"))).toList())
-                .isEqualTo(constraints);
+                .isEqualTo(preservedConstraints);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version = '129' AND success = true", Long.class))
                 .isEqualTo(1L);
         flyway("upgrade_metadata", null).validate();

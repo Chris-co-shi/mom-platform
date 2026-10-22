@@ -13,7 +13,7 @@ import java.util.List;
  * @param name 当前名称
  * @param plantId 适用工厂 ID
  * @param materialId 适用物料 ID
- * @param inspectionUsage 检验用途，V1 固定为 INCOMING
+ * @param inspectionUsage 检验用途，V1 支持 INCOMING 与 FINISHED_GOODS
  * @param revisionId 当前已发布修订 ID；没有已发布修订时为空
  * @param revisionNo 当前已发布业务修订号；没有已发布修订时为空
  * @param releasedAt 发布时间；没有已发布修订时为空
