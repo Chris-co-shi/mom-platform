@@ -46,10 +46,11 @@ Redis 锁、SET-NX 和幂等 Guard 可减少重复执行，但不能成为库存
 
 ## 3. Actor 规则
 
-- `USER`、`ADMIN`、`SYSTEM` 显式区分；业务写入缺少 Actor 默认 fail closed。
+- 当前 `ActorType` 只有 `USER`、`SYSTEM`；业务写入缺少 Actor 的目标规则是 fail closed，不得伪造 Actor。当前 `MomMetaObjectHandler` 在 Provider 为空时填入 `null`，并非主动抛出 `AuditActorMissingException`；具备 `NOT NULL` 约束的表由数据库拒绝，其他写路径须逐项验证，不能宣称已统一实现该目标。
 - 不回退到 `SYSTEM`、`0` 或 `anonymous`。
-- MQ、定时、Outbox 和清理任务显式建立稳定 SYSTEM Code。
+- MQ、定时、Outbox 和清理任务必须定义稳定 SYSTEM 身份及可信建立方式；当前 `AuditContextExecutor.java` 全部被注释，不能作为现成接入 API。
 - 异步线程不自动继承 ThreadLocal Actor；客户端 Header 不能作为可信审计主体。
+- MyBatis-Plus 的 `updateById(entity)` 与 `update(entity, wrapper)` 可经 Entity 触发审计；Wrapper-only Update 不得依赖自动填充。自定义 SQL、XML、JdbcTemplate 应显式写入必要审计字段并测试。审计处理器不负责 Factory、Party、Session 或业务状态。
 
 ## 4. 删除与生命周期
 

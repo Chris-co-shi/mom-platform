@@ -23,12 +23,17 @@
 | 测试/CI | [测试策略](engineering/standards/testing-strategy-standard.md) | Maven 或 CI 专项规范 |
 | 质量定义所有权 | [ADR-045](adr/ADR-045-MDM质量基础定义与QMS运行时边界.md) | MDM/QMS 当前源码 |
 | 产品范围与路线 | [V1 路线图](plans/V1路线图.md) | [垂直切片计划](plans/V1垂直切片计划.md) |
+| Framework 公共技术能力 | [真实模块与接入边界](framework/README.md) | 对应源码、专题规范 |
+| 平台可复用业务契约 | [平台契约](platform/README.md) | Auth、System、MDM 的 Owner 接口 |
+| WMS 内部业务入口 | [WMS 模块文档](modules/wms.md) | WMS 源码和 Slice 验收证据 |
 
 ## 文档职责
 
 - `当前实现地图.md`：唯一的稳定实现状态摘要。
 - `requirements/`：产品能力与范围，不宣称完成状态。
 - `architecture/`：当前整体结构和边界，不记录实施流水账。
+- `framework/`：真实 Framework Maven 模块、公开入口、采用程度和限制。
+- `platform/`：跨业务模块复用的 Owner 契约；业务内部流程留在 `modules/`。
 - `engineering/standards/`：可执行工程规则。
 - `adr/`：决策及替代关系；历史 ADR 不代表当前运行时。
 - `plans/`：只保留未来路线与尚未完成的垂直切片。

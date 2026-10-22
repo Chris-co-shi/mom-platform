@@ -21,14 +21,14 @@
 
 | 文件 | 当前语义 | 后续处理 |
 |---|---|---|
-| `mom-framework/mom-idempotency/.../RedisIdempotencyKeyFactory.java` | 对原始 `requestKey` 执行 `trim()` 后摘要，与“不规范化原始 Key”目标冲突 | S03 Redis/安全配置规范实施时修正并增加兼容测试 |
+| `mom-framework/mom-idempotency/.../RedisIdempotencyKeyFactory.java` | 原始 `requestKey` 不裁剪、不改大小写，直接以 UTF-8 做 SHA-256 摘要；仅 scope 等命名空间片段被规范化 | 当前实现与请求键身份规则一致；仍需检查具体业务对稳定键的使用 |
 | `mom-framework/mom-idempotency/.../RedisIdempotencyGuard.java` | 只做 SET-NX-TTL 占位，不绑定主体、Client、路由和负载摘要，也不保存首次结果 | 保留为低阶技术原语；具体业务 Slice 不得直接宣称其满足完整 HTTP 幂等 |
 | `mom-integration-platform/.../IntegrationIdempotencyProbeController.java` | 条件开启的 Phase 01 技术探针，重复直接 409，不重放首次结果 | 仅保留技术探针语义，不作为正式 API 范例；S01 不改行为 |
 
 ## 2. OpenAPI 策略
 
 - OpenAPI 用于 HTTP 契约文档、Review、调用方沟通和兼容检查，不是领域模型或数据库模型；
-- OAuth2/OIDC 标准端点优先引用官方 Discovery 与协议文档，不重新生成或包装其语义；
+- 当前 Mini Auth 不启用 OAuth2/OIDC 标准端点；将来重新引入时，协议端点优先引用官方 Discovery 与协议文档，不重新生成或包装其语义；
 - 内部管理 API 与外部集成 API 可以采用不同发布门槛，但已发布契约都必须受兼容治理；
 - OpenAPI 注解只能位于 Web/API Adapter，不得污染 Domain/Application；权限、幂等、失败策略和业务不变量不能只存在于注解；
 - S01 不引入运行时 OpenAPI 依赖。维护方资料表明 springdoc-openapi 3.x 支持 Spring Boot 4，但正式引入前仍需在仓库锁定的 Boot 4.1.0、Framework 7.1、Jackson 3 组合上做生成、启动和契约验证；
@@ -45,7 +45,7 @@ Auth、System、MDM 现使用 `springdoc-openapi-starter-webmvc-ui` 3.1.0；Base
 Gateway 与前端代理的重写路径需另行核对，不能把服务内部 `paths` 直接当成浏览器 URL。
 具体访问方式和已知路由差异见 `docs/api/README.md`。
 
-未来契约检查至少检测：路径删除、字段删除、必填字段增加、类型变化、Enum 收窄、状态码变化、安全方案变化和分页语义变化。工具选择与 CI 集成在有真实 OpenAPI 产物后实施，S01 不强行增加依赖。
+后续契约检查至少检测：路径删除、字段删除、必填字段增加、类型变化、Enum 收窄、状态码变化、安全方案变化和分页语义变化。已有本地 OpenAPI 快照；自动兼容 Diff 的工具与 CI 集成仍待单独决定，不因快照存在就宣称门禁已启用。
 
 ## 3. API 兼容性分类
 
@@ -85,4 +85,4 @@ Gateway 与前端代理的重写路径需另行核对，不能把服务内部 `p
 - 破坏性变更必须给出并行版本或迁移窗口；
 - 错误码、状态码、权限和幂等变化必须纳入契约测试；
 - OpenAPI 基线可用后，CI 必须阻止未获批准的破坏性差异；
-- 标准 OAuth2/OIDC 协议响应不参与 MOM ProblemDetail 统一迁移。
+- 当前无 OAuth2/OIDC 运行端点；将来重新引入时，协议端点响应须单独决策。MOM 第一方业务/管理 API 继续使用 `Result<T>`，不以 `ProblemDetail` 替换其响应格式。

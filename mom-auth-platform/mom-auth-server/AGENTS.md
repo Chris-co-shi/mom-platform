@@ -133,7 +133,7 @@ Permission  code, id
 ## 9. 参考决策
 
 - `docs/architecture/Mini-Auth数据库与代码分层.md`
-- `docs/security/P1.5-认证与授权设计基线.md`
+- `docs/engineering/standards/security-protocol-runtime-standard.md`
 - `docs/adr/ADR-040-Mini-Auth与Redis-Opaque-Token认证基线.md`
 - `docs/adr/ADR-042-MOM渐进式分层与对象模型.md`
 - `docs/engineering/standards/crud-application-standard.md`

@@ -26,7 +26,7 @@ L1 不启动 Spring Context、Docker或网络，时间、随机数可控制。L2
 
 ## 4. 契约测试
 
-契约测试覆盖 DTO 序列化、状态码、错误 code、安全要求、Feign 请求/响应、事件 Envelope，以及 OAuth2/OIDC 标准错误不被 MOM 包装。没有稳定 OpenAPI 产物时不伪造契约 Diff；Spring Cloud Contract 等待真实消费者/提供方需求。
+契约测试覆盖当前 DTO 序列化、状态码、错误 code、安全要求、Feign 请求/响应和已使用的事件 Envelope。OAuth2/OIDC 标准端点当前未启用，不将旧协议错误测试算作 Mini Auth 验收。已有本地 OpenAPI 快照，未启用自动兼容 Diff 时不得声称 CI 覆盖；Spring Cloud Contract 等待真实消费者/提供方需求。
 
 ## 5. 覆盖率
 

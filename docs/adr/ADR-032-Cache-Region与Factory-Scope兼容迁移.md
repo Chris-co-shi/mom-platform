@@ -4,7 +4,7 @@
 - 日期：2026-08-01
 - 决策人：MOM Platform 维护者
 - 关联需求：P1.6 Framework Governance Phase 1
-- 关联文档：[Redis Key、TTL 与失败策略规范](../engineering/standards/redis-key-ttl-failure-standard.md)、[MOM Cache 使用指南](../engineering/mom-cache-guide.md)
+- 关联文档：[Redis Key、TTL 与失败策略规范](../engineering/standards/redis-key-ttl-failure-standard.md)、[MOM Cache 使用指南](../framework/mom-cache.md)
 
 ## 1. 背景
 

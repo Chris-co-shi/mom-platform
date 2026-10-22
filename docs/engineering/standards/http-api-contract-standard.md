@@ -1,23 +1,21 @@
 # MOM HTTP API 契约规范
 
-- 状态：Accepted
+- 状态：Accepted；响应格式已确认，既有不一致端点按兼容性治理
 - 生效范围：MOM 第一方业务/管理 HTTP API
 - 首次冻结：P1.6 S01
 
-## 1. 四类事实
+## 1. 规则与现状
 
-- **官方框架事实**：Spring Framework 7 以 RFC 9457 `ProblemDetail`、`ErrorResponse`、`ErrorResponseException` 和 `ResponseEntityExceptionHandler` 支持 HTTP 问题详情；Spring MVC 对 `@Valid @RequestBody` 与方法参数约束分别可能抛出 `MethodArgumentNotValidException` 和 `HandlerMethodValidationException`。
-- **MOM 项目决策**：本文的路径、DTO、状态码、分页、规范化和错误扩展字段规则。
-- **当前已有实现**：IAM Admin、第一方 JSON 认证、Gateway/Resource Server 和技术探针已有已发布契约。
-- **未来迁移目标**：普通 MOM 业务 API 渐进采用本文目标；S01 不改写现有公开响应。
+- **官方框架事实**：Spring MVC 对 `@Valid @RequestBody` 与方法参数约束分别可能抛出 `MethodArgumentNotValidException` 和 `HandlerMethodValidationException`。框架支持其他错误格式，不改变 MOM 的响应契约。
+- **MOM 项目决策**：第一方业务/管理 HTTP API 的成功与业务失败响应统一使用 `Result<T>`；同时遵循本文的路径、DTO、状态码、分页和规范化规则。
+- **当前已有实现**：Mini Auth、业务 Controller 和 Framework WebMVC 使用 `Result<T>`；Gateway/Resource Server 认证错误各有 HTTP 边界。以当前源码和 OpenAPI 快照核实具体端点。
+- **历史例外**：少数已发布旧端点响应不一致，见第 9 节；保留兼容行为直至完成调用方核查与明确迁移，不作为新接口范例。
 
 官方来源：
 
-- [Spring Framework 7 Error Responses](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-ann-rest-exceptions.html)
 - [Spring MVC Validation](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-validation.html)
 - [Jakarta Validation 3.1](https://jakarta.ee/specifications/bean-validation/3.1/)
 - [Spring Security 7 Reference](https://docs.spring.io/spring-security/reference/7.0/)
-- [Spring Authorization Server Protocol Endpoints](https://docs.spring.io/spring-authorization-server/reference/protocol-endpoints.html)
 
 ## 2. 路径与资源
 
@@ -66,41 +64,24 @@ Domain 负责聚合状态、值对象合法性和任何入口都不能绕过的�
 
 ## 5. 成功响应
 
-MOM 不引入通用 `ApiResponse<T>` 成功信封。HTTP 已表达状态；通用包装增加噪音，容易产生 HTTP 200 + 业务失败，并妨碍流、文件、分页及 OAuth2/OIDC 标准协议。
+第一方业务/管理 Controller 使用 `mom-webmvc` 的 `Result<T>` 包装成功数据：`Result.success(data)`；无业务数据时使用 `Result.success()`。成功码固定为 `"0"`，响应体字段为 `code`、`message`、`data`。Application 不返回 `Result<T>`。新增接口不得直接返回业务 DTO 或自定义成功信封。
 
-- 成功直接返回明确 Response DTO；
-- 查询或更新成功且有正文：200；创建：201；异步接受：202；无正文：204；
-- 不以 200 表示失败；列表是否含元数据由分页契约决定。
+- HTTP 200/201/202 的使用由具体端点契约决定；不能从本段推断所有创建已返回 201。新接口应返回 `Result<T>` 正文，不新增无响应体的 204；既有 204 按兼容性治理。
+- 不以 200 表示失败；列表元数据按项目分页契约返回。
 
-## 6. MOM 业务错误目标契约
+## 6. MOM 业务错误响应
 
-普通 MOM 业务 API 目标采用 Spring Framework 7 `ProblemDetail/ErrorResponse`，媒体类型为 `application/problem+json`：
+新业务/管理端点的业务失败响应使用 `Result.failure(code, message)`；若该端点需要结构化校验详情，可使用 `Result.failure(code, message, data)`，其 `data` 结构须由端点契约定义。HTTP 状态码仍表达失败类别，不能用 HTTP 200 包装失败。不得以直接返回 `ProblemDetail` 或其他错误信封代替 `Result<T>`。
 
-```json
-{
-  "type": "https://mom.example/problems/resource-conflict",
-  "title": "Resource conflict",
-  "status": 409,
-  "detail": "资源状态不允许当前操作",
-  "instance": "/wms/reservations/123",
-  "code": "wms.reservation.state_conflict",
-  "correlationId": "...",
-  "fieldErrors": [
-    {"field": "quantity", "code": "positive", "message": "必须大于 0"}
-  ]
-}
-```
-
-- `code` 是稳定机器码；`detail/message` 可本地化，不得成为客户端唯一分支依据；
-- `correlationId` 只用于排障，不是业务 ID；Trace ID 不用于权限或幂等；
-- `fieldErrors` 仅在字段校验失败时出现，条目固定为 `field/code/message`；
+- `code` 是稳定机器码；`message` 可本地化，不得成为客户端唯一分支依据；
+- Correlation ID 只用于排障，不是业务 ID；Trace ID 不用于权限或幂等；
+- 校验详情仅在校验失败时放入 `data`，结构参考实际端点的 Response DTO；
 - 不返回 Java 类名、SQL、Stack Trace、数据库约束原文、密码、Token、Secret 或内网连接信息。
 
 ### 6.1 兼容边界
 
-- IAM Admin `{code,message}` 是已发布兼容契约，S09 迁移必须提供调用方证据、兼容策略和回归测试；
-- 第一方 JSON 认证 `{error,message}` 在 S07/S08 协议裁决前保持；
-- Spring Authorization Server OAuth2/OIDC 端点继续返回协议规定的 OAuth2/OIDC 错误，禁止包装为 MOM ProblemDetail；
+- Mini Auth 登录和业务响应使用 `Result<T>`；既有例外以各端点 ControllerAdvice、Security Filter Chain 和 OpenAPI 快照为准，不能从历史 IAM/SAS 文档推断。
+- 旧 IAM/SAS/OIDC 协议端点当前未启用；重新引入需新 ADR。
 - Gateway 与 Resource Server 的认证失败由 Security Filter Chain 中的 `AuthenticationEntryPoint`/`AccessDeniedHandler` 等协议边界处理，普通 ControllerAdvice 不得覆盖。未认证/无效认证为 401，已认证但无权为 403；防枚举例外必须有明确安全场景。
 
 ## 7. HTTP 状态码矩阵
@@ -110,7 +91,7 @@ MOM 不引入通用 `ApiResponse<T>` 成功信封。HTTP 已表达状态；通�
 | 200 | 查询或更新成功且有正文 |
 | 201 | 资源创建成功 |
 | 202 | 请求已接受并异步处理，不代表业务完成 |
-| 204 | 成功且无正文 |
+| 204 | 已发布无正文响应的兼容现状；新业务/管理接口不采用 |
 | 400 | 语法、绑定、基础校验、非法枚举或非法请求 |
 | 401 | 缺少或无效认证、Token/Session 失效 |
 | 403 | 已认证但无访问权限 |
@@ -159,7 +140,7 @@ MOM 不引入通用 `ApiResponse<T>` 成功信封。HTTP 已表达状态；通�
 | 文件 | 偏差与证据 | 处理 Slice |
 |---|---|---|
 | `.../admin/IamAdminController.java`、`IamAdminExceptionHandler.java` | 已发布列表直接返回数组、错误为 `{code,message}`、撤销全部 Session 返回 `Map`、DELETE 带 Body | S09 基于 Web/Mobile 调用方证据设计兼容迁移 |
-| `.../web/IamDirectAuthenticationController.java`、`IamDirectAuthenticationExceptionHandler.java` | 第一方认证内嵌 DTO、手工校验、设备名超过 120 字符会截断、错误为 `{error,message}` | S08 行为保持抽取；S09 仅在协议决定后迁移 |
+| `.../web/IamDirectAuthenticationController.java`、`IamDirectAuthenticationExceptionHandler.java` | 第一方认证内嵌 DTO、手工校验、设备名超过 120 字符会截断、错误为 `{error,message}` | S08 行为保持抽取；若端点仍启用，后续按 `Result<T>` 决策及调用方证据治理 |
 | `.../resources/mapper/iam/IamUserMapper.xml`、`IamRoleMapper.xml`、`IamPermissionMapper.xml` | Offset 查询有上限但排序只使用非唯一业务字段 | S09 为 IAM 管理列表补唯一 ID tie-breaker，保持外部字段不变 |
 | `.../resources/mapper/iam/IamUserSessionMapper.xml`、`IamSecurityAuditEventMapper.xml` | 高增长 Session/审计仍用 Offset，且时间排序无 ID tie-breaker | S09 先补稳定排序；Cursor 演进需兼容证据，复杂平台推迟 P1.7 |
 | `.../admin/IamAdminService.java` | `limit<=0` 回退 50、负 offset 归零，而目标契约要求 400 | S09 结合调用方证据迁移，S01 不改状态码 |

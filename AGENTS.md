@@ -17,6 +17,8 @@
 | 任务 | 先读 |
 |---|---|
 | 当前模块、接口、Schema、权限 | `docs/当前实现地图.md` |
+| Framework 公共能力或业务接入 | `docs/framework/README.md`；按目标模块再读源码 |
+| Auth、System、MDM 跨模块复用 | `docs/platform/README.md`；按 Owner 再读 API/Client 源码 |
 | 新服务、接口或分层 | `docs/adr/ADR-042-MOM渐进式分层与对象模型.md`；`docs/engineering/standards/module-layering-standard.md` |
 | CRUD、分页、关联、Flyway | `docs/engineering/standards/crud-application-standard.md`；按需再读持久化或表设计规范 |
 | 事务、消息、幂等、并发 | `docs/engineering/standards/transaction-consistency-standard.md`；按需再读审计并发规范 |
@@ -29,7 +31,7 @@
 
 ## 不变量
 
-- 调用方向默认 `Controller/Web → Application → Infrastructure`；`Result<T>` 只属于 HTTP 边界。
+- 调用方向默认 `Controller/Web → Application → Infrastructure`；MOM 第一方业务/管理 HTTP API 的成功与业务失败响应统一使用 `Result<T>`，且仅限 HTTP 边界。现存不一致端点按兼容性治理，不作为新接口范例。
 - `*-api` 承载跨模块契约，`*-client` 承载调用契约；Server 不直接依赖其他领域 Server。
 - PostgreSQL 结构变更只通过 Flyway；禁止修改已发布 Migration、跨 Schema 业务 JOIN/外键/级联。
 - 主键 Java 使用 `String`、数据库使用 `varchar(19)`；技术时间使用 UTC/`Instant`/`timestamptz`；精度敏感数量使用 `BigDecimal`/Decimal String。

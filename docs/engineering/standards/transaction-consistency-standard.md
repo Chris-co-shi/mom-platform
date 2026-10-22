@@ -55,14 +55,9 @@ AI、Codex 和自动化 Agent 在修改事务、Feign、Outbox/Inbox、MQ、Cach
 - Seata 不能替代 Outbox/Inbox、幂等、DEAD/DLQ、状态机和对账。
 - 只读 Feign 权威校验、缓存失效、消息发布、长流程、文件或设备操作不得使用 Seata。
 
-## 6. Spring Authorization Server JDBC Store
+## 6. 历史协议边界
 
-`JdbcRegisteredClientRepository`、`JdbcOAuth2AuthorizationService` 和 `JdbcOAuth2AuthorizationConsentService` 是 IAM 内的标准协议持久化边界：
-
-- 保留官方 JDBC Store，不改写为 MyBatis-Plus Repository；
-- 官方表位于 IAM Schema，其他服务不得查询；
-- 不强加 `BaseEntity`、通用逻辑删除、MOM 审计列、乐观锁或领域外键；
-- 协议表迁移跟随当前 SAS 官方 Schema 与项目兼容要求；修改只能在后续 IAM Slice 完成协议级测试后进行。
+旧 IAM/Spring Authorization Server JDBC Store 决策属于历史设计。当前 Mini Auth V1 使用 Redis Opaque Token，不启用 `JdbcRegisteredClientRepository`、`JdbcOAuth2AuthorizationService` 或 `JdbcOAuth2AuthorizationConsentService`；不得据旧文档为当前 Auth 增加 SAS 表或事务处理。未来重新引入协议服务需新 ADR，见[安全运行规范](security-protocol-runtime-standard.md)。
 
 ## 7. AI 强制验收
 
