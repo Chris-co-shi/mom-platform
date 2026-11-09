@@ -7,19 +7,18 @@ spring:
     name: mom-gateway
   data:
     redis:
-      host: ${REDIS_HOST:127.0.0.1}
+      host: ${REDIS_HOST:192.168.3.2}
       port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:b2523448f8705da99275bab2ff60eada7c387d3a4e903a5e}
       database: ${REDIS_DATABASE:0}
-      password: ${REDIS_PASSWORD:}
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
-      timeout: ${REDIS_TIMEOUT:2s}
+      timeout: ${REDIS_COMMAND_TIMEOUT:2s}
   cloud:
     nacos:
       discovery:
-        enabled: ${NACOS_DISCOVERY_ENABLED:false}
-        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        server-addr: ${NACOS_SERVER_ADDR:192.168.3.2:8848}
         username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:}
+        password: ${NACOS_PASSWORD:7bf3eddeba98962121386a487649ac2f45b5564c06f9afcd}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
@@ -88,13 +87,13 @@ spring:
                 - Path=/system/**
               filters:
                 - StripPrefix=1
-                - name: RequestRateLimiter
-                  args:
-                    rate-limiter: "#{@momFailClosedRedisRateLimiter}"
-                    key-resolver: "#{@requestIdentityKeyResolver}"
-                    redis-rate-limiter.replenishRate: ${GATEWAY_SYSTEM_RATE_LIMIT_REPLENISH_RATE:10}
-                    redis-rate-limiter.burstCapacity: ${GATEWAY_SYSTEM_RATE_LIMIT_BURST_CAPACITY:20}
-                    redis-rate-limiter.requestedTokens: ${GATEWAY_SYSTEM_RATE_LIMIT_REQUESTED_TOKENS:1}
+#                - name: RequestRateLimiter
+#                  args:
+#                    rate-limiter: "#{@momFailClosedRedisRateLimiter}"
+#                    key-resolver: "#{@requestIdentityKeyResolver}"
+#                    redis-rate-limiter.replenishRate: ${GATEWAY_SYSTEM_RATE_LIMIT_REPLENISH_RATE:10}
+#                    redis-rate-limiter.burstCapacity: ${GATEWAY_SYSTEM_RATE_LIMIT_BURST_CAPACITY:20}
+#                    redis-rate-limiter.requestedTokens: ${GATEWAY_SYSTEM_RATE_LIMIT_REQUESTED_TOKENS:1}
 
             # MDM 自有 API 与 I18n Runtime；认证仍由 MDM Resource Server 负责。
             - id: mdm-api

@@ -11,11 +11,11 @@ spring:
   application:
     name: mom-system-server
   datasource:
-    url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_system}&tcpKeepAlive=${POSTGRES_TCP_KEEP_ALIVE:true}&ApplicationName=${POSTGRES_APPLICATION_NAME:mom-system-server}}
-    username: ${POSTGRES_USERNAME:postgres}
-    password: ${POSTGRES_PASSWORD:}
+    url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_system}&tcpKeepAlive=${POSTGRES_TCP_KEEP_ALIVE:true}&ApplicationName=${POSTGRES_APPLICATION_NAME:mom-auth-server}}
+    username: postgres
+    password: ${POSTGRES_PASSWORD:12345678}
     hikari:
-      pool-name: ${POSTGRES_POOL_NAME:mom-system-hikari}
+      pool-name: ${POSTGRES_POOL_NAME:mom-auth-hikari}
       minimum-idle: ${POSTGRES_MINIMUM_IDLE:1}
       maximum-pool-size: ${POSTGRES_MAXIMUM_POOL_SIZE:5}
       connection-timeout: ${POSTGRES_CONNECTION_TIMEOUT:3000}
@@ -33,22 +33,22 @@ spring:
     baseline-on-migrate: false
   data:
     redis:
-      host: ${REDIS_HOST:127.0.0.1}
+      host: ${REDIS_HOST:192.168.3.2}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:b2523448f8705da99275bab2ff60eada7c387d3a4e903a5e}
       database: ${REDIS_DATABASE:0}
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
       timeout: ${REDIS_COMMAND_TIMEOUT:2s}
   cloud:
     nacos:
       discovery:
-        enabled: ${NACOS_DISCOVERY_ENABLED:false}
-        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        server-addr: ${NACOS_SERVER_ADDR:192.168.3.2:8848}
         username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:}
+        password: ${NACOS_PASSWORD:7bf3eddeba98962121386a487649ac2f45b5564c06f9afcd}
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
+
 
 mybatis-plus:
   configuration:
