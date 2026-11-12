@@ -33,7 +33,7 @@ public class QualitySpecificationController {
     @PreAuthorize("hasAuthority('mdm:quality-definition:write')")
     public Result<QualityModels.DetailView> create(@Valid @RequestBody CreateRequest request) {
         return Result.success(application.createSpecification(request.code(), request.name(), request.plantId(),
-            request.materialId(), inputs(request.items())));
+            request.materialId(), request.inspectionUsage(), inputs(request.items())));
     }
 
     @PostMapping("/search")
@@ -93,6 +93,7 @@ public class QualitySpecificationController {
 
     public record CreateRequest(@NotBlank @Size(max = 64) String code, @NotBlank @Size(max = 200) String name,
                                 @NotBlank String plantId, @NotBlank String materialId,
+                                String inspectionUsage,
                                 @NotEmpty List<@Valid ItemRequest> items) {
     }
 

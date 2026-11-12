@@ -40,6 +40,19 @@ class SchemaDesignBaselineTest(unittest.TestCase):
     COMMENT ON COLUMN system_item.status IS 'status';
     COMMENT ON COLUMN system_item.version IS 'version';"""
 
+    def test_mysql_inline_comments_and_time_precision(self):
+        path = self.path.replace("/migration/", "/migration-mysql/")
+        sql = """CREATE TABLE system_item (
+          id varchar(19) NOT NULL COMMENT '标识',
+          created_at datetime(6) NOT NULL,
+          CONSTRAINT pk_system_item PRIMARY KEY (id)
+        ) ENGINE=InnoDB COMMENT='系统项';"""
+        report = module.Report()
+        module.check_sql(path, sql, report, set())
+        self.assertEqual([], report.errors)
+        module.check_sql(path, sql.replace("datetime(6)", "datetime(3)").replace("InnoDB", "MyISAM"), report, set())
+        self.assertEqual(2, len(report.errors))
+
     def test_valid_table_passes_and_emits_review(self):
         report = module.Report()
         module.check_sql(self.path, self.valid, report, set())

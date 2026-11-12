@@ -63,6 +63,11 @@ REQUIRED_CRUD_REPOSITORIES = {
 }
 
 DIRECT_JDBC_EXCEPTIONS = {
+    # ADR-046：Mapper 类型映射与驱动异常识别，不持有连接。
+    "mom-wms-platform/mom-wms-server/src/main/java/"
+    "io/github/chrisshi/mom/wms/infrastructure/entity/InventoryCountScopeTypeHandler.java",
+    "mom-wms-platform/mom-wms-server/src/main/java/"
+    "io/github/chrisshi/mom/wms/infrastructure/mapper/WmsMysqlDuplicateKey.java",
     "mom-iam-platform/mom-iam-server/src/main/java/"
     "io/github/chrisshi/mom/iam/security/"
     "IamAuthorizationServerProtocolConfiguration.java",

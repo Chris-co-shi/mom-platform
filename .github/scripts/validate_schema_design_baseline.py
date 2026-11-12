@@ -12,14 +12,14 @@ import zlib
 from dataclasses import dataclass, field
 
 MIGRATION = re.compile(
-    r"^mom-(?P<service>[a-z0-9-]+)-platform/mom-[^/]+-server/src/main/resources/db/migration/"
+    r"^mom-(?P<service>[a-z0-9-]+)-platform/mom-[^/]+-server/src/main/resources/db/migration(?:-mysql)?/"
     r"(?P<context>[a-z0-9-]+)/(?P<name>.+\.sql)$"
 )
 CREATE_TABLE = re.compile(r"\bCREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+([A-Za-z_][A-Za-z0-9_]*)", re.I)
 SNAKE = re.compile(r"^[a-z][a-z0-9_]*$")
 COLUMN = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s+([^,]+)", re.I)
-SCHEMA_REF = re.compile(r"\bmom_([a-z][a-z0-9_]*)\s*\.", re.I)
-KNOWN_CONTEXTS = {"iam", "mdm", "mes", "wms", "qms", "ems", "eam", "integration", "traceability", "system"}
+SCHEMA_REF = re.compile(r"\bmom_([a-z][a-z0-9_]*)`?\s*\.", re.I)
+KNOWN_CONTEXTS = {"auth", "iam", "mdm", "mes", "wms", "qms", "ems", "eam", "integration", "traceability", "system"}
 
 # 已发布表的精确历史基线；只跳过既有 CREATE TABLE，不授权新增表复制旧设计。
 LEGACY_TABLES = {
@@ -116,7 +116,7 @@ def table_statements(sql: str) -> list[tuple[str, str]]:
     """提取 CREATE TABLE 语句。"""
 
     result = []
-    for statement in clean(sql).split(";"):
+    for statement in re.sub(r"`([a-zA-Z0-9_]+)`", r"\1", clean(sql)).split(";"):
         match = CREATE_TABLE.search(statement)
         if match:
             result.append((match.group(1), statement))
@@ -140,6 +140,7 @@ def check_table(path: str, table: str, statement: str, full_sql: str, report: Re
     if table != table_lower or not SNAKE.fullmatch(table):
         report.errors.append(f"表名必须小写 snake_case: {path}#{table}")
 
+    mysql = "/db/migration-mysql/" in path
     columns: dict[str, str] = {}
     body = statement[statement.find("(") + 1: statement.rfind(")")]
     for raw in body.splitlines():
@@ -147,7 +148,7 @@ def check_table(path: str, table: str, statement: str, full_sql: str, report: Re
         if not match:
             continue
         name, definition = match.group(1), match.group(2)
-        if name.upper() in {"CONSTRAINT", "PRIMARY", "UNIQUE", "CHECK", "FOREIGN"}:
+        if name.upper() in {"CONSTRAINT", "PRIMARY", "UNIQUE", "CHECK", "FOREIGN", "KEY", "INDEX"}:
             continue
         if name != name.lower() or not SNAKE.fullmatch(name):
             report.errors.append(f"列名必须小写 snake_case: {path}#{table_lower}.{name}")
@@ -157,6 +158,12 @@ def check_table(path: str, table: str, statement: str, full_sql: str, report: Re
         report.errors.append(f"MOM 技术主键必须为 varchar(19): {path}#{table_lower}.id")
     if re.search(r"\btimestamp\s*(?:without\s+time\s+zone)?\b", statement, re.I) and not re.search(r"\btimestamptz\b", statement, re.I):
         report.errors.append(f"技术时间点禁止无时区 timestamp: {path}#{table_lower}")
+    if mysql:
+        if not re.search(r"\)\s*ENGINE\s*=\s*InnoDB\b", statement, re.I):
+            report.errors.append(f"MySQL 业务表必须使用 InnoDB: {path}#{table_lower}")
+        for column, definition in columns.items():
+            if re.search(r"^datetime\b(?!\s*\(\s*6\s*\))", definition, re.I):
+                report.errors.append(f"MySQL 技术时间必须使用 datetime(6): {path}#{table_lower}.{column}")
     if re.search(r"\b(?:float\d*|real|double\s+precision)\b", statement, re.I):
         report.errors.append(f"精度敏感字段禁止浮点数据库类型: {path}#{table_lower}")
 
@@ -169,11 +176,20 @@ def check_table(path: str, table: str, statement: str, full_sql: str, report: Re
     ):
         report.errors.append(f"Version 必须有非负命名 Check: {path}#{table_lower}.version")
 
-    if not re.search(rf"\bCOMMENT\s+ON\s+TABLE\s+{re.escape(table_lower)}\s+IS\b", full_sql, re.I):
-        report.errors.append(f"正式业务表必须有表注释: {path}#{table_lower}")
-    for column in sorted(name for name in columns if name == "id" or name.endswith("_id") or name in {"status", "state", "version"}):
-        if not re.search(rf"\bCOMMENT\s+ON\s+COLUMN\s+{re.escape(table_lower)}\.{re.escape(column)}\s+IS\b", full_sql, re.I):
-            report.errors.append(f"关键列必须有注释: {path}#{table_lower}.{column}")
+    if mysql:
+        if not re.search(r"\bCOMMENT\s*=\s*''", statement[statement.rfind(")") + 1:], re.I):
+            report.errors.append(f"正式业务表必须有表注释: {path}#{table_lower}")
+        for column, definition in columns.items():
+            if (column == "id" or column.endswith("_id") or column in {"status", "state", "version"}) and not re.search(
+                r"\bCOMMENT\s+''", definition, re.I
+            ):
+                report.errors.append(f"关键列必须有注释: {path}#{table_lower}.{column}")
+    else:
+        if not re.search(rf"\bCOMMENT\s+ON\s+TABLE\s+{re.escape(table_lower)}\s+IS\b", full_sql, re.I):
+            report.errors.append(f"正式业务表必须有表注释: {path}#{table_lower}")
+        for column in sorted(name for name in columns if name == "id" or name.endswith("_id") or name in {"status", "state", "version"}):
+            if not re.search(rf"\bCOMMENT\s+ON\s+COLUMN\s+{re.escape(table_lower)}\.{re.escape(column)}\s+IS\b", full_sql, re.I):
+                report.errors.append(f"关键列必须有注释: {path}#{table_lower}.{column}")
 
     report.reviews.append(f"字段长度、索引有效性、生命周期与业务完整性需 Review: {path}#{table_lower}")
 

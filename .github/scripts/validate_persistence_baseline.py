@@ -13,13 +13,13 @@ from dataclasses import dataclass, field
 
 MIGRATION_PATH = re.compile(
     r"^(?P<prefix>.+/)?mom-(?P<service>[a-z0-9-]+)-server/"
-    r"src/main/resources/db/migration/(?P<context>[a-z0-9-]+)/(?P<name>[^/]+)$"
+    r"src/main/resources/db/migration(?:-mysql)?/(?P<context>[a-z0-9-]+)/(?P<name>[^/]+)$"
 )
 VERSIONED_NAME = re.compile(r"^V(?P<version>[0-9]+(?:[._][0-9]+)*)__[a-z0-9][a-z0-9_]*\.sql$")
 REPEATABLE_NAME = re.compile(r"^R__[a-z0-9][a-z0-9_]*\.sql$")
-MOM_SCHEMA = re.compile(r"\bmom_([a-z][a-z0-9_]*)\s*\.", re.IGNORECASE)
+MOM_SCHEMA = re.compile(r"\bmom_([a-z][a-z0-9_]*)`?\s*\.", re.IGNORECASE)
 KNOWN_CONTEXTS = {
-    "iam", "mdm", "mes", "wms", "qms", "ems", "eam", "integration", "traceability", "system"
+    "auth", "iam", "mdm", "mes", "wms", "qms", "ems", "eam", "integration", "traceability", "system"
 }
 XML_SQL_TAGS = {"select", "insert", "update", "delete"}
 

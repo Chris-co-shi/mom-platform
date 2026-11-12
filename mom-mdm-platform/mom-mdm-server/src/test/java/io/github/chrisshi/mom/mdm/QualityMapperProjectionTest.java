@@ -35,7 +35,8 @@ class QualityMapperProjectionTest {
     @Test
     void revisionMustSelectAllMappedColumnsExplicitly() throws NoSuchMethodException {
         assertProjection(SpecificationRevisionMapper.class, "mdm_specification_revision",
-                "id, specification_id, revision_no, status, lock_version, released_at, obsolete_at, "
+                "id, specification_id, revision_no, status, lock_version, plant_version, "
+                        + "material_revision_no, material_version, released_at, obsolete_at, "
                         + "created_at, created_by, updated_at, updated_by");
     }
 

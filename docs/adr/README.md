@@ -51,5 +51,6 @@ ADR 记录决策历史，不等于当前实现。运行时事实先看 [当前�
 | [043 System V1](ADR-043-System-V1能力与I18n数据所有权.md) | Accepted | 当前 System 边界 |
 | [044 MDM/WMS/MES 静态边界](ADR-044-MDM静态主数据与WMS-MES运行时所有权边界.md) | Accepted | 静态/运行时边界 |
 | [045 MDM/QMS 质量边界](ADR-045-MDM质量基础定义与QMS运行时边界.md) | Accepted | 质量定义所有权 |
+| [046 PostgreSQL / MySQL 部署兼容](ADR-046-PostgreSQL与MySQL部署兼容.md) | Accepted | 数据库选择、迁移基线与服务隔离 |
 
 新决策使用 [ADR 模板](ADR-模板.md)。已接受 ADR 不改写历史结论；变化通过新 ADR 和状态更新表达。

@@ -5,9 +5,11 @@ import io.github.chrisshi.mom.metrics.MomMetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.sql.SQLException;
 import java.util.Objects;
 
 /**
@@ -30,6 +32,7 @@ public final class InboxDeduplicator {
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
     private final MeterRegistry meterRegistry;
+    private final boolean mysql;
 
     /**
      * 创建不启用运行指标的 Inbox 幂等执行器。
@@ -54,7 +57,17 @@ public final class InboxDeduplicator {
             JdbcTemplate jdbcTemplate,
             TransactionTemplate transactionTemplate,
             MeterRegistry meterRegistry) {
+        this(jdbcTemplate, transactionTemplate, meterRegistry, false);
+    }
+
+    /** 创建使用当前服务本地事务和指定数据库语法的 Inbox 幂等执行器。 */
+    public InboxDeduplicator(
+            JdbcTemplate jdbcTemplate,
+            TransactionTemplate transactionTemplate,
+            MeterRegistry meterRegistry,
+            boolean mysql) {
         this.jdbcTemplate = Objects.requireNonNull(jdbcTemplate, "jdbcTemplate 不能为空");
+        this.mysql = mysql;
         this.transactionTemplate = Objects.requireNonNull(
                 transactionTemplate,
                 "transactionTemplate 不能为空");
@@ -80,31 +93,14 @@ public final class InboxDeduplicator {
 
         try {
             Boolean processed = transactionTemplate.execute(status -> {
-                int inserted = jdbcTemplate.update("""
-                                INSERT INTO mom_inbox_event (
-                                    event_id,
-                                    consumer_name,
-                                    event_type,
-                                    event_version,
-                                    correlation_id,
-                                    received_at,
-                                    created_at
-                                ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                                ON CONFLICT (event_id, consumer_name) DO NOTHING
-                                """,
-                        event.eventId(),
-                        normalizedConsumer,
-                        event.eventType(),
-                        event.eventVersion(),
-                        event.correlationId());
-                if (inserted == 0) {
+                if (!claim(event, normalizedConsumer)) {
                     return false;
                 }
 
                 action.run();
                 int completed = jdbcTemplate.update("""
                                 UPDATE mom_inbox_event
-                                SET processed_at = CURRENT_TIMESTAMP
+                                SET processed_at = CURRENT_TIMESTAMP(6)
                                 WHERE event_id = ?
                                   AND consumer_name = ?
                                   AND processed_at IS NULL
@@ -123,6 +119,27 @@ public final class InboxDeduplicator {
         catch (RuntimeException exception) {
             recordProcessResult(normalizedConsumer, "failed");
             throw exception;
+        }
+    }
+
+    private boolean claim(EventEnvelope event, String consumerName) {
+        String sql = """
+                INSERT INTO mom_inbox_event (
+                    event_id, consumer_name, event_type, event_version,
+                    correlation_id, received_at, created_at
+                ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                """;
+        if (!mysql) sql += " ON CONFLICT (event_id, consumer_name) DO NOTHING";
+        try {
+            return jdbcTemplate.update(sql, event.eventId(), consumerName, event.eventType(),
+                    event.eventVersion(), event.correlationId()) == 1;
+        } catch (DuplicateKeyException ex) {
+            if (mysql && ex.getMostSpecificCause() instanceof SQLException cause && cause.getErrorCode() == 1062
+                    && (cause.getMessage().endsWith("'PRIMARY'")
+                    || cause.getMessage().endsWith("'mom_inbox_event.PRIMARY'"))) {
+                return false;
+            }
+            throw ex;
         }
     }
 

@@ -113,6 +113,7 @@ public class QualityDefinitionWriter {
     /** 原子校验引用并创建标准身份、第一草稿修订和有序条目。 */
     @Transactional
     public QualityModels.DetailView createSpecification(String code, String name, String plantId, String materialId,
+                                                        String inspectionUsage,
                                                         List<QualityModels.ItemInput> inputs) {
         QualityModels.ScopeSnapshot scope = references.requireScope(plantId, materialId);
         List<QualityModels.PreparedItem> prepared = prepare(inputs);
@@ -121,7 +122,7 @@ public class QualityDefinitionWriter {
         specification.setName(QualityDefinitionRules.name(name));
         specification.setPlantId(scope.plantId());
         specification.setMaterialId(scope.materialId());
-        specification.setInspectionUsage("INCOMING");
+        specification.setInspectionUsage(QualityDefinitionRules.inspectionUsage(inspectionUsage));
         applyScopeSnapshot(specification, scope);
         try {
             specifications.insert(specification);
@@ -182,6 +183,9 @@ public class QualityDefinitionWriter {
         applyScopeSnapshot(specification, scope);
         specifications.updateById(specification);
         refreshItems(revision.getId(), prepared);
+        revision.setPlantVersion(scope.plantVersion());
+        revision.setMaterialRevisionNo(scope.materialRevisionNo());
+        revision.setMaterialVersion(scope.materialVersion());
         revision.setStatus(RELEASED);
         revision.setReleasedAt(Instant.now());
         if (revisions.updateById(revision) != 1) throw MdmException.versionConflict();
@@ -432,7 +436,7 @@ public class QualityDefinitionWriter {
                         decimal(item.getUpperLimit()), Boolean.TRUE.equals(item.getMandatory()))).toList();
         return new QualityModels.DetailView(specification.getId(), specification.getCode(), specification.getName(),
                 specification.getPlantId(), specification.getMaterialId(), specification.getInspectionUsage(),
-                specification.getPlantVersion(), specification.getMaterialRevisionNo(), specification.getMaterialVersion(),
+                revision.getPlantVersion(), revision.getMaterialRevisionNo(), revision.getMaterialVersion(),
                 revision.getId(), revision.getRevisionNo(), revision.getStatus(), revision.getLockVersion(),
                 revision.getReleasedAt(), revision.getObsoleteAt(), itemViews);
     }

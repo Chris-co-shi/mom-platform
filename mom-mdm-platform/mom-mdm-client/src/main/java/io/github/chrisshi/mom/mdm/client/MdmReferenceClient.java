@@ -59,7 +59,7 @@ public interface MdmReferenceClient {
     Result<ProductionVersionReference> getProductionVersionReference(@PathVariable("id") String id);
 
     /**
-     * 查询来料质量标准当前已发布修订及其新业务可用性。
+     * 查询质量标准当前已发布修订、检验用途及其新业务可用性。
      */
     @GetMapping("/quality-specification-references/{id}")
     Result<QualitySpecificationReference> getQualitySpecificationReference(@PathVariable("id") String id);

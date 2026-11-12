@@ -27,8 +27,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -166,7 +169,18 @@ public class RoutingApplication {
         }
         conditions.orderByAsc(RoutingEntity::getCode).orderByAsc(RoutingEntity::getId);
         routingMapper.selectPage(page, conditions);
-        return pageAdapter.toResult(page, RoutingApplication::routingView);
+        Map<String, List<RoutingModels.ReleasedRevisionView>> released = new HashMap<>();
+        if (!page.getRecords().isEmpty()) {
+            List<String> ids = page.getRecords().stream().map(RoutingEntity::getId).toList();
+            revisionMapper.selectList(new LambdaQueryWrapper<RoutingRevisionEntity>()
+                    .in(RoutingRevisionEntity::getRoutingId, ids)
+                    .eq(RoutingRevisionEntity::getStatus, RELEASED)
+                    .orderByAsc(RoutingRevisionEntity::getRevisionNo)).forEach(row ->
+                    released.computeIfAbsent(row.getRoutingId(), ignored -> new ArrayList<>())
+                            .add(new RoutingModels.ReleasedRevisionView(row.getId(), row.getRevisionNo())));
+        }
+        return pageAdapter.toResult(page, entity -> routingView(entity,
+                released.getOrDefault(entity.getId(), List.of())));
     }
 
     private void lockAndValidateResources(RoutingEntity routing, List<RoutingModels.StepInput> steps) {
@@ -298,9 +312,19 @@ public class RoutingApplication {
         return new RoutingModels.DetailView(routingView(routing), revisionView(revision), steps);
     }
 
-    private static RoutingModels.RoutingView routingView(RoutingEntity routing) {
+    private RoutingModels.RoutingView routingView(RoutingEntity routing) {
+        List<RoutingModels.ReleasedRevisionView> released = revisionMapper.selectList(new LambdaQueryWrapper<RoutingRevisionEntity>()
+                .eq(RoutingRevisionEntity::getRoutingId, routing.getId())
+                .eq(RoutingRevisionEntity::getStatus, RELEASED)
+                .orderByAsc(RoutingRevisionEntity::getRevisionNo)).stream()
+                .map(row -> new RoutingModels.ReleasedRevisionView(row.getId(), row.getRevisionNo())).toList();
+        return routingView(routing, released);
+    }
+
+    private static RoutingModels.RoutingView routingView(RoutingEntity routing,
+            List<RoutingModels.ReleasedRevisionView> released) {
         return new RoutingModels.RoutingView(routing.getId(), routing.getCode(), routing.getName(),
-                routing.getPlantId(), routing.getCreatedAt(), routing.getUpdatedAt());
+                routing.getPlantId(), routing.getCreatedAt(), routing.getUpdatedAt(), released);
     }
 
     private static RoutingModels.RevisionView revisionView(RoutingRevisionEntity revision) {

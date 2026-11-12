@@ -131,6 +131,10 @@ class PersistenceArchitectureTest {
         noClasses().that().resideInAnyPackage(BOUNDED_CONTEXT_PACKAGES)
                 .and().doNotHaveFullyQualifiedName(
                         "io.github.chrisshi.mom.iam.security.IamAuthorizationServerProtocolConfiguration")
+                .and().doNotHaveFullyQualifiedName(
+                        "io.github.chrisshi.mom.wms.infrastructure.entity.InventoryCountScopeTypeHandler")
+                .and().doNotHaveFullyQualifiedName(
+                        "io.github.chrisshi.mom.wms.infrastructure.mapper.WmsMysqlDuplicateKey")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "org.springframework.jdbc..", "java.sql..")
                 .check(productionClasses);

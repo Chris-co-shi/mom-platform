@@ -15,6 +15,9 @@ public class SpecificationRevisionEntity extends BaseAuditEntity {
     private Integer revisionNo;
     private String status;
     @Version @TableField("lock_version") private Long lockVersion = 0L;
+    private Long plantVersion;
+    private Integer materialRevisionNo;
+    private Long materialVersion;
     private Instant releasedAt;
     private Instant obsoleteAt;
 }

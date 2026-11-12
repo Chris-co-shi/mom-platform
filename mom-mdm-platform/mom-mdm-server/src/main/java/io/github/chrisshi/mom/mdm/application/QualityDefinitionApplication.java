@@ -55,7 +55,12 @@ public class QualityDefinitionApplication {
     /** 在单一 MDM 事务内校验范围和全部条目后创建第一草稿。 */
     public QualityModels.DetailView createSpecification(String code, String name, String plantId, String materialId,
             List<QualityModels.ItemInput> inputs) {
-        return writer.createSpecification(code, name, plantId, materialId, inputs);
+        return createSpecification(code, name, plantId, materialId, null, inputs);
+    }
+    /** 按明确用途创建质量标准；空用途兼容旧调用方的来料标准。 */
+    public QualityModels.DetailView createSpecification(String code, String name, String plantId, String materialId,
+            String inspectionUsage, List<QualityModels.ItemInput> inputs) {
+        return writer.createSpecification(code, name, plantId, materialId, inspectionUsage, inputs);
     }
     /** 在 MDM 本地事务内替换草稿条目。 */
     public QualityModels.DetailView updateDraft(String revisionId, Long lockVersion,

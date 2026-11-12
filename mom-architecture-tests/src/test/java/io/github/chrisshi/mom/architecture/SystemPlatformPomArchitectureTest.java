@@ -26,6 +26,7 @@ class SystemPlatformPomArchitectureTest {
             MOM_GROUP + ":mom-metrics", MOM_GROUP + ":mom-i18n",
             "org.springframework.boot:spring-boot-starter-flyway",
             "org.flywaydb:flyway-database-postgresql", "org.postgresql:postgresql",
+            "org.flywaydb:flyway-mysql", "com.mysql:mysql-connector-j",
             "com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery",
             "org.springdoc:springdoc-openapi-starter-webmvc-ui",
             "org.projectlombok:lombok", "org.springframework.security:spring-security-test",
@@ -71,6 +72,10 @@ class SystemPlatformPomArchitectureTest {
         assertThat(coordinates(dependencies)).containsExactlyInAnyOrderElementsOf(SERVER_DEPENDENCIES);
         assertThat(validateServerDependencies(dependencies)).isEmpty();
         assertThat(coordinates(dependencies)).doesNotContain(MOM_GROUP + ":mom-seata");
+        assertThat(dependencies)
+                .filteredOn(dependency -> Set.of("org.flywaydb:flyway-mysql", "com.mysql:mysql-connector-j")
+                        .contains(dependency.coordinates()))
+                .extracting(Dependency::scope).containsExactly("runtime", "runtime");
     }
 
     @Test

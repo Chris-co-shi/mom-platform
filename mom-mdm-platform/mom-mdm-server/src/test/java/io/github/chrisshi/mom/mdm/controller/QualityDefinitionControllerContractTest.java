@@ -41,7 +41,18 @@ class QualityDefinitionControllerContractTest {
              "lowerLimit":99.9,"targetValue":"99.95","upperLimit":"100","mandatory":true}]}
           """))
           .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("mdm.quality_invalid_range"));
-        verify(application, never()).createSpecification(any(), any(), any(), any(), any());
+        verify(application, never()).createSpecification(any(), any(), any(), any(), any(), any());
+    }
+    @Test void finishedGoodsUsageMustReachMdmApplication() throws Exception {
+        mvc.perform(post("/quality-specifications").contentType(MediaType.APPLICATION_JSON).content("""
+          {"code":"FG-1","name":"成品标准","plantId":"1","materialId":"2",
+           "inspectionUsage":"FINISHED_GOODS","items":[
+            {"sequenceNo":10,"characteristicId":"3","methodId":"4","uomId":"5",
+             "lowerLimit":"99","targetValue":"99.5","upperLimit":"100","mandatory":true}]}
+          """))
+          .andExpect(status().isCreated());
+        verify(application).createSpecification(eq("FG-1"), eq("成品标准"), eq("1"), eq("2"),
+                eq("FINISHED_GOODS"), any());
     }
     @Test void applicationConflictMustKeep409AndStableCode() throws Exception {
         when(application.updateMethod(any(), any(), any(), any(), any())).thenThrow(MdmException.versionConflict());

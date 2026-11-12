@@ -40,10 +40,20 @@ public interface PermissionCatalogQueryMapper {
           AND p.enabled = #{filters.enabled}
         </if>
         <if test="filters.keyword != null and filters.keyword != ''">
-          AND (p.code ILIKE CONCAT('%', #{filters.keyword}, '%')
-            OR p.name ILIKE CONCAT('%', #{filters.keyword}, '%')
-            OR p.description ILIKE CONCAT('%', #{filters.keyword}, '%')
-            OR r.name ILIKE CONCAT('%', #{filters.keyword}, '%'))
+          <choose>
+            <when test="_databaseId == 'mysql'">
+              AND (LOWER(p.code) LIKE LOWER(CONCAT('%', #{filters.keyword}, '%'))
+                OR LOWER(p.name) LIKE LOWER(CONCAT('%', #{filters.keyword}, '%'))
+                OR LOWER(p.description) LIKE LOWER(CONCAT('%', #{filters.keyword}, '%'))
+                OR LOWER(r.name) LIKE LOWER(CONCAT('%', #{filters.keyword}, '%')))
+            </when>
+            <otherwise>
+              AND (p.code ILIKE CONCAT('%', #{filters.keyword}, '%')
+                OR p.name ILIKE CONCAT('%', #{filters.keyword}, '%')
+                OR p.description ILIKE CONCAT('%', #{filters.keyword}, '%')
+                OR r.name ILIKE CONCAT('%', #{filters.keyword}, '%'))
+            </otherwise>
+          </choose>
         </if>
         ORDER BY p.code ASC, p.id ASC
         </script>

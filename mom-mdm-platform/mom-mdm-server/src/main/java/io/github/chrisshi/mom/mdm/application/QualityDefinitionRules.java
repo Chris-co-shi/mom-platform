@@ -18,6 +18,13 @@ final class QualityDefinitionRules {
         if (value == null || value.isBlank()) throw MdmException.invalidReference();
         return value.trim();
     }
+    static String inspectionUsage(String value) {
+        if (value == null) return "INCOMING";
+        if (!"INCOMING".equals(value) && !"FINISHED_GOODS".equals(value)) {
+            throw MdmException.invalidReference();
+        }
+        return value;
+    }
     static BigDecimal optionalDecimal(String value) {
         if (value == null || value.isBlank()) return null;
         try { return new BigDecimal(value); }

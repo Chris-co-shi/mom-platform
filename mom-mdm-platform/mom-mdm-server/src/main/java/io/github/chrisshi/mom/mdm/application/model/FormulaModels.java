@@ -13,7 +13,11 @@ public final class FormulaModels {
     /** 配方身份和批量基准的只读视图。 */
     public record FormulaView(String id, String code, String name, String plantId,
                               String outputMaterialId, String baseBatchQuantity, String baseUomId,
-                              Instant createdAt, String createdBy, Instant updatedAt, String updatedBy) { }
+                              Instant createdAt, String createdBy, Instant updatedAt, String updatedBy,
+                              List<ReleasedRevisionView> releasedRevisions) { }
+
+    /** 当前仍可供生产版本选取的已发布修订摘要。 */
+    public record ReleasedRevisionView(String id, Integer revisionNo) { }
 
     /** 业务修订号与技术锁版本分离的修订视图。 */
     public record RevisionView(String id, String formulaId, Integer revisionNo, String status,

@@ -18,8 +18,8 @@ public final class QualityModels {
                            String methodId, long methodVersion, String uomId, long uomVersion,
                            String lowerLimit, String targetValue, String upperLimit, boolean mandatory) { }
     public record DetailView(String id, String code, String name, String plantId, String materialId,
-                             String inspectionUsage, long plantVersion, int materialRevisionNo,
-                             long materialVersion, String revisionId, int revisionNo, String status,
+                             String inspectionUsage, Long plantVersion, Integer materialRevisionNo,
+                             Long materialVersion, String revisionId, int revisionNo, String status,
                              long lockVersion, Instant releasedAt, Instant obsoleteAt, List<ItemView> items) { }
     public record ScopeSnapshot(String plantId, long plantVersion, String materialId,
                                 int materialRevisionNo, long materialVersion) { }

@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${MYSQL_URL:jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:mom_auth}}
+    username: ${MYSQL_USERNAME:mom_auth}
+    password: ${MYSQL_PASSWORD:}
+    hikari:
+      catalog: ${MYSQL_DATABASE:mom_auth}
+      pool-name: ${MYSQL_POOL_NAME:mom-auth-hikari}
+      minimum-idle: ${MYSQL_MINIMUM_IDLE:1}
+      maximum-pool-size: ${MYSQL_MAXIMUM_POOL_SIZE:5}
+      connection-timeout: ${MYSQL_CONNECTION_TIMEOUT:3000}
+      validation-timeout: ${MYSQL_VALIDATION_TIMEOUT:2000}
+      leak-detection-threshold: ${MYSQL_LEAK_DETECTION_THRESHOLD:0}
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+      connection-init-sql: SET time_zone = '+00:00'
+      data-source-properties:
+        connectionTimeZone: UTC
+        preserveInstants: true
+  flyway:
+    create-schemas: false
+    default-schema: ${MYSQL_DATABASE:mom_auth}
+    schemas: ${MYSQL_DATABASE:mom_auth}
+    locations: classpath:db/migration-mysql/auth
+    fail-on-missing-locations: true
+
+mom:
+  database:
+    vendor: mysql

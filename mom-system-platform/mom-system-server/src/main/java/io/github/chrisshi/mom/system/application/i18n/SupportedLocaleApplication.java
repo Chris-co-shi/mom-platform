@@ -33,7 +33,7 @@ public class SupportedLocaleApplication {
     private final SupportedLocaleMapper localeMapper;
     private final I18nChangeNotifier notifier;
 
-    
+
 
     /** 创建动态 Locale；创建默认 Locale 必须使用单独的默认切换用例。 */
     @Transactional
@@ -137,9 +137,11 @@ public class SupportedLocaleApplication {
     /** 返回供跨服务或客户端读取的稳定 Locale Code 契约。 */
     @Transactional(readOnly = true)
     public List<SupportedLocaleInfo> supportedLocales() {
-        return list().stream().map(locale -> new SupportedLocaleInfo(
-                locale.localeCode(), locale.displayName(), locale.nativeName(), locale.enabled(),
-                locale.defaultLocale(), locale.sortOrder())).toList();
+        List<LocaleView> list = list();
+        List<SupportedLocaleInfo> list1 = list.stream().map(locale -> new SupportedLocaleInfo(
+            locale.localeCode(), locale.displayName(), locale.nativeName(), locale.enabled(),
+            locale.defaultLocale(), locale.sortOrder())).toList();
+        return list1;
     }
 
     /**

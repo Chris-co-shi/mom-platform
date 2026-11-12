@@ -10,6 +10,7 @@ import org.apache.ibatis.annotations.Arg;
 import org.apache.ibatis.annotations.ConstructorArgs;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -19,7 +20,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * 库存专用 PostgreSQL 原子写入；由 Application 的公共事务入口统一调用。
+ * 库存记账查询、事务锁及 PostgreSQL 原子写入；由 Application 的公共事务入口统一调用。
  */
 @Mapper
 public interface InventoryAccountingMapper {
@@ -36,8 +37,13 @@ public interface InventoryAccountingMapper {
 
 
 
-    /** 同一事务按稳定键锁定库位或 SN；所有 SN 记账方共用此锁以阻止位置校验期间出现幻影余额。 */
+    /** 按稳定业务键持有事务锁；MySQL 用专用技术行锁住首次和重复出现的同一键。 */
     @Select("SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(#{key}, 0))")
+    @Insert(value = """
+        INSERT INTO wms_inventory_accounting_lock(lock_key) VALUES (#{key})
+        ON DUPLICATE KEY UPDATE lock_key=lock_key
+        """, databaseId = "mysql")
+    @Options(flushCache = Options.FlushCachePolicy.TRUE, useCache = false)
     int lockAccountingKey(@Param("key") String key);
 
     /** 仓库事务级锁取得后读取已提交的持久盘点锁及任务状态。 */

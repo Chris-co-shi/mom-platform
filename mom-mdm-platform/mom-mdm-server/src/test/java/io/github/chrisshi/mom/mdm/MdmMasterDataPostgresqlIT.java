@@ -292,6 +292,52 @@ class MdmMasterDataPostgresqlIT {
                 .extracting("code").isEqualTo("mdm.immutable_master_data");
     }
 
+    /** 成品标准允许发布；旧修订的范围版本不能被下一次发布覆盖。 */
+    @Test
+    void finishedGoodsQualityRevisionMustKeepItsPublishedScopeSnapshot() {
+        var plant = factoryApplication.createPlant("FG-PLANT", "成品工厂", "Asia/Shanghai", MdmMasterDataRules.ENABLED);
+        var category = materialCategoryApplication.createMaterialCategory(
+                "FG-CAT", "成品类别", null, 1, null, MdmMasterDataRules.ENABLED);
+        String kilogramId = jdbcTemplate.queryForObject("SELECT id FROM mdm_uom WHERE code='kg'", String.class);
+        String percentId = jdbcTemplate.queryForObject("SELECT id FROM mdm_uom WHERE code='%'", String.class);
+        var material = materialApplication.createMaterial("FG-001", "成品一", category.id(), kilogramId,
+                MaterialType.FINISHED_PRODUCT, BatchTrackingSource.EXPLICIT, BatchTrackingPolicy.REQUIRED,
+                ShelfLifeSource.EXPLICIT, 365, MdmMasterDataRules.ENABLED);
+        var characteristic = qualityDefinitionApplication.createCharacteristic("FG-PURITY", "成品纯度", percentId);
+        var method = qualityDefinitionApplication.createMethod("FG-METHOD", "成品检验", null);
+        var inputs = java.util.List.of(qualityItem(characteristic.id(), method.id(), percentId, "99", "99.5", "100"));
+
+        var draft = qualityDefinitionApplication.createSpecification("FG-SPEC", "成品标准", plant.id(),
+                material.id(), "FINISHED_GOODS", inputs);
+        var first = qualityDefinitionApplication.release(draft.revisionId(), draft.lockVersion());
+        assertThat(first.inspectionUsage()).isEqualTo("FINISHED_GOODS");
+        assertThat(qualityDefinitionApplication.reference(draft.id()).inspectionUsage()).isEqualTo("FINISHED_GOODS");
+        var secondMaterial = materialApplication.createMaterial("FG-002", "成品二", category.id(), kilogramId,
+                MaterialType.FINISHED_PRODUCT, BatchTrackingSource.EXPLICIT, BatchTrackingPolicy.REQUIRED,
+                ShelfLifeSource.EXPLICIT, 365, MdmMasterDataRules.ENABLED);
+        var secondDraft = qualityDefinitionApplication.createSpecification("FG-SPEC-2", "第二成品标准",
+                plant.id(), secondMaterial.id(), "FINISHED_GOODS", inputs);
+        assertThat(qualityDefinitionApplication.release(secondDraft.revisionId(), secondDraft.lockVersion()).status())
+                .isEqualTo("RELEASED");
+        var incoming = qualityDefinitionApplication.createSpecification("FG-IN", "同物料来料标准",
+                plant.id(), material.id(), inputs);
+        assertThat(incoming.inspectionUsage()).isEqualTo("INCOMING");
+        assertThatThrownBy(() -> qualityDefinitionApplication.createSpecification("FG-INVALID", "无效用途",
+                plant.id(), material.id(), "OTHER", inputs))
+                .isInstanceOf(MdmException.class)
+                .extracting("code").isEqualTo("mdm.invalid_reference");
+        qualityDefinitionApplication.obsolete(first.revisionId(), first.lockVersion());
+        jdbcTemplate.update("UPDATE mdm_plant SET version=version+1 WHERE id=?", plant.id());
+        var next = qualityDefinitionApplication.nextRevision(draft.id());
+        var second = qualityDefinitionApplication.release(next.revisionId(), next.lockVersion());
+
+        assertThat(second.plantVersion()).isGreaterThan(first.plantVersion());
+        assertThat(qualityDefinitionApplication.revision(first.revisionId()).plantVersion())
+                .isEqualTo(first.plantVersion());
+        assertThat(qualityDefinitionApplication.revision(first.revisionId()).materialVersion())
+                .isEqualTo(first.materialVersion());
+    }
+
     /** 非法范围或停用物料必须在质量标准写入前失败且不留局部数据。 */
     @Test
     void invalidQualityRangeOrDisabledMaterialMustRollbackMdmWrite() {

@@ -22,6 +22,22 @@ class PersistenceBaselineTest(unittest.TestCase):
     def report(self):
         return baseline.Report()
 
+    def test_mysql_versions_are_independent_and_immutable(self):
+        pg = "mom-wms-platform/mom-wms-server/src/main/resources/db/migration/wms/V1__init.sql"
+        mysql = pg.replace("/migration/", "/migration-mysql/")
+        report = self.report()
+        baseline.check_migration_paths([pg, mysql], {pg: "", mysql: ""}, report)
+        baseline.check_versioned_immutability([("A", mysql)], {pg}, report)
+        self.assertEqual([], report.errors)
+        baseline.check_versioned_immutability([("M", mysql)], {pg, mysql}, report)
+        self.assertTrue(report.errors)
+
+    def test_mysql_quoted_cross_database_reference_is_rejected(self):
+        path = "mom-wms-platform/mom-wms-server/src/main/resources/db/migration-mysql/wms/V1__init.sql"
+        report = self.report()
+        baseline.check_migration_paths([path], {path: "SELECT id FROM `mom_auth`.`auth_user`"}, report)
+        self.assertTrue(report.errors)
+
     def test_existing_versioned_migration_modification_is_rejected(self):
         report = self.report()
         path = "mom-mdm-platform/mom-mdm-server/src/main/resources/db/migration/mdm/V1__init.sql"

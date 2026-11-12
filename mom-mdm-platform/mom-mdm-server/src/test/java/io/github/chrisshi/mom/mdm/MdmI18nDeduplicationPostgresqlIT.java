@@ -34,9 +34,9 @@ class MdmI18nDeduplicationPostgresqlIT {
         flyway(schema, null).migrate();
         assertCleaned(schema);
         assertThat(jdbc(schema).queryForObject("SELECT count(*) FROM mdm_i18n_message_definition", Integer.class))
-                .isEqualTo(318);
+                .isEqualTo(321);
         assertThat(jdbc(schema).queryForObject("SELECT count(*) FROM mdm_i18n_translation", Integer.class))
-                .isEqualTo(636);
+                .isEqualTo(642);
     }
 
     @Test
@@ -58,8 +58,10 @@ class MdmI18nDeduplicationPostgresqlIT {
         flyway(schema, null).migrate();
 
         assertCleaned(schema);
-        assertThat(snapshot(jdbc, "mdm_i18n_message_definition", "true")).isEqualTo(messages);
-        assertThat(snapshot(jdbc, "mdm_i18n_translation", "true")).isEqualTo(translations);
+        assertThat(snapshot(jdbc, "mdm_i18n_message_definition", "id NOT LIKE '9770000000000000%'"))
+                .isEqualTo(messages);
+        assertThat(snapshot(jdbc, "mdm_i18n_translation", "id NOT LIKE '9780000000000000%'"))
+                .isEqualTo(translations);
         assertThat(flyway(schema, null).migrate().migrationsExecuted).isZero();
     }
 
