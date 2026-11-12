@@ -21,11 +21,9 @@ public class DictionaryItemEntity extends BaseEntity {
     @TableField("dictionary_id")
     private String typeId;
 
-    @TableField("item_code")
-    private String key;
+    private String itemCode;
 
-    @TableField("item_label")
-    private String value;
+    private String itemLabel;
 
     @TableField("sort_order")
     private Integer sortOrder;

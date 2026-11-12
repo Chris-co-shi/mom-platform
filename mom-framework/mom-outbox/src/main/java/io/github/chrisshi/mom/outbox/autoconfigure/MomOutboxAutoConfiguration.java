@@ -53,20 +53,23 @@ import java.util.UUID;
 public class MomOutboxAutoConfiguration {
 
     /**
-     * 创建 PostgreSQL Outbox 仓储。
+     * 创建当前数据库的 Outbox 仓储。
      *
      * @param jdbcTemplate       当前服务 JDBC 模板
      * @param transactionManager 当前服务唯一本地事务管理器
+     * @param environment        数据库启动配置
      * @return 租约式 Outbox 仓储
      */
     @Bean
     @ConditionalOnMissingBean
     JdbcOutboxRepository momJdbcOutboxRepository(
         JdbcTemplate jdbcTemplate,
-        PlatformTransactionManager transactionManager) {
+        PlatformTransactionManager transactionManager,
+        Environment environment) {
         return new JdbcOutboxRepository(
             jdbcTemplate,
-            new TransactionTemplate(transactionManager));
+            new TransactionTemplate(transactionManager),
+            "mysql".equals(environment.getProperty("mom.database.vendor")));
     }
 
     /**
@@ -87,6 +90,7 @@ public class MomOutboxAutoConfiguration {
      * @param jdbcTemplate          当前服务 JDBC 模板
      * @param transactionManager    当前服务本地事务管理器
      * @param meterRegistryProvider 可选 Micrometer 指标注册表
+     * @param environment           数据库启动配置
      * @return Inbox 幂等执行器
      */
     @Bean
@@ -94,11 +98,13 @@ public class MomOutboxAutoConfiguration {
     InboxDeduplicator momInboxDeduplicator(
         JdbcTemplate jdbcTemplate,
         PlatformTransactionManager transactionManager,
-        ObjectProvider<MeterRegistry> meterRegistryProvider) {
+        ObjectProvider<MeterRegistry> meterRegistryProvider,
+        Environment environment) {
         return new InboxDeduplicator(
             jdbcTemplate,
             new TransactionTemplate(transactionManager),
-            meterRegistryProvider.getIfAvailable());
+            meterRegistryProvider.getIfAvailable(),
+            "mysql".equals(environment.getProperty("mom.database.vendor")));
     }
 
     /**

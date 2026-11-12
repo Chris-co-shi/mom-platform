@@ -92,8 +92,8 @@ public class DictionaryApplication {
         DictionaryTypeEntity type = requireType(typeId);
         DictionaryItemEntity entity = new DictionaryItemEntity();
         entity.setTypeId(type.getId());
-        entity.setKey(SystemV1Rules.itemKey(command.key()));
-        entity.setValue(SystemV1Rules.displayText(command.value(), "value", 200));
+        entity.setItemCode(SystemV1Rules.itemKey(command.key()));
+        entity.setItemLabel(SystemV1Rules.displayText(command.value(), "value", 200));
         entity.setSortOrder(SystemV1Rules.sortOrder(command.sortOrder()));
         entity.setEnabled(command.enabled() == null || command.enabled());
         entity.setDescription(SystemV1Rules.description(command.description()));
@@ -112,7 +112,7 @@ public class DictionaryApplication {
         requireType(typeId);
         DictionaryItemEntity entity = requireItem(typeId, itemId);
         entity.setVersion(SystemV1Rules.version(command.version()));
-        entity.setValue(SystemV1Rules.displayText(command.value(), "value", 200));
+        entity.setItemLabel(SystemV1Rules.displayText(command.value(), "value", 200));
         entity.setSortOrder(SystemV1Rules.sortOrder(command.sortOrder()));
         entity.setDescription(SystemV1Rules.description(command.description()));
         updateItemOrConflict(entity);
@@ -138,7 +138,7 @@ public class DictionaryApplication {
         return itemMapper.selectList(Wrappers.<DictionaryItemEntity>lambdaQuery()
                         .eq(DictionaryItemEntity::getTypeId, type.getId())
                         .orderByAsc(DictionaryItemEntity::getSortOrder)
-                        .orderByAsc(DictionaryItemEntity::getKey)
+                        .orderByAsc(DictionaryItemEntity::getItemCode)
                         .orderByAsc(DictionaryItemEntity::getId))
                 .stream().map(DictionaryApplication::toItemView).toList();
     }
@@ -154,10 +154,10 @@ public class DictionaryApplication {
                         .eq(DictionaryItemEntity::getTypeId, type.getId())
                         .eq(DictionaryItemEntity::getEnabled, true)
                         .orderByAsc(DictionaryItemEntity::getSortOrder)
-                        .orderByAsc(DictionaryItemEntity::getKey)
+                        .orderByAsc(DictionaryItemEntity::getItemCode)
                         .orderByAsc(DictionaryItemEntity::getId))
                 .stream().map(item -> new SystemDictionaryItemOption(
-                        type.getCode(), item.getKey(), item.getValue(), item.getSortOrder())).toList();
+                        type.getCode(), item.getItemCode(), item.getItemLabel(), item.getSortOrder())).toList();
     }
 
     /** 返回历史值可解析结果，不因当前禁用而隐藏条目。 */
@@ -166,11 +166,11 @@ public class DictionaryApplication {
         DictionaryTypeEntity type = requireTypeByCode(dictionaryCode);
         DictionaryItemEntity item = itemMapper.selectOne(Wrappers.<DictionaryItemEntity>lambdaQuery()
                 .eq(DictionaryItemEntity::getTypeId, type.getId())
-                .eq(DictionaryItemEntity::getKey, SystemV1Rules.itemKey(key)));
+                .eq(DictionaryItemEntity::getItemCode, SystemV1Rules.itemKey(key)));
         if (item == null) {
             throw new SystemV1Exception.NotFound("system.dictionary.error.item_not_found");
         }
-        return new ResolvedSystemDictionaryItem(type.getCode(), item.getKey(), item.getValue(),
+        return new ResolvedSystemDictionaryItem(type.getCode(), item.getItemCode(), item.getItemLabel(),
                 Boolean.TRUE.equals(type.getEnabled()) && Boolean.TRUE.equals(item.getEnabled()));
     }
 
@@ -226,7 +226,7 @@ public class DictionaryApplication {
     }
 
     private static ItemView toItemView(DictionaryItemEntity entity) {
-        return new ItemView(entity.getId(), entity.getTypeId(), entity.getKey(), entity.getValue(),
+        return new ItemView(entity.getId(), entity.getTypeId(), entity.getItemCode(), entity.getItemLabel(),
                 entity.getSortOrder(), Boolean.TRUE.equals(entity.getEnabled()), entity.getDescription(),
                 entity.getVersion(), entity.getUpdatedAt());
     }

@@ -44,7 +44,8 @@ public class I18nJdbcAutoConfiguration {
             throw new IllegalStateException("I18n JDBC Store 与本地事务管理器必须使用同一 DataSource");
         }
         return new JdbcI18nStore(dataSource, prefix + "_i18n_message_definition",
-                prefix + "_i18n_translation", ids::nextId, actors, clock);
+                prefix + "_i18n_translation", ids::nextId, actors, clock,
+                "mysql".equals(environment.getProperty("mom.database.vendor")));
     }
 
     /** 非 System Owner 使用固定内部缺失译文兜底，不把它当作平台动态默认语言。 */

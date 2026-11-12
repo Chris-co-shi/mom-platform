@@ -3,6 +3,7 @@ package io.github.chrisshi.mom.wms.application;
 import lombok.RequiredArgsConstructor;
 import io.github.chrisshi.mom.core.id.IdGenerator;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper;
+import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingWrites;
 import io.github.chrisshi.mom.wms.infrastructure.mapper.InventoryAccountingMapper.BalanceChange;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ import java.util.List;
 public class InventoryAccountingService {
     private final InventoryAccountingMapper mapper;
     private final IdGenerator ids;
+    private final InventoryAccountingWrites writes;
 
     
 
@@ -56,7 +58,7 @@ public class InventoryAccountingService {
                           String operatorId, List<Entry> entries) { }
 
     /**
-     * 在一个 PostgreSQL REQUIRED 本地事务中写交易、更新余额并记录不可变分录快照。
+     * 在一个 REQUIRED 本地事务中写交易、更新余额并记录不可变分录快照。
      * 同键同内容重放返回原交易 ID，同键不同内容拒绝；唯一约束串行化同键并发，条件扣减禁止负库存。
      * 任一分录失败均抛出异常并回滚主表、此前分录和余额更新。分录按请求顺序逐条计算前后数量。
      *
@@ -87,7 +89,7 @@ public class InventoryAccountingService {
                 .distinct().sorted().forEach(sn -> mapper.lockAccountingKey("WMS:SN:" + sn));
         String digest = digest(posting);
         String id = ids.nextId();
-        String claimed = mapper.claim(id, posting.requestKey(), digest, posting.transactionType(),
+        String claimed = writes.claim(id, posting.requestKey(), digest, posting.transactionType(),
                 posting.sourceType(), posting.sourceId(), posting.operatorId());
         if (claimed == null) {
             if (digest.equals(mapper.hashOf(posting.requestKey()))) return mapper.idOf(posting.requestKey());
@@ -101,8 +103,8 @@ public class InventoryAccountingService {
         int line = 0;
         for (Entry entry : posting.entries()) {
             BalanceChange change = entry.delta().signum() > 0
-                ? mapper.increase(ids.nextId(), entry.dimension(), entry.delta())
-                : mapper.decrease(entry.dimension(), entry.delta());
+                ? writes.increase(ids.nextId(), entry.dimension(), entry.delta())
+                : writes.decrease(entry.dimension(), entry.delta());
             if (change == null) throw new IllegalStateException("库存不足或库位所属仓库冲突");
             if (mapper.insertEntry(ids.nextId(), claimed, ++line, change.id(), entry.dimension(), entry.delta(),
                     change.beforeQuantity(), change.afterQuantity()) != 1)

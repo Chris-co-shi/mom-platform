@@ -42,7 +42,8 @@ public class CodeRuleAutoConfiguration {
         if (!(transactions instanceof DataSourceTransactionManager manager) || manager.getDataSource() != source)
             throw new IllegalStateException("编码规则 Store 与本地事务必须使用同一 DataSource");
         long maxPageSize = environment.getProperty("mom.data.pagination.max-page-size", Long.class, 200L);
-        return new JdbcCodeRuleStore(source, json, maxPageSize, actors, clock, owner);
+        return new JdbcCodeRuleStore(source, json, maxPageSize, actors, clock, owner,
+                "mysql".equals(environment.getProperty("mom.database.vendor")));
     }
     @Bean CodeRuleApplication codeRuleApplication(CodeRuleStore store, CodeSegmentRegistry handlers,
                                                    CodeFieldRegistry fields, IdGenerator ids) {

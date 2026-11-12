@@ -1,0 +1,2 @@
+-- integration：根据 PostgreSQL 17 空库 Flyway 迁移至 V101 后的有效结构建立 MySQL 8.4 基线。
+-- V101 已退役早期技术表，当前 Integration 无服务自有表。

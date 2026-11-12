@@ -19,12 +19,12 @@
 | 类别 | 技术 |
 |---|---|
 | 运行时 | JDK 25、Spring Boot 4.1、Spring Cloud 2025.1、Spring Cloud Alibaba 2025.1 |
-| 数据 | PostgreSQL、MyBatis-Plus、Flyway、Redis |
+| 数据 | PostgreSQL 17 / MySQL 8.4、MyBatis-Plus、Flyway、Redis |
 | 调用与消息 | OpenFeign、RocketMQ、Outbox/Inbox |
 | 可观测性 | Micrometer、OpenTelemetry、Prometheus、Loki、Tempo、Grafana |
 | 测试 | JUnit 5、Testcontainers、ArchUnit |
 
-具体版本以根 `pom.xml` 和 `mom-dependencies/pom.xml` 为准。
+具体版本以根 `pom.xml` 和 `mom-dependencies/pom.xml` 为准。数据库选择与初始化见 [数据库部署说明](docs/engineering/database-vendors.md)。
 
 ## 模块
 

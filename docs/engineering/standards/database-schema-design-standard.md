@@ -3,12 +3,12 @@
 > 适用于新增或修改表、约束、索引和 Migration；不涉及 Schema 时无需读取本文。
 
 - 状态：Accepted
-- 数据库基线：PostgreSQL 17 / Flyway 12
+- 数据库基线：PostgreSQL 17 或 MySQL 8.4 / Flyway 12
 - 决策关联：[ADR-026](../../adr/ADR-026-MOM业务表禁止物理外键与关联完整性策略.md)
 
 ## 1. 所有权、Schema 与命名
 
-数据库为 `mom_platform`，每服务独占 `mom_<bounded-context>` Schema。表、列和约束使用小写 `snake_case`，禁止双引号大小写标识符、跨 Schema JOIN/读写/View/FK。表名前缀遵循所属上下文现有惯例。
+PostgreSQL 在 `mom_platform` 中为每服务分配独立 `mom_<bounded-context>` Schema。MySQL 在同一实例为每服务分配独立 `mom_<bounded-context>` Database。部署与迁移对应关系见 [ADR-046](../../adr/ADR-046-PostgreSQL与MySQL部署兼容.md)。表、列和约束使用小写 `snake_case`，禁止双引号大小写标识符、跨 Schema JOIN/读写/View/FK。表名前缀遵循所属上下文现有惯例。
 
 约束与索引统一命名：`pk_<table>`、`uk_<table>_<semantic>`、`ck_<table>_<semantic>`、`ix_<table>_<query_semantic>`。名称表达业务/查询语义，不以自动生成名进入正式 Migration。
 
@@ -18,11 +18,11 @@
 
 ## 3. 键、字段与类型
 
-- MOM 技术主键：Java `String`、PostgreSQL `varchar(19)`、MyBatis-Plus `ASSIGN_ID`；业务 Code/单号独立建模。
+- MOM 技术主键：Java `String`、数据库 `varchar(19)`、MyBatis-Plus `ASSIGN_ID`；业务 Code/单号独立建模。
 - 业务唯一性由命名 Unique Constraint/Index 兜底，并明确逻辑删除后是否允许复用。
 - 字段长度、`numeric(p,s)` 精度/scale 必须来自领域范围和增长假设，不使用无依据默认。
 - Null 表示未知/不适用；默认值只用于确定语义，不用空串、0 或 epoch 隐藏缺失。
-- 技术时间点使用 `timestamptz`/Java `Instant`，连接 UTC；业务日期使用 `date`，禁止无时区 `timestamp` 表示技术时间。
+- 技术时间点使用 Java `Instant`，PostgreSQL 列为 `timestamptz`，MySQL 列为 `datetime(6)`，连接统一 UTC；业务日期使用 `date`，禁止无时区 `timestamp` 表示技术时间。
 - 金额、数量、比例使用 `numeric(p,s)`/`BigDecimal`，禁止 `float`、`real`、`double precision`。
 - 状态使用稳定字符串并通过 Check 或受控状态表约束；version 为非负整数并有 `ck_<table>_version_non_negative`。
 

@@ -36,9 +36,18 @@ public interface InventoryQueryMapper {
              WHERE quantity &gt; 0
                <if test="filter.materialId != null">AND material_id = #{filter.materialId}</if>
                <if test="filter.warehouseId != null">AND warehouse_id = #{filter.warehouseId}</if>
-               <if test="filter.warehouseCode != null">AND warehouse_code ILIKE '%' || #{filter.warehouseCode} || '%'</if>
-               <if test="filter.keyword != null">AND (material_code ILIKE '%' || #{filter.keyword} || '%'
-                    OR material_name ILIKE '%' || #{filter.keyword} || '%')</if>
+               <if test="filter.warehouseCode != null">AND <choose>
+                    <when test="_databaseId == 'mysql'">LOWER(warehouse_code) LIKE CONCAT('%', LOWER(#{filter.warehouseCode}), '%')</when>
+                    <otherwise>warehouse_code ILIKE '%' || #{filter.warehouseCode} || '%'</otherwise>
+                  </choose></if>
+               <if test="filter.keyword != null">AND (<choose>
+                    <when test="_databaseId == 'mysql'">LOWER(material_code) LIKE CONCAT('%', LOWER(#{filter.keyword}), '%')</when>
+                    <otherwise>material_code ILIKE '%' || #{filter.keyword} || '%'</otherwise>
+                  </choose>
+                    OR <choose>
+                    <when test="_databaseId == 'mysql'">LOWER(material_name) LIKE CONCAT('%', LOWER(#{filter.keyword}), '%')</when>
+                    <otherwise>material_name ILIKE '%' || #{filter.keyword} || '%'</otherwise>
+                  </choose>)</if>
              GROUP BY material_id ORDER BY material_id
             </script>
             """)

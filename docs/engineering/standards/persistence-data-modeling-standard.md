@@ -4,7 +4,7 @@
 
 ## 1. 适用范围与事实层次
 
-本规范冻结 MOM 新增和实质修改数据访问代码的工程边界。当前事实基线是 PostgreSQL 17、Flyway
+本规范冻结 MOM 新增和实质修改数据访问代码的工程边界。数据库基线是 PostgreSQL 17 或 MySQL 8.4，使用 Flyway
 12.4.0、MyBatis-Plus 3.5.17、Spring Framework 7 / Spring Boot 4.1；框架行为以官方资料为事实来源，
 命名、失败策略和分层是 MOM 项目决策。
 
@@ -17,12 +17,12 @@
 
 ## 2. 数据所有权与物理命名
 
-- V1 使用共享 PostgreSQL 数据库 `mom_platform`，每服务使用独立 `mom_<bounded-context>` Schema；
+- PostgreSQL 使用共享数据库 `mom_platform`，每服务使用独立 `mom_<bounded-context>` Schema。MySQL 在同实例使用同名的独立 Database。部署选择见 [ADR-046](../../adr/ADR-046-PostgreSQL与MySQL部署兼容.md)；
 - 服务账号只拥有自身 Schema 所需权限；默认一个实例只有一个权威 DataSource 和 HikariCP；
 - 业务表、Outbox 和 Inbox 共用本服务 DataSource 与事务管理器；数据源不可用时写入 fail closed；
 - 禁止跨 Schema JOIN、外键、读写、共享 Mapper，禁止用 View 或只读账号静默绕过边界；
 - 跨域查询使用 Query API、本地事件投影或明确查询服务；多数据源必须由 ADR 明确授权；
-- 部署必须设置受控 `currentSchema/search_path`，不能依赖公共可写 Schema。
+- 部署设置受控 PostgreSQL `currentSchema/search_path` 或 MySQL 默认 Database，应用账号只能访问本服务的数据。
 
 ## 3. 表、列、约束与类型
 
@@ -43,11 +43,11 @@
   Schema 或聚合也不例外；完整性由 Application 校验、受控删除、Unique/Check、索引、事务、测试和必要对账共同保证；
 - 稳定、简单且适合数据库兜底的不变量应评估 Check Constraint。
 
-### 3.3 Java/PostgreSQL 类型
+### 3.3 Java 与数据库类型
 
-| 语义 | Java | PostgreSQL | 约束 |
+| 语义 | Java | PostgreSQL / MySQL | 约束 |
 |---|---|---|---|
-| 全球时间点 | `Instant` | `timestamptz` | 连接会话 UTC；不以 `LocalDateTime` 表示 |
+| 全球时间点 | `Instant` | `timestamptz` / `datetime(6)` | 连接会话 UTC；不以 `LocalDateTime` 表示 |
 | 业务日期 | `LocalDate` | `date` | 时区/工厂日界线另行定义 |
 | 金额、数量、比例 | `BigDecimal` | `numeric(p,s)` | 精度和 scale 由领域范围确定 |
 | 布尔 | `boolean/Boolean` | `boolean` | true/false 语义明确 |
@@ -278,7 +278,7 @@ SQL 统一要求：
 
 ## 9. Flyway
 
-- Schema 变更只由服务自己的 `src/main/resources/db/migration/<bounded-context>` 管理；
+- PostgreSQL 迁移使用服务自己的 `src/main/resources/db/migration/<bounded-context>`，MySQL 使用独立的 `src/main/resources/db/migration-mysql/<bounded-context>`。新增变更随同一 PR 提供两个版本；
 - 已执行的 Versioned Migration 不得修改或删除；新增变化使用更高版本；
 - `clean` 在正式配置禁用，`baseline-on-migrate` 默认关闭；
 - 滚动升级采用 Expand → Migrate → Contract；

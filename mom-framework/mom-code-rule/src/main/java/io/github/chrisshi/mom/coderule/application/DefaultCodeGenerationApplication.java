@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * 使用 Owner 本地事务、规则行锁和 PostgreSQL 原子流水生成正式编码。
+ * 使用 Owner 本地事务、规则行锁和事务型流水生成正式编码。
  */
 @RequiredArgsConstructor
 public class DefaultCodeGenerationApplication implements CodeGenerationApplication {

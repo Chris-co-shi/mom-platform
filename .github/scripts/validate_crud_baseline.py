@@ -26,6 +26,7 @@ QUERY_MAPPER_NAME = re.compile(r"\binterface\s+\w+QueryMapper\b")
 # 两个精确受控例外仅提供受限原子 SQL，不允许 BaseMapper 的任意删除和覆盖。
 SPECIAL_SQL_MAPPERS = {
     "mom-wms-platform/mom-wms-server/src/main/java/io/github/chrisshi/mom/wms/infrastructure/mapper/InventoryAccountingMapper.java",
+    "mom-wms-platform/mom-wms-server/src/main/java/io/github/chrisshi/mom/wms/infrastructure/mapper/MysqlInventoryAccountingMapper.java",
     "mom-wms-platform/mom-wms-server/src/main/java/io/github/chrisshi/mom/wms/infrastructure/mapper/InventoryFreezeMapper.java",
 }
 

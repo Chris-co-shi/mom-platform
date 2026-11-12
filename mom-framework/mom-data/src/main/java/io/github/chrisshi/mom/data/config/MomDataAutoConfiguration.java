@@ -10,6 +10,8 @@ import io.github.chrisshi.mom.core.id.IdGenerator;
 import io.github.chrisshi.mom.data.audit.MomMetaObjectHandler;
 import io.github.chrisshi.mom.data.page.PageAdapter;
 import com.baomidou.mybatisplus.core.toolkit.GlobalConfigUtils;
+import org.apache.ibatis.mapping.DatabaseIdProvider;
+import org.apache.ibatis.mapping.VendorDatabaseIdProvider;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -20,6 +22,7 @@ import org.springframework.context.annotation.Bean;
 
 import java.time.Clock;
 import java.util.Optional;
+import java.util.Properties;
 
 /**
  * MOM 关系型数据访问、审计和乐观锁自动配置。
@@ -28,6 +31,18 @@ import java.util.Optional;
 @ConditionalOnClass(MybatisPlusInterceptor.class)
 @EnableConfigurationProperties(MomDataPaginationProperties.class)
 public class MomDataAutoConfiguration {
+
+    /** 由真实 JDBC 数据库产品选择 Mapper 方言。 */
+    @Bean
+    @ConditionalOnMissingBean(DatabaseIdProvider.class)
+    DatabaseIdProvider momDatabaseIdProvider() {
+        Properties vendors = new Properties();
+        vendors.setProperty("PostgreSQL", "postgresql");
+        vendors.setProperty("MySQL", "mysql");
+        var provider = new VendorDatabaseIdProvider();
+        provider.setProperties(vendors);
+        return provider;
+    }
 
     /**
      * 提供可被测试替换的 UTC 时钟。

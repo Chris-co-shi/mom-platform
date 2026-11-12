@@ -11,12 +11,14 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
 /**
- * PostgreSQL Outbox JDBC 仓储。
+ * Outbox JDBC 仓储，按当前服务数据库领取并更新租约。
  *
  * <p>仓储固定操作当前服务 Schema 中的 {@code mom_outbox_event} 表，不允许指定任意表名或跨 Schema 访问。
  * 多实例发布器使用 {@code FOR UPDATE SKIP LOCKED} 领取不同记录，并立即写入租约后提交事务。后续 SENT、RETRY
@@ -27,13 +29,17 @@ import java.util.Optional;
  */
 public final class JdbcOutboxRepository {
 
+    private static final String CLAIM_FILTER = """
+            ((status IN ('PENDING', 'RETRY') AND next_attempt_at <= CURRENT_TIMESTAMP(6)
+                AND (lease_until IS NULL OR lease_until < CURRENT_TIMESTAMP(6)))
+             OR (status = 'CLAIMED' AND lease_until < CURRENT_TIMESTAMP(6)))
+            """;
+
     private static final String CLAIM_SQL = """
             WITH candidates AS (
                 SELECT event_id
                 FROM mom_outbox_event
-                WHERE status IN ('PENDING', 'RETRY')
-                  AND next_attempt_at <= CURRENT_TIMESTAMP
-                  AND (lease_until IS NULL OR lease_until < CURRENT_TIMESTAMP)
+                WHERE %s
                 ORDER BY occurred_at, event_id
                 FOR UPDATE SKIP LOCKED
                 LIMIT ?
@@ -42,7 +48,7 @@ public final class JdbcOutboxRepository {
             SET status = 'CLAIMED',
                 lease_owner = ?,
                 lease_until = CURRENT_TIMESTAMP + CAST(? AS bigint) * INTERVAL '1 millisecond',
-                updated_at = CURRENT_TIMESTAMP
+                updated_at = CURRENT_TIMESTAMP(6)
             FROM candidates
             WHERE event.event_id = candidates.event_id
             RETURNING event.event_id,
@@ -58,10 +64,11 @@ public final class JdbcOutboxRepository {
                       event.retry_count,
                       event.lease_owner,
                       event.lease_until
-            """;
+            """.formatted(CLAIM_FILTER);
 
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
+    private final boolean mysql;
 
     /**
      * 创建 Outbox JDBC 仓储。
@@ -72,7 +79,16 @@ public final class JdbcOutboxRepository {
     public JdbcOutboxRepository(
             JdbcTemplate jdbcTemplate,
             TransactionTemplate transactionTemplate) {
+        this(jdbcTemplate, transactionTemplate, false);
+    }
+
+    /** 创建使用当前服务本地事务和指定数据库语法的 Outbox 仓储。 */
+    public JdbcOutboxRepository(
+            JdbcTemplate jdbcTemplate,
+            TransactionTemplate transactionTemplate,
+            boolean mysql) {
         this.jdbcTemplate = Objects.requireNonNull(jdbcTemplate, "jdbcTemplate 不能为空");
+        this.mysql = mysql;
         this.transactionTemplate = Objects.requireNonNull(
                 transactionTemplate,
                 "transactionTemplate 不能为空");
@@ -105,8 +121,8 @@ public final class JdbcOutboxRepository {
                             next_attempt_at,
                             created_at,
                             updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, CURRENT_TIMESTAMP,
-                                  CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, CURRENT_TIMESTAMP(6),
+                                  CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
                         """,
                 event.eventId(),
                 event.eventType(),
@@ -139,13 +155,50 @@ public final class JdbcOutboxRepository {
             throw new IllegalArgumentException("leaseDuration 必须为正数");
         }
 
-        List<OutboxRecord> claimed = transactionTemplate.execute(status -> jdbcTemplate.query(
-                CLAIM_SQL,
+        List<OutboxRecord> claimed = transactionTemplate.execute(status -> mysql
+                ? claimMysql(normalizedOwner, batchSize, leaseDuration)
+                : jdbcTemplate.query(CLAIM_SQL,
                 JdbcOutboxRepository::mapRecord,
                 batchSize,
                 normalizedOwner,
                 leaseDuration.toMillis()));
         return claimed == null ? List.of() : List.copyOf(claimed);
+    }
+
+    private List<OutboxRecord> claimMysql(String owner, int batchSize, Duration duration) {
+        List<String> ids = jdbcTemplate.queryForList("""
+                SELECT event_id FROM mom_outbox_event
+                WHERE %s
+                ORDER BY occurred_at, event_id
+                LIMIT ? FOR UPDATE SKIP LOCKED
+                """.formatted(CLAIM_FILTER), String.class, batchSize);
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+
+        String placeholders = String.join(", ", Collections.nCopies(ids.size(), "?"));
+        List<Object> updateParameters = new ArrayList<>(ids.size() + 2);
+        updateParameters.add(owner);
+        updateParameters.add(Math.multiplyExact(duration.toMillis(), 1000L));
+        updateParameters.addAll(ids);
+        int updated = jdbcTemplate.update("""
+                UPDATE mom_outbox_event
+                SET status = 'CLAIMED', lease_owner = ?,
+                    lease_until = TIMESTAMPADD(MICROSECOND, ?, CURRENT_TIMESTAMP(6)),
+                    updated_at = CURRENT_TIMESTAMP(6)
+                WHERE event_id IN (%s)
+                """.formatted(placeholders), updateParameters.toArray());
+        if (updated != ids.size()) {
+            throw new IllegalStateException("Outbox 领取未更新全部已锁定记录");
+        }
+        return jdbcTemplate.query("""
+                SELECT event_id, event_type, event_version, aggregate_type, aggregate_id,
+                       occurred_at, producer, correlation_id, payload_json, status,
+                       retry_count, lease_owner, lease_until
+                FROM mom_outbox_event
+                WHERE event_id IN (%s)
+                ORDER BY occurred_at, event_id
+                """.formatted(placeholders), JdbcOutboxRepository::mapRecord, ids.toArray());
     }
 
     /**
@@ -159,11 +212,11 @@ public final class JdbcOutboxRepository {
         Integer changed = transactionTemplate.execute(status -> jdbcTemplate.update("""
                         UPDATE mom_outbox_event
                         SET status = 'SENT',
-                            sent_at = CURRENT_TIMESTAMP,
+                            sent_at = CURRENT_TIMESTAMP(6),
                             lease_owner = NULL,
                             lease_until = NULL,
                             last_error = NULL,
-                            updated_at = CURRENT_TIMESTAMP
+                            updated_at = CURRENT_TIMESTAMP(6)
                         WHERE event_id = ?
                           AND status = 'CLAIMED'
                           AND lease_owner = ?
@@ -207,7 +260,7 @@ public final class JdbcOutboxRepository {
                             lease_owner = NULL,
                             lease_until = NULL,
                             last_error = ?,
-                            updated_at = CURRENT_TIMESTAMP
+                            updated_at = CURRENT_TIMESTAMP(6)
                         WHERE event_id = ?
                           AND status = 'CLAIMED'
                           AND lease_owner = ?

@@ -9,6 +9,7 @@ import io.github.chrisshi.mom.core.page.PageQuery;
 import io.github.chrisshi.mom.core.page.PageResult;
 import io.github.chrisshi.mom.core.security.CurrentActorProvider;
 import io.github.chrisshi.mom.core.page.PageQueryValidationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -21,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * JDBC JSONB 规则 Store，只接入当前 Owner 的本地表。
+ * JDBC 编码规则存储，只接入当前 Owner 的本地表。
  */
 public final class JdbcCodeRuleStore implements CodeRuleStore {
     private final JdbcTemplate jdbc;
@@ -33,10 +34,18 @@ public final class JdbcCodeRuleStore implements CodeRuleStore {
     private final String revisionTable;
     private final String sequenceTable;
     private final String issueTable;
+    private final boolean mysql;
+    private final String definitionParameter;
 
     /** 创建 Owner 本地 Store；分页上限沿用 mom.data.pagination.max-page-size。 */
     public JdbcCodeRuleStore(DataSource source, JsonMapper json, long maxPageSize,
                              CurrentActorProvider actors, Clock clock, String owner) {
+        this(source, json, maxPageSize, actors, clock, owner, false);
+    }
+
+    /** 创建 Owner 本地 Store，并按部署配置选择数据库语法。 */
+    public JdbcCodeRuleStore(DataSource source, JsonMapper json, long maxPageSize,
+                             CurrentActorProvider actors, Clock clock, String owner, boolean mysql) {
         String prefix = new CodeRuleOwner(owner).value();
         this.jdbc = new JdbcTemplate(source);
         this.json = json;
@@ -48,6 +57,8 @@ public final class JdbcCodeRuleStore implements CodeRuleStore {
         this.revisionTable = prefix + "_code_rule_revision";
         this.sequenceTable = prefix + "_code_rule_sequence";
         this.issueTable = prefix + "_code_rule_issue";
+        this.mysql = mysql;
+        this.definitionParameter = mysql ? "CAST(? AS JSON)" : "?::jsonb";
     }
 
     public Rule lockRule(String id) {
@@ -66,19 +77,46 @@ public final class JdbcCodeRuleStore implements CodeRuleStore {
                 r.getString(3), r.getString(4), r.getString(5), r.getInt(6)), requestKey));
     }
 
+    /** 在持有规则身份行锁的事务内分配流水，达到上限时返回空值。 */
     public Long nextSequence(String ruleId, String scopeKey, long maximum) {
+        if (mysql) return nextMysqlSequence(ruleId, scopeKey, maximum);
         return one(jdbc.query("INSERT INTO " + sequenceTable + "(rule_id,scope_key,last_value) VALUES (?,?,1)"
                 + " ON CONFLICT(rule_id,scope_key) DO UPDATE SET last_value=" + sequenceTable + ".last_value+1"
                 + " WHERE " + sequenceTable + ".last_value < ? RETURNING last_value",
                 (r, n) -> r.getLong(1), ruleId, scopeKey, maximum));
     }
 
+    private Long nextMysqlSequence(String ruleId, String scopeKey, long maximum) {
+        // Application 已锁定所属规则，即使计数行尚未建立也只有一个事务可以初始化。
+        Long current = one(jdbc.query("SELECT `last_value` FROM " + sequenceTable
+                + " WHERE rule_id=? AND scope_key=? FOR UPDATE", (r, n) -> r.getLong(1), ruleId, scopeKey));
+        if (current == null) {
+            requireOne(jdbc.update("INSERT INTO " + sequenceTable
+                    + "(rule_id,scope_key,`last_value`) VALUES (?,?,1)", ruleId, scopeKey));
+            return 1L;
+        }
+        if (current >= maximum) return null;
+        requireOne(jdbc.update("UPDATE " + sequenceTable
+                + " SET `last_value`=`last_value`+1 WHERE rule_id=? AND scope_key=?", ruleId, scopeKey));
+        return current + 1;
+    }
+
+    /** 保存发号结果，仅把请求主键冲突报告为幂等冲突。 */
     public boolean insertIssue(Issue issue) {
-        return jdbc.update("INSERT INTO " + issueTable
-                + "(rule_id,request_key,request_hash,code,revision_id,revision_no,created_at) VALUES (?,?,?,?,?,?,?)"
-                + " ON CONFLICT(request_key) DO NOTHING",
-                issue.ruleId(), issue.requestKey(), issue.requestHash(), issue.code(), issue.revisionId(),
-                issue.revisionNo(), Timestamp.from(clock.instant())) == 1;
+        String sql = "INSERT INTO " + issueTable
+                + "(rule_id,request_key,request_hash,code,revision_id,revision_no,created_at) VALUES (?,?,?,?,?,?,?)";
+        if (!mysql) sql += " ON CONFLICT(request_key) DO NOTHING";
+        try {
+            return jdbc.update(sql, issue.ruleId(), issue.requestKey(), issue.requestHash(), issue.code(),
+                    issue.revisionId(), issue.revisionNo(), Timestamp.from(clock.instant())) == 1;
+        } catch (DuplicateKeyException ex) {
+            if (mysql && ex.getMostSpecificCause() instanceof SQLException cause && cause.getErrorCode() == 1062
+                    && (cause.getMessage().endsWith("'PRIMARY'")
+                    || cause.getMessage().endsWith("'" + issueTable + ".PRIMARY'"))) {
+                return false;
+            }
+            throw ex;
+        }
     }
 
     public Rule rule(String id) {
@@ -107,17 +145,20 @@ public final class JdbcCodeRuleStore implements CodeRuleStore {
         return jdbc.update("UPDATE " + ruleTable + " SET usage_scenario=?,description=? WHERE id=?", usageScenario, description, id) == 1;
     }
 
+    /** 以当前数据库的 JSON 类型保存规则修订定义及审计信息。 */
     public void insertRevision(String id, String ruleId, int revisionNo, String status, CodeRuleDefinition definition) {
         String actor = actors.requireCurrentActor().actorId();
         Timestamp now = Timestamp.from(clock.instant());
         requireOne(jdbc.update("INSERT INTO " + revisionTable
                 + " (id,rule_id,revision_no,status,definition,created_at,created_by,updated_at,updated_by)"
-                + " VALUES (?,?,?,?,?::jsonb,?,?,?,?)", id, ruleId, revisionNo, status,
+                + " VALUES (?,?,?,?," + definitionParameter + ",?,?,?,?)", id, ruleId, revisionNo, status,
             json.writeValueAsString(definition), now, actor, now, actor));
     }
 
+    /** 更新仍处于草稿状态的定义，已发布修订不受影响。 */
     public boolean updateDraft(String id, CodeRuleDefinition definition) {
-        return jdbc.update("UPDATE " + revisionTable + " SET definition=?::jsonb, updated_at=?,updated_by=? WHERE id=? AND status='DRAFT'",
+        return jdbc.update("UPDATE " + revisionTable + " SET definition=" + definitionParameter
+                + ", updated_at=?,updated_by=? WHERE id=? AND status='DRAFT'",
             json.writeValueAsString(definition), Timestamp.from(clock.instant()), actors.requireCurrentActor().actorId(), id) == 1;
     }
 

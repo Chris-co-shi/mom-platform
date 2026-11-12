@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_integration}&tcpKeepAlive=${POSTGRES_TCP_KEEP_ALIVE:true}&ApplicationName=${POSTGRES_APPLICATION_NAME:mom-integration-server}}
+    hikari:
+      pool-name: ${POSTGRES_POOL_NAME:mom-integration-hikari}
+      minimum-idle: ${POSTGRES_MINIMUM_IDLE:1}
+      maximum-pool-size: ${POSTGRES_MAXIMUM_POOL_SIZE:5}
+      connection-timeout: ${POSTGRES_CONNECTION_TIMEOUT:3000}
+      validation-timeout: ${POSTGRES_VALIDATION_TIMEOUT:2000}
+      leak-detection-threshold: ${POSTGRES_LEAK_DETECTION_THRESHOLD:0}
+      connection-init-sql: SET TIME ZONE 'UTC'
+  flyway:
+    create-schemas: true
+    default-schema: ${POSTGRES_SCHEMA:mom_integration}
+    schemas: ${POSTGRES_SCHEMA:mom_integration}
+    locations: classpath:db/migration/integration
+
+mom:
+  database:
+    vendor: postgresql

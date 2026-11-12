@@ -6,6 +6,8 @@ springdoc:
   swagger-ui:
     enabled: false
 spring:
+  config:
+    import: classpath:database-${MOM_DATABASE_VENDOR:postgresql}.yml
   application:
     name: mom-auth-server
   cloud:
@@ -17,18 +19,6 @@ spring:
         namespace: ${NACOS_NAMESPACE:}
         group: ${NACOS_GROUP:DEFAULT_GROUP}
         cluster-name: ${NACOS_CLUSTER_NAME:DEFAULT}
-  datasource:
-    url: ${POSTGRES_URL:jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:mom_platform}?currentSchema=${POSTGRES_SCHEMA:mom_auth}&tcpKeepAlive=${POSTGRES_TCP_KEEP_ALIVE:true}&ApplicationName=${POSTGRES_APPLICATION_NAME:mom-auth-server}}
-    username: postgres
-    password: ${POSTGRES_PASSWORD:12345678}
-    hikari:
-      pool-name: ${POSTGRES_POOL_NAME:mom-auth-hikari}
-      minimum-idle: ${POSTGRES_MINIMUM_IDLE:1}
-      maximum-pool-size: ${POSTGRES_MAXIMUM_POOL_SIZE:5}
-      connection-timeout: ${POSTGRES_CONNECTION_TIMEOUT:3000}
-      validation-timeout: ${POSTGRES_VALIDATION_TIMEOUT:2000}
-      leak-detection-threshold: ${POSTGRES_LEAK_DETECTION_THRESHOLD:0}
-      connection-init-sql: SET TIME ZONE 'UTC'
   data:
     redis:
       host: ${REDIS_HOST:192.168.3.2}
@@ -37,12 +27,11 @@ spring:
       database: ${REDIS_DATABASE:0}
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
       timeout: ${REDIS_COMMAND_TIMEOUT:2s}
+  datasource:
+    username: postgres
+    password: ${POSTGRES_PASSWORD:12345678}
   flyway:
     enabled: ${FLYWAY_ENABLED:true}
-    create-schemas: true
-    default-schema: ${POSTGRES_SCHEMA:mom_auth}
-    schemas: ${POSTGRES_SCHEMA:mom_auth}
-    locations: classpath:db/migration/auth
     validate-migration-naming: true
     clean-disabled: true
     baseline-on-migrate: false

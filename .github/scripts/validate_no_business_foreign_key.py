@@ -10,7 +10,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 
-MIGRATION = re.compile(r"^mom-[^/]+-platform/mom-[^/]+-server/src/main/resources/db/migration/[^/]+/.+\.sql$")
+MIGRATION = re.compile(r"^mom-[^/]+-platform/mom-[^/]+-server/src/main/resources/db/migration(?:-mysql)?/[^/]+/.+\.sql$")
 CREATE_TABLE = re.compile(r"\bCREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+([a-z][a-z0-9_]*)", re.I)
 FORBIDDEN = re.compile(r"\b(?:FOREIGN\s+KEY|REFERENCES|ON\s+DELETE\s+CASCADE|ON\s+UPDATE\s+CASCADE)\b", re.I)
 

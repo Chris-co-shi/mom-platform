@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import io.github.chrisshi.mom.data.entity.BaseAuditEntity;
 import lombok.Getter;
 import lombok.Setter;
-import org.apache.ibatis.type.ArrayTypeHandler;
 
 import java.time.Instant;
 
@@ -22,10 +21,10 @@ public class InventoryCountTaskEntity extends BaseAuditEntity {
     private String warehouseId;
     private String warehouseCode;
 
-    /** PostgreSQL varchar[]；空数组表示整个仓库或全部物料。 */
-    @TableField(typeHandler = ArrayTypeHandler.class)
+    /** 范围按原顺序保存，空数组表示整个仓库或全部物料。 */
+    @TableField(typeHandler = InventoryCountScopeTypeHandler.class)
     private String[] locationIds;
-    @TableField(typeHandler = ArrayTypeHandler.class)
+    @TableField(typeHandler = InventoryCountScopeTypeHandler.class)
     private String[] materialIds;
 
     private String status = "DRAFT";

@@ -54,8 +54,15 @@ public final class JdbcI18nStore implements I18nStore {
      */
     public JdbcI18nStore(DataSource dataSource, String messageTable, String translationTable,
                          Supplier<String> ids, CurrentActorProvider actors, Clock clock) {
-        this.messageTable = tableName(messageTable);
-        this.translationTable = tableName(translationTable);
+        this(dataSource, messageTable, translationTable, ids, actors, clock, false);
+    }
+
+    /** 按宿主数据库引用受信表名，保持不同方言下的标识符解析一致。 */
+    public JdbcI18nStore(DataSource dataSource, String messageTable, String translationTable,
+                         Supplier<String> ids, CurrentActorProvider actors, Clock clock, boolean mysql) {
+        String quote = mysql ? "`" : "\"";
+        this.messageTable = tableName(messageTable, quote);
+        this.translationTable = tableName(translationTable, quote);
         this.jdbc = new NamedParameterJdbcTemplate(Objects.requireNonNull(dataSource, "dataSource"));
         this.ids = Objects.requireNonNull(ids, "ids");
         this.actors = Objects.requireNonNull(actors, "actors");
@@ -195,7 +202,7 @@ public final class JdbcI18nStore implements I18nStore {
         return org.springframework.dao.support.DataAccessUtils.singleResult(rows);
     }
 
-    private static String tableName(String name) {
+    private static String tableName(String name, String quote) {
         if (name == null) throw new IllegalArgumentException("表名不能为空");
         String[] parts = name.split("\\.", -1);
         if (parts.length > 2) throw new IllegalArgumentException("表名只允许一个 Schema 前缀");
@@ -203,6 +210,6 @@ public final class JdbcI18nStore implements I18nStore {
             if (!IDENTIFIER.matcher(part).matches())
                 throw new IllegalArgumentException("表名必须是受信小写 SQL 标识符");
         }
-        return "\"" + String.join("\".\"", parts) + "\"";
+        return quote + String.join(quote + "." + quote, parts) + quote;
     }
 }
